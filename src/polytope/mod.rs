@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use bevy::prelude::Mesh;
 use bevy::render::mesh::Indices;
 use bevy::render::pipeline::PrimitiveTopology;
@@ -11,7 +10,18 @@ pub struct PolytopeC {
     triangles: Vec<[usize; 3]>,
 }
 
-impl PolytopeC {
+impl PolytopeC {    
+    pub fn new(vertices: Vec<DVec3>, edges: Vec<(usize, usize)>, faces: Vec<Vec<usize>>) -> Self {
+        let triangles = Self::triangulate(&edges, &faces);
+
+        PolytopeC {
+            vertices,
+            edges,
+            faces,
+            triangles,
+        }
+    }
+    
     fn triangulate(
         edges: &Vec<(usize, usize)>,
         faces: &Vec<Vec<usize>>,
@@ -33,14 +43,11 @@ impl PolytopeC {
         triangles
     }
 
-    pub fn new(vertices: Vec<DVec3>, edges: Vec<(usize, usize)>, faces: Vec<Vec<usize>>) -> Self {
-        let triangles = Self::triangulate(&edges, &faces);
+    fn scale(&mut self, k: f64) {
+        let k = DVec3::broadcast(k);
 
-        PolytopeC {
-            vertices,
-            edges,
-            faces,
-            triangles,
+        for v in &mut self.vertices {
+            *v *= k;
         }
     }
 }
