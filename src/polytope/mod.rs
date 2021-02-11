@@ -3,6 +3,8 @@ use bevy::render::mesh::Indices;
 use bevy::render::pipeline::PrimitiveTopology;
 use ultraviolet::DVec3;
 
+pub mod shapes;
+
 pub struct PolytopeC {
     pub vertices: Vec<DVec3>,
     pub edges: Vec<(usize, usize)>,
@@ -10,7 +12,7 @@ pub struct PolytopeC {
     triangles: Vec<[usize; 3]>,
 }
 
-impl PolytopeC {    
+impl PolytopeC {
     pub fn new(vertices: Vec<DVec3>, edges: Vec<(usize, usize)>, faces: Vec<Vec<usize>>) -> Self {
         let triangles = Self::triangulate(&edges, &faces);
 
@@ -21,11 +23,8 @@ impl PolytopeC {
             triangles,
         }
     }
-    
-    fn triangulate(
-        edges: &Vec<(usize, usize)>,
-        faces: &Vec<Vec<usize>>,
-    ) -> Vec<[usize; 3]> {
+
+    fn triangulate(edges: &Vec<(usize, usize)>, faces: &Vec<Vec<usize>>) -> Vec<[usize; 3]> {
         let mut triangles = Vec::with_capacity(4 * (edges.len() - faces.len()));
 
         for face in faces {
@@ -73,7 +72,7 @@ impl From<PolytopeC> for Mesh {
         );
         mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 0.0]; vertices.len()]);
         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
-        mesh.set_indices(Some(Indices::U16(dbg!(indices))));
+        mesh.set_indices(Some(Indices::U16(indices)));
 
         mesh
     }

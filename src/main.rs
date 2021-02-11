@@ -1,7 +1,6 @@
 use bevy::prelude::*;
-use bevy::render::camera::{Camera, PerspectiveProjection};
-use polytope::PolytopeC;
-use ultraviolet::DVec3;
+use bevy::render::camera::Camera;
+use polytope::shapes::*;
 
 mod polytope;
 
@@ -19,7 +18,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let vertices = vec![
+    /*let vertices = vec![
         DVec3::new(0.0, 0.0, 0.0),
         DVec3::new(1.0, 0.0, 0.0),
         DVec3::new(0.0, 1.0, 0.0),
@@ -40,11 +39,13 @@ fn setup(
         vec![3, 4, 5],
     ];
 
-    let tet = PolytopeC::new(vertices, edges, faces);
+    let tet = PolytopeC::new(vertices, edges, faces);*/
+
+    let poly = antiprism(5, 1);
 
     commands
         .spawn(PbrBundle {
-            mesh: meshes.add(tet.into()),
+            mesh: meshes.add(poly.into()),
             material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
             transform: Transform::from_translation(Vec3::new(0.0, 0.5, 0.0)),
             ..Default::default()
