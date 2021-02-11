@@ -18,30 +18,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    /*let vertices = vec![
-        DVec3::new(0.0, 0.0, 0.0),
-        DVec3::new(1.0, 0.0, 0.0),
-        DVec3::new(0.0, 1.0, 0.0),
-        DVec3::new(0.0, 0.0, 1.0),
-    ];
-    let edges = vec![
-        (0, 1),
-        (0, 2),
-        (0, 3),
-        (1, 2),
-        (1, 3),
-        (2, 3),
-    ];
-    let faces = vec![
-        vec![0, 1, 3],
-        vec![0, 2, 4],
-        vec![1, 2, 5],
-        vec![3, 4, 5],
-    ];
-
-    let tet = PolytopeC::new(vertices, edges, faces);*/
-
-    let poly = antiprism(5, 1);
+    let poly = oct();
 
     commands
         .spawn(PbrBundle {

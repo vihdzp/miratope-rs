@@ -4,6 +4,99 @@ use ultraviolet::DVec3;
 
 use super::PolytopeC;
 
+pub fn tet() -> PolytopeC {
+    let x = 2f64.sqrt() / 4.0;
+
+    let vertices = vec![
+        DVec3::new(x, x, x),
+        DVec3::new(-x, -x, x),
+        DVec3::new(x, -x, -x),
+        DVec3::new(-x, x, -x),
+    ];
+    let edges = vec![(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)];
+    let faces = vec![vec![0, 1, 3], vec![0, 2, 4], vec![1, 2, 5], vec![3, 4, 5]];
+
+    PolytopeC::new(vertices, edges, faces)
+}
+
+pub fn cube() -> PolytopeC {
+    let x = 0.5;
+
+    let vertices = vec![
+        DVec3::new(x, x, x),
+        DVec3::new(x, x, -x),
+        DVec3::new(x, -x, -x),
+        DVec3::new(x, -x, x),
+        DVec3::new(-x, x, x),
+        DVec3::new(-x, x, -x),
+        DVec3::new(-x, -x, -x),
+        DVec3::new(-x, -x, x),
+    ];
+    let edges = vec![
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 0),
+        (4, 5),
+        (5, 6),
+        (6, 7),
+        (7, 3),
+        (0, 4),
+        (1, 5),
+        (2, 6),
+        (3, 7),
+    ];
+    let faces = vec![
+        vec![0, 1, 2, 3],
+        vec![4, 5, 6, 7],
+        vec![0, 4, 8, 9],
+        vec![1, 5, 9, 10],
+        vec![2, 6, 10, 11],
+        vec![3, 7, 11, 8],
+    ];
+
+    PolytopeC::new(vertices, edges, faces)
+}
+
+pub fn oct() -> PolytopeC {
+    let x = 1.0 / 2f64.sqrt();
+
+    let vertices = vec![
+        DVec3::new(x, 0.0, 0.0),
+        DVec3::new(-x, 0.0, 0.0),
+        DVec3::new(0.0, x, 0.0),
+        DVec3::new(0.0, 0.0, x),
+        DVec3::new(0.0, -x, 0.0),
+        DVec3::new(0.0, 0.0, -x),
+    ];
+    let edges = vec![
+        (0, 2),
+        (0, 3),
+        (0, 4),
+        (0, 5),
+        (1, 2),
+        (1, 3),
+        (1, 4),
+        (1, 5),
+        (2, 3),
+        (3, 4),
+        (4, 5),
+        (5, 2),
+    ];
+    let faces = vec![
+        vec![0, 1, 8],
+        vec![4, 5, 8],
+        vec![1, 2, 9],
+        vec![5, 6, 9],
+        vec![2, 3, 10],
+        vec![6, 7, 10],
+        vec![3, 0, 11],
+        vec![7, 4, 11],
+    ];
+
+    PolytopeC::new(vertices, edges, faces)
+}
+
 /// Creates an [[https://polytope.miraheze.org/wiki/Antiprism | antiprism]] with unit edge length and a given height.
 pub fn antiprism_with_height(n: u32, d: u32, mut h: f64) -> PolytopeC {
     let n = n as usize;
