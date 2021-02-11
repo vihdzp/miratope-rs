@@ -1,13 +1,15 @@
 [package]
 name = "miratope"
 version = "0.1.0"
-authors = ["Violeta Hernández <vi.hdz.p@gmail.com>"]
+authors = ["Violeta Hernández <vi.hdz.p@gmail.com>", "Grayson Burton <ocornoc@protonmail.com>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 bevy = "0.4.0"
 ultraviolet = {version = "0.7.5", features = ["f64"]}
 rand = "0.8.3"
 # bevy_egui = "0.2.0"
+
+[profile.release]
+lto = "thin"
+incremental = true
