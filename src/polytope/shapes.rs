@@ -1,50 +1,76 @@
 use std::f64::consts::PI;
 use std::{f64, usize};
-use ultraviolet::DVec3;
 
-use super::PolytopeC;
+use super::Polytope;
 
-pub fn tet() -> PolytopeC {
+pub fn polygon(n: u32, d: u32) -> Polytope {
+    let n = n as usize;
+    let a = 2.0 * PI / (n as f64) * (d as f64);
+    let s = a.sin() * 2.0;
+
+    let mut vertices = Vec::with_capacity(n);
+    let mut edges = Vec::with_capacity(n);
+    let mut components = vec![Vec::with_capacity(n)];
+
+    for k in 0..n {
+        let ka = (k as f64) * a;
+        vertices.push(vec![ka.cos() / s, ka.sin() / s].into());
+        edges.push(vec![k, (k + 1) % n]);
+        components[0].push(k);
+    }
+
+    Polytope::new(vertices, vec![edges, components])
+}
+
+pub fn tet() -> Polytope {
     let x = 2f64.sqrt() / 4.0;
 
     let vertices = vec![
-        DVec3::new(x, x, x),
-        DVec3::new(-x, -x, x),
-        DVec3::new(x, -x, -x),
-        DVec3::new(-x, x, -x),
+        vec![x, x, x].into(),
+        vec![-x, -x, x].into(),
+        vec![-x, x, -x].into(),
+        vec![x, -x, -x].into(),
     ];
-    let edges = vec![(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)];
+    let edges = vec![
+        vec![0, 1],
+        vec![0, 2],
+        vec![0, 3],
+        vec![1, 2],
+        vec![1, 3],
+        vec![2, 3],
+    ];
     let faces = vec![vec![0, 1, 3], vec![0, 2, 4], vec![1, 2, 5], vec![3, 4, 5]];
+    let components = vec![vec![0, 1, 2, 3, 4]];
 
-    PolytopeC::new(vertices, edges, faces)
+    Polytope::new(vertices, vec![edges, faces, components])
 }
 
-pub fn cube() -> PolytopeC {
+pub fn cube() -> Polytope {
     let x = 0.5;
 
     let vertices = vec![
-        DVec3::new(x, x, x),
-        DVec3::new(x, x, -x),
-        DVec3::new(x, -x, -x),
-        DVec3::new(x, -x, x),
-        DVec3::new(-x, x, x),
-        DVec3::new(-x, x, -x),
-        DVec3::new(-x, -x, -x),
-        DVec3::new(-x, -x, x),
+        vec![x, x, x].into(),
+        vec![x, x, -x].into(),
+        vec![x, -x, -x].into(),
+        vec![x, -x, x].into(),
+        vec![-x, x, x].into(),
+        vec![-x, x, -x].into(),
+        vec![-x, -x, -x].into(),
+        vec![-x, -x, x].into(),
     ];
     let edges = vec![
-        (0, 1),
-        (1, 2),
-        (2, 3),
-        (3, 0),
-        (4, 5),
-        (5, 6),
-        (6, 7),
-        (7, 3),
-        (0, 4),
-        (1, 5),
-        (2, 6),
-        (3, 7),
+        vec![0, 1],
+        vec![1, 2],
+        vec![2, 3],
+        vec![3, 0],
+        vec![4, 5],
+        vec![5, 6],
+        vec![6, 7],
+        vec![7, 3],
+        vec![0, 4],
+        vec![1, 5],
+        vec![2, 6],
+        vec![3, 7],
     ];
     let faces = vec![
         vec![0, 1, 2, 3],
@@ -54,34 +80,35 @@ pub fn cube() -> PolytopeC {
         vec![2, 6, 10, 11],
         vec![3, 7, 11, 8],
     ];
+    let components = vec![vec![0, 1, 2, 3, 4, 5]];
 
-    PolytopeC::new(vertices, edges, faces)
+    Polytope::new(vertices, vec![edges, faces, components])
 }
 
-pub fn oct() -> PolytopeC {
+pub fn oct() -> Polytope {
     let x = 1.0 / 2f64.sqrt();
 
     let vertices = vec![
-        DVec3::new(x, 0.0, 0.0),
-        DVec3::new(-x, 0.0, 0.0),
-        DVec3::new(0.0, x, 0.0),
-        DVec3::new(0.0, 0.0, x),
-        DVec3::new(0.0, -x, 0.0),
-        DVec3::new(0.0, 0.0, -x),
+        vec![x, 0.0, 0.0].into(),
+        vec![-x, 0.0, 0.0].into(),
+        vec![0.0, x, 0.0].into(),
+        vec![0.0, 0.0, x].into(),
+        vec![0.0, -x, 0.0].into(),
+        vec![0.0, 0.0, -x].into(),
     ];
     let edges = vec![
-        (0, 2),
-        (0, 3),
-        (0, 4),
-        (0, 5),
-        (1, 2),
-        (1, 3),
-        (1, 4),
-        (1, 5),
-        (2, 3),
-        (3, 4),
-        (4, 5),
-        (5, 2),
+        vec![0, 2],
+        vec![0, 3],
+        vec![0, 4],
+        vec![0, 5],
+        vec![1, 2],
+        vec![1, 3],
+        vec![1, 4],
+        vec![1, 5],
+        vec![2, 3],
+        vec![3, 4],
+        vec![4, 5],
+        vec![5, 2],
     ];
     let faces = vec![
         vec![0, 1, 8],
@@ -93,12 +120,13 @@ pub fn oct() -> PolytopeC {
         vec![3, 0, 11],
         vec![7, 4, 11],
     ];
+    let components = vec![vec![0, 1, 2, 3, 4, 5, 6, 7]];
 
-    PolytopeC::new(vertices, edges, faces)
+    Polytope::new(vertices, vec![edges, faces, components])
 }
 
 /// Creates an [[https://polytope.miraheze.org/wiki/Antiprism | antiprism]] with unit edge length and a given height.
-pub fn antiprism_with_height(n: u32, d: u32, mut h: f64) -> PolytopeC {
+pub fn antiprism_with_height(n: u32, d: u32, mut h: f64) -> Polytope {
     let n = n as usize;
     let a = PI / (n as f64) * (d as f64);
     let s = a.sin() * 2.0;
@@ -106,19 +134,23 @@ pub fn antiprism_with_height(n: u32, d: u32, mut h: f64) -> PolytopeC {
     let mut vertices = Vec::with_capacity(2 * n);
     let mut edges = Vec::with_capacity(4 * n);
     let mut faces = Vec::with_capacity(2 * n + 2);
+    let mut components = vec![Vec::with_capacity(2 * n + 2)];
 
     for k in 0..(2 * n) {
         // Generates vertices.
         let ka = (k as f64) * a;
-        vertices.push(DVec3::new((ka).cos() / s, (ka).sin() / s, h));
+        vertices.push(vec![ka.cos() / s, ka.sin() / s, h].into());
         h *= -1.0;
 
         // Generates edges.
-        edges.push((k, (k + 1) % (2 * n)));
-        edges.push((k, (k + 2) % (2 * n)));
+        edges.push(vec![k, (k + 1) % (2 * n)]);
+        edges.push(vec![k, (k + 2) % (2 * n)]);
 
         // Generates faces.
         faces.push(vec![2 * k, 2 * k + 1, (2 * k + 2) % (4 * n)]);
+
+        // Generates component.
+        components[0].push(k);
     }
 
     let (mut base1, mut base2) = (Vec::with_capacity(n), Vec::with_capacity(n));
@@ -129,10 +161,13 @@ pub fn antiprism_with_height(n: u32, d: u32, mut h: f64) -> PolytopeC {
     faces.push(base1);
     faces.push(base2);
 
-    PolytopeC::new(vertices, edges, faces)
+    components[0].push(2 * n);
+    components[0].push(2 * n + 1);
+
+    Polytope::new(vertices, vec![edges, faces, components])
 }
 
-pub fn antiprism(n: u32, d: u32) -> PolytopeC {
+pub fn antiprism(n: u32, d: u32) -> Polytope {
     let a = PI / (n as f64);
     let h = (a.cos() - (2.0 * a).cos()).sqrt() / (4.0 * a.sin());
 
