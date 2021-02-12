@@ -1,5 +1,6 @@
 use std::fs::read;
-use std::io::Result;
+use std::num::ParseFloatError;
+use std::io::Result as IoResult;
 use std::path::Path;
 
 use super::PolytopeSerde;
@@ -44,8 +45,40 @@ fn read_u32(chars: &mut impl Iterator<Item = char>) -> u32 {
     n
 }
 
-fn read_f64(chars: &mut impl Clone + Iterator<Item = char>) -> f64 {
-    let mut lookahead = chars..clone().enumerate().find_map(|(i, c)| c )
+fn read_f64(chars: &mut (impl Clone + Iterator<Item = char>)) -> Result<f64, ParseFloatError> {
+    // get the index of the next whitespace character
+    let next_ws = chars
+        .clone()
+        .enumerate()
+        .find_map(|(i, c)| if c.is_whitespace() {
+            Some(i)
+        } else {
+            None
+        });
+    // if the first character is whitespace
+    let s = if next_ws == Some(0) {
+        // skip it and try again
+        chars.next();
+        return read_f64(chars);
+    // otherwise, if there is an index to a whitespace
+    } else if let Some(i) = next_ws {
+        // take the characters up to the whitespace
+        let slice = chars.clone().take(i - 1).collect();
+
+        // skip past the whitespace in chars
+        for _ in 0..i {
+            chars.next();
+        }
+        
+        slice
+    } else {
+        // 
+        let mut s = String::new();
+        s.extend(chars);
+        s
+    };
+
+    s.parse()
 }
 
 fn get_elems_nums(chars: &mut impl Iterator<Item = char>, dims: usize) -> Vec<usize> {
@@ -53,7 +86,7 @@ fn get_elems_nums(chars: &mut impl Iterator<Item = char>, dims: usize) -> Vec<us
 
     for _ in 0..dims {
         chars.next();
-        num_elems.push(chars.read_u32());
+        num_elems.push(read_u32(chars) as usize);
     }
 
     // 2-elements go before 1-elements, we're undoing that
@@ -79,7 +112,7 @@ pub fn polytope_from_off_src(mut src: String) -> PolytopeSerde {
         panic!("ayo this file's not an OFF")
     }
 
-    let num_facets = get_facet_nums(&mut chars, dims as usize);
+    let num_elems = get_elems_nums(&mut chars, dim as usize);
     todo!()
 
     /*
@@ -96,6 +129,6 @@ pub fn polytope_from_off_src(mut src: String) -> PolytopeSerde {
     */
 }
 
-pub fn open_off(fp: &Path) -> Result<PolytopeSerde> {
+pub fn open_off(fp: &Path) -> IoResult<PolytopeSerde> {
     Ok(polytope_from_off_src(String::from_utf8(read(fp)?).unwrap()))
 }
