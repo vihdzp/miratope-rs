@@ -1,10 +1,15 @@
-use bevy::asset::{Assets, HandleUntyped};
+use bevy::prelude::{Draw, GlobalTransform, RenderPipelines, StandardMaterial, Transform, Visible};
+use bevy::asset::{Assets, HandleUntyped, Handle};
 use bevy::reflect::TypeUuid;
+use bevy::ecs::Bundle;
 use bevy::render::{
+    mesh::Mesh,
+    render_graph::base::MainPass,
     pipeline::{
         BlendDescriptor, BlendFactor, BlendOperation, ColorStateDescriptor, ColorWrite,
         CompareFunction, CullMode, DepthStencilStateDescriptor, FrontFace, PipelineDescriptor,
         RasterizationStateDescriptor, StencilStateDescriptor, StencilStateFaceDescriptor,
+        RenderPipeline
     },
     shader::{Shader, ShaderStage, ShaderStages},
     texture::TextureFormat,
@@ -58,5 +63,34 @@ pub fn build_no_cull_pipeline(shaders: &mut Assets<Shader>) -> PipelineDescripto
                 include_str!("forward.frag"),
             ))),
         })
+    }
+}
+
+#[derive(Bundle)]
+pub struct PbrNoBackfaceBundle {
+    pub mesh: Handle<Mesh>,
+    pub material: Handle<StandardMaterial>,
+    pub main_pass: MainPass,
+    pub draw: Draw,
+    pub visible: Visible,
+    pub render_pipelines: RenderPipelines,
+    pub transform: Transform,
+    pub global_transform: GlobalTransform,
+}
+
+impl Default for PbrNoBackfaceBundle {
+    fn default() -> Self {
+        Self {
+            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                NO_CULL_PIPELINE_HANDLE.typed(),
+            )]),
+            mesh: Default::default(),
+            visible: Default::default(),
+            material: Default::default(),
+            main_pass: Default::default(),
+            draw: Default::default(),
+            transform: Default::default(),
+            global_transform: Default::default(),
+        }
     }
 }

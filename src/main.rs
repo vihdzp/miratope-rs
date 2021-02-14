@@ -3,6 +3,7 @@ use bevy::render::camera::Camera;
 use bevy::render::pipeline::{RenderPipeline ,PipelineDescriptor};
 use polytope::shapes::*;
 use polytope::*;
+use no_cull_pipeline::PbrNoBackfaceBundle;
 
 mod polytope;
 mod no_cull_pipeline;
@@ -79,13 +80,10 @@ fn setup(
     );
 
     commands
-        .spawn(PbrBundle {
+        .spawn(PbrNoBackfaceBundle {
             mesh: meshes.add(poly.into()),
             material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
             transform: Transform::from_translation(Vec3::new(0.0, 0.5, 0.0)),
-            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
-                no_cull_pipeline::NO_CULL_PIPELINE_HANDLE.typed(),
-            )]),
             ..Default::default()
         })
         .spawn(LightBundle {
