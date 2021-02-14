@@ -24,54 +24,6 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    //let poly = oct();
-    /*
-    let poly: Polytope = ron::from_str::<polytope::PolytopeSerde>(
-        "(
-            vertices: [
-                [0.5, 0.5, 0.5],
-                [0.5, 0.5, -0.5],
-                [0.5, -0.5, 0.5],
-                [0.5, -0.5, -0.5],
-                [-0.5, 0.5, 0.5],
-                [-0.5, 0.5, -0.5],
-                [-0.5, -0.5, 0.5],
-                [-0.5, -0.5, -0.5],
-            ],
-            elements: [[
-                    [0, 1],
-                    [1, 2],
-                    [2, 3],
-                    [3, 0],
-                    [4, 5],
-                    [5, 6],
-                    [6, 7],
-                    [7, 3],
-                    [0, 4],
-                    [1, 5],
-                    [2, 6],
-                    [3, 7],
-                ], [
-                    [0, 1, 2, 3],
-                    [4, 5, 6, 7],
-                    [0, 4, 8, 9],
-                    [1, 5, 9, 10],
-                    [2, 6, 10, 11],
-                    [3, 7, 11, 8],
-                ], [
-                    0,
-                    1,
-                    2,
-                    3,
-                    4,
-                    5,
-                ]
-            ],
-        )",
-    )
-    .unwrap()
-    .into();
-    */
     let poly = antiprism(21, 3);
 
     pipelines.set_untracked(
