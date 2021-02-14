@@ -92,9 +92,11 @@ fn setup(
         });
 }
 
-fn spin_camera(mut query: Query<&mut Transform, With<Camera>>) {
+fn spin_camera(mut query: Query<&mut Transform, With<Camera>>, time: Res<Time>) {
+    const SPIN_RATE: f32 = std::f32::consts::PI * 2.0 / 3.0;
+
     for mut tf in query.iter_mut() {
-        tf.translation = Quat::from_rotation_y(0.01) * tf.translation;
+        tf.translation = Quat::from_rotation_y(time.delta_seconds() * SPIN_RATE) * tf.translation;
         tf.look_at(Vec3::zero(), Vec3::unit_y());
     }
 }
