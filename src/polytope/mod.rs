@@ -79,7 +79,6 @@ impl Polytope {
                 let [vert_j, vert_k]: [usize; 2] = verts;
                 if vert_i != vert_j && vert_i != vert_k {
                     triangles.push([vert_i, vert_j, vert_k]);
-                    triangles.push([vert_i, vert_k, vert_j]);
                 }
             }
         }

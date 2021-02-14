@@ -1,9 +1,11 @@
 use bevy::prelude::*;
 use bevy::render::camera::Camera;
+use bevy::render::pipeline::{RenderPipeline ,PipelineDescriptor};
 use polytope::shapes::*;
 use polytope::*;
 
 mod polytope;
+mod no_cull_pipeline;
 
 fn main() {
     App::build()
@@ -18,6 +20,8 @@ fn setup(
     commands: &mut Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut shaders: ResMut<Assets<Shader>>,
+    mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
     //let poly = oct();
     /*
@@ -67,11 +71,11 @@ fn setup(
     .unwrap()
     .into();
     */
-    let poly = polygon(7, 1);
-    let polyserde: PolytopeSerde = poly.clone().into();
-    println!(
-        "{}",
-        ron::ser::to_string_pretty(&polyserde, ron::ser::PrettyConfig::default()).unwrap(),
+    let poly = antiprism(21, 3);
+
+    pipelines.set_untracked(
+        no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
+        no_cull_pipeline::build_no_cull_pipeline(&mut shaders),
     );
 
     commands
@@ -79,6 +83,9 @@ fn setup(
             mesh: meshes.add(poly.into()),
             material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
             transform: Transform::from_translation(Vec3::new(0.0, 0.5, 0.0)),
+            render_pipelines: RenderPipelines::from_pipelines(vec![RenderPipeline::new(
+                no_cull_pipeline::NO_CULL_PIPELINE_HANDLE.typed(),
+            )]),
             ..Default::default()
         })
         .spawn(LightBundle {
