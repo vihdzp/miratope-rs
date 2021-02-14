@@ -103,19 +103,10 @@ impl Polytope {
             *v *= k;
         }
     }
-}
 
-impl From<PolytopeSerde> for Polytope {
-    fn from(ps: PolytopeSerde) -> Self {
-        Polytope::new(ps.vertices, ps.elements)
-    }
-}
-
-impl From<Polytope> for Mesh {
-    fn from(p: Polytope) -> Self {
-        let vertices: Vec<_> = p
-            .vertices
-            .into_iter()
+    fn get_vertex_coords(&self) -> Vec<[f32; 3]> {
+        self.vertices
+            .iter()
             .map(|point| {
                 let mut iter = point.iter().copied().take(3);
                 let x = iter.next().unwrap_or(0.0);
@@ -123,9 +114,13 @@ impl From<Polytope> for Mesh {
                 let z = iter.next().unwrap_or(0.0);
                 [x as f32, y as f32, z as f32]
             })
-            .collect();
-        let mut indices = Vec::new();
-        for [i, j, k] in p.triangles {
+            .collect()
+    }
+
+    pub fn get_mesh(&self) -> Mesh {
+        let vertices = self.get_vertex_coords();
+        let mut indices = Vec::with_capacity(self.triangles.len() * 3);
+        for &[i, j, k] in &self.triangles {
             indices.push(i as u16);
             indices.push(j as u16);
             indices.push(k as u16);
@@ -141,5 +136,31 @@ impl From<Polytope> for Mesh {
         mesh.set_indices(Some(Indices::U16(indices)));
 
         mesh
+    }
+
+    pub fn get_wireframe(&self) -> Mesh {
+        let edges = &self.elements[0];
+        let vertices: Vec<_> = self.get_vertex_coords();
+        let mut indices = Vec::with_capacity(edges.len() * 2);
+        for edge in edges {
+            indices.push(edge[0] as u16);
+            indices.push(edge[1] as u16);
+        }
+
+        let mut mesh = Mesh::new(PrimitiveTopology::LineList);
+        mesh.set_attribute(
+            Mesh::ATTRIBUTE_NORMAL,
+            vec![[0.0, 1.0, 0.0]; vertices.len()],
+        );
+        mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 0.0]; vertices.len()]);
+        mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
+        mesh.set_indices(Some(Indices::U16(indices)));
+        mesh
+    }
+}
+
+impl From<PolytopeSerde> for Polytope {
+    fn from(ps: PolytopeSerde) -> Self {
+        Polytope::new(ps.vertices, ps.elements)
     }
 }

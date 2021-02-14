@@ -1,6 +1,7 @@
 use bevy::prelude::*;
+use bevy::reflect::TypeUuid;
 use bevy::render::camera::Camera;
-use bevy::render::pipeline::{RenderPipeline ,PipelineDescriptor};
+use bevy::render::pipeline::PipelineDescriptor;
 use polytope::shapes::*;
 use polytope::*;
 use no_cull_pipeline::PbrNoBackfaceBundle;
@@ -17,6 +18,11 @@ fn main() {
         .run();
 }
 
+const WIREFRAME_SELECTED_MATERIAL: HandleUntyped =
+    HandleUntyped::weak_from_u64(StandardMaterial::TYPE_UUID, 0x82A3A5DD3A34CC21);
+const WIREFRAME_UNSELECTED_MATERIAL: HandleUntyped =
+    HandleUntyped::weak_from_u64(StandardMaterial::TYPE_UUID, 0x82A3A5DD3A34CC22);
+
 fn setup(
     commands: &mut Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -31,12 +37,30 @@ fn setup(
         no_cull_pipeline::build_no_cull_pipeline(&mut shaders),
     );
 
+    materials.set_untracked(
+        WIREFRAME_SELECTED_MATERIAL,
+        Color::rgb_u8(126, 192, 236).into(),
+    );
+
+    let wf_unselected = materials.set(
+        WIREFRAME_UNSELECTED_MATERIAL,
+        Color::rgb_u8(56, 68, 236).into(),
+    );
+    
     commands
         .spawn(PbrNoBackfaceBundle {
-            mesh: meshes.add(poly.into()),
+            mesh: meshes.add(poly.get_mesh()),
             material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
             transform: Transform::from_translation(Vec3::new(0.0, 0.5, 0.0)),
             ..Default::default()
+        })
+        .with_children(|cb| {
+            cb
+                .spawn(PbrNoBackfaceBundle {
+                    mesh: meshes.add(poly.get_wireframe()),
+                    material: wf_unselected,
+                    ..Default::default()
+                });
         })
         .spawn(LightBundle {
             transform: Transform::from_translation(Vec3::new(-2.0, 2.5, 2.0)),
