@@ -1,9 +1,9 @@
+use std::collections::HashMap;
 use std::fs::read;
-use std::num::ParseFloatError;
 use std::io::Result as IoResult;
 use std::path::Path;
 
-use super::PolytopeSerde;
+use super::*;
 
 fn strip_comments(src: &mut String) {
     while let Some(com_start) = src.chars().position(|c| c == '#') {
@@ -16,117 +16,161 @@ fn strip_comments(src: &mut String) {
     }
 }
 
-fn homogenize_whitespace(src: &mut String) {
-    *src = src.trim().to_string();
-    let mut new_src = String::with_capacity(src.capacity());
-    let mut was_ws = false;
-
-    for c in src.chars() {
-        if c.is_whitespace() && !was_ws {
-            new_src.push(' ');
-            was_ws = true;
-        } else {
-            new_src.push(c);
-            was_ws = false;
-        }
-    }
-
-    *src = new_src;
+fn non_ws_subs(src: &String) -> impl Iterator<Item = &str> {
+    str::split(&src, |c: char| c.is_whitespace()).filter(|s| !s.is_empty())
 }
 
-fn read_u32(chars: &mut impl Iterator<Item = char>) -> u32 {
-    let mut n = 0;
+fn get_elem_nums<'a>(subs: &mut impl Iterator<Item = &'a str>, dim: usize) -> Vec<usize> {
+    let mut num_elems = Vec::with_capacity(dim);
 
-    while let Some(c @ '0'..='9') = chars.next() {
-        n *= 10;
-        n += (c as u32) - ('0' as u32);
+    for _ in 0..dim {
+        let next_subs = subs.next().expect("supposed to be enough numbers here");
+        num_elems.push(next_subs.parse().expect("could not parse as integer"));
     }
 
-    n
-}
-
-fn read_f64(chars: &mut (impl Clone + Iterator<Item = char>)) -> Result<f64, ParseFloatError> {
-    // get the index of the next whitespace character
-    let next_ws = chars
-        .clone()
-        .enumerate()
-        .find_map(|(i, c)| if c.is_whitespace() {
-            Some(i)
-        } else {
-            None
-        });
-    // if the first character is whitespace
-    let s = if next_ws == Some(0) {
-        // skip it and try again
-        chars.next();
-        return read_f64(chars);
-    // otherwise, if there is an index to a whitespace
-    } else if let Some(i) = next_ws {
-        // take the characters up to the whitespace
-        let slice = chars.clone().take(i - 1).collect();
-
-        // skip past the whitespace in chars
-        for _ in 0..i {
-            chars.next();
-        }
-        
-        slice
-    } else {
-        // 
-        let mut s = String::new();
-        s.extend(chars);
-        s
-    };
-
-    s.parse()
-}
-
-fn get_elems_nums(chars: &mut impl Iterator<Item = char>, dims: usize) -> Vec<usize> {
-    let mut num_elems = Vec::with_capacity(dims);
-
-    for _ in 0..dims {
-        chars.next();
-        num_elems.push(read_u32(chars) as usize);
-    }
-
-    // 2-elements go before 1-elements, we're undoing that
-    if dims >= 3 {
+    // 2-elements go before 1-elements, we're undoing that.
+    if dim >= 3 {
         num_elems.swap(1, 2);
     }
 
     num_elems
 }
 
+fn parse_vertices<'a>(
+    num: usize,
+    dim: usize,
+    subs: &mut impl Iterator<Item = &'a str>,
+) -> Vec<nalgebra::DVector<f64>> {
+    // Reads all vertices.
+    let mut vertices = Vec::with_capacity(num);
+
+    // Add each vertex to the vector.
+    for _ in 0..num {
+        let mut vert = Vec::with_capacity(dim);
+
+        for _ in 0..dim {
+            vert.push(subs.next().unwrap().parse().expect("Float parsing failed!"));
+        }
+
+        vertices.push(vert.into());
+    }
+
+    vertices
+}
+
+// no hugs and kisses comes to the person who made this format
+fn parse_edges_and_faces<'a>(
+    num_edges: usize,
+    num_faces: usize,
+    subs: &mut impl Iterator<Item = &'a str>,
+) -> (Vec<Vec<usize>>, Vec<Vec<usize>>) {
+    let (mut edges, mut faces) = (Vec::with_capacity(num_edges), Vec::with_capacity(num_faces));
+    let mut hash_edges = HashMap::new();
+
+    // Add each face to the element list.
+    for _ in 0..num_faces {
+        let face_sub_count: usize = subs
+            .next()
+            .unwrap()
+            .parse()
+            .expect("Integer parsing failed!");
+
+        let mut face = Vec::with_capacity(face_sub_count);
+        let mut verts = Vec::with_capacity(face_sub_count);
+
+        // Reads all vertices of the face.
+        for _ in 0..face_sub_count {
+            verts.push(
+                subs.next()
+                    .unwrap()
+                    .parse()
+                    .expect("Integer parsing failed!"),
+            );
+        }
+
+        // Gets all edges of the face.
+        for i in 0..face_sub_count {
+            let mut edge = vec![verts[i], verts[(i + 1) % face_sub_count]];
+            edge.sort();
+
+            if let Some(idx) = hash_edges.get(&edge) {
+                face.push(*idx);
+            } else {
+                // Is the clone really necessary?
+                hash_edges.insert(edge.clone(), edges.len());
+                face.push(edges.len());
+                edges.push(edge);
+            }
+        }
+
+        faces.push(face);
+    }
+
+    // The number of edges in the file should match the number of read edges, though this isn't obligatory.
+    assert_eq!(
+        edges.len(),
+        num_edges,
+        "Edge count doesn't match expected edge count!",
+    );
+
+    (edges, faces)
+}
+
 pub fn polytope_from_off_src(mut src: String) -> PolytopeSerde {
     strip_comments(&mut src);
-    homogenize_whitespace(&mut src);
-    let mut chars = src.chars();
-    let mut dim = read_u32(&mut chars);
+    let mut subs = non_ws_subs(&src);
+    let dim = {
+        let first = subs.next().expect("need an OFF magic number and dim");
+        let dim = first.strip_suffix("OFF").expect("no \"OFF\" detected");
 
-    // This assumes our OFF file isn't 0D.
-    if dim == 0 {
-        dim = 3;
+        if dim.is_empty() {
+            3
+        } else {
+            dim.parse()
+                .expect("could not parse dimension as an integer")
+        }
+    };
+
+    let num_elems = get_elem_nums(&mut subs, dim);
+    let vertices = parse_vertices(num_elems[0], dim, &mut subs);
+
+    // Reads edges and faces.
+    let mut elements = Vec::with_capacity(dim as usize);
+    let (edges, faces) = parse_edges_and_faces(num_elems[1], num_elems[2], &mut subs);
+    elements.push(edges);
+    elements.push(faces);
+
+    // Adds all higher elements.
+    for d in 3..dim {
+        let num_els = num_elems[d];
+        let mut els = Vec::with_capacity(num_els);
+
+        // Adds every d-element to the element list.
+        for _ in 0..num_els {
+            let el_sub_count = subs
+                .next()
+                .unwrap()
+                .parse()
+                .expect("Integer parsing failed!");
+            let mut el = Vec::with_capacity(el_sub_count);
+
+            // Reads all sub-elements of the d-element.
+            for _ in 0..el_sub_count {
+                el.push(
+                    subs.next()
+                        .unwrap()
+                        .parse()
+                        .expect("Integer parsing failed!"),
+                );
+            }
+
+            els.push(el);
+        }
+
+        elements.push(els);
     }
 
-    if [chars.next(), chars.next(), chars.next()] != [Some('O'), Some('F'), Some('F')] {
-        panic!("ayo this file's not an OFF")
-    }
-
-    let num_elems = get_elems_nums(&mut chars, dim as usize);
-    todo!()
-
-    /*
-    if src.
-
-    let dim: u8;
-    if(src[0] == 'O'){
-        dim = 3;
-    }
-    else{
-
-
-    }
-    */
+    PolytopeSerde { vertices, elements }
 }
 
 pub fn open_off(fp: &Path) -> IoResult<PolytopeSerde> {
