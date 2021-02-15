@@ -38,8 +38,6 @@ pub struct Polytope {
     /// # Assumptions
     ///
     /// * All points have the same dimension.
-    ///
-    ///
     pub vertices: Vec<Point>,
     pub elements: Vec<ElementList>,
 

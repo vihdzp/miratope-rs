@@ -2,12 +2,12 @@ use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::camera::Camera;
 use bevy::render::pipeline::PipelineDescriptor;
-use polytope::shapes::*;
-use polytope::*;
 use no_cull_pipeline::PbrNoBackfaceBundle;
+use polytope::*;
+use polytope::{off::polytope_from_off_src, shapes::*};
 
-mod polytope;
 mod no_cull_pipeline;
+mod polytope;
 
 fn main() {
     App::build()
@@ -30,7 +30,27 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = antiprism(21, 3);
+    let cube_off = "OFF
+    8 6 12
+    
+    # Vertices
+    0.5 0.5 0.5
+    0.5 0.5 -0.5
+    0.5 -0.5 0.5
+    0.5 -0.5 -0.5
+    -0.5 0.5 0.5
+    -0.5 0.5 -0.5
+    -0.5 -0.5 0.5
+    -0.5 -0.5 -0.5
+    
+    # Faces
+    4 4 0 2 6
+    4 0 1 3 2
+    4 6 7 3 2
+    4 5 7 6 4
+    4 4 0 1 5
+    4 7 5 1 3";
+    let poly: Polytope = polytope_from_off_src(cube_off.to_string()).into();
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
@@ -46,7 +66,7 @@ fn setup(
         WIREFRAME_UNSELECTED_MATERIAL,
         Color::rgb_u8(56, 68, 236).into(),
     );
-    
+
     commands
         .spawn(PbrNoBackfaceBundle {
             mesh: meshes.add(poly.get_mesh()),
@@ -55,12 +75,11 @@ fn setup(
             ..Default::default()
         })
         .with_children(|cb| {
-            cb
-                .spawn(PbrNoBackfaceBundle {
-                    mesh: meshes.add(poly.get_wireframe()),
-                    material: wf_unselected,
-                    ..Default::default()
-                });
+            cb.spawn(PbrNoBackfaceBundle {
+                mesh: meshes.add(poly.get_wireframe()),
+                material: wf_unselected,
+                ..Default::default()
+            });
         })
         .spawn(LightBundle {
             transform: Transform::from_translation(Vec3::new(-2.0, 2.5, 2.0)),
