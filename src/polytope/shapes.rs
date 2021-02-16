@@ -40,7 +40,7 @@ pub fn tet() -> Polytope {
         vec![2, 3],
     ];
     let faces = vec![vec![0, 1, 3], vec![0, 2, 4], vec![1, 2, 5], vec![3, 4, 5]];
-    let components = vec![vec![0, 1, 2, 3, 4]];
+    let components = vec![vec![0, 1, 2, 3]];
 
     Polytope::new(vertices, vec![edges, faces, components])
 }
