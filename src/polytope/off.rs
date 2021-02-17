@@ -3,6 +3,8 @@ use std::fs::read;
 use std::io::Result as IoResult;
 use std::path::Path;
 
+use petgraph::{graph::Graph, prelude::NodeIndex, Undirected};
+
 use super::*;
 
 /// Removes all whitespace and comments from the OFF file.
@@ -122,7 +124,7 @@ fn parse_edges_and_faces<'a>(
 }
 
 /// Reads the next set of elements from the OFF file, starting from cells.
-pub fn read_next_els<'a>(num_els: usize, toks: &mut impl Iterator<Item = &'a str>) -> ElementList {
+pub fn parse_els<'a>(num_els: usize, toks: &mut impl Iterator<Item = &'a str>) -> ElementList {
     let mut els = Vec::with_capacity(num_els);
 
     // Adds every d-element to the element list.
@@ -144,6 +146,37 @@ pub fn read_next_els<'a>(num_els: usize, toks: &mut impl Iterator<Item = &'a str
     }
 
     els
+}
+
+pub fn get_comps(ridges: &ElementList, facets: &ElementList) -> ElementList {
+    let num_ridges = ridges.len();
+    let num_facets = facets.len();
+    let mut g: Graph<(), (), Undirected> = Graph::new_undirected();
+    for _ in 0..(num_ridges + num_facets) {
+        g.add_node(());
+    }
+
+    for (i, f) in facets.iter().enumerate() {
+        for r in f.iter() {
+            g.add_edge(NodeIndex::new(*r), NodeIndex::new(num_ridges + i), ());
+        }
+    }
+
+    let g_comps = petgraph::algo::tarjan_scc(&g);
+    let mut comps = Vec::with_capacity(g_comps.len());
+    for g_comp in g_comps.iter() {
+        let mut comp = Vec::new();
+        for idx in g_comp.iter() {
+            let idx: usize = idx.index();
+            if idx < num_ridges {
+                comp.push(idx);
+            }
+        }
+
+        comps.push(comp);
+    }
+
+    comps
 }
 
 pub fn polytope_from_off_src(src: String) -> PolytopeSerde {
@@ -171,12 +204,102 @@ pub fn polytope_from_off_src(src: String) -> PolytopeSerde {
 
     // Adds all higher elements.
     for d in 3..dim {
-        elements.push(read_next_els(num_elems[d], &mut toks));
+        elements.push(parse_els(num_elems[d], &mut toks));
     }
+
+    // Adds components.
+    elements.push(get_comps(&elements[dim - 3], &elements[dim - 2]));
 
     PolytopeSerde { vertices, elements }
 }
 
 pub fn open_off(fp: &Path) -> IoResult<PolytopeSerde> {
     Ok(polytope_from_off_src(String::from_utf8(read(fp)?).unwrap()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tet_counts() {
+        let tet: Polytope = polytope_from_off_src(
+            "OFF 4 4 6 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2".to_string(),
+        )
+        .into();
+
+        assert_eq!(tet.el_counts(), vec![4, 6, 4, 1])
+    }
+
+    #[test]
+    fn so_counts() {
+        let so: Polytope = polytope_from_off_src(
+            "OFF 8 8 12 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 -1 -1 -1 -1 1 1 1 -1 1 1 1 -1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2 3 4 5 6 3 7 4 6 3 4 5 7 3 7 5 6 ".to_string(),
+        )
+        .into();
+
+        assert_eq!(so.el_counts(), vec![8, 12, 8, 2])
+    }
+
+    #[test]
+    fn comments() {
+        let tet: Polytope = polytope_from_off_src(
+            "OFF # this
+            4 4 6 # is
+            # a # test # of
+            # Vertices
+            1 1 1 # the 3 1
+            1 -1 -1 # comment 4 1
+            -1 1 -1 # removal 5 9
+            -1 -1 1 # system 2 6
+            
+            # Faces
+            3 0 1 2
+            3 3 0 2
+            3 0 1 3
+            3 3 1 2"
+                .to_string(),
+        )
+        .into();
+
+        assert_eq!(tet.el_counts(), vec![4, 6, 4, 1])
+    }
+
+    #[test]
+    fn pen_counts() {
+        let pen: Polytope = polytope_from_off_src(
+            "4OFF
+            5 10 10 5
+            
+            # Vertices
+            0.158113883008419 0.204124145231932 0.288675134594813 0.5
+            0.158113883008419 0.204124145231932 0.288675134594813 -0.5
+            0.158113883008419 0.204124145231932 -0.577350269189626 0
+            0.158113883008419 -0.612372435695794 0 0
+            -0.632455532033676 0 0 0
+            
+            # Faces
+            3 0 3 4
+            3 0 2 4
+            3 2 3 4
+            3 0 2 3
+            3 0 1 4
+            3 1 3 4
+            3 0 1 3
+            3 1 2 4
+            3 0 1 2
+            3 1 2 3
+            
+            # Cells
+            4 0 1 2 3
+            4 0 4 5 6
+            4 1 4 7 8
+            4 2 5 7 9
+            4 3 6 8 9"
+                .to_string(),
+        )
+        .into();
+
+        assert_eq!(pen.el_counts(), vec![5, 10, 10, 5, 1])
+    }
 }
