@@ -1,3 +1,4 @@
+use core::num;
 use std::collections::HashMap;
 use std::fs::read;
 use std::io::Result as IoResult;
@@ -22,7 +23,8 @@ fn data_tokens(src: &String) -> impl Iterator<Item = &str> {
 }
 
 /// Gets the number of elements from the OFF file.
-/// This includes components *only* for dim = 2.
+/// This includes components *only* for dim ≤ 2
+/// (this makes things easier down the line).
 fn get_elem_nums<'a>(dim: usize, toks: &mut impl Iterator<Item = &'a str>) -> Vec<usize> {
     let mut num_elems = Vec::with_capacity(dim);
 
@@ -32,8 +34,18 @@ fn get_elem_nums<'a>(dim: usize, toks: &mut impl Iterator<Item = &'a str>) -> Ve
         num_elems.push(num_elem.parse().expect("could not parse as integer"));
     }
 
+    // A point has a single component (itself)
+    if dim == 0 {
+        num_elems.push(1);
+    }
+    // A dyad has twice as many vertices as components.
+    else if dim == 1 {
+        let comps = num_elems[0];
+        num_elems[0] *= 2;
+        num_elems.push(comps);
+    }
     // A polygon always has as many vertices as edges.
-    if dim == 2 {
+    else if dim == 2 {
         num_elems.push(num_elems[0]);
     }
 
@@ -198,8 +210,17 @@ pub fn polytope_from_off_src(src: String) -> PolytopeSerde {
     let vertices = parse_vertices(num_elems[0], dim, &mut toks);
     let mut elements = Vec::with_capacity(dim as usize);
 
+    // Gets components in the 1D case.
+    if dim == 1 {
+        let num_comps = num_elems[1];
+        let mut comps = Vec::with_capacity(num_comps);
+        for i in 0..num_comps {
+            comps.push(vec![2 * i, 2 * i + 1]);
+        }
+        elements.push(comps);
+    }
     // Reads edges and faces.
-    if dim >= 2 {
+    else if dim >= 2 {
         let (edges, faces) = parse_edges_and_faces(num_elems[1], num_elems[2], &mut toks);
         elements.push(edges);
         elements.push(faces);
@@ -225,6 +246,20 @@ pub fn open_off(fp: &Path) -> IoResult<PolytopeSerde> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn point_counts() {
+        let point: Polytope = polytope_from_off_src("0OFF".to_string()).into();
+
+        assert_eq!(point.el_counts(), vec![1])
+    }
+
+    #[test]
+    fn dyad_counts() {
+        let point: Polytope = polytope_from_off_src("1OFF 1 -1 1".to_string()).into();
+
+        assert_eq!(point.el_counts(), vec![2, 1])
+    }
 
     #[test]
     fn hig_counts() {
