@@ -96,6 +96,17 @@ impl Polytope {
         }
     }
 
+    fn el_counts(&self) -> Vec<usize> {
+        let mut counts = Vec::with_capacity(self.elements.len() + 1);
+        counts.push(self.vertices.len());
+
+        for e in self.elements.iter() {
+            counts.push(e.len());
+        }
+
+        counts
+    }
+
     fn scale(&mut self, k: f64) {
         for v in &mut self.vertices {
             *v *= k;

@@ -173,3 +173,41 @@ pub fn antiprism(n: u32, d: u32) -> Polytope {
 
     antiprism_with_height(n, d, h)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn polygon_counts() {
+        assert_eq!(polygon(5, 1).el_counts(), vec![5, 5, 1]);
+        assert_eq!(polygon(7, 2).el_counts(), vec![7, 7, 1])
+
+        // We aren't implementing polygon compounds yet.
+        // assert_eq!(polygon(6, 2).el_counts(), vec![6, 6, 2])
+    }
+
+    #[test]
+    fn tet_counts() {
+        assert_eq!(tet().el_counts(), vec![4, 6, 4, 1])
+    }
+
+    #[test]
+    fn cube_counts() {
+        assert_eq!(cube().el_counts(), vec![8, 12, 6, 1])
+    }
+
+    #[test]
+    fn oct_counts() {
+        assert_eq!(oct().el_counts(), vec![6, 12, 8, 1])
+    }
+
+    #[test]
+    fn antiprism_counts() {
+        assert_eq!(antiprism(5, 1).el_counts(), vec![10, 20, 12, 1]);
+        assert_eq!(antiprism(7, 2).el_counts(), vec![14, 28, 16, 1]);
+
+        // We aren't implementing compound antiprisms yet.
+        // assert_eq!(antiprism(6, 2).el_counts(), vec![12, 24, 16, 2])
+    }
+}

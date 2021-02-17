@@ -5,27 +5,30 @@ use std::path::Path;
 
 use super::*;
 
-fn strip_comments(src: &mut String) {
-    while let Some(com_start) = src.chars().position(|c| c == '#') {
-        let line_end = com_start
-            + src[com_start..]
-                .chars()
-                .position(|c| c == '\n')
-                .unwrap_or_else(|| src.len() - com_start - 1);
-        src.drain(com_start..=line_end);
-    }
+/// Removes all whitespace and comments from the OFF file.
+fn data_tokens(src: &String) -> impl Iterator<Item = &str> {
+    let mut comment = false;
+    str::split(&src, move |c: char| {
+        if c == '#' {
+            comment = true;
+        } else if c == '\n' {
+            comment = false;
+        }
+        !comment && c.is_whitespace()
+    })
+    .filter(|s| match s.chars().next() {
+        None => false,
+        Some(c) => c != '#',
+    })
 }
 
-fn non_ws_subs(src: &String) -> impl Iterator<Item = &str> {
-    str::split(&src, |c: char| c.is_whitespace()).filter(|s| !s.is_empty())
-}
-
-fn get_elem_nums<'a>(subs: &mut impl Iterator<Item = &'a str>, dim: usize) -> Vec<usize> {
+/// Gets the number of elements from the OFF file.
+fn get_elem_nums<'a>(dim: usize, toks: &mut impl Iterator<Item = &'a str>) -> Vec<usize> {
     let mut num_elems = Vec::with_capacity(dim);
 
     for _ in 0..dim {
-        let next_subs = subs.next().expect("supposed to be enough numbers here");
-        num_elems.push(next_subs.parse().expect("could not parse as integer"));
+        let num_elem = toks.next().expect("OFF file ended unexpectedly.");
+        num_elems.push(num_elem.parse().expect("could not parse as integer"));
     }
 
     // 2-elements go before 1-elements, we're undoing that.
@@ -36,10 +39,11 @@ fn get_elem_nums<'a>(subs: &mut impl Iterator<Item = &'a str>, dim: usize) -> Ve
     num_elems
 }
 
+/// Parses all vertex coordinates from the OFF file.
 fn parse_vertices<'a>(
     num: usize,
     dim: usize,
-    subs: &mut impl Iterator<Item = &'a str>,
+    toks: &mut impl Iterator<Item = &'a str>,
 ) -> Vec<nalgebra::DVector<f64>> {
     // Reads all vertices.
     let mut vertices = Vec::with_capacity(num);
@@ -49,7 +53,8 @@ fn parse_vertices<'a>(
         let mut vert = Vec::with_capacity(dim);
 
         for _ in 0..dim {
-            vert.push(subs.next().unwrap().parse().expect("Float parsing failed!"));
+            let coord = toks.next().expect("OFF file ended unexpectedly.");
+            vert.push(coord.parse().expect("Float parsing failed!"));
         }
 
         vertices.push(vert.into());
@@ -58,20 +63,22 @@ fn parse_vertices<'a>(
     vertices
 }
 
-// no hugs and kisses comes to the person who made this format
+/// Reads the faces from the OFF file and gets the edges and faces from them.
+/// Since the OFF file doesn't store edges explicitly, this is harder than reading
+/// general elements.
 fn parse_edges_and_faces<'a>(
     num_edges: usize,
     num_faces: usize,
-    subs: &mut impl Iterator<Item = &'a str>,
+    toks: &mut impl Iterator<Item = &'a str>,
 ) -> (Vec<Vec<usize>>, Vec<Vec<usize>>) {
     let (mut edges, mut faces) = (Vec::with_capacity(num_edges), Vec::with_capacity(num_faces));
     let mut hash_edges = HashMap::new();
 
     // Add each face to the element list.
     for _ in 0..num_faces {
-        let face_sub_count: usize = subs
+        let face_sub_count: usize = toks
             .next()
-            .unwrap()
+            .expect("OFF file ended unexpectedly.")
             .parse()
             .expect("Integer parsing failed!");
 
@@ -81,8 +88,8 @@ fn parse_edges_and_faces<'a>(
         // Reads all vertices of the face.
         for _ in 0..face_sub_count {
             verts.push(
-                subs.next()
-                    .unwrap()
+                toks.next()
+                    .expect("OFF file ended unexpectedly.")
                     .parse()
                     .expect("Integer parsing failed!"),
             );
@@ -107,20 +114,42 @@ fn parse_edges_and_faces<'a>(
     }
 
     // The number of edges in the file should match the number of read edges, though this isn't obligatory.
-    assert_eq!(
-        edges.len(),
-        num_edges,
-        "Edge count doesn't match expected edge count!",
-    );
+    if edges.len() != num_edges {
+        println!("Edge count doesn't match expected edge count!");
+    }
 
     (edges, faces)
 }
 
-pub fn polytope_from_off_src(mut src: String) -> PolytopeSerde {
-    strip_comments(&mut src);
-    let mut subs = non_ws_subs(&src);
+/// Reads the next set of elements from the OFF file, starting from cells.
+pub fn read_next_els<'a>(num_els: usize, toks: &mut impl Iterator<Item = &'a str>) -> ElementList {
+    let mut els = Vec::with_capacity(num_els);
+
+    // Adds every d-element to the element list.
+    for _ in 0..num_els {
+        let el_sub_count = toks
+            .next()
+            .expect("OFF file ended unexpectedly.")
+            .parse()
+            .expect("Integer parsing failed!");
+        let mut el = Vec::with_capacity(el_sub_count);
+
+        // Reads all sub-elements of the d-element.
+        for _ in 0..el_sub_count {
+            let el_sub = toks.next().expect("OFF file ended unexpectedly.");
+            el.push(el_sub.parse().expect("Integer parsing failed!"));
+        }
+
+        els.push(el);
+    }
+
+    els
+}
+
+pub fn polytope_from_off_src(src: String) -> PolytopeSerde {
+    let mut toks = data_tokens(&src);
     let dim = {
-        let first = subs.next().expect("need an OFF magic number and dim");
+        let first = toks.next().expect("OFF file empty");
         let dim = first.strip_suffix("OFF").expect("no \"OFF\" detected");
 
         if dim.is_empty() {
@@ -131,43 +160,18 @@ pub fn polytope_from_off_src(mut src: String) -> PolytopeSerde {
         }
     };
 
-    let num_elems = get_elem_nums(&mut subs, dim);
-    let vertices = parse_vertices(num_elems[0], dim, &mut subs);
+    let num_elems = get_elem_nums(dim, &mut toks);
+    let vertices = parse_vertices(num_elems[0], dim, &mut toks);
 
     // Reads edges and faces.
     let mut elements = Vec::with_capacity(dim as usize);
-    let (edges, faces) = parse_edges_and_faces(num_elems[1], num_elems[2], &mut subs);
+    let (edges, faces) = parse_edges_and_faces(num_elems[1], num_elems[2], &mut toks);
     elements.push(edges);
     elements.push(faces);
 
     // Adds all higher elements.
     for d in 3..dim {
-        let num_els = num_elems[d];
-        let mut els = Vec::with_capacity(num_els);
-
-        // Adds every d-element to the element list.
-        for _ in 0..num_els {
-            let el_sub_count = subs
-                .next()
-                .unwrap()
-                .parse()
-                .expect("Integer parsing failed!");
-            let mut el = Vec::with_capacity(el_sub_count);
-
-            // Reads all sub-elements of the d-element.
-            for _ in 0..el_sub_count {
-                el.push(
-                    subs.next()
-                        .unwrap()
-                        .parse()
-                        .expect("Integer parsing failed!"),
-                );
-            }
-
-            els.push(el);
-        }
-
-        elements.push(els);
+        elements.push(read_next_els(num_elems[d], &mut toks));
     }
 
     PolytopeSerde { vertices, elements }

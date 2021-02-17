@@ -31,18 +31,18 @@ fn setup(
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
     let cube_off = "OFF
-    8 6 12
+    8 6 1337
     
     # Vertices
-    0.5 0.5 0.5
-    0.5 0.5 -0.5
-    0.5 -0.5 0.5
-    0.5 -0.5 -0.5
-    -0.5 0.5 0.5
-    -0.5 0.5 -0.5
-    -0.5 -0.5 0.5
-    -0.5 -0.5 -0.5
-    
+    0.5 0.5 0.5 #this
+    0.5 0.5 -0.5 #   is
+    0.5 -0.5 0.5 # a
+    0.5 -0.5 -0.5 #test
+    -0.5 0.5 0.5 # of
+    -0.5 0.5 -0.5 #the new
+    -0.5 -0.5 0.5     #comment 
+    -0.5 -0.5 -0.5 #removal
+    # system
     # Faces
     4 4 0 2 6
     4 0 1 3 2
