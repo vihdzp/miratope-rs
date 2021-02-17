@@ -4,7 +4,7 @@ use bevy::render::camera::Camera;
 use bevy::render::pipeline::PipelineDescriptor;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 use polytope::*;
-use polytope::{off::polytope_from_off_src, shapes::*};
+use polytope::{off::load::from_src, shapes::*};
 
 mod no_cull_pipeline;
 mod polytope;
@@ -30,7 +30,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly: Polytope = antiprism(10, 1);
+    let poly: Polytope = antiprism(12, 1);
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,

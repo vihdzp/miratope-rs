@@ -5,7 +5,7 @@ use std::path::Path;
 
 use petgraph::{graph::Graph, prelude::NodeIndex, Undirected};
 
-use super::*;
+use super::super::*;
 
 /// Removes all whitespace and comments from the OFF file.
 fn data_tokens(src: &String) -> impl Iterator<Item = &str> {
@@ -204,7 +204,7 @@ pub fn get_comps(num_ridges: usize, facets: &ElementList) -> ElementList {
 }
 
 /// Builds a `PolytopeSerde` from the string representation of an OFF file.
-pub fn polytope_from_off_src(src: String) -> PolytopeSerde {
+pub fn from_src(src: String) -> PolytopeSerde {
     let mut toks = data_tokens(&src);
     let dim = {
         let first = toks.next().expect("OFF file empty");
@@ -251,8 +251,8 @@ pub fn polytope_from_off_src(src: String) -> PolytopeSerde {
     PolytopeSerde { vertices, elements }
 }
 
-pub fn open_off(fp: &Path) -> IoResult<PolytopeSerde> {
-    Ok(polytope_from_off_src(String::from_utf8(read(fp)?).unwrap()))
+pub fn from_path(fp: &Path) -> IoResult<PolytopeSerde> {
+    Ok(from_src(String::from_utf8(read(fp)?).unwrap()))
 }
 
 #[cfg(test)]
@@ -261,21 +261,21 @@ mod tests {
 
     #[test]
     fn point_counts() {
-        let point: Polytope = polytope_from_off_src("0OFF".to_string()).into();
+        let point: Polytope = from_src("0OFF".to_string()).into();
 
         assert_eq!(point.el_counts(), vec![1])
     }
 
     #[test]
     fn dyad_counts() {
-        let point: Polytope = polytope_from_off_src("1OFF 1 -1 1".to_string()).into();
+        let point: Polytope = from_src("1OFF 1 -1 1".to_string()).into();
 
         assert_eq!(point.el_counts(), vec![2, 1])
     }
 
     #[test]
     fn hig_counts() {
-        let hig: Polytope = polytope_from_off_src(
+        let hig: Polytope = from_src(
             "2OFF 6 1 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 6 0 1 2 3 4 5".to_string()
         ).into();
 
@@ -284,7 +284,7 @@ mod tests {
 
     #[test]
     fn shig_counts() {
-        let shig: Polytope = polytope_from_off_src(
+        let shig: Polytope = from_src(
             "2OFF 6 2 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 3 0 2 4 3 1 3 5".to_string()
         ).into();
 
@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn tet_counts() {
-        let tet: Polytope = polytope_from_off_src(
+        let tet: Polytope = from_src(
             "OFF 4 4 6 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2".to_string(),
         )
         .into();
@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn so_counts() {
-        let so: Polytope = polytope_from_off_src(
+        let so: Polytope = from_src(
             "OFF 8 8 12 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 -1 -1 -1 -1 1 1 1 -1 1 1 1 -1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2 3 4 5 6 3 7 4 6 3 4 5 7 3 7 5 6 ".to_string(),
         )
         .into();
@@ -313,7 +313,7 @@ mod tests {
 
     #[test]
     fn pen_counts() {
-        let pen: Polytope = polytope_from_off_src(
+        let pen: Polytope = from_src(
             "4OFF 5 10 10 5 0.158113883008419 0.204124145231932 0.288675134594813 0.5 0.158113883008419 0.204124145231932 0.288675134594813 -0.5 0.158113883008419 0.204124145231932 -0.577350269189626 0 0.158113883008419 -0.612372435695794 0 0 -0.632455532033676 0 0 0 3 0 3 4 3 0 2 4 3 2 3 4 3 0 2 3 3 0 1 4 3 1 3 4 3 0 1 3 3 1 2 4 3 0 1 2 3 1 2 3 4 0 1 2 3 4 0 4 5 6 4 1 4 7 8 4 2 5 7 9 4 3 6 8 9"
                 .to_string(),
         )
@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn comments() {
-        let tet: Polytope = polytope_from_off_src(
+        let tet: Polytope = from_src(
             "# So
             OFF # this
             4 4 6 # is
@@ -347,12 +347,12 @@ mod tests {
     #[test]
     #[should_panic(expected = "OFF file empty")]
     fn empty() {
-        Polytope::from(polytope_from_off_src("".to_string()));
+        Polytope::from(from_src("".to_string()));
     }
 
     #[test]
     #[should_panic(expected = "no \"OFF\" detected")]
     fn magic_num() {
-        Polytope::from(polytope_from_off_src("foo bar".to_string()));
+        Polytope::from(from_src("foo bar".to_string()));
     }
 }

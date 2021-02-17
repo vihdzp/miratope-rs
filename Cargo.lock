@@ -1587,6 +1587,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "gcd"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c7cd301bf2ab11ae4e5bdfd79c221d97a25e46c089144a62ee9d09cb32d2b92"
+
+[[package]]
 name = "generic-array"
 version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2355,6 +2361,7 @@ name = "miratope"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "gcd",
  "nalgebra",
  "petgraph",
  "rand 0.8.3",

@@ -1,22 +1,34 @@
 use std::f64::consts::PI;
 use std::{f64, usize};
 
+use gcd::Gcd;
+
 use super::Polytope;
 
 pub fn polygon(n: u32, d: u32) -> Polytope {
     let n = n as usize;
-    let a = 2.0 * PI / (n as f64) * (d as f64);
+    let g = n.gcd(d as usize);
+    let a = 2.0 * PI / (n as f64 * g as f64) * (d as f64);
     let s = a.sin() * 2.0;
 
     let mut vertices = Vec::with_capacity(n);
     let mut edges = Vec::with_capacity(n);
-    let mut components = vec![Vec::with_capacity(n)];
+    let mut components = Vec::with_capacity(g);
 
     for k in 0..n {
         let ka = (k as f64) * a;
         vertices.push(vec![ka.cos() / s, ka.sin() / s].into());
-        edges.push(vec![k, (k + 1) % n]);
-        components[0].push(k);
+        edges.push(vec![k, (k + g) % n]);
+    }
+
+    for k in 0..g {
+        let c = n / g;
+        let mut comp = Vec::with_capacity(c);
+        for i in 0..c {
+            comp.push(k + i * g);
+        }
+
+        components.push(comp);
     }
 
     Polytope::new(vertices, vec![edges, components])
@@ -125,7 +137,8 @@ pub fn oct() -> Polytope {
     Polytope::new(vertices, vec![edges, faces, components])
 }
 
-/// Creates an [[https://polytope.miraheze.org/wiki/Antiprism | antiprism]] with unit edge length and a given height.
+/// Creates an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
+/// with unit edge length and a given height.
 pub fn antiprism_with_height(n: u32, d: u32, mut h: f64) -> Polytope {
     let n = n as usize;
     let a = PI / (n as f64) * (d as f64);
@@ -168,8 +181,8 @@ pub fn antiprism_with_height(n: u32, d: u32, mut h: f64) -> Polytope {
 }
 
 pub fn antiprism(n: u32, d: u32) -> Polytope {
-    let a = PI / (n as f64);
-    let h = (a.cos() - (2.0 * a).cos()).sqrt() / (4.0 * a.sin());
+    let a = PI / (n as f64) * (d as f64);
+    let h = (0.5 * a.cos() - 0.25).sqrt();
 
     antiprism_with_height(n, d, h)
 }
@@ -181,10 +194,8 @@ mod tests {
     #[test]
     fn polygon_counts() {
         assert_eq!(polygon(5, 1).el_counts(), vec![5, 5, 1]);
-        assert_eq!(polygon(7, 2).el_counts(), vec![7, 7, 1])
-
-        // We aren't implementing polygon compounds yet.
-        // assert_eq!(polygon(6, 2).el_counts(), vec![6, 6, 2])
+        assert_eq!(polygon(7, 2).el_counts(), vec![7, 7, 1]);
+        assert_eq!(polygon(6, 2).el_counts(), vec![6, 6, 2])
     }
 
     #[test]
