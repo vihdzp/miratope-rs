@@ -30,27 +30,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let cube_off = "OFF
-    8 6 1337
-    
-    # Vertices
-    0.5 0.5 0.5 #this
-    0.5 0.5 -0.5 #   is
-    0.5 -0.5 0.5 # a
-    0.5 -0.5 -0.5 #test
-    -0.5 0.5 0.5 # of
-    -0.5 0.5 -0.5 #the new
-    -0.5 -0.5 0.5     #comment 
-    -0.5 -0.5 -0.5 #removal
-    # system
-    # Faces
-    4 4 0 2 6
-    4 0 1 3 2
-    4 6 7 3 2
-    4 5 7 6 4
-    4 4 0 1 5
-    4 7 5 1 3";
-    let poly: Polytope = polytope_from_off_src(cube_off.to_string()).into();
+    let poly: Polytope = antiprism(10, 1);
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,

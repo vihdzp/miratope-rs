@@ -1,4 +1,3 @@
-use core::num;
 use std::collections::HashMap;
 use std::fs::read;
 use std::io::Result as IoResult;
@@ -23,7 +22,7 @@ fn data_tokens(src: &String) -> impl Iterator<Item = &str> {
 }
 
 /// Gets the number of elements from the OFF file.
-/// This includes components *only* for dim ≤ 2
+/// This includes components iff dim ≤ 2
 /// (this makes things easier down the line).
 fn get_elem_nums<'a>(dim: usize, toks: &mut impl Iterator<Item = &'a str>) -> Vec<usize> {
     let mut num_elems = Vec::with_capacity(dim);
@@ -106,7 +105,9 @@ fn parse_edges_and_faces<'a>(
         // Reads all vertices of the face.
         for _ in 0..face_sub_count {
             verts.push(
-                dbg!(toks.next().expect("OFF file ended unexpectedly.").parse())
+                toks.next()
+                    .expect("OFF file ended unexpectedly.")
+                    .parse()
                     .expect("Integer parsing failed!"),
             );
         }
@@ -162,8 +163,13 @@ pub fn parse_els<'a>(num_els: usize, toks: &mut impl Iterator<Item = &'a str>) -
     els
 }
 
+/// Gets the connected components of the polytope.
 pub fn get_comps(num_ridges: usize, facets: &ElementList) -> ElementList {
     let num_facets = facets.len();
+
+    // g is the incidence graph of ridges and facets.
+    // The ith ridge is stored at position i.
+    // The ith facet is stored at position num_ridges + i.
     let mut g: Graph<(), (), Undirected> = Graph::new_undirected();
     for _ in 0..(num_ridges + num_facets) {
         g.add_node(());
@@ -175,12 +181,17 @@ pub fn get_comps(num_ridges: usize, facets: &ElementList) -> ElementList {
         }
     }
 
+    // Converts the connected components of our facet + ridge graph
+    // into just the lists of facets in each component.
     let g_comps = petgraph::algo::tarjan_scc(&g);
     let mut comps = Vec::with_capacity(g_comps.len());
+
     for g_comp in g_comps.iter() {
         let mut comp = Vec::new();
+
         for idx in g_comp.iter() {
             let idx: usize = idx.index();
+
             if idx < num_ridges {
                 comp.push(idx);
             }
@@ -192,6 +203,7 @@ pub fn get_comps(num_ridges: usize, facets: &ElementList) -> ElementList {
     comps
 }
 
+/// Builds a `PolytopeSerde` from the string representation of an OFF file.
 pub fn polytope_from_off_src(src: String) -> PolytopeSerde {
     let mut toks = data_tokens(&src);
     let dim = {
@@ -300,6 +312,17 @@ mod tests {
     }
 
     #[test]
+    fn pen_counts() {
+        let pen: Polytope = polytope_from_off_src(
+            "4OFF 5 10 10 5 0.158113883008419 0.204124145231932 0.288675134594813 0.5 0.158113883008419 0.204124145231932 0.288675134594813 -0.5 0.158113883008419 0.204124145231932 -0.577350269189626 0 0.158113883008419 -0.612372435695794 0 0 -0.632455532033676 0 0 0 3 0 3 4 3 0 2 4 3 2 3 4 3 0 2 3 3 0 1 4 3 1 3 4 3 0 1 3 3 1 2 4 3 0 1 2 3 1 2 3 4 0 1 2 3 4 0 4 5 6 4 1 4 7 8 4 2 5 7 9 4 3 6 8 9"
+                .to_string(),
+        )
+        .into();
+
+        assert_eq!(pen.el_counts(), vec![5, 10, 10, 5, 1])
+    }
+
+    #[test]
     fn comments() {
         let tet: Polytope = polytope_from_off_src(
             "# So
@@ -322,13 +345,14 @@ mod tests {
     }
 
     #[test]
-    fn pen_counts() {
-        let pen: Polytope = polytope_from_off_src(
-            "4OFF 5 10 10 5 0.158113883008419 0.204124145231932 0.288675134594813 0.5 0.158113883008419 0.204124145231932 0.288675134594813 -0.5 0.158113883008419 0.204124145231932 -0.577350269189626 0 0.158113883008419 -0.612372435695794 0 0 -0.632455532033676 0 0 0 3 0 3 4 3 0 2 4 3 2 3 4 3 0 2 3 3 0 1 4 3 1 3 4 3 0 1 3 3 1 2 4 3 0 1 2 3 1 2 3 4 0 1 2 3 4 0 4 5 6 4 1 4 7 8 4 2 5 7 9 4 3 6 8 9"
-                .to_string(),
-        )
-        .into();
+    #[should_panic(expected = "OFF file empty")]
+    fn empty() {
+        Polytope::from(polytope_from_off_src("".to_string()));
+    }
 
-        assert_eq!(pen.el_counts(), vec![5, 10, 10, 5, 1])
+    #[test]
+    #[should_panic(expected = "no \"OFF\" detected")]
+    fn magic_num() {
+        Polytope::from(polytope_from_off_src("foo bar".to_string()));
     }
 }
