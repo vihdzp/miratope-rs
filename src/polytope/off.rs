@@ -16,25 +16,29 @@ fn data_tokens(src: &String) -> impl Iterator<Item = &str> {
         } else if c == '\n' {
             comment = false;
         }
-        !comment && c.is_whitespace()
+        comment || c.is_whitespace()
     })
-    .filter(|s| match s.chars().next() {
-        None => false,
-        Some(c) => c != '#',
-    })
+    .filter(|s| !s.is_empty())
 }
 
 /// Gets the number of elements from the OFF file.
+/// This includes components *only* for dim = 2.
 fn get_elem_nums<'a>(dim: usize, toks: &mut impl Iterator<Item = &'a str>) -> Vec<usize> {
     let mut num_elems = Vec::with_capacity(dim);
 
+    // Reads entries one by one.
     for _ in 0..dim {
         let num_elem = toks.next().expect("OFF file ended unexpectedly.");
         num_elems.push(num_elem.parse().expect("could not parse as integer"));
     }
 
+    // A polygon always has as many vertices as edges.
+    if dim == 2 {
+        num_elems.push(num_elems[0]);
+    }
+
     // 2-elements go before 1-elements, we're undoing that.
-    if dim >= 3 {
+    if dim >= 2 {
         num_elems.swap(1, 2);
     }
 
@@ -90,9 +94,7 @@ fn parse_edges_and_faces<'a>(
         // Reads all vertices of the face.
         for _ in 0..face_sub_count {
             verts.push(
-                toks.next()
-                    .expect("OFF file ended unexpectedly.")
-                    .parse()
+                dbg!(toks.next().expect("OFF file ended unexpectedly.").parse())
                     .expect("Integer parsing failed!"),
             );
         }
@@ -148,8 +150,7 @@ pub fn parse_els<'a>(num_els: usize, toks: &mut impl Iterator<Item = &'a str>) -
     els
 }
 
-pub fn get_comps(ridges: &ElementList, facets: &ElementList) -> ElementList {
-    let num_ridges = ridges.len();
+pub fn get_comps(num_ridges: usize, facets: &ElementList) -> ElementList {
     let num_facets = facets.len();
     let mut g: Graph<(), (), Undirected> = Graph::new_undirected();
     for _ in 0..(num_ridges + num_facets) {
@@ -195,12 +196,14 @@ pub fn polytope_from_off_src(src: String) -> PolytopeSerde {
 
     let num_elems = get_elem_nums(dim, &mut toks);
     let vertices = parse_vertices(num_elems[0], dim, &mut toks);
+    let mut elements = Vec::with_capacity(dim as usize);
 
     // Reads edges and faces.
-    let mut elements = Vec::with_capacity(dim as usize);
-    let (edges, faces) = parse_edges_and_faces(num_elems[1], num_elems[2], &mut toks);
-    elements.push(edges);
-    elements.push(faces);
+    if dim >= 2 {
+        let (edges, faces) = parse_edges_and_faces(num_elems[1], num_elems[2], &mut toks);
+        elements.push(edges);
+        elements.push(faces);
+    }
 
     // Adds all higher elements.
     for d in 3..dim {
@@ -208,7 +211,9 @@ pub fn polytope_from_off_src(src: String) -> PolytopeSerde {
     }
 
     // Adds components.
-    elements.push(get_comps(&elements[dim - 3], &elements[dim - 2]));
+    if dim >= 3 {
+        elements.push(get_comps(elements[dim - 3].len(), &elements[dim - 2]));
+    }
 
     PolytopeSerde { vertices, elements }
 }
@@ -220,6 +225,24 @@ pub fn open_off(fp: &Path) -> IoResult<PolytopeSerde> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hig_counts() {
+        let hig: Polytope = polytope_from_off_src(
+            "2OFF 6 1 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 6 0 1 2 3 4 5".to_string()
+        ).into();
+
+        assert_eq!(hig.el_counts(), vec![6, 6, 1])
+    }
+
+    #[test]
+    fn shig_counts() {
+        let shig: Polytope = polytope_from_off_src(
+            "2OFF 6 2 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 3 0 2 4 3 1 3 5".to_string()
+        ).into();
+
+        assert_eq!(shig.el_counts(), vec![6, 6, 2])
+    }
 
     #[test]
     fn tet_counts() {
@@ -244,20 +267,18 @@ mod tests {
     #[test]
     fn comments() {
         let tet: Polytope = polytope_from_off_src(
-            "OFF # this
+            "# So
+            OFF # this
             4 4 6 # is
             # a # test # of
-            # Vertices
             1 1 1 # the 3 1
             1 -1 -1 # comment 4 1
             -1 1 -1 # removal 5 9
             -1 -1 1 # system 2 6
-            
-            # Faces
-            3 0 1 2
-            3 3 0 2
-            3 0 1 3
-            3 3 1 2"
+            3 0 1 2 #let #us #see
+            3 3 0 2# if
+            3 0 1 3#it
+            3 3 1 2#works!#"
                 .to_string(),
         )
         .into();
@@ -268,34 +289,7 @@ mod tests {
     #[test]
     fn pen_counts() {
         let pen: Polytope = polytope_from_off_src(
-            "4OFF
-            5 10 10 5
-            
-            # Vertices
-            0.158113883008419 0.204124145231932 0.288675134594813 0.5
-            0.158113883008419 0.204124145231932 0.288675134594813 -0.5
-            0.158113883008419 0.204124145231932 -0.577350269189626 0
-            0.158113883008419 -0.612372435695794 0 0
-            -0.632455532033676 0 0 0
-            
-            # Faces
-            3 0 3 4
-            3 0 2 4
-            3 2 3 4
-            3 0 2 3
-            3 0 1 4
-            3 1 3 4
-            3 0 1 3
-            3 1 2 4
-            3 0 1 2
-            3 1 2 3
-            
-            # Cells
-            4 0 1 2 3
-            4 0 4 5 6
-            4 1 4 7 8
-            4 2 5 7 9
-            4 3 6 8 9"
+            "4OFF 5 10 10 5 0.158113883008419 0.204124145231932 0.288675134594813 0.5 0.158113883008419 0.204124145231932 0.288675134594813 -0.5 0.158113883008419 0.204124145231932 -0.577350269189626 0 0.158113883008419 -0.612372435695794 0 0 -0.632455532033676 0 0 0 3 0 3 4 3 0 2 4 3 2 3 4 3 0 2 3 3 0 1 4 3 1 3 4 3 0 1 3 3 1 2 4 3 0 1 2 3 1 2 3 4 0 1 2 3 4 0 4 5 6 4 1 4 7 8 4 2 5 7 9 4 3 6 8 9"
                 .to_string(),
         )
         .into();
