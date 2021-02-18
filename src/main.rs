@@ -1,10 +1,12 @@
+#![allow(dead_code)]
+
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::camera::Camera;
 use bevy::render::pipeline::PipelineDescriptor;
 use no_cull_pipeline::PbrNoBackfaceBundle;
+use polytope::shapes::*;
 use polytope::*;
-use polytope::{off::load::from_src, shapes::*};
 
 mod no_cull_pipeline;
 mod polytope;
