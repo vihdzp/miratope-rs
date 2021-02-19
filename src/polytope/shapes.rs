@@ -29,9 +29,9 @@ fn rotations(angle: f64, num: usize, dim: usize) -> Vec<Matrix> {
 pub fn compound(p: Polytope, trans: Vec<Matrix>) -> Polytope {
     let comps = trans.len();
     let el_counts = p.el_counts();
-    let vertices = p.vertices
+    let vertices = trans
         .into_iter()
-        .flat_map(|v| trans.iter().map(move |m| m * v.clone()))
+        .flat_map(|m| p.vertices.iter().map(move |v| m.clone() * v))
         .collect();
     let mut elements = Vec::with_capacity(p.elements.len());
 
