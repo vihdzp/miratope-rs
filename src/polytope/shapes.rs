@@ -1,6 +1,4 @@
-use std::f64::consts::PI;
-use std::{f64, usize};
-
+use std::f64::consts::PI as PI64;
 use gcd::Gcd;
 use nalgebra::*;
 
@@ -31,14 +29,11 @@ fn rotations(angle: f64, num: usize, dim: usize) -> Vec<Matrix> {
 pub fn compound(p: Polytope, trans: Vec<Matrix>) -> Polytope {
     let comps = trans.len();
     let el_counts = p.el_counts();
-    let mut vertices = Vec::with_capacity(el_counts[0] * comps);
+    let vertices = p.vertices
+        .into_iter()
+        .flat_map(|v| trans.iter().map(move |m| m * v.clone()))
+        .collect();
     let mut elements = Vec::with_capacity(p.elements.len());
-
-    for m in trans.iter() {
-        for v in p.vertices.iter() {
-            vertices.push(m * v);
-        }
-    }
 
     for (d, els) in p.elements.iter().enumerate() {
         let sub_count = el_counts[d];
@@ -62,7 +57,7 @@ pub fn compound(p: Polytope, trans: Vec<Matrix>) -> Polytope {
 pub fn polygon(n: u32, d: u32) -> Polytope {
     let mut n = n as usize;
     let g = n.gcd(d as usize);
-    let a = 2.0 * PI / (n as f64) * (d as f64);
+    let a = 2.0 * PI64 / (n as f64) * (d as f64);
     n /= g;
     let s = a.sin() * 2.0;
 
@@ -84,7 +79,7 @@ pub fn polygon(n: u32, d: u32) -> Polytope {
 }
 
 pub fn tet() -> Polytope {
-    let x = 2f64.sqrt() / 4.0;
+    let x = 2.0_f64.sqrt() / 4.0;
 
     let vertices = vec![
         vec![x, x, x].into(),
@@ -147,7 +142,7 @@ pub fn cube() -> Polytope {
 }
 
 pub fn oct() -> Polytope {
-    let x = 1.0 / 2f64.sqrt();
+    let x = 1.0 / 2.0_f64.sqrt();
 
     let vertices = vec![
         vec![x, 0.0, 0.0].into(),
@@ -191,7 +186,7 @@ pub fn oct() -> Polytope {
 pub fn antiprism_with_height(n: u32, d: u32, h: f64) -> Polytope {
     let mut n = n as usize;
     let g = n.gcd(d as usize);
-    let a = PI / (n as f64) * (d as f64);
+    let a = PI64 / (n as f64) * (d as f64);
     n /= g;
     let s = a.sin() * 2.0;
     let mut h = h / 2.0;
@@ -232,7 +227,11 @@ pub fn antiprism_with_height(n: u32, d: u32, h: f64) -> Polytope {
     // Compounds of antiprisms with antiprismatic symmetry must be handled differently
     // than compounds of antiprisms with prismatic symmetry.
     let d = d as usize;
-    let a = if d / g % 2 == 0 { a } else { a * 2.0 };
+    let a = if d / g % 2 == 0 {
+        a
+    } else {
+        a * 2.0
+    };
     compound(
         Polytope::new(vertices, vec![edges, faces, components]),
         rotations(a / (g as f64), g, 3),
@@ -240,7 +239,7 @@ pub fn antiprism_with_height(n: u32, d: u32, h: f64) -> Polytope {
 }
 
 pub fn antiprism(n: u32, d: u32) -> Polytope {
-    let a = PI / (n as f64) * (d as f64);
+    let a = PI64 / (n as f64) * (d as f64);
     let c = 2.0 * a.cos();
     let h = ((1.0 + c) / (2.0 + c)).sqrt();
     if h.is_nan() {
