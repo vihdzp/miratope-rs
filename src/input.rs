@@ -136,7 +136,7 @@ fn cam_events_from_mouse(
     real_scale: f32,
     cam_inputs: &mut Events<CameraInputEvent>,
 ) {
-    if mouse_button.pressed(MouseButton::Left) {
+    if mouse_button.pressed(MouseButton::Right) {
         for &MouseMotion { mut delta } in mouse_move.get_reader().iter(&mouse_move) {
             delta.x /= width;
             delta.y /= height;

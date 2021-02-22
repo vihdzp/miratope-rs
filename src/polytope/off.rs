@@ -33,36 +33,35 @@ fn data_tokens(src: &String) -> impl Iterator<Item = &str> {
 /// Gets the number of elements from the OFF file.
 /// This includes components iff dim ≤ 2
 /// (this makes things easier down the line).
-fn get_elem_nums<'a>(dim: usize, toks: &mut impl Iterator<Item = &'a str>) -> Vec<usize> {
-    let mut num_elems = Vec::with_capacity(dim);
+fn get_el_counts<'a>(dim: usize, toks: &mut impl Iterator<Item = &'a str>) -> Vec<usize> {
+    let mut el_counts = Vec::with_capacity(dim);
 
     // Reads entries one by one.
     for _ in 0..dim {
         let num_elem = toks.next().expect("OFF file ended unexpectedly.");
-        num_elems.push(num_elem.parse().expect("could not parse as integer"));
+        el_counts.push(num_elem.parse().expect("could not parse as integer"));
     }
 
     // A point has a single component (itself)
     if dim == 0 {
-        num_elems.push(1);
+        el_counts.push(1);
     }
     // A dyad has twice as many vertices as components.
     else if dim == 1 {
-        let comps = num_elems[0];
-        num_elems[0] *= 2;
-        num_elems.push(comps);
+        let comps = el_counts[0] / 2;
+        el_counts.push(comps);
     }
     // A polygon always has as many vertices as edges.
     else if dim == 2 {
-        num_elems.push(num_elems[0]);
+        el_counts.push(el_counts[0]);
     }
 
     // 2-elements go before 1-elements, we're undoing that.
     if dim >= 2 {
-        num_elems.swap(1, 2);
+        el_counts.swap(1, 2);
     }
 
-    num_elems
+    el_counts
 }
 
 /// Parses all vertex coordinates from the OFF file.
@@ -227,21 +226,12 @@ pub fn from_src(src: String) -> PolytopeSerde {
         }
     };
 
-    let num_elems = get_elem_nums(dim, &mut toks);
+    let num_elems = get_el_counts(dim, &mut toks);
     let vertices = parse_vertices(num_elems[0], dim, &mut toks);
-    let mut elements = Vec::with_capacity(dim as usize);
+    let mut elements = Vec::with_capacity(dim);
 
-    // Gets components in the 1D case.
-    if dim == 1 {
-        let num_comps = num_elems[1];
-        let mut comps = Vec::with_capacity(num_comps);
-        for i in 0..num_comps {
-            comps.push(vec![2 * i, 2 * i + 1]);
-        }
-        elements.push(comps);
-    }
     // Reads edges and faces.
-    else if dim >= 2 {
+    if dim >= 2 {
         let (edges, faces) = parse_edges_and_faces(num_elems[1], num_elems[2], &mut toks);
         elements.push(edges);
         elements.push(faces);
@@ -255,6 +245,28 @@ pub fn from_src(src: String) -> PolytopeSerde {
     // Adds components.
     if dim >= 3 {
         elements.push(get_comps(elements[dim - 3].len(), &elements[dim - 2]));
+    }
+    // Deals with the weird 1D case.
+    else if dim == 1 {
+        let comp_count = num_elems[1];
+        let mut components = Vec::with_capacity(comp_count);
+
+        for _ in 0..comp_count {
+            let mut comp = Vec::with_capacity(2);
+
+            for _ in 0..2 {
+                comp.push(
+                    toks.next()
+                        .expect("OFF file ended unexpectedly.")
+                        .parse()
+                        .expect("Integer parsing failed!"),
+                );
+            }
+
+            components.push(comp);
+        }
+
+        elements.push(components);
     }
 
     PolytopeSerde { vertices, elements }
@@ -295,11 +307,23 @@ fn write_vertices(off: &mut String, opt: &OFFOptions, vertices: &Vec<Point>) {
     }
 }
 
-fn write_faces(off: &mut String, opt: &OFFOptions, edges: &ElementList, faces: &ElementList) {
+fn write_faces(
+    off: &mut String,
+    opt: &OFFOptions,
+    dim: usize,
+    edges: &ElementList,
+    faces: &ElementList,
+) {
     // # Faces
     if opt.comments {
+        let el_name = if dim > 2 {
+            element_name(2)
+        } else {
+            COMPONENTS.to_string()
+        };
+
         off.push_str("\n# ");
-        off.push_str(&element_name(2).to_string());
+        off.push_str(&el_name);
         off.push('\n');
     }
 
@@ -349,19 +373,15 @@ fn write_faces(off: &mut String, opt: &OFFOptions, edges: &ElementList, faces: &
     }
 }
 
-fn write_els(off: &mut String, opt: &OFFOptions, d: usize, dim: usize, els: &ElementList) {
+fn write_els(off: &mut String, opt: &OFFOptions, d: usize, els: &ElementList) {
+    // # n-elements
     if opt.comments {
-        let el_name = if d < dim {
-            element_name(dim)
-        } else {
-            COMPONENTS.to_string()
-        };
-
         off.push_str("\n# ");
-        off.push_str(&el_name);
+        off.push_str(&element_name(d).to_string());
         off.push('\n');
     }
 
+    // Adds the elements' indices.
     for el in els {
         off.push_str(&el.len().to_string());
 
@@ -373,7 +393,7 @@ fn write_els(off: &mut String, opt: &OFFOptions, d: usize, dim: usize, els: &Ele
     }
 }
 
-pub fn to_src(p: Polytope, opt: OFFOptions) -> String {
+pub fn to_src(p: &Polytope, opt: OFFOptions) -> String {
     let dim = p.rank();
     let vertices = &p.vertices;
     let elements = &p.elements;
@@ -392,6 +412,11 @@ pub fn to_src(p: Polytope, opt: OFFOptions) -> String {
         off += &dim.to_string();
     }
     off += "OFF\n";
+
+    // If we have a 0-polytope on our hands, that is all.
+    if dim == 0 {
+        return off;
+    }
 
     // Comment before element counts (TODO check 2D and lower).
     if opt.comments {
@@ -423,28 +448,43 @@ pub fn to_src(p: Polytope, opt: OFFOptions) -> String {
     }
 
     for i in 0..(el_counts.len() - 1) {
-        off += &format!("{} ", el_counts[i]);
+        off += &el_counts[i].to_string();
+        off += " ";
     }
     off += "\n";
 
     // Adds vertex coordinates.
     write_vertices(&mut off, &opt, vertices);
 
+    // Takes care of the weird 1D case.
+    if dim == 1 {
+        if opt.comments {
+            off += "\n# ";
+            off += COMPONENTS;
+            off += "\n";
+        }
+
+        for comp in &elements[0] {
+            off += &format!("{} {}\n", comp[0], comp[1]);
+        }
+    }
+
     // Adds faces.
-    if dim >= 3 {
+    if dim >= 2 {
         let (edges, faces) = (&elements[0], &elements[1]);
-        write_faces(&mut off, &opt, edges, faces);
+        write_faces(&mut off, &opt, dim, edges, faces);
     }
 
     // Adds the rest of the elements.
     for d in 3..(dim - 1) {
-        write_els(&mut off, &opt, d, dim, &elements[d - 1]);
+        let els = &elements[d - 1];
+        write_els(&mut off, &opt, d, els);
     }
 
     off
 }
 
-pub fn to_path(fp: &Path, p: Polytope, opt: OFFOptions) -> IoResult<()> {
+pub fn to_path(fp: &Path, p: &Polytope, opt: OFFOptions) -> IoResult<()> {
     std::fs::write(fp, to_src(p, opt))
 }
 
@@ -461,7 +501,7 @@ mod tests {
 
     #[test]
     fn dyad_counts() {
-        let point: Polytope = from_src("1OFF 1 -1 1".to_string()).into();
+        let point: Polytope = from_src("1OFF 2 -1 1 0 1".to_string()).into();
 
         assert_eq!(point.el_counts(), vec![2, 1])
     }
@@ -535,6 +575,33 @@ mod tests {
         .into();
 
         assert_eq!(tet.el_counts(), vec![4, 6, 4, 1])
+    }
+
+    #[test]
+    fn load_reload_point() {
+        let point: Polytope = from_src("0OFF".to_string()).into();
+        let point_src = to_src(&point, Default::default());
+        let point_reload: Polytope = from_src(point_src).into();
+
+        assert_eq!(point.el_counts(), point_reload.el_counts())
+    }
+
+    #[test]
+    fn load_reload_dyad() {
+        let dyad: Polytope = from_src("1OFF 2 -1 1 0 1".to_string()).into();
+        let dyad_src = to_src(&dyad, Default::default());
+        let dyad_reload: Polytope = from_src(dyad_src).into();
+
+        assert_eq!(dyad.el_counts(), dyad_reload.el_counts())
+    }
+
+    #[test]
+    fn load_reload_cube() {
+        let cube: Polytope = from_src("OFF 8 6 12 0.5 0.5 0.5 0.5 0.5 -0.5 0.5 -0.5 0.5 0.5 -0.5 -0.5 -0.5 0.5 0.5 -0.5 0.5 -0.5 -0.5 -0.5 0.5 -0.5 -0.5 -0.5 4 4 0 2 6 4 0 1 3 2 4 6 7 3 2 4 5 7 6 4 4 4 0 1 5 4 7 5 1 3".to_string()).into();
+        let cube_src = to_src(&cube, Default::default());
+        let cube_reload: Polytope = from_src(cube_src).into();
+
+        assert_eq!(cube.el_counts(), cube_reload.el_counts())
     }
 
     #[test]

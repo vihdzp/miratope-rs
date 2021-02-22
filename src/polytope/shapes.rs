@@ -1,6 +1,6 @@
-use std::f64::consts::PI as PI64;
 use gcd::Gcd;
 use nalgebra::*;
+use std::f64::consts::PI as PI64;
 
 use super::Polytope;
 
@@ -30,16 +30,14 @@ pub fn compound(p: Polytope, trans: Vec<Matrix>) -> Polytope {
     let comps = trans.len();
     let el_counts = p.el_counts();
     // the vertices, turned into homogeneous points
-    let vertices = p.vertices
+    let vertices = p
+        .vertices
         .into_iter()
         .map(|v| v.push(1.0))
         .collect::<Vec<_>>();
     let vertices = trans
         .into_iter()
-        .flat_map(|m| vertices
-            .iter()
-            .map(move |v| m.clone() * v)
-        )
+        .flat_map(|m| vertices.iter().map(move |v| m.clone() * v))
         .map(|v| {
             // remove the extra homogeneous coordinate
             let row = v.nrows() - 1;
@@ -63,6 +61,20 @@ pub fn compound(p: Polytope, trans: Vec<Matrix>) -> Polytope {
 
         elements.push(new_els);
     }
+
+    Polytope::new(vertices, elements)
+}
+
+pub fn point() -> Polytope {
+    let vertices = vec![].into();
+    let elements = vec![];
+
+    Polytope::new(vertices, elements)
+}
+
+pub fn dyad() -> Polytope {
+    let vertices = vec![vec![-0.5].into(), vec![0.5].into()];
+    let elements = vec![vec![vec![0, 1]]];
 
     Polytope::new(vertices, elements)
 }
@@ -237,14 +249,10 @@ pub fn antiprism_with_height(n: u32, d: u32, h: f64) -> Polytope {
     components[0].push(2 * n);
     components[0].push(2 * n + 1);
 
-    // Compounds of antiprisms with antiprismatic symmetry must be handled differently
-    // than compounds of antiprisms with prismatic symmetry.
+    // Compounds of antiprisms with antiprismatic symmetry must be handled
+    // differently than compounds of antiprisms with prismatic symmetry.
     let d = d as usize;
-    let a = if d / g % 2 == 0 {
-        a
-    } else {
-        a * 2.0
-    };
+    let a = if d / g % 2 == 0 { a } else { a * 2.0 };
     compound(
         Polytope::new(vertices, vec![edges, faces, components]),
         rotations(a / (g as f64), g, 3),

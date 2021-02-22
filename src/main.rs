@@ -74,13 +74,11 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly: Polytope = off::from_path(&"./lib/utahteapot.off")
-        .unwrap()
-        .into();
+    let poly: Polytope = off::from_path(&"./lib/utahteapot.off").unwrap().into();
 
     println!(
         "{}",
-        off::to_src(shapes::cube(), off::OFFOptions { comments: false })
+        off::to_src(&shapes::dyad(), off::OFFOptions { comments: true })
     );
 
     pipelines.set_untracked(
