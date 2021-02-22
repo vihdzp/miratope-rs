@@ -46,13 +46,11 @@ pub struct Polytope {
 
 impl Polytope {
     pub fn new(vertices: Vec<Point>, elements: Vec<ElementList>) -> Self {
-        let triangles;
-
-        if elements.len() >= 2 {
-            triangles = Self::triangulate(&elements[0], &elements[1]);
+        let triangles = if elements.len() >= 2 {
+            Self::triangulate(&elements[0], &elements[1])
         } else {
-            triangles = vec![];
-        }
+            vec![]
+        };
 
         Polytope {
             vertices,
@@ -62,7 +60,7 @@ impl Polytope {
     }
 
     fn triangulate(edges: &Vec<Element>, faces: &Vec<Element>) -> Vec<[usize; 3]> {
-        let mut triangles = Vec::with_capacity(4 * (edges.len() - faces.len()));
+        let mut triangles = Vec::new();
 
         for face in faces {
             let edge_i = face.first().expect("no indices in face").clone();
