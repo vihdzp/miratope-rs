@@ -45,6 +45,7 @@
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
+use nalgebra::{DMatrix, Dynamic, Translation3};
 use no_cull_pipeline::PbrNoBackfaceBundle;
 use polytope::shapes::*;
 use polytope::*;
@@ -74,7 +75,9 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly: Polytope = antiprism(12, 2);
+    let mut trans = DMatrix::identity_generic(Dynamic::new(4), Dynamic::new(4));
+    trans.copy_from(&Translation3::new(3.0, -3.0, 0.0).to_homogeneous());
+    let poly: Polytope = shapes::compound(antiprism(10, 2), vec![DMatrix::identity_generic(Dynamic::new(4), Dynamic::new(4)), trans]);
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
@@ -125,13 +128,5 @@ fn setup(
                 },
                 ..Default::default()
             });
-}
-
-fn spin_camera(mut query: Query<&mut Transform, With<Camera>>, time: Res<Time>) {
-    const SPIN_RATE: f32 = std::f32::consts::PI * 2.0 / 3.0;
-
-    for mut tf in query.iter_mut() {
-        tf.translation = Quat::from_rotation_y(time.delta_seconds() * SPIN_RATE) * tf.translation;
-        tf.look_at(Vec3::zero(), Vec3::unit_y());
-    }
+        });
 }

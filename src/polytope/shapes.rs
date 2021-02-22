@@ -12,14 +12,14 @@ fn rotations(angle: f64, num: usize, dim: usize) -> Vec<Matrix> {
     let mut m = Matrix::identity_generic(d, d);
     let mut r = Matrix::identity_generic(d, d);
 
-    let (c, s) = (angle.cos(), angle.sin());
+    let (s, c) = angle.sin_cos();
     r[(0, 0)] = c;
     r[(1, 0)] = s;
     r[(0, 1)] = -s;
     r[(1, 1)] = c;
 
     for _ in 0..num {
-        rotations.push(m.clone());
+        rotations.push(m.to_homogeneous());
         m *= &r;
     }
 
@@ -29,9 +29,22 @@ fn rotations(angle: f64, num: usize, dim: usize) -> Vec<Matrix> {
 pub fn compound(p: Polytope, trans: Vec<Matrix>) -> Polytope {
     let comps = trans.len();
     let el_counts = p.el_counts();
+    // the vertices, turned into homogeneous points
+    let vertices = p.vertices
+        .into_iter()
+        .map(|v| v.push(1.0))
+        .collect::<Vec<_>>();
     let vertices = trans
         .into_iter()
-        .flat_map(|m| p.vertices.iter().map(move |v| m.clone() * v))
+        .flat_map(|m| vertices
+            .iter()
+            .map(move |v| m.clone() * v)
+        )
+        .map(|v| {
+            // remove the extra homogeneous coordinate
+            let row = v.nrows() - 1;
+            v.remove_row(row)
+        })
         .collect();
     let mut elements = Vec::with_capacity(p.elements.len());
 
