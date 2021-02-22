@@ -259,7 +259,7 @@ pub fn from_src(src: String) -> PolytopeSerde {
     PolytopeSerde { vertices, elements }
 }
 
-pub fn from_path(fp: &Path) -> IoResult<PolytopeSerde> {
+pub fn from_path(fp: &impl AsRef<Path>) -> IoResult<PolytopeSerde> {
     Ok(from_src(String::from_utf8(std::fs::read(fp)?).unwrap()))
 }
 

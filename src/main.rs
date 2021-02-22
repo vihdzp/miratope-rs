@@ -75,7 +75,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly: Polytope = off::from_path(&std::path::Path::new("./lib/utahteapot.off"))
+    let poly: Polytope = off::from_path(&"./lib/utahteapot.off")
         .unwrap()
         .into();
 
