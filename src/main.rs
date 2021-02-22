@@ -44,21 +44,21 @@
 
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
-use bevy::render::camera::Camera;
-use bevy::render::pipeline::PipelineDescriptor;
+use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use no_cull_pipeline::PbrNoBackfaceBundle;
 use polytope::shapes::*;
 use polytope::*;
 
 mod no_cull_pipeline;
 mod polytope;
+mod input;
 
 fn main() {
     App::build()
         .add_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
+        .add_plugin(input::InputPlugin)
         .add_startup_system(setup.system())
-        .add_system(spin_camera.system())
         .run();
 }
 
@@ -109,11 +109,22 @@ fn setup(
             transform: Transform::from_translation(Vec3::new(-2.0, 2.5, 2.0)),
             ..Default::default()
         })
-        .spawn(Camera3dBundle {
-            transform: Transform::from_translation(Vec3::new(-2.0, 2.5, 5.0))
+        // camera anchor
+        .spawn((
+            GlobalTransform::default(),
+            Transform::from_translation(Vec3::new(-0.02, 0.025, 0.05))
                 .looking_at(Vec3::default(), Vec3::unit_y()),
-            ..Default::default()
-        });
+        ))
+        .with_children(|cb| {
+            // camera
+            cb.spawn(Camera3dBundle {
+                transform: Transform::from_translation(Vec3::new(0.0, 0.0, 5.0)),
+                perspective_projection: PerspectiveProjection {
+                    near: 0.0001,
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
 }
 
 fn spin_camera(mut query: Query<&mut Transform, With<Camera>>, time: Res<Time>) {
