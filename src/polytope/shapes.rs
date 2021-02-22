@@ -135,7 +135,7 @@ pub fn cube() -> Polytope {
         vec![4, 5],
         vec![5, 6],
         vec![6, 7],
-        vec![7, 3],
+        vec![7, 4],
         vec![0, 4],
         vec![1, 5],
         vec![2, 6],

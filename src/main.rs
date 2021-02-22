@@ -47,12 +47,12 @@ use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use nalgebra::{DMatrix, Dynamic, Translation3};
 use no_cull_pipeline::PbrNoBackfaceBundle;
-use polytope::shapes::*;
+use polytope::shapes;
 use polytope::*;
 
+mod input;
 mod no_cull_pipeline;
 mod polytope;
-mod input;
 
 fn main() {
     App::build()
@@ -75,9 +75,11 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let mut trans = DMatrix::identity_generic(Dynamic::new(4), Dynamic::new(4));
-    trans.copy_from(&Translation3::new(3.0, -3.0, 0.0).to_homogeneous());
-    let poly: Polytope = shapes::compound(antiprism(10, 2), vec![DMatrix::identity_generic(Dynamic::new(4), Dynamic::new(4)), trans]);
+    let poly: Polytope = off::from_path(&std::path::Path::new("./lib/utahteapot.off"))
+        .unwrap()
+        .into();
+
+    println!("{}", off::to_src(shapes::cube(), Default::default()));
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
@@ -97,7 +99,7 @@ fn setup(
     commands
         .spawn(PbrNoBackfaceBundle {
             mesh: meshes.add(poly.get_mesh()),
-            material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
+            material: materials.add(Color::rgb(0.93, 0.5, 0.93).into()),
             transform: Transform::from_translation(Vec3::new(0.0, 0.5, 0.0)),
             ..Default::default()
         })

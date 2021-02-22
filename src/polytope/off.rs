@@ -2,9 +2,18 @@ use std::collections::HashMap;
 use std::io::Result as IoResult;
 use std::path::Path;
 
-use petgraph::{graph::Graph, prelude::NodeIndex, Undirected};
+use petgraph::{graph::Graph, prelude::NodeIndex, visit::Dfs, Undirected};
 
 use super::super::*;
+
+const ELEMENT_NAMES: [&str; 5] = ["Vertices", "Edges", "Faces", "Cells", "Tera"];
+
+fn element_name(dim: usize) -> String {
+    match ELEMENT_NAMES.get(dim) {
+        Some(&name) => String::from(name),
+        None => dim.to_string() + "-elements",
+    }
+}
 
 /// Removes all whitespace and comments from the OFF file.
 fn data_tokens(src: &String) -> impl Iterator<Item = &str> {
@@ -169,20 +178,20 @@ pub fn get_comps(num_ridges: usize, facets: &ElementList) -> ElementList {
     // g is the incidence graph of ridges and facets.
     // The ith ridge is stored at position i.
     // The ith facet is stored at position num_ridges + i.
-    let mut g: Graph<(), (), Undirected> = Graph::new_undirected();
+    let mut graph: Graph<(), (), Undirected> = Graph::new_undirected();
     for _ in 0..(num_ridges + num_facets) {
-        g.add_node(());
+        graph.add_node(());
     }
 
     for (i, f) in facets.iter().enumerate() {
         for r in f.iter() {
-            g.add_edge(NodeIndex::new(*r), NodeIndex::new(num_ridges + i), ());
+            graph.add_edge(NodeIndex::new(*r), NodeIndex::new(num_ridges + i), ());
         }
     }
 
     // Converts the connected components of our facet + ridge graph
     // into just the lists of facets in each component.
-    let g_comps = petgraph::algo::tarjan_scc(&g);
+    let g_comps = petgraph::algo::kosaraju_scc(&graph);
     let mut comps = Vec::with_capacity(g_comps.len());
 
     for g_comp in g_comps.iter() {
@@ -254,39 +263,165 @@ pub fn from_path(fp: &Path) -> IoResult<PolytopeSerde> {
     Ok(from_src(String::from_utf8(std::fs::read(fp)?).unwrap()))
 }
 
-const EL_NAMES: &[&str] = &["Vertices", "Edges", "Faces"];
-
 /// A set of options to be used when saving the OFF file.
 #[derive(Clone, Copy)]
 pub struct OFFOptions {
     /// Whether the OFF file should have comments specifying each face type.
     comments: bool,
-    /// Whether the file should be compatible with Stella (3D and 4D only).
-    stella_compat: bool,
 }
 
 impl Default for OFFOptions {
     fn default() -> Self {
-        OFFOptions {
-            comments: true,
-            stella_compat: true,
-        }
+        OFFOptions { comments: true }
     }
 }
 
-pub fn to_src(p: Polytope, mut opt: OFFOptions) -> String {
+fn write_vertices(off: &mut String, vertices: &Vec<Point>) {
+    for v in vertices {
+        for c in v.into_iter() {
+            off.push_str(&c.to_string());
+            off.push(' ');
+        }
+        off.push('\n');
+    }
+}
+
+fn write_faces(off: &mut String, edges: &ElementList, faces: &ElementList) {
+    for f in faces {
+        off.push_str(&f.len().to_string());
+
+        let mut hash_edges = HashMap::new();
+        let mut graph = Graph::new_undirected();
+
+        // Maps the vertex indices to consecutive integers from 0.
+        for &e in f {
+            let e = &edges[e];
+            let mut hash_edge = Vec::with_capacity(2);
+
+            for &v in e {
+                match hash_edges.get(&v) {
+                    Some(&idx) => hash_edge.push(idx),
+                    None => {
+                        let idx = hash_edges.len();
+                        hash_edges.insert(v, idx);
+                        hash_edge.push(idx);
+
+                        graph.add_node(v);
+                    }
+                }
+            }
+        }
+
+        assert_eq!(hash_edges.len(), f.len());
+
+        for &e in f {
+            let e = &edges[e];
+            graph.add_edge(
+                NodeIndex::new(*hash_edges.get(&e[0]).unwrap()),
+                NodeIndex::new(*hash_edges.get(&e[1]).unwrap()),
+                (),
+            );
+        }
+
+        let mut dfs = Dfs::new(&graph, NodeIndex::new(0));
+        while let Some(nx) = dfs.next(&graph) {
+            off.push(' ');
+            off.push_str(&graph[nx].to_string());
+        }
+        off.push('\n');
+    }
+}
+
+fn write_els(off: &mut String, els: &ElementList) {
+    for el in els {
+        off.push_str(&el.len().to_string());
+
+        for sub in el {
+            off.push(' ');
+            off.push_str(&sub.to_string());
+        }
+        off.push('\n');
+    }
+}
+
+pub fn to_src(p: Polytope, opt: OFFOptions) -> String {
     let dim = p.rank();
+    let vertices = &p.vertices;
+    let elements = &p.elements;
     let mut off = String::new();
 
-    // Stella compatibility only matters in 3D and 4D.
-    opt.stella_compat &= dim == 3 || dim == 4;
+    // Blatant advertising
+    if opt.comments {
+        off += &format!(
+            "# Generated using Miratope v{} (https://github.com/OfficialURL/miratope-rs)\n",
+            env!("CARGO_PKG_VERSION")
+        );
+    }
 
     // Writes header.
     if dim != 3 {
         off += &dim.to_string();
     }
+    off += "OFF\n";
 
-    off + "OFF\n"
+    // Comment before element counts (TODO check 2D and lower).
+    if opt.comments {
+        off += "\n# Vertices";
+
+        let mut element_names = Vec::with_capacity(dim - 1);
+
+        for d in 1..dim {
+            element_names.push(element_name(d));
+        }
+
+        if element_names.len() >= 2 {
+            element_names.swap(0, 1);
+        }
+
+        for d in 0..(dim - 1) {
+            off += ", ";
+            off += &element_names[d];
+        }
+
+        off += "\n";
+    }
+
+    // Adds element counts (TODO check 2D and lower).
+    let mut el_counts = p.el_counts();
+
+    if el_counts.len() >= 3 {
+        el_counts.swap(1, 2);
+    }
+
+    for i in 0..(el_counts.len() - 1) {
+        off += &format!("{} ", el_counts[i]);
+    }
+    off += "\n";
+
+    // Adds vertex coordinates.
+    if opt.comments {
+        off += &format!("\n# {}\n", element_name(0));
+    }
+    write_vertices(&mut off, vertices);
+
+    // Adds faces.
+    if dim >= 3 {
+        if opt.comments {
+            off += &format!("\n# {}\n", element_name(2));
+        }
+        let (edges, faces) = (&elements[0], &elements[1]);
+        write_faces(&mut off, edges, faces);
+    }
+
+    // Adds the rest of the elements.
+    for d in 3..(dim - 1) {
+        if opt.comments {
+            off += &format!("\n# {}\n", element_name(d));
+        }
+        write_els(&mut off, &elements[d - 1]);
+    }
+
+    off
 }
 
 pub fn to_path(fp: &Path, p: Polytope, opt: OFFOptions) -> IoResult<()> {
