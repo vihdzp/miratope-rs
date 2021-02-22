@@ -7,6 +7,7 @@ use petgraph::{graph::Graph, prelude::NodeIndex, visit::Dfs, Undirected};
 use super::super::*;
 
 const ELEMENT_NAMES: [&str; 5] = ["Vertices", "Edges", "Faces", "Cells", "Tera"];
+const COMPONENTS: &str = "Components";
 
 fn element_name(dim: usize) -> String {
     match ELEMENT_NAMES.get(dim) {
@@ -267,7 +268,7 @@ pub fn from_path(fp: &impl AsRef<Path>) -> IoResult<PolytopeSerde> {
 #[derive(Clone, Copy)]
 pub struct OFFOptions {
     /// Whether the OFF file should have comments specifying each face type.
-    comments: bool,
+    pub comments: bool,
 }
 
 impl Default for OFFOptions {
@@ -276,7 +277,15 @@ impl Default for OFFOptions {
     }
 }
 
-fn write_vertices(off: &mut String, vertices: &Vec<Point>) {
+fn write_vertices(off: &mut String, opt: &OFFOptions, vertices: &Vec<Point>) {
+    // # Vertices
+    if opt.comments {
+        off.push_str("\n# ");
+        off.push_str(&element_name(0).to_string());
+        off.push('\n');
+    }
+
+    // Adds the coordinates.
     for v in vertices {
         for c in v.into_iter() {
             off.push_str(&c.to_string());
@@ -286,7 +295,15 @@ fn write_vertices(off: &mut String, vertices: &Vec<Point>) {
     }
 }
 
-fn write_faces(off: &mut String, edges: &ElementList, faces: &ElementList) {
+fn write_faces(off: &mut String, opt: &OFFOptions, edges: &ElementList, faces: &ElementList) {
+    // # Faces
+    if opt.comments {
+        off.push_str("\n# ");
+        off.push_str(&element_name(2).to_string());
+        off.push('\n');
+    }
+
+    // Retrieves the faces, writes them line by line.
     for f in faces {
         off.push_str(&f.len().to_string());
 
@@ -312,7 +329,7 @@ fn write_faces(off: &mut String, edges: &ElementList, faces: &ElementList) {
             }
         }
 
-        assert_eq!(hash_edges.len(), f.len());
+        debug_assert_eq!(hash_edges.len(), f.len());
 
         for &e in f {
             let e = &edges[e];
@@ -332,7 +349,19 @@ fn write_faces(off: &mut String, edges: &ElementList, faces: &ElementList) {
     }
 }
 
-fn write_els(off: &mut String, els: &ElementList) {
+fn write_els(off: &mut String, opt: &OFFOptions, d: usize, dim: usize, els: &ElementList) {
+    if opt.comments {
+        let el_name = if d < dim {
+            element_name(dim)
+        } else {
+            COMPONENTS.to_string()
+        };
+
+        off.push_str("\n# ");
+        off.push_str(&el_name);
+        off.push('\n');
+    }
+
     for el in els {
         off.push_str(&el.len().to_string());
 
@@ -399,26 +428,17 @@ pub fn to_src(p: Polytope, opt: OFFOptions) -> String {
     off += "\n";
 
     // Adds vertex coordinates.
-    if opt.comments {
-        off += &format!("\n# {}\n", element_name(0));
-    }
-    write_vertices(&mut off, vertices);
+    write_vertices(&mut off, &opt, vertices);
 
     // Adds faces.
     if dim >= 3 {
-        if opt.comments {
-            off += &format!("\n# {}\n", element_name(2));
-        }
         let (edges, faces) = (&elements[0], &elements[1]);
-        write_faces(&mut off, edges, faces);
+        write_faces(&mut off, &opt, edges, faces);
     }
 
     // Adds the rest of the elements.
     for d in 3..(dim - 1) {
-        if opt.comments {
-            off += &format!("\n# {}\n", element_name(d));
-        }
-        write_els(&mut off, &elements[d - 1]);
+        write_els(&mut off, &opt, d, dim, &elements[d - 1]);
     }
 
     off

@@ -45,7 +45,6 @@
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
-use nalgebra::{DMatrix, Dynamic, Translation3};
 use no_cull_pipeline::PbrNoBackfaceBundle;
 use polytope::shapes;
 use polytope::*;
@@ -79,7 +78,10 @@ fn setup(
         .unwrap()
         .into();
 
-    println!("{}", off::to_src(shapes::cube(), Default::default()));
+    println!(
+        "{}",
+        off::to_src(shapes::cube(), off::OFFOptions { comments: false })
+    );
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
