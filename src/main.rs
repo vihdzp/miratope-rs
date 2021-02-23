@@ -74,7 +74,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly: Polytope = shapes::tegum(&shapes::polygon(5, 1), &shapes::dyad());
+    let poly: Polytope = shapes::dual(&shapes::cube());
     println!("{}", off::to_src(&poly, Default::default()));
 
     pipelines.set_untracked(

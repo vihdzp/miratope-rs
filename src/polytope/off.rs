@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::Result as IoResult;
 use std::path::Path;
 
-use petgraph::{graph::Graph, prelude::NodeIndex, visit::Dfs, Undirected};
+use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 
 use super::super::*;
 
@@ -173,48 +173,8 @@ pub fn parse_els<'a>(num_els: usize, toks: &mut impl Iterator<Item = &'a str>) -
     els
 }
 
-/// Gets the connected components of the polytope.
-pub fn get_comps(num_ridges: usize, facets: &ElementList) -> ElementList {
-    let num_facets = facets.len();
-
-    // g is the incidence graph of ridges and facets.
-    // The ith ridge is stored at position i.
-    // The ith facet is stored at position num_ridges + i.
-    let mut graph: Graph<(), (), Undirected> = Graph::new_undirected();
-    for _ in 0..(num_ridges + num_facets) {
-        graph.add_node(());
-    }
-
-    for (i, f) in facets.iter().enumerate() {
-        for r in f.iter() {
-            graph.add_edge(NodeIndex::new(*r), NodeIndex::new(num_ridges + i), ());
-        }
-    }
-
-    // Converts the connected components of our facet + ridge graph
-    // into just the lists of facets in each component.
-    let g_comps = petgraph::algo::kosaraju_scc(&graph);
-    let mut comps = Vec::with_capacity(g_comps.len());
-
-    for g_comp in g_comps.iter() {
-        let mut comp = Vec::new();
-
-        for idx in g_comp.iter() {
-            let idx: usize = idx.index();
-
-            if idx < num_ridges {
-                comp.push(idx);
-            }
-        }
-
-        comps.push(comp);
-    }
-
-    comps
-}
-
-/// Builds a `PolytopeSerde` from the string representation of an OFF file.
-pub fn from_src(src: String) -> PolytopeSerde {
+/// Builds a `Polytope` from the string representation of an OFF file.
+pub fn from_src(src: String) -> Polytope {
     let mut toks = data_tokens(&src);
     let dim = {
         let first = toks.next().expect("OFF file empty");
@@ -246,7 +206,7 @@ pub fn from_src(src: String) -> PolytopeSerde {
 
     // Adds components.
     if dim >= 3 {
-        elements.push(get_comps(elements[dim - 3].len(), &elements[dim - 2]));
+        return Polytope::new_wo_comps(vertices, elements);
     }
     // Deals with the weird 1D case.
     else if dim == 1 {
@@ -271,11 +231,11 @@ pub fn from_src(src: String) -> PolytopeSerde {
         elements.push(components);
     }
 
-    PolytopeSerde { vertices, elements }
+    Polytope::new(vertices, elements)
 }
 
 /// Loads a polytope from a file path.
-pub fn from_path(fp: &impl AsRef<Path>) -> IoResult<PolytopeSerde> {
+pub fn from_path(fp: &impl AsRef<Path>) -> IoResult<Polytope> {
     Ok(from_src(String::from_utf8(std::fs::read(fp)?).unwrap()))
 }
 
@@ -497,7 +457,7 @@ pub fn to_src(p: &Polytope, opt: OFFOptions) -> String {
 }
 
 /// Writes a polytope's OFF file in a specified file path.
-pub fn to_path(fp: &Path, p: &Polytope, opt: OFFOptions) -> IoResult<()> {
+pub fn to_path(fp: &impl AsRef<Path>, p: &Polytope, opt: OFFOptions) -> IoResult<()> {
     std::fs::write(fp, to_src(p, opt))
 }
 

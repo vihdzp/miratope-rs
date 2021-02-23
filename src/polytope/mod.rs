@@ -4,6 +4,8 @@ use bevy::render::pipeline::PrimitiveTopology;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 
+use petgraph::{graph::Graph, prelude::NodeIndex, Undirected};
+
 pub mod convex;
 pub mod off;
 pub mod shapes;
@@ -12,6 +14,7 @@ pub type Element = Vec<usize>;
 pub type ElementList = Vec<Element>;
 pub type Point = nalgebra::DVector<f64>;
 pub type Matrix = nalgebra::DMatrix<f64>;
+pub type Hyperplane = Vec<Point>;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolytopeSerde {
@@ -26,6 +29,34 @@ impl From<Polytope> for PolytopeSerde {
             elements: p.elements,
         }
     }
+}
+
+pub fn project(p: &Point, h: Hyperplane) -> Point {
+    const EPS: f64 = 1e-9;
+
+    let mut h = h.iter();
+    let o = h.next().unwrap();
+    let mut basis: Vec<Point> = Vec::new();
+
+    for q in h {
+        let mut q = q - o;
+
+        for b in &basis {
+            q -= b * (q.dot(&b)) / b.norm_squared();
+        }
+
+        if q.norm() > EPS {
+            basis.push(q);
+        }
+    }
+
+    let mut p = p - o;
+
+    for b in &basis {
+        p -= b * (p.dot(&b)) / b.norm_squared();
+    }
+
+    p
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -58,6 +89,52 @@ impl Polytope {
             elements,
             triangles,
         }
+    }
+
+    /// Builds a polytope and auto-generates its connected components.
+    pub fn new_wo_comps(vertices: Vec<Point>, elements: Vec<ElementList>) -> Self {
+        let rank = elements.len() + 1;
+        let num_ridges = elements[rank - 3].len();
+        let facets = &elements[rank - 2];
+        let num_facets = facets.len();
+
+        // g is the incidence graph of ridges and facets.
+        // The ith ridge is stored at position i.
+        // The ith facet is stored at position num_ridges + i.
+        let mut graph: Graph<(), (), Undirected> = Graph::new_undirected();
+        for _ in 0..(num_ridges + num_facets) {
+            graph.add_node(());
+        }
+
+        for (i, f) in facets.iter().enumerate() {
+            for r in f.iter() {
+                graph.add_edge(NodeIndex::new(*r), NodeIndex::new(num_ridges + i), ());
+            }
+        }
+
+        // Converts the connected components of our facet + ridge graph
+        // into just the lists of facets in each component.
+        let g_comps = petgraph::algo::kosaraju_scc(&graph);
+        let mut comps = Vec::with_capacity(g_comps.len());
+
+        for g_comp in g_comps.iter() {
+            let mut comp = Vec::new();
+
+            for idx in g_comp.iter() {
+                let idx: usize = idx.index();
+
+                if idx < num_ridges {
+                    comp.push(idx);
+                }
+            }
+
+            comps.push(comp);
+        }
+
+        let mut elements = elements.clone();
+        elements.push(comps);
+
+        Polytope::new(vertices, elements)
     }
 
     fn triangulate(edges: &Vec<Element>, faces: &Vec<Element>) -> Vec<[usize; 3]> {
