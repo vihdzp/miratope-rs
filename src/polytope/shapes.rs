@@ -280,6 +280,8 @@ pub fn antiprism(n: u32, d: u32) -> Polytope {
 }
 
 fn dual_vertices(vertices: &Vec<Point>, elements: &Vec<ElementList>, o: &Point) -> Vec<Point> {
+    const EPS: f64 = 1e-9;
+
     let rank = elements.len();
     let facets = &elements[rank - 2];
     let ridges = &elements[rank - 3];
@@ -310,6 +312,10 @@ fn dual_vertices(vertices: &Vec<Point>, elements: &Vec<ElementList>, o: &Point) 
             let h = el.iter().map(|&v| vertices[v].clone()).collect();
             let v = super::project(o, h);
             let s = v.norm_squared();
+
+            if s < EPS {
+                panic!("Facet passes through the dual center.")
+            }
 
             v / s
         })
@@ -810,6 +816,14 @@ mod tests {
     }
 
     #[test]
+    /// Checks the element count of a cube dual (octahedron).
+    fn cube_dual_counts() {
+        let cube_dual = dual(&cube());
+
+        assert_eq!(cube_dual.el_counts(), vec![6, 12, 8, 1])
+    }
+
+    #[test]
     /// Checks the element count of a triangular-pentagonal duoprism.
     fn trapedip_counts() {
         let trig = polygon(3, 1);
@@ -835,7 +849,7 @@ mod tests {
         let peg = polygon(5, 1);
         let trapedit = duotegum(&trig, &peg);
 
-        assert_eq!(trapedit.el_counts(), vec![9, 31, 54, 50, 20, 1])
+        assert_eq!(trapedit.el_counts(), vec![8, 23, 30, 15, 1])
     }
 
     #[test]
@@ -854,7 +868,7 @@ mod tests {
         let peg = polygon(5, 1);
         let trapdupy = duopyramid(&trig, &peg);
 
-        assert_eq!(trapdupy.el_counts(), vec![9, 31, 55, 55, 31, 9, 1])
+        assert_eq!(trapdupy.el_counts(), vec![8, 23, 32, 23, 8, 1])
     }
 
     #[test]
