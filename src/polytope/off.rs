@@ -6,7 +6,9 @@ use petgraph::{graph::Graph, prelude::NodeIndex, visit::Dfs, Undirected};
 
 use super::super::*;
 
-const ELEMENT_NAMES: [&str; 5] = ["Vertices", "Edges", "Faces", "Cells", "Tera"];
+const ELEMENT_NAMES: [&str; 11] = [
+    "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta", "Xenna", "Daka",
+];
 const COMPONENTS: &str = "Components";
 
 fn element_name(dim: usize) -> String {
@@ -272,6 +274,7 @@ pub fn from_src(src: String) -> PolytopeSerde {
     PolytopeSerde { vertices, elements }
 }
 
+/// Loads a polytope from a file path.
 pub fn from_path(fp: &impl AsRef<Path>) -> IoResult<PolytopeSerde> {
     Ok(from_src(String::from_utf8(std::fs::read(fp)?).unwrap()))
 }
@@ -289,6 +292,7 @@ impl Default for OFFOptions {
     }
 }
 
+/// Writes the vertices of a polytope into an OFF file.
 fn write_vertices(off: &mut String, opt: &OFFOptions, vertices: &Vec<Point>) {
     // # Vertices
     if opt.comments {
@@ -307,6 +311,7 @@ fn write_vertices(off: &mut String, opt: &OFFOptions, vertices: &Vec<Point>) {
     }
 }
 
+/// Gets and writes the faces of a polytope into an OFF file.
 fn write_faces(
     off: &mut String,
     opt: &OFFOptions,
@@ -331,6 +336,7 @@ fn write_faces(
     for f in faces {
         off.push_str(&f.len().to_string());
 
+        // Maps an OFF index into a graph index.
         let mut hash_edges = HashMap::new();
         let mut graph = Graph::new_undirected();
 
@@ -353,8 +359,11 @@ fn write_faces(
             }
         }
 
+        // There should be as many graph indices as edges on the face.
+        // Otherwise, something went wrong.
         debug_assert_eq!(hash_edges.len(), f.len());
 
+        // Adds the edges to the graph.
         for &e in f {
             let e = &edges[e];
             graph.add_edge(
@@ -364,6 +373,7 @@ fn write_faces(
             );
         }
 
+        // Retrieves the cycle of vertices.
         let mut dfs = Dfs::new(&graph, NodeIndex::new(0));
         while let Some(nx) = dfs.next(&graph) {
             off.push(' ');
@@ -373,6 +383,7 @@ fn write_faces(
     }
 }
 
+/// Writes the n-elements of a polytope into an OFF file.
 fn write_els(off: &mut String, opt: &OFFOptions, d: usize, els: &ElementList) {
     // # n-elements
     if opt.comments {
@@ -393,6 +404,7 @@ fn write_els(off: &mut String, opt: &OFFOptions, d: usize, els: &ElementList) {
     }
 }
 
+/// Converts a polytope into an OFF file.
 pub fn to_src(p: &Polytope, opt: OFFOptions) -> String {
     let dim = p.rank();
     let vertices = &p.vertices;
@@ -440,7 +452,7 @@ pub fn to_src(p: &Polytope, opt: OFFOptions) -> String {
         off += "\n";
     }
 
-    // Adds element counts (TODO check 2D and lower).
+    // Adds element counts.
     let mut el_counts = p.el_counts();
 
     if el_counts.len() >= 3 {
@@ -476,7 +488,7 @@ pub fn to_src(p: &Polytope, opt: OFFOptions) -> String {
     }
 
     // Adds the rest of the elements.
-    for d in 3..(dim - 1) {
+    for d in 3..dim {
         let els = &elements[d - 1];
         write_els(&mut off, &opt, d, els);
     }
@@ -484,6 +496,7 @@ pub fn to_src(p: &Polytope, opt: OFFOptions) -> String {
     off
 }
 
+/// Writes a polytope's OFF file in a specified file path.
 pub fn to_path(fp: &Path, p: &Polytope, opt: OFFOptions) -> IoResult<()> {
     std::fs::write(fp, to_src(p, opt))
 }

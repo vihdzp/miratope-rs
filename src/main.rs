@@ -74,8 +74,8 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly: Polytope = shapes::multiprism(vec![&shapes::dyad(); 3]);
-    dbg!(off::to_src(&poly, Default::default()));
+    let poly: Polytope = shapes::tegum(&shapes::polygon(5, 1), &shapes::dyad());
+    println!("{}", off::to_src(&poly, Default::default()));
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,

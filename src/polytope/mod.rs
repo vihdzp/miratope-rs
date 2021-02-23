@@ -11,6 +11,7 @@ pub mod shapes;
 pub type Element = Vec<usize>;
 pub type ElementList = Vec<Element>;
 pub type Point = nalgebra::DVector<f64>;
+pub type Matrix = nalgebra::DMatrix<f64>;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolytopeSerde {

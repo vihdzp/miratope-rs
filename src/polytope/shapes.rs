@@ -1,16 +1,14 @@
 use gcd::Gcd;
-use nalgebra::*;
+use nalgebra::Dynamic;
 use std::f64::consts::PI as PI64;
 
-use super::Polytope;
-
-type Matrix = nalgebra::DMatrix<f64>;
+use super::{Matrix, Point, Polytope};
 
 fn rotations(angle: f64, num: usize, dim: usize) -> Vec<Matrix> {
     let mut rotations = Vec::with_capacity(num);
     let d = Dynamic::new(dim);
-    let mut m = Matrix::identity_generic(d, d);
-    let mut r = Matrix::identity_generic(d, d);
+    let mut m = nalgebra::Matrix::identity_generic(d, d);
+    let mut r = nalgebra::Matrix::identity_generic(d, d);
 
     let (s, c) = angle.sin_cos();
     r[(0, 0)] = c;
@@ -26,6 +24,8 @@ fn rotations(angle: f64, num: usize, dim: usize) -> Vec<Matrix> {
     rotations
 }
 
+/// Applies a list of transformations to a polytope and creates a compound from
+/// all of the copies of the polytope this generates.
 pub fn compound(p: Polytope, trans: Vec<Matrix>) -> Polytope {
     let comps = trans.len();
     let el_counts = p.el_counts();
@@ -65,6 +65,7 @@ pub fn compound(p: Polytope, trans: Vec<Matrix>) -> Polytope {
     Polytope::new(vertices, elements)
 }
 
+/// Generates the unique 0D polytope.
 pub fn point() -> Polytope {
     let vertices = vec![].into();
     let elements = vec![];
@@ -72,6 +73,7 @@ pub fn point() -> Polytope {
     Polytope::new(vertices, elements)
 }
 
+/// Generates a dyad, the unique non-compound 1D polytope.
 pub fn dyad() -> Polytope {
     let vertices = vec![vec![-0.5].into(), vec![0.5].into()];
     let elements = vec![vec![vec![0, 1]]];
@@ -79,6 +81,7 @@ pub fn dyad() -> Polytope {
     Polytope::new(vertices, elements)
 }
 
+/// Generates a polygon with Schläfli symbol {n / d}.
 pub fn polygon(n: u32, d: u32) -> Polytope {
     let mut n = n as usize;
     let g = n.gcd(d as usize);
@@ -103,6 +106,7 @@ pub fn polygon(n: u32, d: u32) -> Polytope {
     )
 }
 
+/// Generates a regular tetrahedron with unit edge length.
 pub fn tet() -> Polytope {
     let x = 2.0_f64.sqrt() / 4.0;
 
@@ -126,6 +130,7 @@ pub fn tet() -> Polytope {
     Polytope::new(vertices, vec![edges, faces, components])
 }
 
+/// Generates a cube with unit edge length.
 pub fn cube() -> Polytope {
     let x = 0.5;
 
@@ -166,6 +171,7 @@ pub fn cube() -> Polytope {
     Polytope::new(vertices, vec![edges, faces, components])
 }
 
+/// Generates an octahedron with unit edge length.
 pub fn oct() -> Polytope {
     let x = 1.0 / 2.0_f64.sqrt();
 
@@ -259,10 +265,13 @@ pub fn antiprism_with_height(n: u32, d: u32, h: f64) -> Polytope {
     )
 }
 
+/// Creates a uniform [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
+/// with unit edge length.
 pub fn antiprism(n: u32, d: u32) -> Polytope {
     let a = PI64 / (n as f64) * (d as f64);
     let c = 2.0 * a.cos();
     let h = ((1.0 + c) / (2.0 + c)).sqrt();
+
     if h.is_nan() {
         panic!("Uniform antiprism could not be built from these parameters.");
     }
@@ -270,58 +279,14 @@ pub fn antiprism(n: u32, d: u32) -> Polytope {
     antiprism_with_height(n, d, h)
 }
 
-pub fn duoprism(p: &Polytope, q: &Polytope) -> Polytope {
-    let (p_rank, q_rank) = (p.rank(), q.rank());
-    let rank = p_rank + q_rank;
-    let (p_elements, q_elements) = (&p.elements, &q.elements);
-    let (p_vertices, q_vertices) = (&p.vertices, &q.vertices);
-    let (p_el_counts, q_el_counts) = (p.el_counts(), q.el_counts());
+fn duoprism_vertices(p: &Vec<Point>, q: &Vec<Point>) -> Vec<Point> {
+    let dimension = p[0].len() + q[0].len();
+    let mut vertices = Vec::with_capacity(p.len() * q.len());
 
-    if p_rank == 0 {
-        return q.clone();
-    }
-    if q_rank == 0 {
-        return p.clone();
-    }
-
-    let mut vertices = Vec::with_capacity(p_vertices.len() * q_vertices.len());
-    let mut elements = Vec::with_capacity(rank);
-
-    // The elements of a given rank are added in order vertex × facet, edge ×
-    // ridge, ...
-    //
-    // el_counts[m][n] will memoize the number of elements of rank m generated
-    // by these products up and until those of type n-element × (d - n)-element.
-    let mut el_counts = Vec::with_capacity(rank);
-
-    for _ in 0..rank {
-        elements.push(Vec::new());
-    }
-
-    let mut get_idx = |m: usize, i: usize, n: usize, j: usize| -> usize {
-        let offset = i * q_el_counts[n] + j;
-
-        if el_counts.len() <= m {
-            el_counts.push(Vec::new());
-        }
-
-        if el_counts[m].len() <= n {
-            if m == 0 || n == q_rank {
-                el_counts[m].push(0);
-            } else {
-                let idx = el_counts[m - 1][n + 1] + p_el_counts[m - 1] * q_el_counts[n + 1];
-                el_counts[m].push(idx);
-            }
-        }
-
-        el_counts[m][n] + offset
-    };
-
-    // Adds vertices.
-    for pv in p_vertices {
-        for qv in q_vertices {
+    for pv in p {
+        for qv in q {
             let (pv, qv) = (pv.into_iter(), qv.into_iter());
-            let mut v = Vec::with_capacity(rank);
+            let mut v = Vec::with_capacity(dimension);
 
             for &c in pv {
                 v.push(c);
@@ -334,39 +299,100 @@ pub fn duoprism(p: &Polytope, q: &Polytope) -> Polytope {
         }
     }
 
+    vertices
+}
+
+/// Creates a [duoprism](https://polytope.miraheze.org/wiki/Duoprism)
+/// from two given polytopes.
+///
+/// Duoprisms are usually defined in terms of Cartesian products, but this
+/// definition only makes sense in the context of convex polytopes. For general
+/// polytopes, a duoprism may be inductively built as a polytope whose facets
+/// are the "prism products" of the elements of the first polytope times those
+/// of the second, where the prism product of two points is simply the point
+/// resulting from concatenating their coordinates.
+pub fn duoprism(p: &Polytope, q: &Polytope) -> Polytope {
+    let (p_rank, q_rank) = (p.rank(), q.rank());
+    let (p_vertices, q_vertices) = (&p.vertices, &q.vertices);
+    let (p_elements, q_elements) = (&p.elements, &q.elements);
+    let (p_el_counts, q_el_counts) = (p.el_counts(), q.el_counts());
+
+    let rank = p_rank + q_rank;
+
+    if p_rank == 0 {
+        return q.clone();
+    }
+    if q_rank == 0 {
+        return p.clone();
+    }
+
+    let vertices = duoprism_vertices(&p_vertices, &q_vertices);
+    let mut elements = Vec::with_capacity(rank);
+    for _ in 0..rank {
+        elements.push(Vec::new());
+    }
+
+    // The elements of a given rank are added in order vertex × facet, edge ×
+    // ridge, ...
+    //
+    // el_counts[m][n] will memoize the number of elements of rank m generated
+    // by these products up to those of type n-element × (m - n)-element.
+    let mut el_counts = Vec::with_capacity(rank);
     for m in 0..(p_rank + 1) {
-        let p_els = if m > 0 {
-            Some(&p_elements[m - 1])
-        } else {
-            None
-        };
+        el_counts.push(Vec::new());
 
         for n in 0..(q_rank + 1) {
+            if m == 0 || n == q_rank {
+                el_counts[m].push(0);
+            } else {
+                let idx = el_counts[m - 1][n + 1] + p_el_counts[m - 1] * q_el_counts[n + 1];
+                el_counts[m].push(idx);
+            }
+        }
+    }
+
+    // Gets the index of the prism product of the i-th m-element times the j-th
+    // n-element.
+    let get_idx = |m: usize, i: usize, n: usize, j: usize| -> usize {
+        let offset = i * q_el_counts[n] + j;
+
+        el_counts[m][n] + offset
+    };
+
+    // For each of the element lists of p (including vertices):
+    for m in 0..(p_rank + 1) {
+        // For each of the element lists of q (including vertices):
+        for n in 0..(q_rank + 1) {
+            // We'll multiply the m-elements times the n-elements inside of this loop.
+
             // We already took care of vertices.
             if m == 0 && n == 0 {
                 continue;
             }
 
-            let q_els = if n > 0 {
-                Some(&q_elements[n - 1])
-            } else {
-                None
-            };
-
+            // For each m-element:
             for i in 0..p_el_counts[m] {
+                // For each n-element:
                 for j in 0..q_el_counts[n] {
                     let mut els = Vec::new();
 
+                    // The prism product of the i-th m-element A and the j-th n-element B
+                    // has the products of A with the facets of B and B with the facets of
+                    // A as facets.
+
+                    // Points don't have facets.
                     if m != 0 {
-                        let p_els = p_els.unwrap();
+                        let p_els = &p_elements[m - 1];
                         let p_el = &p_els[i];
 
                         for &p_sub in p_el {
                             els.push(get_idx(m - 1, p_sub, n, j));
                         }
                     }
+
+                    // Points don't have facets.
                     if n != 0 {
-                        let q_els = q_els.unwrap();
+                        let q_els = &q_elements[n - 1];
                         let q_el = &q_els[j];
 
                         for &q_sub in q_el {
@@ -388,6 +414,196 @@ pub fn multiprism(polytopes: Vec<&Polytope>) -> Polytope {
 
     for p in polytopes {
         r = duoprism(&p, &r);
+    }
+
+    r
+}
+
+fn tegum_vertices(p: &Vec<Point>, q: &Vec<Point>) -> Vec<Point> {
+    let (p_dimension, q_dimension) = (p[0].len(), q[0].len());
+    let dimension = p_dimension + q_dimension;
+    let mut vertices = Vec::with_capacity(p.len() + q.len());
+
+    for vq in q {
+        let mut v = Vec::with_capacity(dimension);
+        let pad = p_dimension;
+
+        for _ in 0..pad {
+            v.push(0.0);
+        }
+        for &c in vq.iter() {
+            v.push(c);
+        }
+
+        vertices.push(v.into());
+    }
+    for vp in p {
+        let mut v = Vec::with_capacity(dimension);
+        let pad = q_dimension;
+
+        for &c in vp.iter() {
+            v.push(c);
+        }
+        for _ in 0..pad {
+            v.push(0.0);
+        }
+
+        vertices.push(v.into());
+    }
+
+    vertices
+}
+
+pub fn tegum(p: &Polytope, q: &Polytope) -> Polytope {
+    let (p_rank, q_rank) = (p.rank(), q.rank());
+    let (p_vertices, q_vertices) = (&p.vertices, &q.vertices);
+    let (p_elements, q_elements) = (&p.elements, &q.elements);
+    let (p_el_counts, q_el_counts) = (p.el_counts(), q.el_counts());
+
+    let rank = p_rank + q_rank;
+
+    if p_rank == 0 {
+        return q.clone();
+    }
+    if q_rank == 0 {
+        return p.clone();
+    }
+
+    let vertices = tegum_vertices(&p_vertices, &q_vertices);
+    let mut elements = Vec::with_capacity(rank);
+    for _ in 0..rank {
+        elements.push(Vec::new());
+    }
+
+    // The elements of a given rank are added in order nullitope × facet, vertex
+    // × ridge, ...
+    //
+    // el_counts[m][n] will memoize the number of elements of rank m - 1
+    // generated by these products up to those of type (n - 1)-element ×
+    // (m - n)-element.
+    let mut el_counts = Vec::with_capacity(rank);
+    for m in 0..(p_rank + 1) {
+        el_counts.push(Vec::new());
+
+        for n in 0..(q_rank + 1) {
+            if m == 0 || n == q_rank {
+                el_counts[m].push(0);
+            } else {
+                let p_el_count = if m == 1 { 1 } else { p_el_counts[m - 2] };
+                let idx = el_counts[m - 1][n + 1] + p_el_count * q_el_counts[n];
+                el_counts[m].push(idx);
+            }
+        }
+    }
+
+    // Gets the index of the prism product of the i-th m-element times the j-th
+    // n-element.
+    let get_idx = |m: usize, i: usize, n: usize, j: usize| -> usize {
+        let q_el_counts_n = if n == 0 { 1 } else { q_el_counts[n - 1] };
+        let offset = i * q_el_counts_n + j;
+
+        el_counts[m][n] + offset
+    };
+
+    // For each of the element lists of p (including vertices & the nullitope):
+    for m in 0..(p_rank + 1) {
+        let p_el_counts_m = if m == 0 { 1 } else { p_el_counts[m - 1] };
+
+        // For each of the element lists of q (including vertices & the nullitope):
+        for n in 0..(q_rank + 1) {
+            let q_el_counts_n = if n == 0 { 1 } else { q_el_counts[n - 1] };
+
+            // We'll multiply the (m - 1)-elements with the (n - 1)-elements inside of this loop.
+
+            // We already took care of vertices.
+            if m + n < 2 {
+                continue;
+            }
+            // For each m-element:
+            for i in 0..p_el_counts_m {
+                // For each n-element:
+                for j in 0..q_el_counts_n {
+                    let mut els = Vec::new();
+
+                    // The prism product of the i-th m-element A and the j-th n-element B
+                    // has the products of A with the facets of B and B with the facets of
+                    // A as facets.
+
+                    // Nullitopes don't have facets.
+                    if m != 0 {
+                        if m > 1 {
+                            let p_els = &p_elements[m - 2];
+                            let p_el = &p_els[i];
+
+                            for &p_sub in p_el {
+                                els.push(get_idx(m - 1, p_sub, n, j));
+                            }
+                        }
+                        // Dealing with a vertex
+                        else {
+                            els.push(get_idx(m - 1, 0, n, j));
+                        }
+                    }
+
+                    // Nullitopes don't have facets.
+                    if n != 0 {
+                        if n > 1 {
+                            let q_els = &q_elements[n - 2];
+                            let q_el = &q_els[j];
+
+                            for &q_sub in q_el {
+                                els.push(get_idx(m, i, n - 1, q_sub));
+                            }
+                        }
+                        // Dealing with a vertex
+                        else {
+                            els.push(get_idx(m, i, n - 1, 0));
+                        }
+                    }
+
+                    elements[m + n - 2].push(els);
+                }
+            }
+        }
+    }
+
+    // We take special care of the components.
+    // These are simply the pyramid products of the two polytopes' facets.
+    // For each m-element:
+    let (m, n) = (p_rank + 1, q_rank + 1);
+    let (p_el_counts_m, q_el_counts_n) = (p_el_counts[m - 1], q_el_counts[n - 1]);
+
+    // For each component of p:
+    for i in 0..p_el_counts_m {
+        // For each component of q:
+        for j in 0..q_el_counts_n {
+            let mut els = Vec::new();
+
+            // The prism product of the i-th m-element A and the j-th n-element B
+            // has the products of A with the facets of B and B with the facets of
+            // A as facets.
+
+            let (p_els, q_els) = (&p_elements[m - 2], &q_elements[n - 2]);
+            let (p_el, q_el) = (&p_els[i], &q_els[j]);
+
+            for &p_sub in p_el {
+                for &q_sub in q_el {
+                    els.push(get_idx(m - 1, p_sub, n - 1, q_sub));
+                }
+            }
+
+            elements[m + n - 3].push(els);
+        }
+    }
+
+    Polytope::new(vertices, elements)
+}
+
+pub fn multitegum(polytopes: Vec<&Polytope>) -> Polytope {
+    let mut r = point();
+
+    for p in polytopes {
+        r = tegum(&p, &r);
     }
 
     r
@@ -443,5 +659,22 @@ mod tests {
         let trittip = multiprism(vec![&trig; 3]);
 
         assert_eq!(trittip.el_counts(), vec![27, 81, 108, 81, 36, 9, 1])
+    }
+
+    #[test]
+    fn dupetet_counts() {
+        let peg = polygon(5, 1);
+        let tet = tet();
+        let petet = tegum(&peg, &tet);
+
+        assert_eq!(petet.el_counts(), vec![9, 31, 54, 50, 20, 1])
+    }
+
+    #[test]
+    fn dutrittip_counts() {
+        let trig = polygon(3, 1);
+        let trittip = multitegum(vec![&trig; 3]);
+
+        assert_eq!(trittip.el_counts(), vec![9, 36, 81, 108, 81, 27, 1])
     }
 }
