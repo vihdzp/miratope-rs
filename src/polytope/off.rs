@@ -9,7 +9,7 @@ use std::path::Path;
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 
-use super::super::*;
+use super::{super::*, Element};
 
 const ELEMENT_NAMES: [&str; 11] = [
     "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta", "Xenna", "Daka",
@@ -25,7 +25,7 @@ fn element_name(dim: usize) -> String {
 }
 
 /// Removes all whitespace and comments from the OFF file.
-fn data_tokens(src: &String) -> impl Iterator<Item = &str> {
+fn data_tokens(src: &str) -> impl Iterator<Item = &str> {
     let mut comment = false;
     str::split(&src, move |c: char| {
         if c == '#' {
@@ -40,35 +40,35 @@ fn data_tokens(src: &String) -> impl Iterator<Item = &str> {
 
 /// Gets the number of elements from the OFF file.
 /// This includes components iff dim ≤ 2, as this makes things easier down the line.
-fn get_el_counts<'a>(dim: usize, toks: &mut impl Iterator<Item = &'a str>) -> Vec<usize> {
-    let mut el_counts = Vec::with_capacity(dim);
+fn get_el_nums<'a>(dim: usize, toks: &mut impl Iterator<Item = &'a str>) -> Vec<usize> {
+    let mut el_nums = Vec::with_capacity(dim);
 
     // Reads entries one by one.
     for _ in 0..dim {
         let num_elem = toks.next().expect("OFF file ended unexpectedly.");
-        el_counts.push(num_elem.parse().expect("could not parse as integer"));
+        el_nums.push(num_elem.parse().expect("could not parse as integer"));
     }
 
     // A point has a single component (itself)
     if dim == 0 {
-        el_counts.push(1);
+        el_nums.push(1);
     }
     // A dyad has twice as many vertices as components.
     else if dim == 1 {
-        let comps = el_counts[0] / 2;
-        el_counts.push(comps);
+        let comps = el_nums[0] / 2;
+        el_nums.push(comps);
     }
     // A polygon always has as many vertices as edges.
     else if dim == 2 {
-        el_counts.push(el_counts[0]);
+        el_nums.push(el_nums[0]);
     }
 
     // 2-elements go before 1-elements, we're undoing that.
     if dim >= 2 {
-        el_counts.swap(1, 2);
+        el_nums.swap(1, 2);
     }
 
-    el_counts
+    el_nums
 }
 
 /// Parses all vertex coordinates from the OFF file.
@@ -108,17 +108,17 @@ fn parse_edges_and_faces<'a>(
 
     // Add each face to the element list.
     for _ in 0..num_faces {
-        let face_sub_count: usize = toks
+        let face_sub_num: usize = toks
             .next()
             .expect("OFF file ended unexpectedly.")
             .parse()
             .expect("Integer parsing failed!");
 
-        let mut face = Vec::with_capacity(face_sub_count);
-        let mut verts = Vec::with_capacity(face_sub_count);
+        let mut face = Vec::with_capacity(face_sub_num);
+        let mut verts = Vec::with_capacity(face_sub_num);
 
         // Reads all vertices of the face.
-        for _ in 0..face_sub_count {
+        for _ in 0..face_sub_num {
             verts.push(
                 toks.next()
                     .expect("OFF file ended unexpectedly.")
@@ -128,9 +128,9 @@ fn parse_edges_and_faces<'a>(
         }
 
         // Gets all edges of the face.
-        for i in 0..face_sub_count {
-            let mut edge = vec![verts[i], verts[(i + 1) % face_sub_count]];
-            edge.sort();
+        for i in 0..face_sub_num {
+            let mut edge = vec![verts[i], verts[(i + 1) % face_sub_num]];
+            edge.sort_unstable();
 
             if let Some(idx) = hash_edges.get(&edge) {
                 face.push(*idx);
@@ -146,27 +146,27 @@ fn parse_edges_and_faces<'a>(
 
     // The number of edges in the file should match the number of read edges, though this isn't obligatory.
     if edges.len() != num_edges {
-        println!("Edge count doesn't match expected edge count!");
+        println!("Edge num doesn't match expected edge num!");
     }
 
     (edges, faces)
 }
 
 /// Reads the next set of elements from the OFF file, starting from cells.
-pub fn parse_els<'a>(num_els: usize, toks: &mut impl Iterator<Item = &'a str>) -> ElementList {
-    let mut els = Vec::with_capacity(num_els);
+pub fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> ElementList {
+    let mut els = Vec::with_capacity(num_el);
 
     // Adds every d-element to the element list.
-    for _ in 0..num_els {
-        let el_sub_count = toks
+    for _ in 0..num_el {
+        let el_sub_num = toks
             .next()
             .expect("OFF file ended unexpectedly.")
             .parse()
             .expect("Integer parsing failed!");
-        let mut el = Vec::with_capacity(el_sub_count);
+        let mut el = Vec::with_capacity(el_sub_num);
 
         // Reads all sub-elements of the d-element.
-        for _ in 0..el_sub_count {
+        for _ in 0..el_sub_num {
             let el_sub = toks.next().expect("OFF file ended unexpectedly.");
             el.push(el_sub.parse().expect("Integer parsing failed!"));
         }
@@ -192,7 +192,7 @@ pub fn from_src(src: String) -> Polytope {
         }
     };
 
-    let num_elems = get_el_counts(dim, &mut toks);
+    let num_elems = get_el_nums(dim, &mut toks);
     let vertices = parse_vertices(num_elems[0], dim, &mut toks);
     let mut elements = Vec::with_capacity(dim);
 
@@ -204,8 +204,8 @@ pub fn from_src(src: String) -> Polytope {
     }
 
     // Adds all higher elements.
-    for d in 3..dim {
-        elements.push(parse_els(num_elems[d], &mut toks));
+    for &num_el in num_elems.iter().take(dim).skip(3) {
+        elements.push(parse_els(num_el, &mut toks));
     }
 
     // Adds components.
@@ -214,10 +214,10 @@ pub fn from_src(src: String) -> Polytope {
     }
     // Deals with the weird 1D case.
     else if dim == 1 {
-        let comp_count = num_elems[1];
-        let mut components = Vec::with_capacity(comp_count);
+        let comp_num = num_elems[1];
+        let mut components = Vec::with_capacity(comp_num);
 
-        for _ in 0..comp_count {
+        for _ in 0..comp_num {
             let mut comp = Vec::with_capacity(2);
 
             for _ in 0..2 {
@@ -257,11 +257,11 @@ impl Default for OFFOptions {
 }
 
 /// Writes the vertices of a polytope into an OFF file.
-fn write_vertices(off: &mut String, opt: &OFFOptions, vertices: &Vec<Point>) {
+fn write_vertices(off: &mut String, opt: &OFFOptions, vertices: &[Point]) {
     // # Vertices
     if opt.comments {
         off.push_str("\n# ");
-        off.push_str(&element_name(0).to_string());
+        off.push_str(&element_name(0));
         off.push('\n');
     }
 
@@ -280,8 +280,8 @@ fn write_faces(
     off: &mut String,
     opt: &OFFOptions,
     dim: usize,
-    edges: &ElementList,
-    faces: &ElementList,
+    edges: &[Element],
+    faces: &[Element],
 ) {
     // # Faces
     if opt.comments {
@@ -348,11 +348,11 @@ fn write_faces(
 }
 
 /// Writes the n-elements of a polytope into an OFF file.
-fn write_els(off: &mut String, opt: &OFFOptions, d: usize, els: &ElementList) {
+fn write_els(off: &mut String, opt: &OFFOptions, d: usize, els: &[Element]) {
     // # n-elements
     if opt.comments {
         off.push_str("\n# ");
-        off.push_str(&element_name(d).to_string());
+        off.push_str(&element_name(d));
         off.push('\n');
     }
 
@@ -394,7 +394,7 @@ pub fn to_src(p: &Polytope, opt: OFFOptions) -> String {
         return off;
     }
 
-    // Comment before element counts (TODO check 2D and lower).
+    // Comment before element nums (TODO check 2D and lower).
     if opt.comments {
         off += "\n# Vertices";
 
@@ -408,23 +408,23 @@ pub fn to_src(p: &Polytope, opt: OFFOptions) -> String {
             element_names.swap(0, 1);
         }
 
-        for d in 0..(dim - 1) {
+        for element_name in element_names {
             off += ", ";
-            off += &element_names[d];
+            off += &element_name;
         }
 
         off += "\n";
     }
 
-    // Adds element counts.
-    let mut el_counts = p.el_counts();
+    // Adds element nums.
+    let mut el_nums = p.el_nums();
 
-    if el_counts.len() >= 3 {
-        el_counts.swap(1, 2);
+    if el_nums.len() >= 3 {
+        el_nums.swap(1, 2);
     }
 
-    for el_count in &el_counts[0..el_counts.len() - 1] {
-        off += dbg!(&el_count.to_string());
+    for el_num in &el_nums[0..el_nums.len() - 1] {
+        off += dbg!(&el_num.to_string());
         off += " ";
     }
     off += "\n";
@@ -470,66 +470,66 @@ mod tests {
     use super::*;
 
     #[test]
-    fn point_counts() {
+    fn point_nums() {
         let point: Polytope = from_src("0OFF".to_string()).into();
 
-        assert_eq!(point.el_counts(), vec![1])
+        assert_eq!(point.el_nums(), vec![1])
     }
 
     #[test]
-    fn dyad_counts() {
+    fn dyad_nums() {
         let point: Polytope = from_src("1OFF 2 -1 1 0 1".to_string()).into();
 
-        assert_eq!(point.el_counts(), vec![2, 1])
+        assert_eq!(point.el_nums(), vec![2, 1])
     }
 
     #[test]
-    fn hig_counts() {
+    fn hig_nums() {
         let hig: Polytope = from_src(
             "2OFF 6 1 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 6 0 1 2 3 4 5".to_string()
         ).into();
 
-        assert_eq!(hig.el_counts(), vec![6, 6, 1])
+        assert_eq!(hig.el_nums(), vec![6, 6, 1])
     }
 
     #[test]
-    fn shig_counts() {
+    fn shig_nums() {
         let shig: Polytope = from_src(
             "2OFF 6 2 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 3 0 2 4 3 1 3 5".to_string()
         ).into();
 
-        assert_eq!(shig.el_counts(), vec![6, 6, 2])
+        assert_eq!(shig.el_nums(), vec![6, 6, 2])
     }
 
     #[test]
-    fn tet_counts() {
+    fn tet_nums() {
         let tet: Polytope = from_src(
             "OFF 4 4 6 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2".to_string(),
         )
         .into();
 
-        assert_eq!(tet.el_counts(), vec![4, 6, 4, 1])
+        assert_eq!(tet.el_nums(), vec![4, 6, 4, 1])
     }
 
     #[test]
-    fn so_counts() {
+    fn so_nums() {
         let so: Polytope = from_src(
             "OFF 8 8 12 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 -1 -1 -1 -1 1 1 1 -1 1 1 1 -1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2 3 4 5 6 3 7 4 6 3 4 5 7 3 7 5 6 ".to_string(),
         )
         .into();
 
-        assert_eq!(so.el_counts(), vec![8, 12, 8, 2])
+        assert_eq!(so.el_nums(), vec![8, 12, 8, 2])
     }
 
     #[test]
-    fn pen_counts() {
+    fn pen_nums() {
         let pen: Polytope = from_src(
             "4OFF 5 10 10 5 0.158113883008419 0.204124145231932 0.288675134594813 0.5 0.158113883008419 0.204124145231932 0.288675134594813 -0.5 0.158113883008419 0.204124145231932 -0.577350269189626 0 0.158113883008419 -0.612372435695794 0 0 -0.632455532033676 0 0 0 3 0 3 4 3 0 2 4 3 2 3 4 3 0 2 3 3 0 1 4 3 1 3 4 3 0 1 3 3 1 2 4 3 0 1 2 3 1 2 3 4 0 1 2 3 4 0 4 5 6 4 1 4 7 8 4 2 5 7 9 4 3 6 8 9"
                 .to_string(),
         )
         .into();
 
-        assert_eq!(pen.el_counts(), vec![5, 10, 10, 5, 1])
+        assert_eq!(pen.el_nums(), vec![5, 10, 10, 5, 1])
     }
 
     #[test]
@@ -551,7 +551,7 @@ mod tests {
         )
         .into();
 
-        assert_eq!(tet.el_counts(), vec![4, 6, 4, 1])
+        assert_eq!(tet.el_nums(), vec![4, 6, 4, 1])
     }
 
     #[test]
@@ -560,7 +560,7 @@ mod tests {
         let point_src = to_src(&point, Default::default());
         let point_reload: Polytope = from_src(point_src).into();
 
-        assert_eq!(point.el_counts(), point_reload.el_counts())
+        assert_eq!(point.el_nums(), point_reload.el_nums())
     }
 
     #[test]
@@ -569,7 +569,7 @@ mod tests {
         let dyad_src = to_src(&dyad, Default::default());
         let dyad_reload: Polytope = from_src(dyad_src).into();
 
-        assert_eq!(dyad.el_counts(), dyad_reload.el_counts())
+        assert_eq!(dyad.el_nums(), dyad_reload.el_nums())
     }
 
     #[test]
@@ -578,7 +578,7 @@ mod tests {
         let cube_src = to_src(&cube, Default::default());
         let cube_reload: Polytope = from_src(cube_src).into();
 
-        assert_eq!(cube.el_counts(), cube_reload.el_counts())
+        assert_eq!(cube.el_nums(), cube_reload.el_nums())
     }
 
     #[test]

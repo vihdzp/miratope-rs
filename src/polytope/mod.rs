@@ -121,15 +121,15 @@ impl Polytope {
     }
 
     fn triangulate(
-        _vertices: &Vec<Point>,
-        edges: &Vec<Element>,
-        faces: &Vec<Element>,
+        _vertices: &[Point],
+        edges: &[Element],
+        faces: &[Element],
     ) -> (Vec<Point>, Vec<[usize; 3]>) {
         let extra_vertices = Vec::new();
         let mut triangles = Vec::new();
 
         for face in faces {
-            let edge_i = face.first().expect("no indices in face").clone();
+            let edge_i = *face.first().expect("no indices in face");
             let vert_i = edges[edge_i][0];
 
             for verts in face[1..].iter().map(|&i| {
@@ -162,16 +162,16 @@ impl Polytope {
     }
 
     /// Gets the element counts of a polytope.
-    /// The n-th entry corresponds to the amount of n elements.
-    fn el_counts(&self) -> Vec<usize> {
-        let mut counts = Vec::with_capacity(self.elements.len() + 1);
-        counts.push(self.vertices.len());
+    /// The n-th entry corresponds to the amount of n-elements.
+    fn el_nums(&self) -> Vec<usize> {
+        let mut nums = Vec::with_capacity(self.elements.len() + 1);
+        nums.push(self.vertices.len());
 
         for e in self.elements.iter() {
-            counts.push(e.len());
+            nums.push(e.len());
         }
 
-        counts
+        nums
     }
 
     /// Scales a polytope by a given factor.
