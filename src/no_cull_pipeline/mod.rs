@@ -1,16 +1,16 @@
-use bevy::prelude::{Draw, GlobalTransform, RenderPipelines, StandardMaterial, Transform, Visible};
-use bevy::asset::{Assets, HandleUntyped, Handle};
-use bevy::reflect::TypeUuid;
+use bevy::asset::{Assets, Handle, HandleUntyped};
 use bevy::ecs::Bundle;
+use bevy::prelude::{Draw, GlobalTransform, RenderPipelines, StandardMaterial, Transform, Visible};
+use bevy::reflect::TypeUuid;
 use bevy::render::{
     mesh::Mesh,
-    render_graph::base::MainPass,
     pipeline::{
         BlendDescriptor, BlendFactor, BlendOperation, ColorStateDescriptor, ColorWrite,
         CompareFunction, CullMode, DepthStencilStateDescriptor, FrontFace, PipelineDescriptor,
-        RasterizationStateDescriptor, StencilStateDescriptor, StencilStateFaceDescriptor,
-        RenderPipeline
+        RasterizationStateDescriptor, RenderPipeline, StencilStateDescriptor,
+        StencilStateFaceDescriptor,
     },
+    render_graph::base::MainPass,
     shader::{Shader, ShaderStage, ShaderStages},
     texture::TextureFormat,
 };
