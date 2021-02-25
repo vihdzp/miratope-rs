@@ -7,7 +7,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          components: rustfmt, clippy
+          override: true
+
+      - name: Install alsa and udev
+        run: sudo apt-get update; sudo apt-get install --no-install-recommends libasound2-dev libudev-dev
+        if: runner.os == 'linux'     
+
+      - name: Build & run tests
       - uses: icepuma/rust-action@master
         with:
-          args: apt-get install libasound2-dev && cargo fmt -- --check && cargo clippy -- -Dwarnings && cargo test
+          args: cargo fmt -- --check && cargo clippy -- -Dwarnings && cargo test
