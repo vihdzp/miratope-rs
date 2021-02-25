@@ -1,4 +1,4 @@
-name: Rust Example
+name: Rust Build
 
 on: [push]
 
@@ -8,7 +8,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.toolchain }}
@@ -20,6 +19,6 @@ jobs:
         if: runner.os == 'linux'     
 
       - name: Build & run tests
-      - uses: icepuma/rust-action@master
+        uses: icepuma/rust-action@master
         with:
           args: cargo fmt -- --check && cargo clippy -- -Dwarnings && cargo test
