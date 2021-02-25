@@ -77,7 +77,14 @@ impl Polytope {
     /// Builds a polytope and auto-generates its connected components.
     pub fn new_wo_comps(vertices: Vec<Point>, mut elements: Vec<ElementList>) -> Self {
         let rank = elements.len() + 1;
-        let num_ridges = elements[rank - 3].len();
+        assert!(rank >= 2, "new_wo_comps can only work on 2D and higher!");
+
+        let num_ridges = if rank >= 3 {
+            elements[rank - 3].len()
+        } else {
+            vertices.len()
+        };
+
         let facets = &elements[rank - 2];
         let num_facets = facets.len();
 
@@ -85,6 +92,8 @@ impl Polytope {
         // The ith ridge is stored at position i.
         // The ith facet is stored at position num_ridges + i.
         let mut graph: Graph<(), (), Undirected> = Graph::new_undirected();
+
+        // Is there not any sort of extend function we can use for syntactic sugar?
         for _ in 0..(num_ridges + num_facets) {
             graph.add_node(());
         }

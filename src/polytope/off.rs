@@ -469,59 +469,76 @@ pub fn to_path(fp: &impl AsRef<Path>, p: &Polytope, opt: OFFOptions) -> IoResult
 mod tests {
     use super::*;
 
+    /// Used to test a particular polytope.
+    fn test_shape(mut p: Polytope, el_nums: Vec<usize>) {
+        // Checks that element counts match up.
+        assert_eq!(p.el_nums(), el_nums);
+
+        // Checks that the polytope can be reloaded correctly.
+        p = from_src(to_src(&p, Default::default()));
+        assert_eq!(p.el_nums(), el_nums);
+    }
+
     #[test]
+    /// Checks that a point has the correct amount of elements.
     fn point_nums() {
         let point: Polytope = from_src("0OFF".to_string()).into();
 
-        assert_eq!(point.el_nums(), vec![1])
+        test_shape(point, vec![1])
     }
 
     #[test]
+    /// Checks that a dyad has the correct amount of elements.
     fn dyad_nums() {
-        let point: Polytope = from_src("1OFF 2 -1 1 0 1".to_string()).into();
+        let dyad: Polytope = from_src("1OFF 2 -1 1 0 1".to_string()).into();
 
-        assert_eq!(point.el_nums(), vec![2, 1])
+        test_shape(dyad, vec![2, 1])
     }
 
     #[test]
+    /// Checks that a hexagon has the correct amount of elements.
     fn hig_nums() {
         let hig: Polytope = from_src(
             "2OFF 6 1 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 6 0 1 2 3 4 5".to_string()
         ).into();
 
-        assert_eq!(hig.el_nums(), vec![6, 6, 1])
+        test_shape(hig, vec![6, 6, 1])
     }
 
     #[test]
+    /// Checks that a hexagram has the correct amount of elements.
     fn shig_nums() {
         let shig: Polytope = from_src(
             "2OFF 6 2 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 3 0 2 4 3 1 3 5".to_string()
         ).into();
 
-        assert_eq!(shig.el_nums(), vec![6, 6, 2])
+        test_shape(shig, vec![6, 6, 2])
     }
 
     #[test]
+    /// Checks that a tetrahedron has the correct amount of elements.
     fn tet_nums() {
         let tet: Polytope = from_src(
             "OFF 4 4 6 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2".to_string(),
         )
         .into();
 
-        assert_eq!(tet.el_nums(), vec![4, 6, 4, 1])
+        test_shape(tet, vec![4, 6, 4, 1])
     }
 
     #[test]
+    /// Checks that a 2-tetrahedron compund has the correct amount of elements.
     fn so_nums() {
         let so: Polytope = from_src(
             "OFF 8 8 12 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 -1 -1 -1 -1 1 1 1 -1 1 1 1 -1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2 3 4 5 6 3 7 4 6 3 4 5 7 3 7 5 6 ".to_string(),
         )
         .into();
 
-        assert_eq!(so.el_nums(), vec![8, 12, 8, 2])
+        test_shape(so, vec![8, 12, 8, 2])
     }
 
     #[test]
+    /// Checks that a pentachoron has the correct amount of elements.
     fn pen_nums() {
         let pen: Polytope = from_src(
             "4OFF 5 10 10 5 0.158113883008419 0.204124145231932 0.288675134594813 0.5 0.158113883008419 0.204124145231932 0.288675134594813 -0.5 0.158113883008419 0.204124145231932 -0.577350269189626 0 0.158113883008419 -0.612372435695794 0 0 -0.632455532033676 0 0 0 3 0 3 4 3 0 2 4 3 2 3 4 3 0 2 3 3 0 1 4 3 1 3 4 3 0 1 3 3 1 2 4 3 0 1 2 3 1 2 3 4 0 1 2 3 4 0 4 5 6 4 1 4 7 8 4 2 5 7 9 4 3 6 8 9"
@@ -529,20 +546,21 @@ mod tests {
         )
         .into();
 
-        assert_eq!(pen.el_nums(), vec![5, 10, 10, 5, 1])
+        test_shape(pen, vec![5, 10, 10, 5, 1])
     }
 
     #[test]
+    /// Checks that comments are correctly parsed.
     fn comments() {
         let tet: Polytope = from_src(
             "# So
             OFF # this
             4 4 6 # is
             # a # test # of
-            1 1 1 # the 3 1
-            1 -1 -1 # comment 4 1
-            -1 1 -1 # removal 5 9
-            -1 -1 1 # system 2 6
+            1 1 1 # the 1234 5678
+            1 -1 -1 # comment 987
+            -1 1 -1 # removal 654
+            -1 -1 1 # system 321
             3 0 1 2 #let #us #see
             3 3 0 2# if
             3 0 1 3#it
@@ -551,34 +569,7 @@ mod tests {
         )
         .into();
 
-        assert_eq!(tet.el_nums(), vec![4, 6, 4, 1])
-    }
-
-    #[test]
-    fn load_reload_point() {
-        let point: Polytope = from_src("0OFF".to_string()).into();
-        let point_src = to_src(&point, Default::default());
-        let point_reload: Polytope = from_src(point_src).into();
-
-        assert_eq!(point.el_nums(), point_reload.el_nums())
-    }
-
-    #[test]
-    fn load_reload_dyad() {
-        let dyad: Polytope = from_src("1OFF 2 -1 1 0 1".to_string()).into();
-        let dyad_src = to_src(&dyad, Default::default());
-        let dyad_reload: Polytope = from_src(dyad_src).into();
-
-        assert_eq!(dyad.el_nums(), dyad_reload.el_nums())
-    }
-
-    #[test]
-    fn load_reload_cube() {
-        let cube: Polytope = from_src("OFF 8 6 12 0.5 0.5 0.5 0.5 0.5 -0.5 0.5 -0.5 0.5 0.5 -0.5 -0.5 -0.5 0.5 0.5 -0.5 0.5 -0.5 -0.5 -0.5 0.5 -0.5 -0.5 -0.5 4 4 0 2 6 4 0 1 3 2 4 6 7 3 2 4 5 7 6 4 4 4 0 1 5 4 7 5 1 3".to_string()).into();
-        let cube_src = to_src(&cube, Default::default());
-        let cube_reload: Polytope = from_src(cube_src).into();
-
-        assert_eq!(cube.el_nums(), cube_reload.el_nums())
+        test_shape(tet, vec![4, 6, 4, 1])
     }
 
     #[test]

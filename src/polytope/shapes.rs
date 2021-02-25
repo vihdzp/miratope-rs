@@ -75,7 +75,7 @@ pub fn compound(p: Polytope, trans: Vec<Matrix>) -> Polytope {
 
 /// Generates the unique 0D polytope.
 pub fn point() -> Polytope {
-    let vertices = vec![];
+    let vertices = vec![vec![].into()];
     let elements = vec![];
 
     Polytope::new(vertices, elements)
@@ -105,7 +105,7 @@ pub fn polygon(vertices: Vec<Point>) -> Polytope {
 
 /// Generates a semiregular polygon, with order n rotational symmetry and winding number d.
 /// Bowties correspond to shapes where `d == 0`.
-pub fn semiregular_polygon(mut n: usize, d: usize, mut len_a: f64, mut len_b: f64) -> Polytope {
+pub fn sreg_polygon(mut n: usize, d: usize, mut len_a: f64, mut len_b: f64) -> Polytope {
     let comp_num;
     let comp_angle;
 
@@ -173,12 +173,12 @@ pub fn semiregular_polygon(mut n: usize, d: usize, mut len_a: f64, mut len_b: f6
 }
 
 /// Generates a regular polygon with Schläfli symbol {n / d}.
-pub fn regular_polygon(n: usize, d: usize) -> Polytope {
+pub fn reg_polygon(n: usize, d: usize) -> Polytope {
     if d == 0 {
         panic!("Invalid parameter d = 0.")
     }
 
-    semiregular_polygon(n, d, 1.0, 0.0)
+    sreg_polygon(n, d, 1.0, 0.0)
 }
 
 /// Generates a regular tetrahedron with unit edge length.
@@ -331,11 +331,7 @@ pub fn antiprism_with_height(mut n: usize, d: usize, height: f64) -> Polytope {
 
     // Compounds of antiprisms with antiprismatic symmetry must be handled
     // differently than compounds of antiprisms with prismatic symmetry.
-    let angle = if d / component_num % 2 == 0 {
-        theta
-    } else {
-        theta * 2.0
-    };
+    let angle = theta * (d / component_num % 2 + 1) as f64;
     compound(
         Polytope::new(vertices, vec![edges, faces, components]),
         rotations(angle / component_num as f64, component_num, 3),
@@ -390,8 +386,6 @@ fn dual_vertices(vertices: &[Point], elements: &[ElementList], o: &Point) -> Vec
     const EPS: f64 = 1e-9;
 
     let rank = elements.len();
-    let facets = &elements[rank - 2];
-    let ridges = &elements[rank - 3];
 
     // Gets the unique sub-elements from a list of elements.
     let unique_subs = |els: &Vec<&Vec<usize>>| -> Element {
@@ -407,20 +401,50 @@ fn dual_vertices(vertices: &[Point], elements: &[ElementList], o: &Point) -> Vec
     };
 
     // We find the indices of the vertices on the facet.
-    facets
-        .iter()
-        .map(|f| {
-            // We repeatedly retrieve the next subelements of the facets until we get to the vertices.
-            let mut els = f.iter().map(|&el| &ridges[el]).collect();
-            for d in (0..(rank - 3)).rev() {
-                let uniq = unique_subs(&els);
-                els = uniq.iter().map(|&el| &elements[d][el]).collect();
-            }
+    let projections: Vec<Point>;
 
-            // We project the dual center onto the hyperplane defined by the vertices.
-            let el = unique_subs(&els);
-            let h = el.iter().map(|&v| vertices[v].clone()).collect();
-            let v = project(o, h);
+    if rank >= 2 {
+        let facets = &elements[rank - 2];
+
+        projections = facets
+            .iter()
+            .map(|f| {
+                // We repeatedly retrieve the next subelements of the facets until we get to the vertices.
+                let facet_verts;
+
+                if rank >= 3 {
+                    let ridges = &elements[rank - 3];
+                    let mut els = f.iter().map(|&el| &ridges[el]).collect();
+
+                    for d in (0..(rank - 3)).rev() {
+                        let uniq = unique_subs(&els);
+                        els = uniq.iter().map(|&el| &elements[d][el]).collect();
+                    }
+
+                    facet_verts = unique_subs(&els);
+                }
+                // If our polytope is 2D, we already know the vertices of the facets.
+                else {
+                    facet_verts = f.clone();
+                }
+
+                // We project the dual center onto the hyperplane defined by the vertices.
+                let h = facet_verts.iter().map(|&v| vertices[v].clone()).collect();
+
+                project(o, h)
+            })
+            .collect()
+    }
+    // If our polytope is 1D, the vertices themselves are the facets.
+    else {
+        projections = vertices.into();
+    }
+
+    // Reciprocates the projected points.
+    projections
+        .iter()
+        .map(|v| {
+            let v = v - o;
             let s = v.norm_squared();
 
             // We avoid division by 0.
@@ -428,13 +452,20 @@ fn dual_vertices(vertices: &[Point], elements: &[ElementList], o: &Point) -> Vec
                 panic!("Facet passes through the dual center.")
             }
 
-            v / s
+            v / s + o
         })
         .collect()
 }
 
 /// Builds the dual polytope of `p`. Uses `o` as the center for reciprocation.
 pub fn dual_with_center(p: &Polytope, o: &Point) -> Polytope {
+    let rank = p.rank();
+
+    // If we're dealing with a point, let's skip all of the bs:
+    if rank == 0 {
+        return point();
+    }
+
     let el_nums = p.el_nums();
 
     let vertices = &p.vertices;
@@ -465,7 +496,14 @@ pub fn dual_with_center(p: &Polytope, o: &Point) -> Polytope {
         du_elements.push(du_els);
     }
 
-    Polytope::new_wo_comps(du_vertices, du_elements)
+    if rank >= 2 {
+        Polytope::new_wo_comps(du_vertices, du_elements)
+    } else {
+        let components = p.elements[0].clone();
+        du_elements.push(components);
+
+        Polytope::new(du_vertices, du_elements)
+    }
 }
 
 /// Builds the dual polytope of `p`. Uses the origin as the center for reciprocation.
@@ -477,23 +515,16 @@ pub fn dual(p: &Polytope) -> Polytope {
     dual_with_center(p, &o.into())
 }
 
+/// Generates the vertices for a duoprism with two given vertex sets.
 fn duoprism_vertices(p: &[Point], q: &[Point]) -> Vec<Point> {
-    let dimension = p[0].len() + q[0].len();
     let mut vertices = Vec::with_capacity(p.len() * q.len());
 
     for pv in p {
         for qv in q {
             let (pv, qv) = (pv.into_iter(), qv.into_iter());
-            let mut v = Vec::with_capacity(dimension);
+            let v = pv.chain(qv).cloned().collect::<Vec<_>>().into();
 
-            for &c in pv {
-                v.push(c);
-            }
-            for &c in qv {
-                v.push(c);
-            }
-
-            vertices.push(v.into());
+            vertices.push(v);
         }
     }
 
@@ -506,9 +537,9 @@ fn duoprism_vertices(p: &[Point], q: &[Point]) -> Vec<Point> {
 /// Duoprisms are usually defined in terms of Cartesian products, but this
 /// definition only makes sense in the context of convex polytopes. For general
 /// polytopes, a duoprism may be inductively built as a polytope whose facets
-/// are the "prism products" of the elements of the first polytope times those
-/// of the second, where the prism product of two points is simply the point
-/// resulting from concatenating their coordinates.
+/// are the "products" of the elements of the first polytope times those of the
+/// second, where the prism product of two points is simply the point resulting
+/// from concatenating their coordinates.
 pub fn duoprism(p: &Polytope, q: &Polytope) -> Polytope {
     let (p_rank, q_rank) = (p.rank(), q.rank());
     let (p_vertices, q_vertices) = (&p.vertices, &q.vertices);
@@ -607,17 +638,23 @@ pub fn duoprism(p: &Polytope, q: &Polytope) -> Polytope {
     Polytope::new(vertices, elements)
 }
 
-pub fn prism_with_height(p: &Polytope, h: f64) -> Polytope {
+/// Builds a prism from a given polytope with a given height. Internally calls
+/// [`duoprism`] with the polytope and a [`dyad`].
+pub fn prism_with_height(p: &Polytope, height: f64) -> Polytope {
     let mut dyad = dyad();
-    dyad.scale(h);
+    dyad.scale(height);
 
     duoprism(p, &dyad)
 }
 
+/// Builds a prism from a given polytope with unit height. Internally calls
+/// [`prism_with_height`].
 pub fn prism(p: &Polytope) -> Polytope {
     prism_with_height(p, 1.0)
 }
 
+/// Builds a multiprism from a set of polytopes. Internally uses [`duoprism`]
+/// to do this.
 pub fn multiprism(polytopes: &[&Polytope]) -> Polytope {
     let mut r = point();
 
@@ -628,19 +665,11 @@ pub fn multiprism(polytopes: &[&Polytope]) -> Polytope {
     r
 }
 
-fn pyramid_vertices(p: &[Point], q: &[Point], h: f64) -> Vec<Point> {
-    let (p_dimension, q_dimension) = (
-        match p.get(0) {
-            Some(v) => v.len(),
-            None => 0,
-        },
-        match q.get(0) {
-            Some(v) => v.len(),
-            None => 0,
-        },
-    );
+/// Generates the vertices for a pyramid product with two given vertex sets and a given height.
+fn pyramid_vertices(p: &[Point], q: &[Point], height: f64) -> Vec<Point> {
+    let (p_dimension, q_dimension) = (p[0].len(), q[0].len());
 
-    let tegum = h == 0.0;
+    let tegum = height == 0.0;
     let dimension = p_dimension + q_dimension + tegum as usize;
 
     let mut vertices = Vec::with_capacity(p.len() + q.len());
@@ -656,7 +685,7 @@ fn pyramid_vertices(p: &[Point], q: &[Point], h: f64) -> Vec<Point> {
         }
 
         if !tegum {
-            v.push(h / 2.0);
+            v.push(height / 2.0);
         }
 
         vertices.push(v.into());
@@ -671,7 +700,7 @@ fn pyramid_vertices(p: &[Point], q: &[Point], h: f64) -> Vec<Point> {
         v.resize(p_dimension + q_dimension, 0.0);
 
         if !tegum {
-            v.push(-h / 2.0);
+            v.push(-height / 2.0);
         }
 
         vertices.push(v.into());
@@ -692,6 +721,7 @@ pub fn duopyramid_with_height(p: &Polytope, q: &Polytope, height: f64) -> Polyto
 
     let (m_max, n_max) = (p_rank + !tegum as usize + 1, q_rank + !tegum as usize + 1);
 
+    // The tegum product of a polytope and a point is just the polytope.
     if tegum {
         if p_rank == 0 {
             return q.clone();
@@ -718,18 +748,17 @@ pub fn duopyramid_with_height(p: &Polytope, q: &Polytope, height: f64) -> Polyto
     for m in 0..m_max {
         el_nums.push(Vec::new());
 
-        for (n, &q_el_num) in q_el_nums.iter().enumerate().take(n_max) {
-            if m == 0 {
+        for n in 0..n_max {
+            if m == 0 || n == n_max - 1 {
                 el_nums[m].push(0);
             } else {
                 let p_el_num = if m == 1 { 1 } else { p_el_nums[m - 2] };
+                let q_el_num = q_el_nums[n];
 
                 let idx = el_nums[m - 1][n + 1] + p_el_num * q_el_num;
                 el_nums[m].push(idx);
             }
         }
-
-        el_nums[m].push(0);
     }
 
     // Gets the index of the prism product of the i-th m-element times the j-th
@@ -792,7 +821,7 @@ pub fn duopyramid_with_height(p: &Polytope, q: &Polytope, height: f64) -> Polyto
                                 els.push(get_idx(m, i, n - 1, q_sub));
                             }
                         }
-                        // Dealing with a vertex
+                        // Dealing with a vertex.
                         else {
                             els.push(get_idx(m, i, n - 1, 0));
                         }
@@ -804,6 +833,7 @@ pub fn duopyramid_with_height(p: &Polytope, q: &Polytope, height: f64) -> Polyto
         }
     }
 
+    // Components are a special case in tegum products.
     if tegum {
         // We take special care of the components.
         // These are simply the pyramid products of the two polytopes' facets.
@@ -838,13 +868,22 @@ pub fn duopyramid_with_height(p: &Polytope, q: &Polytope, height: f64) -> Polyto
     Polytope::new(vertices, elements)
 }
 
+/// Creates a [duotegum](https://polytope.miraheze.org/wiki/Duotegum)
+/// from two given polytopes.
+///
+/// Duotegums are usually defined in terms of convex hulls, but this definition
+/// only makes sense in the context of convex polytopes. For general polytopes,
+/// a duotegum may be inductively built as a polytope whose facets are the
+/// "products" of the elements of the first polytope times those of the second,
+/// where the prism product of a point and the nullitope is simply the point
+/// resulting from padding its coordinates with zeros.
 pub fn duotegum(p: &Polytope, q: &Polytope) -> Polytope {
     duopyramid_with_height(p, q, 0.0)
 }
 
-pub fn tegum_with_height(p: &Polytope, h: f64) -> Polytope {
+pub fn tegum_with_height(p: &Polytope, height: f64) -> Polytope {
     let mut dyad = dyad();
-    dyad.scale(h);
+    dyad.scale(height);
 
     duotegum(p, &dyad)
 }
@@ -896,102 +935,153 @@ pub fn multipyramid(polytopes: &[&Polytope]) -> Polytope {
 mod tests {
     use super::*;
 
-    #[test]
-    /// Checks the element nums of a few polygons.
-    fn polygon_nums() {
-        assert_eq!(regular_polygon(5, 1).el_nums(), vec![5, 5, 1]);
-        assert_eq!(regular_polygon(7, 2).el_nums(), vec![7, 7, 1]);
-        assert_eq!(regular_polygon(6, 2).el_nums(), vec![6, 6, 2])
+    /// Used to test a particular polytope.
+    /// We assume that the polytope has no hemi facets.
+    fn test_shape(mut p: Polytope, mut el_nums: Vec<usize>) {
+        // Checks that element counts match up.
+        assert_eq!(p.el_nums(), el_nums);
+
+        // Checks that the dual element counts match up as well.
+        let len = el_nums.len();
+        p = dual(&p);
+        el_nums[0..len - 1].reverse();
+        assert_eq!(p.el_nums(), el_nums);
     }
 
     #[test]
-    /// Checks the element num of a tetrahedron.
+    /// Checks the element counts of a point.
+    fn point_nums() {
+        test_shape(point(), vec![1]);
+    }
+
+    #[test]
+    /// Checks the element counts of a dyad.
+    fn dyad_nums() {
+        test_shape(dyad(), vec![2, 1]);
+    }
+
+    #[test]
+    /// Checks the element counts of a few regular polygons.
+    fn reg_polygon_nums() {
+        test_shape(reg_polygon(5, 1), vec![5, 5, 1]);
+        test_shape(reg_polygon(7, 2), vec![7, 7, 1]);
+        test_shape(reg_polygon(6, 2), vec![6, 6, 2]);
+    }
+
+    #[test]
+    /// Checks the element counts of a few regular polygons.
+    fn sreg_polygon_nums() {
+        test_shape(sreg_polygon(5, 1, 1.0, 1.0), vec![10, 10, 1]);
+        test_shape(sreg_polygon(7, 2, 1.0, 1.0), vec![14, 14, 1]);
+        test_shape(sreg_polygon(6, 2, 1.0, 1.0), vec![12, 12, 2]);
+    }
+
+    #[test]
+    /// Checks the element counts of a tetrahedron.
     fn tet_nums() {
-        assert_eq!(tet().el_nums(), vec![4, 6, 4, 1])
+        test_shape(tet(), vec![4, 6, 4, 1]);
     }
 
     #[test]
-    /// Checks the element num of a cube.
+    /// Checks the element conuts of a cube.
     fn cube_nums() {
-        assert_eq!(cube().el_nums(), vec![8, 12, 6, 1])
+        test_shape(cube(), vec![8, 12, 6, 1]);
     }
 
     #[test]
-    /// Checks the element num of an octahedron.
+    /// Checks the element counts of an octahedron.
     fn oct_nums() {
-        assert_eq!(oct().el_nums(), vec![6, 12, 8, 1])
+        test_shape(oct(), vec![6, 12, 8, 1]);
     }
 
     #[test]
-    /// Checks the element nums of a few antiprisms.
+    /// Checks the element counts of a few antiprisms.
     fn antiprism_nums() {
-        assert_eq!(antiprism(5, 1).el_nums(), vec![10, 20, 12, 1]);
-        assert_eq!(antiprism(7, 2).el_nums(), vec![14, 28, 16, 1]);
-        assert_eq!(antiprism(6, 2).el_nums(), vec![12, 24, 16, 2])
+        test_shape(antiprism(5, 1), vec![10, 20, 12, 1]);
+        test_shape(antiprism(7, 2), vec![14, 28, 16, 1]);
+        test_shape(antiprism(6, 2), vec![12, 24, 16, 2]);
     }
 
     #[test]
-    /// Checks the element num of a cube dual (octahedron).
-    fn cube_dual_nums() {
-        let cube_dual = dual(&cube());
+    #[should_panic(expected = "Facet passes through the dual center.")]
+    fn bowtie_dual() {
+        let bowtie = sreg_polygon(2, 0, 2.0, 1.0);
 
-        assert_eq!(cube_dual.el_nums(), vec![6, 12, 8, 1])
+        dual(&bowtie);
     }
 
     #[test]
-    /// Checks the element num of a triangular-pentagonal duoprism.
+    /// Checks the element counts of a hexagonal prism.
+    fn hip_nums() {
+        let hig = reg_polygon(6, 1);
+        let hip = prism(&hig);
+
+        test_shape(hip, vec![12, 18, 8, 1]);
+    }
+
+    #[test]
+    /// Checks the element counts of a triangular-pentagonal duoprism.
     fn trapedip_nums() {
-        let trig = regular_polygon(3, 1);
-        let peg = regular_polygon(5, 1);
+        let trig = reg_polygon(3, 1);
+        let peg = reg_polygon(5, 1);
         let trapedip = duoprism(&trig, &peg);
 
-        assert_eq!(trapedip.el_nums(), vec![15, 30, 23, 8, 1])
+        test_shape(trapedip, vec![15, 30, 23, 8, 1]);
     }
 
     #[test]
     /// Checks the element num of a triangular trioprism.
     fn trittip_nums() {
-        let trig = regular_polygon(3, 1);
+        let trig = reg_polygon(3, 1);
         let trittip = multiprism(&vec![&trig; 3]);
 
-        assert_eq!(trittip.el_nums(), vec![27, 81, 108, 81, 36, 9, 1])
+        test_shape(trittip, vec![27, 81, 108, 81, 36, 9, 1]);
+    }
+
+    #[test]
+    /// Checks the element counts of a hexagonal bipyramid.
+    fn hib_nums() {
+        let hig = reg_polygon(6, 1);
+        let hib = tegum(&hig);
+
+        test_shape(hib, vec![8, 18, 12, 1]);
     }
 
     #[test]
     /// Checks the element num of a triangular-pentagonal duotegum.
     fn trapedit_nums() {
-        let trig = regular_polygon(3, 1);
-        let peg = regular_polygon(5, 1);
+        let trig = reg_polygon(3, 1);
+        let peg = reg_polygon(5, 1);
         let trapedit = duotegum(&trig, &peg);
 
-        assert_eq!(trapedit.el_nums(), vec![8, 23, 30, 15, 1])
+        test_shape(trapedit, vec![8, 23, 30, 15, 1]);
     }
 
     #[test]
     /// Checks the element num of a triangular triotegum.
     fn trittit_nums() {
-        let trig = regular_polygon(3, 1);
+        let trig = reg_polygon(3, 1);
         let trittit = multitegum(&vec![&trig; 3]);
 
-        assert_eq!(trittit.el_nums(), vec![9, 36, 81, 108, 81, 27, 1])
+        test_shape(trittit, vec![9, 36, 81, 108, 81, 27, 1]);
     }
 
     #[test]
     /// Checks the element num of a triangular-pentagonal duopyramid.
     fn trapdupy_nums() {
-        let trig = regular_polygon(3, 1);
-        let peg = regular_polygon(5, 1);
+        let trig = reg_polygon(3, 1);
+        let peg = reg_polygon(5, 1);
         let trapdupy = duopyramid(&trig, &peg);
 
-        assert_eq!(trapdupy.el_nums(), vec![8, 23, 32, 23, 8, 1])
+        test_shape(trapdupy, vec![8, 23, 32, 23, 8, 1]);
     }
 
     #[test]
     /// Checks the element num of a triangular triopyramid.
     fn tritippy_nums() {
-        let trig = regular_polygon(3, 1);
+        let trig = reg_polygon(3, 1);
         let tritippy = multipyramid(&vec![&trig; 3]);
 
-        assert_eq!(tritippy.el_nums(), vec![9, 36, 84, 126, 126, 84, 36, 9, 1])
+        test_shape(tritippy, vec![9, 36, 84, 126, 126, 84, 36, 9, 1]);
     }
 }
