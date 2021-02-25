@@ -75,7 +75,7 @@ pub fn compound(p: Polytope, trans: Vec<Matrix>) -> Polytope {
 
 /// Generates the unique 0D polytope.
 pub fn point() -> Polytope {
-    let vertices = vec![].into();
+    let vertices = vec![];
     let elements = vec![];
 
     Polytope::new(vertices, elements)
@@ -397,7 +397,7 @@ fn dual_vertices(vertices: &Vec<Point>, elements: &Vec<ElementList>, o: &Point) 
             }
         }
 
-        uniq.keys().map(|&u| u).collect()
+        uniq.keys().cloned().collect()
     };
 
     // We find the indices of the vertices on the facet.
@@ -466,10 +466,7 @@ pub fn dual_with_center(p: &Polytope, o: &Point) -> Polytope {
 pub fn dual(p: &Polytope) -> Polytope {
     let dim = p.dimension();
     let mut o = Vec::with_capacity(dim);
-
-    for _ in 0..dim {
-        o.push(0.0);
-    }
+    o.resize(dim, 0.0);
 
     dual_with_center(p, &o.into())
 }

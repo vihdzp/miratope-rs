@@ -154,7 +154,7 @@ impl Polytope {
     }
 
     fn dimension(&self) -> usize {
-        if self.vertices.len() == 0 {
+        if self.vertices.is_empty() {
             0
         } else {
             self.vertices[0].len()

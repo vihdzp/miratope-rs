@@ -423,8 +423,8 @@ pub fn to_src(p: &Polytope, opt: OFFOptions) -> String {
         el_counts.swap(1, 2);
     }
 
-    for i in 0..(el_counts.len() - 1) {
-        off += &el_counts[i].to_string();
+    for el_count in &el_counts[0..el_counts.len() - 1] {
+        off += dbg!(&el_count.to_string());
         off += " ";
     }
     off += "\n";
