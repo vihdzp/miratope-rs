@@ -4,18 +4,22 @@ use std::{collections::HashMap, f64::consts::PI as PI64};
 
 use super::{Element, ElementList, Matrix, Point, Polytope};
 
+/// Generates matrices for rotations by the first `num` multiples of `angle`
+/// through the xy plane.
 fn rotations(angle: f64, num: usize, dim: usize) -> Vec<Matrix> {
     let mut rotations = Vec::with_capacity(num);
     let d = Dynamic::new(dim);
     let mut m = nalgebra::Matrix::identity_generic(d, d);
     let mut r = nalgebra::Matrix::identity_generic(d, d);
 
+    // The first rotation matrix.
     let (s, c) = angle.sin_cos();
     r[(0, 0)] = c;
     r[(1, 0)] = s;
     r[(0, 1)] = -s;
     r[(1, 1)] = c;
 
+    // Generates the other rotation matrices from r.
     for _ in 0..num {
         rotations.push(m.to_homogeneous());
         m *= &r;
@@ -29,23 +33,27 @@ fn rotations(angle: f64, num: usize, dim: usize) -> Vec<Matrix> {
 pub fn compound(p: Polytope, trans: Vec<Matrix>) -> Polytope {
     let comps = trans.len();
     let el_counts = p.el_counts();
-    // the vertices, turned into homogeneous points
+    let mut elements = Vec::with_capacity(p.elements.len());
+
+    // The vertices, turned into homogeneous points.
     let vertices = p
         .vertices
         .into_iter()
         .map(|v| v.push(1.0))
         .collect::<Vec<_>>();
+
+    // Applies the transformations to the vertex list.
     let vertices = trans
         .into_iter()
         .flat_map(|m| vertices.iter().map(move |v| m.clone() * v))
         .map(|v| {
-            // remove the extra homogeneous coordinate
+            // Removes the extra homogeneous coordinate.
             let row = v.nrows() - 1;
             v.remove_row(row)
         })
         .collect();
-    let mut elements = Vec::with_capacity(p.elements.len());
 
+    // Copies and offsets the element list once for each new component.
     for (d, els) in p.elements.iter().enumerate() {
         let sub_count = el_counts[d];
         let el_count = el_counts[d + 1];
@@ -81,29 +89,94 @@ pub fn dyad() -> Polytope {
     Polytope::new(vertices, elements)
 }
 
-/// Generates a polygon with Schläfli symbol {n / d}.
-pub fn polygon(n: u32, d: u32) -> Polytope {
-    let mut n = n as usize;
-    let g = n.gcd(d as usize);
-    let a = 2.0 * PI64 / (n as f64) * (d as f64);
-    n /= g;
-    let s = (a / 2.0).sin() * 2.0;
-
-    let mut vertices = Vec::with_capacity(n);
+/// Builds a polygon from the vertices in order.
+pub fn polygon(vertices: Vec<Point>) -> Polytope {
+    let n = vertices.len();
     let mut edges = Vec::with_capacity(n);
-    let mut components = vec![Vec::with_capacity(g)];
+    let mut component = Vec::with_capacity(n);
 
     for k in 0..n {
-        let ka = (k as f64) * a;
-        vertices.push(vec![ka.cos() / s, ka.sin() / s].into());
         edges.push(vec![k, (k + 1) % n]);
-        components[0].push(k);
+        component.push(k);
     }
 
-    compound(
-        Polytope::new(vertices, vec![edges, components]),
-        rotations(a / (g as f64), g, 2),
-    )
+    Polytope::new(vertices, vec![edges, vec![component]])
+}
+
+/// Generates a semiregular polygon, with order n rotational symmetry and winding number d.
+/// Bowties correspond to shapes where `d == 0`.
+pub fn semiregular_polygon(mut n: usize, d: usize, mut a: f64, mut b: f64) -> Polytope {
+    let comp_count;
+    let comp_angle;
+
+    let regular = a == 0.0 || b == 0.0;
+    let vertex_count = if regular { n } else { 2 * n };
+    let mut vertices = Vec::with_capacity(vertex_count);
+
+    // Bowties are a special case that must be considered separately.
+    if d == 0 {
+        if a > b {
+            std::mem::swap(&mut a, &mut b);
+        }
+
+        let (x, y) = (a / 2.0, (b * b - a * a).sqrt() / 2.0);
+
+        vertices = vec![
+            vec![x, y].into(),
+            vec![-x, -y].into(),
+            vec![x, -y].into(),
+            vec![-x, y].into(),
+        ];
+
+        comp_count = n / 2;
+        comp_angle = PI64 / comp_count as f64;
+    } else {
+        // Builds the triangle from three adjacent vertices, and finds its side lengths and angles.
+        let gamma = PI64 * (1.0 - (2.0 * d as f64) / (n as f64));
+        let c = (a * a + b * b - 2.0 * a * b * gamma.cos()).sqrt();
+        let mut alpha = ((b * b + c * c - a * a) / (2.0 * b * c)).acos();
+        let mut beta = ((c * c + a * a - b * b) / (2.0 * c * a)).acos();
+        let r = gamma / (2.0 * gamma.sin());
+
+        // Fixes the angles in case anything goes wrong in the calculation.
+        let theta = 2.0 * PI64 * (d as f64) / (n as f64);
+        if alpha.is_nan() {
+            alpha = theta;
+        }
+        if beta.is_nan() {
+            beta = theta;
+        }
+
+        comp_count = n.gcd(d);
+        n /= comp_count;
+
+        // Adds vertices.
+        let mut angle = 0f64;
+        for _ in 0..n {
+            if a != 0.0 {
+                vertices.push(vec![angle.cos() * r, angle.sin() * r].into());
+                angle += alpha;
+            }
+
+            if b != 0.0 {
+                vertices.push(vec![angle.cos() * r, angle.sin() * r].into());
+                angle += beta;
+            }
+        }
+
+        comp_angle = 2.0 * PI64 / (n as f64 * comp_count as f64);
+    }
+
+    compound(polygon(vertices), rotations(comp_angle, comp_count, 2))
+}
+
+/// Generates a regular polygon with Schläfli symbol {n / d}.
+pub fn regular_polygon(n: usize, d: usize) -> Polytope {
+    if d == 0 {
+        panic!("Invalid parameter d = 0.")
+    }
+
+    semiregular_polygon(n, d, 1.0, 0.0)
 }
 
 /// Generates a regular tetrahedron with unit edge length.
@@ -214,12 +287,11 @@ pub fn oct() -> Polytope {
 
 /// Creates an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
 /// with unit base edge length and a given height.
-pub fn antiprism_with_height(n: u32, d: u32, h: f64) -> Polytope {
-    let mut n = n as usize;
-    let g = n.gcd(d as usize);
-    let a = PI64 / (n as f64) * (d as f64);
+pub fn antiprism_with_height(mut n: usize, d: usize, h: f64) -> Polytope {
+    let g = n.gcd(d);
+    let theta = PI64 / (n as f64) * (d as f64);
     n /= g;
-    let s = a.sin() * 2.0;
+    let r = theta.sin() * 2.0;
     let mut h = h / 2.0;
 
     let mut vertices = Vec::with_capacity(2 * n);
@@ -229,8 +301,8 @@ pub fn antiprism_with_height(n: u32, d: u32, h: f64) -> Polytope {
 
     for k in 0..(2 * n) {
         // Generates vertices.
-        let ka = (k as f64) * a;
-        vertices.push(vec![ka.cos() / s, ka.sin() / s, h].into());
+        let angle = (k as f64) * theta;
+        vertices.push(vec![angle.cos() / r, angle.sin() / r, h].into());
         h *= -1.0;
 
         // Generates edges.
@@ -257,17 +329,16 @@ pub fn antiprism_with_height(n: u32, d: u32, h: f64) -> Polytope {
 
     // Compounds of antiprisms with antiprismatic symmetry must be handled
     // differently than compounds of antiprisms with prismatic symmetry.
-    let d = d as usize;
-    let a = if d / g % 2 == 0 { a } else { a * 2.0 };
+    let angle = if d / g % 2 == 0 { theta } else { theta * 2.0 };
     compound(
         Polytope::new(vertices, vec![edges, faces, components]),
-        rotations(a / (g as f64), g, 3),
+        rotations(angle / g as f64, g, 3),
     )
 }
 
 /// Creates a uniform [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
 /// with unit edge length.
-pub fn antiprism(n: u32, d: u32) -> Polytope {
+pub fn antiprism(n: usize, d: usize) -> Polytope {
     let a = PI64 / (n as f64) * (d as f64);
     let c = 2.0 * a.cos();
     let h = ((1.0 + c) / (2.0 + c)).sqrt();
@@ -279,6 +350,36 @@ pub fn antiprism(n: u32, d: u32) -> Polytope {
     antiprism_with_height(n, d, h)
 }
 
+/// Projects a [`Point`] onto the hyperplane defined by a vector of [`Points`][`Point`].
+pub fn project(p: &Point, h: Vec<Point>) -> Point {
+    const EPS: f64 = 1e-9;
+
+    let mut h = h.iter();
+    let o = h.next().unwrap();
+    let mut basis: Vec<Point> = Vec::new();
+
+    for q in h {
+        let mut q = q - o;
+
+        for b in &basis {
+            q -= b * (q.dot(&b)) / b.norm_squared();
+        }
+
+        if q.norm() > EPS {
+            basis.push(q);
+        }
+    }
+
+    let mut p = p - o;
+
+    for b in &basis {
+        p -= b * (p.dot(&b)) / b.norm_squared();
+    }
+
+    p
+}
+
+/// Builds the vertices of a dual polytope from its facets.
 fn dual_vertices(vertices: &Vec<Point>, elements: &Vec<ElementList>, o: &Point) -> Vec<Point> {
     const EPS: f64 = 1e-9;
 
@@ -286,6 +387,7 @@ fn dual_vertices(vertices: &Vec<Point>, elements: &Vec<ElementList>, o: &Point) 
     let facets = &elements[rank - 2];
     let ridges = &elements[rank - 3];
 
+    // Gets the unique sub-elements from a list of elements.
     let unique_subs = |els: &Vec<&Vec<usize>>| -> Element {
         let mut uniq = HashMap::new();
 
@@ -298,21 +400,24 @@ fn dual_vertices(vertices: &Vec<Point>, elements: &Vec<ElementList>, o: &Point) 
         uniq.keys().map(|&u| u).collect()
     };
 
+    // We find the indices of the vertices on the facet.
     facets
         .iter()
         .map(|f| {
-            // Retrieves the vertices of each facet.
+            // We repeatedly retrieve the next subelements of the facets until we get to the vertices.
             let mut els = f.iter().map(|&el| &ridges[el]).collect();
             for d in (0..(rank - 3)).rev() {
                 let uniq = unique_subs(&els);
                 els = uniq.iter().map(|&el| &elements[d][el]).collect();
             }
 
+            // We project the dual center onto the hyperplane defined by the vertices.
             let el = unique_subs(&els);
             let h = el.iter().map(|&v| vertices[v].clone()).collect();
-            let v = super::project(o, h);
+            let v = project(o, h);
             let s = v.norm_squared();
 
+            // We avoid division by 0.
             if s < EPS {
                 panic!("Facet passes through the dual center.")
             }
@@ -322,6 +427,7 @@ fn dual_vertices(vertices: &Vec<Point>, elements: &Vec<ElementList>, o: &Point) 
         .collect()
 }
 
+/// Builds the dual polytope of `p`. Uses `o` as the center for reciprocation.
 pub fn dual_with_center(p: &Polytope, o: &Point) -> Polytope {
     let el_counts = p.el_counts();
 
@@ -356,6 +462,7 @@ pub fn dual_with_center(p: &Polytope, o: &Point) -> Polytope {
     Polytope::new_wo_comps(du_vertices, du_elements)
 }
 
+/// Builds the dual polytope of `p`. Uses the origin as the center for reciprocation.
 pub fn dual(p: &Polytope) -> Polytope {
     let dim = p.dimension();
     let mut o = Vec::with_capacity(dim);
@@ -571,6 +678,7 @@ fn pyramid_vertices(p: &Vec<Point>, q: &Vec<Point>, h: f64) -> Vec<Point> {
     vertices
 }
 
+/// Builds a duopyramid with a given height, or a duotegum if the height is 0.
 pub fn duopyramid_with_height(p: &Polytope, q: &Polytope, h: f64) -> Polytope {
     let (p_rank, q_rank) = (p.rank(), q.rank());
     let (p_vertices, q_vertices) = (&p.vertices, &q.vertices);
@@ -582,11 +690,14 @@ pub fn duopyramid_with_height(p: &Polytope, q: &Polytope, h: f64) -> Polytope {
 
     let (m_max, n_max) = (p_rank + !tegum as usize + 1, q_rank + !tegum as usize + 1);
 
-    if p_rank == 0 && tegum {
-        return q.clone();
-    }
-    if q_rank == 0 && tegum {
-        return p.clone();
+    if tegum {
+        if p_rank == 0 {
+            return q.clone();
+        }
+
+        if q_rank == 0 {
+            return p.clone();
+        }
     }
 
     let vertices = pyramid_vertices(&p_vertices, &q_vertices, h);
@@ -752,10 +863,9 @@ pub fn duopyramid(p: &Polytope, q: &Polytope) -> Polytope {
 }
 
 pub fn pyramid_with_height(p: &Polytope, h: f64) -> Polytope {
-    let mut dyad = dyad();
-    dyad.scale(h);
+    let point = point();
 
-    duopyramid(p, &dyad)
+    duopyramid_with_height(p, &point, h)
 }
 
 pub fn pyramid(p: &Polytope) -> Polytope {
@@ -784,9 +894,9 @@ mod tests {
     #[test]
     /// Checks the element counts of a few polygons.
     fn polygon_counts() {
-        assert_eq!(polygon(5, 1).el_counts(), vec![5, 5, 1]);
-        assert_eq!(polygon(7, 2).el_counts(), vec![7, 7, 1]);
-        assert_eq!(polygon(6, 2).el_counts(), vec![6, 6, 2])
+        assert_eq!(regular_polygon(5, 1).el_counts(), vec![5, 5, 1]);
+        assert_eq!(regular_polygon(7, 2).el_counts(), vec![7, 7, 1]);
+        assert_eq!(regular_polygon(6, 2).el_counts(), vec![6, 6, 2])
     }
 
     #[test]
@@ -826,8 +936,8 @@ mod tests {
     #[test]
     /// Checks the element count of a triangular-pentagonal duoprism.
     fn trapedip_counts() {
-        let trig = polygon(3, 1);
-        let peg = polygon(5, 1);
+        let trig = regular_polygon(3, 1);
+        let peg = regular_polygon(5, 1);
         let trapedip = duoprism(&trig, &peg);
 
         assert_eq!(trapedip.el_counts(), vec![15, 30, 23, 8, 1])
@@ -836,7 +946,7 @@ mod tests {
     #[test]
     /// Checks the element count of a triangular trioprism.
     fn trittip_counts() {
-        let trig = polygon(3, 1);
+        let trig = regular_polygon(3, 1);
         let trittip = multiprism(&vec![&trig; 3]);
 
         assert_eq!(trittip.el_counts(), vec![27, 81, 108, 81, 36, 9, 1])
@@ -845,8 +955,8 @@ mod tests {
     #[test]
     /// Checks the element count of a triangular-pentagonal duotegum.
     fn trapedit_counts() {
-        let trig = polygon(3, 1);
-        let peg = polygon(5, 1);
+        let trig = regular_polygon(3, 1);
+        let peg = regular_polygon(5, 1);
         let trapedit = duotegum(&trig, &peg);
 
         assert_eq!(trapedit.el_counts(), vec![8, 23, 30, 15, 1])
@@ -855,7 +965,7 @@ mod tests {
     #[test]
     /// Checks the element count of a triangular triotegum.
     fn trittit_counts() {
-        let trig = polygon(3, 1);
+        let trig = regular_polygon(3, 1);
         let trittit = multitegum(&vec![&trig; 3]);
 
         assert_eq!(trittit.el_counts(), vec![9, 36, 81, 108, 81, 27, 1])
@@ -864,8 +974,8 @@ mod tests {
     #[test]
     /// Checks the element count of a triangular-pentagonal duopyramid.
     fn trapdupy_counts() {
-        let trig = polygon(3, 1);
-        let peg = polygon(5, 1);
+        let trig = regular_polygon(3, 1);
+        let peg = regular_polygon(5, 1);
         let trapdupy = duopyramid(&trig, &peg);
 
         assert_eq!(trapdupy.el_counts(), vec![8, 23, 32, 23, 8, 1])
@@ -874,7 +984,7 @@ mod tests {
     #[test]
     /// Checks the element count of a triangular triopyramid.
     fn tritippy_counts() {
-        let trig = polygon(3, 1);
+        let trig = regular_polygon(3, 1);
         let tritippy = multipyramid(&vec![&trig; 3]);
 
         assert_eq!(

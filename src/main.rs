@@ -47,7 +47,7 @@ use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use no_cull_pipeline::PbrNoBackfaceBundle;
 use polytope::shapes;
-use polytope::*;
+use polytope::{off, ElementList, Point, Polytope};
 
 mod input;
 mod no_cull_pipeline;
@@ -74,7 +74,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly: Polytope = shapes::dual(&shapes::cube());
+    let poly: Polytope = shapes::semiregular_polygon(6, 0, 5., 1.);
     println!("{}", off::to_src(&poly, Default::default()));
 
     pipelines.set_untracked(

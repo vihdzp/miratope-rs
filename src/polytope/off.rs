@@ -1,3 +1,8 @@
+//! Contains methods to load and save OFF files.
+//! ## What is an OFF file?
+//! An OFF file stores the geometric data of a polytope.
+//! [insert format specification here]
+
 use std::collections::HashMap;
 use std::io::Result as IoResult;
 use std::path::Path;
@@ -11,6 +16,7 @@ const ELEMENT_NAMES: [&str; 11] = [
 ];
 const COMPONENTS: &str = "Components";
 
+/// Gets the name for an element with `dim` dimensions.
 fn element_name(dim: usize) -> String {
     match ELEMENT_NAMES.get(dim) {
         Some(&name) => String::from(name),
@@ -33,8 +39,7 @@ fn data_tokens(src: &String) -> impl Iterator<Item = &str> {
 }
 
 /// Gets the number of elements from the OFF file.
-/// This includes components iff dim ≤ 2
-/// (this makes things easier down the line).
+/// This includes components iff dim ≤ 2, as this makes things easier down the line.
 fn get_el_counts<'a>(dim: usize, toks: &mut impl Iterator<Item = &'a str>) -> Vec<usize> {
     let mut el_counts = Vec::with_capacity(dim);
 
@@ -130,7 +135,6 @@ fn parse_edges_and_faces<'a>(
             if let Some(idx) = hash_edges.get(&edge) {
                 face.push(*idx);
             } else {
-                // Is the clone really necessary?
                 hash_edges.insert(edge.clone(), edges.len());
                 face.push(edges.len());
                 edges.push(edge);
@@ -173,7 +177,7 @@ pub fn parse_els<'a>(num_els: usize, toks: &mut impl Iterator<Item = &'a str>) -
     els
 }
 
-/// Builds a `Polytope` from the string representation of an OFF file.
+/// Builds a [`Polytope`] from the string representation of an OFF file.
 pub fn from_src(src: String) -> Polytope {
     let mut toks = data_tokens(&src);
     let dim = {

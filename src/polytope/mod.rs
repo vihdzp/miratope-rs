@@ -14,7 +14,6 @@ pub type Element = Vec<usize>;
 pub type ElementList = Vec<Element>;
 pub type Point = nalgebra::DVector<f64>;
 pub type Matrix = nalgebra::DMatrix<f64>;
-pub type Hyperplane = Vec<Point>;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolytopeSerde {
@@ -31,34 +30,6 @@ impl From<Polytope> for PolytopeSerde {
     }
 }
 
-pub fn project(p: &Point, h: Hyperplane) -> Point {
-    const EPS: f64 = 1e-9;
-
-    let mut h = h.iter();
-    let o = h.next().unwrap();
-    let mut basis: Vec<Point> = Vec::new();
-
-    for q in h {
-        let mut q = q - o;
-
-        for b in &basis {
-            q -= b * (q.dot(&b)) / b.norm_squared();
-        }
-
-        if q.norm() > EPS {
-            basis.push(q);
-        }
-    }
-
-    let mut p = p - o;
-
-    for b in &basis {
-        p -= b * (p.dot(&b)) / b.norm_squared();
-    }
-
-    p
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Polytope {
     /// The concrete vertices of the polytope.
@@ -70,29 +41,41 @@ pub struct Polytope {
     /// # Assumptions
     ///
     /// * All points have the same dimension.
+    /// * There are neither `NaN` nor `Infinity` values.
     pub vertices: Vec<Point>,
+
+    /// A compact representation of the incidences of the polytope. This vector
+    /// stores the edges, faces, ..., of the polytope, all the way up
+    /// to the components.
+    ///
+    /// The (d – 1)-th entry of this vector corresponds to the indices of the
+    /// (d – 1)-elements that form a given d-element.
     pub elements: Vec<ElementList>,
+
+    extra_vertices: Vec<Point>,
 
     triangles: Vec<[usize; 3]>,
 }
 
 impl Polytope {
+    /// Builds a new [Polytope] with the given vertices and elements.
     pub fn new(vertices: Vec<Point>, elements: Vec<ElementList>) -> Self {
-        let triangles = if elements.len() >= 2 {
-            Self::triangulate(&elements[0], &elements[1])
+        let (extra_vertices, triangles) = if elements.len() >= 2 {
+            Self::triangulate(&vertices, &elements[0], &elements[1])
         } else {
-            vec![]
+            (vec![], vec![])
         };
 
         Polytope {
             vertices,
             elements,
+            extra_vertices,
             triangles,
         }
     }
 
     /// Builds a polytope and auto-generates its connected components.
-    pub fn new_wo_comps(vertices: Vec<Point>, elements: Vec<ElementList>) -> Self {
+    pub fn new_wo_comps(vertices: Vec<Point>, mut elements: Vec<ElementList>) -> Self {
         let rank = elements.len() + 1;
         let num_ridges = elements[rank - 3].len();
         let facets = &elements[rank - 2];
@@ -106,6 +89,7 @@ impl Polytope {
             graph.add_node(());
         }
 
+        // We add an edge for each adjacent facet and ridge.
         for (i, f) in facets.iter().enumerate() {
             for r in f.iter() {
                 graph.add_edge(NodeIndex::new(*r), NodeIndex::new(num_ridges + i), ());
@@ -131,13 +115,17 @@ impl Polytope {
             comps.push(comp);
         }
 
-        let mut elements = elements.clone();
         elements.push(comps);
 
         Polytope::new(vertices, elements)
     }
 
-    fn triangulate(edges: &Vec<Element>, faces: &Vec<Element>) -> Vec<[usize; 3]> {
+    fn triangulate(
+        _vertices: &Vec<Point>,
+        edges: &Vec<Element>,
+        faces: &Vec<Element>,
+    ) -> (Vec<Point>, Vec<[usize; 3]>) {
+        let extra_vertices = Vec::new();
         let mut triangles = Vec::new();
 
         for face in faces {
@@ -157,9 +145,10 @@ impl Polytope {
             }
         }
 
-        triangles
+        (extra_vertices, triangles)
     }
 
+    /// Returns the rank of the polytope.
     fn rank(&self) -> usize {
         self.elements.len()
     }
@@ -172,6 +161,8 @@ impl Polytope {
         }
     }
 
+    /// Gets the element counts of a polytope.
+    /// The n-th entry corresponds to the amount of n elements.
     fn el_counts(&self) -> Vec<usize> {
         let mut counts = Vec::with_capacity(self.elements.len() + 1);
         counts.push(self.vertices.len());
@@ -183,6 +174,7 @@ impl Polytope {
         counts
     }
 
+    /// Scales a polytope by a given factor.
     fn scale(&mut self, k: f64) {
         for v in &mut self.vertices {
             *v *= k;
@@ -192,6 +184,7 @@ impl Polytope {
     fn get_vertex_coords(&self) -> Vec<[f32; 3]> {
         self.vertices
             .iter()
+            .chain(self.extra_vertices.iter())
             .map(|point| {
                 let mut iter = point.iter().copied().take(3);
                 let x = iter.next().unwrap_or(0.0);
