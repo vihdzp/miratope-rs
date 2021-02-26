@@ -202,29 +202,32 @@ impl Polytope {
         self
     }
 
+    /// Shifts all vertices by a given vector.
     pub fn shift(mut self, o: Point) -> Self {
         for v in &mut self.vertices {
-            *v -= o.clone();
+            *v -= &o;
         }
 
         self
     }
 
+    /// Recenters a polytope so that the gravicenter is at the origin.
     pub fn recenter(self) -> Self {
         let gravicenter = self.gravicenter();
 
         self.shift(gravicenter)
     }
 
+    /// Applies a matrix to all vertices of a polytope.
     pub fn apply(mut self, m: &Matrix) -> Self {
         for v in &mut self.vertices {
-            *v = m.clone() * v.clone();
+            *v = m * v.clone();
         }
 
         self
     }
 
-    /// Builds the dual polytope of `p`. Uses `o` as the center for reciprocation.
+    /// Builds a dual polytope with a given the center for reciprocation.
     pub fn dual_with_center(&self, o: &Point) -> Polytope {
         let rank = self.rank();
 
@@ -263,9 +266,12 @@ impl Polytope {
             du_elements.push(du_els);
         }
 
+        // We can only auto-generate the components for 2D and up.
         if rank >= 2 {
             Polytope::new_wo_comps(du_vertices, du_elements)
-        } else {
+        }
+        // Fortunately, we already know the components in 1D.
+        else {
             let components = self.elements[0].clone();
             du_elements.push(components);
 

@@ -74,8 +74,11 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let tet = simplex(3).scale(8f64.sqrt());
-    let poly: Polytope = dual_compound(&tet);
+    let mut heap = antiprism(7, 1);
+    let r = heap.midradius();
+    heap = heap.scale(1.0 / r);
+
+    let poly: Polytope = dual_compound(&heap);
     println!("{}", off::to_src(&poly, Default::default()));
 
     pipelines.set_untracked(

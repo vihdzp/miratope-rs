@@ -3,7 +3,7 @@ use bevy::render::mesh::Indices;
 use bevy::render::pipeline::PrimitiveTopology;
 use petgraph::{graph::Graph, prelude::NodeIndex, Undirected};
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, convert::TryInto};
+use std::collections::VecDeque;
 
 pub mod convex;
 pub mod off;
@@ -143,10 +143,9 @@ impl Polytope {
                 .expect("Index out of bounds: you probably screwed up the polytope's indices.")[0];
 
             for verts in face[1..].iter().map(|&i| {
-                edges[i]
-                    .clone()
-                    .try_into()
-                    .expect("edges has more than two elements")
+                let edge = &edges[i];
+                assert_eq!(edge.len(), 2, "edges has more than two elements");
+                [edge[0], edge[1]]
             }) {
                 let [vert_j, vert_k]: [usize; 2] = verts;
                 if vert_i != vert_j && vert_i != vert_k {
@@ -336,10 +335,20 @@ impl Polytope {
         for edge in edges {
             let (sub1, sub2) = (edge[0], edge[1]);
 
-            edge_lengths.push((vertices[sub1].clone() - vertices[sub2].clone()).norm());
+            edge_lengths.push((&vertices[sub1] - &vertices[sub2]).norm());
         }
 
         edge_lengths
+    }
+
+    /// I haven't actually implemented this in the general case.
+    pub fn midradius(&self) -> f64 {
+        let vertices = &self.vertices;
+        let edges = &self.elements[0];
+        let edge = &edges[0];
+        let (sub1, sub2) = (edge[0], edge[1]);
+
+        (&vertices[sub1] + &vertices[sub2]).norm() / 2.0
     }
 }
 
