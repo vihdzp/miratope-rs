@@ -1,10 +1,9 @@
 use bevy::prelude::Mesh;
 use bevy::render::mesh::Indices;
 use bevy::render::pipeline::PrimitiveTopology;
+use petgraph::{graph::Graph, prelude::NodeIndex, Undirected};
 use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, convert::TryInto};
-
-use petgraph::{graph::Graph, prelude::NodeIndex, Undirected};
 
 pub mod convex;
 pub mod off;
@@ -185,29 +184,6 @@ impl Polytope {
         nums
     }
 
-    /// Scales a polytope by a given factor.
-    pub fn scale(&mut self, k: f64) {
-        for v in &mut self.vertices {
-            *v *= k;
-        }
-    }
-
-    pub fn shift(&mut self, o: Point) {
-        for v in &mut self.vertices {
-            *v -= o.clone();
-        }
-    }
-
-    pub fn recenter(&mut self) {
-        self.shift(self.gravicenter())
-    }
-
-    pub fn apply(&mut self, m: &Matrix) {
-        for v in &mut self.vertices {
-            *v = m.clone() * v.clone();
-        }
-    }
-
     fn get_vertex_coords(&self) -> Vec<[f32; 3]> {
         self.vertices
             .iter()
@@ -334,10 +310,10 @@ impl Polytope {
     }
 
     pub fn verf(&self, idx: usize) -> Polytope {
-        let dual = shapes::dual(self);
+        let dual = self.dual();
         let facet = dual.get_element(self.rank() - 1, idx);
 
-        shapes::dual(&facet)
+        facet.dual()
     }
 
     pub fn gravicenter(&self) -> Point {
@@ -350,6 +326,20 @@ impl Polytope {
         }
 
         g / (vertices.len() as f64)
+    }
+
+    pub fn edge_lengths(&self) -> Vec<f64> {
+        let vertices = &self.vertices;
+        let edges = &self.elements[0];
+        let mut edge_lengths = Vec::with_capacity(edges.len());
+
+        for edge in edges {
+            let (sub1, sub2) = (edge[0], edge[1]);
+
+            edge_lengths.push((vertices[sub1].clone() - vertices[sub2].clone()).norm());
+        }
+
+        edge_lengths
     }
 }
 
