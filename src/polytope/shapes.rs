@@ -81,7 +81,7 @@ pub fn compound_from_trans(p: &Polytope, trans: Vec<Matrix>) -> Polytope {
         polytopes.push(p);
     }
 
-    compound(&polytopes.iter().map(|p| p).collect::<Vec<_>>())
+    compound(&polytopes.iter().collect::<Vec<_>>())
 }
 
 pub fn dual_compound(p: &Polytope) -> Polytope {

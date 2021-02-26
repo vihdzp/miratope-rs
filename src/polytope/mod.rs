@@ -314,9 +314,11 @@ impl Polytope {
             new_elements.push(Vec::with_capacity(index_subs[d].len()));
             for &i in &index_subs[d] {
                 let mut el = elements[d - 1][i].clone();
-                for j in 0..el.len() {
-                    el[j] = sub_indices[d - 1][el[j]].unwrap();
+
+                for sub in &mut el {
+                    *sub = sub_indices[d - 1][*sub].unwrap();
                 }
+
                 new_elements[d - 1].push(el);
             }
         }
