@@ -42,6 +42,8 @@
 //! ## Why is the rendering buggy?
 //! Proper rendering, even in 3D is a work in progress.
 
+use std::f64::consts::SQRT_2;
+
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
@@ -74,7 +76,9 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly: Polytope = shapes::tegum(&shapes::reg_polygon(6, 1));
+    let mut cube = shapes::hypercube(3);
+    cube.scale(SQRT_2);
+    let poly: Polytope = shapes::dual_compound(&cube);
     println!("{}", off::to_src(&poly, Default::default()));
 
     pipelines.set_untracked(

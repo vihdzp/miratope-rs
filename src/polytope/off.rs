@@ -424,7 +424,7 @@ pub fn to_src(p: &Polytope, opt: OFFOptions) -> String {
     }
 
     for el_num in &el_nums[0..el_nums.len() - 1] {
-        off += dbg!(&el_num.to_string());
+        off += &el_num.to_string();
         off += " ";
     }
     off += "\n";

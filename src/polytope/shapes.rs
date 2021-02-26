@@ -6,71 +6,86 @@ use super::{Element, ElementList, Matrix, Point, Polytope};
 
 /// Generates matrices for rotations by the first `num` multiples of `angle`
 /// through the xy plane.
-fn rotations(angle: f64, num: usize, dim: usize) -> Vec<Matrix> {
+pub fn rotations(angle: f64, num: usize, dim: usize) -> Vec<Matrix> {
     let mut rotations = Vec::with_capacity(num);
     let dim = Dynamic::new(dim);
     let mut matrix = nalgebra::Matrix::identity_generic(dim, dim);
-    let mut rotation = nalgebra::Matrix::identity_generic(dim, dim);
+    let mut matrices = nalgebra::Matrix::identity_generic(dim, dim);
 
     // The first rotation matrix.
     let (s, c) = angle.sin_cos();
-    rotation[(0, 0)] = c;
-    rotation[(1, 0)] = s;
-    rotation[(0, 1)] = -s;
-    rotation[(1, 1)] = c;
+    matrices[(0, 0)] = c;
+    matrices[(1, 0)] = s;
+    matrices[(0, 1)] = -s;
+    matrices[(1, 1)] = c;
 
     // Generates the other rotation matrices from r.
     for _ in 0..num {
-        rotations.push(matrix.to_homogeneous());
-        matrix *= &rotation;
+        rotations.push(matrix.clone());
+        matrix *= &matrices;
     }
 
     rotations
 }
 
-/// Applies a list of transformations to a polytope and creates a compound from
-/// all of the copies of the polytope this generates.
-pub fn compound(p: Polytope, trans: Vec<Matrix>) -> Polytope {
-    let comps = trans.len();
-    let el_nums = p.el_nums();
-    let mut elements = Vec::with_capacity(p.elements.len());
+pub fn central_inv(dim: usize) -> Vec<Matrix> {
+    let dim = Dynamic::new(dim);
+    let matrix = nalgebra::Matrix::identity_generic(dim, dim);
 
-    // The vertices, turned into homogeneous points.
-    let vertices = p
-        .vertices
-        .into_iter()
-        .map(|v| v.push(1.0))
-        .collect::<Vec<_>>();
+    vec![matrix.clone(), -matrix]
+}
 
-    // Applies the transformations to the vertex list.
-    let vertices = trans
-        .into_iter()
-        .flat_map(|m| vertices.iter().map(move |v| m.clone() * v))
-        .map(|v| {
-            // Removes the extra homogeneous coordinate.
-            let row = v.nrows() - 1;
-            v.remove_row(row)
-        })
-        .collect();
+pub fn compound(polytopes: &[&Polytope]) -> Polytope {
+    let mut polytopes = polytopes.iter();
+    let p = polytopes.next().unwrap();
+    let rank = p.rank();
+    let mut vertices = p.vertices.clone();
+    let mut comp_elements = p.elements.clone();
 
-    // Copies and offsets the element list once for each new component.
-    for (d, els) in p.elements.iter().enumerate() {
-        let sub_num = el_nums[d];
-        let el_num = el_nums[d + 1];
-        let mut new_els = Vec::with_capacity(el_num * comps);
-
-        for comp in 0..comps {
-            let offset = comp * sub_num;
-
-            for el in els.iter() {
-                new_els.push(el.iter().map(|i| i + offset).collect())
-            }
+    for &p in polytopes {
+        let mut el_nums = vec![vertices.len()];
+        for comp_els in &comp_elements {
+            el_nums.push(comp_els.len());
         }
 
-        elements.push(new_els);
+        vertices.append(&mut p.vertices.clone());
+
+        for i in 0..rank {
+            let comp_els = &mut comp_elements[i];
+            let els = &p.elements[i];
+            let offset = dbg!(el_nums[i]);
+
+            for el in els {
+                let mut comp_el = Vec::with_capacity(el.len());
+
+                for &sub in el {
+                    comp_el.push(sub + offset);
+                }
+
+                comp_els.push(comp_el);
+            }
+        }
     }
 
-    Polytope::new(vertices, elements)
+    Polytope::new(vertices, comp_elements)
+}
+
+/// Applies a list of transformations to a polytope and creates a compound from
+/// all of the copies of the polytope this generates.
+pub fn compound_from_trans(p: &Polytope, trans: Vec<Matrix>) -> Polytope {
+    let mut polytopes = Vec::with_capacity(trans.len());
+
+    for m in &trans {
+        let mut p = p.clone();
+        p.apply(&m);
+        polytopes.push(p);
+    }
+
+    compound(&polytopes.iter().map(|p| p).collect::<Vec<_>>())
+}
+
+pub fn dual_compound(p: &Polytope) -> Polytope {
+    compound(&[p, &dual(p)])
 }
 
 /// Generates the unique 0D polytope.
@@ -169,7 +184,7 @@ pub fn sreg_polygon(mut n: usize, d: usize, mut len_a: f64, mut len_b: f64) -> P
         comp_angle = 2.0 * PI64 / (n as f64 * comp_num as f64);
     }
 
-    compound(polygon(vertices), rotations(comp_angle, comp_num, 2))
+    compound_from_trans(&polygon(vertices), rotations(comp_angle, comp_num, 2))
 }
 
 /// Generates a regular polygon with Schläfli symbol {n / d}.
@@ -179,112 +194,6 @@ pub fn reg_polygon(n: usize, d: usize) -> Polytope {
     }
 
     sreg_polygon(n, d, 1.0, 0.0)
-}
-
-/// Generates a regular tetrahedron with unit edge length.
-pub fn tet() -> Polytope {
-    let x = 2.0_f64.sqrt() / 4.0;
-
-    let vertices = vec![
-        vec![x, x, x].into(),
-        vec![-x, -x, x].into(),
-        vec![-x, x, -x].into(),
-        vec![x, -x, -x].into(),
-    ];
-    let edges = vec![
-        vec![0, 1],
-        vec![0, 2],
-        vec![0, 3],
-        vec![1, 2],
-        vec![1, 3],
-        vec![2, 3],
-    ];
-    let faces = vec![vec![0, 1, 3], vec![0, 2, 4], vec![1, 2, 5], vec![3, 4, 5]];
-    let components = vec![vec![0, 1, 2, 3]];
-
-    Polytope::new(vertices, vec![edges, faces, components])
-}
-
-/// Generates a cube with unit edge length.
-pub fn cube() -> Polytope {
-    let x = 0.5;
-
-    let vertices = vec![
-        vec![x, x, x].into(),
-        vec![x, x, -x].into(),
-        vec![x, -x, -x].into(),
-        vec![x, -x, x].into(),
-        vec![-x, x, x].into(),
-        vec![-x, x, -x].into(),
-        vec![-x, -x, -x].into(),
-        vec![-x, -x, x].into(),
-    ];
-    let edges = vec![
-        vec![0, 1],
-        vec![1, 2],
-        vec![2, 3],
-        vec![3, 0],
-        vec![4, 5],
-        vec![5, 6],
-        vec![6, 7],
-        vec![7, 4],
-        vec![0, 4],
-        vec![1, 5],
-        vec![2, 6],
-        vec![3, 7],
-    ];
-    let faces = vec![
-        vec![0, 1, 2, 3],
-        vec![4, 5, 6, 7],
-        vec![0, 4, 8, 9],
-        vec![1, 5, 9, 10],
-        vec![2, 6, 10, 11],
-        vec![3, 7, 11, 8],
-    ];
-    let components = vec![vec![0, 1, 2, 3, 4, 5]];
-
-    Polytope::new(vertices, vec![edges, faces, components])
-}
-
-/// Generates an octahedron with unit edge length.
-pub fn oct() -> Polytope {
-    let x = 1.0 / 2.0_f64.sqrt();
-
-    let vertices = vec![
-        vec![x, 0.0, 0.0].into(),
-        vec![-x, 0.0, 0.0].into(),
-        vec![0.0, x, 0.0].into(),
-        vec![0.0, 0.0, x].into(),
-        vec![0.0, -x, 0.0].into(),
-        vec![0.0, 0.0, -x].into(),
-    ];
-    let edges = vec![
-        vec![0, 2],
-        vec![0, 3],
-        vec![0, 4],
-        vec![0, 5],
-        vec![1, 2],
-        vec![1, 3],
-        vec![1, 4],
-        vec![1, 5],
-        vec![2, 3],
-        vec![3, 4],
-        vec![4, 5],
-        vec![5, 2],
-    ];
-    let faces = vec![
-        vec![0, 1, 8],
-        vec![4, 5, 8],
-        vec![1, 2, 9],
-        vec![5, 6, 9],
-        vec![2, 3, 10],
-        vec![6, 7, 10],
-        vec![3, 0, 11],
-        vec![7, 4, 11],
-    ];
-    let components = vec![vec![0, 1, 2, 3, 4, 5, 6, 7]];
-
-    Polytope::new(vertices, vec![edges, faces, components])
 }
 
 /// Creates an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
@@ -332,8 +241,8 @@ pub fn antiprism_with_height(mut n: usize, d: usize, height: f64) -> Polytope {
     // Compounds of antiprisms with antiprismatic symmetry must be handled
     // differently than compounds of antiprisms with prismatic symmetry.
     let angle = theta * (d / component_num % 2 + 1) as f64;
-    compound(
-        Polytope::new(vertices, vec![edges, faces, components]),
+    compound_from_trans(
+        &Polytope::new(vertices, vec![edges, faces, components]),
         rotations(angle / component_num as f64, component_num, 3),
     )
 }
@@ -745,9 +654,11 @@ pub fn duopyramid_with_height(p: &Polytope, q: &Polytope, height: f64) -> Polyto
     // generated by these products up to those of type (n - 1)-element ×
     // (m - n)-element.
     let mut el_nums = Vec::with_capacity(rank);
+
     for m in 0..m_max {
         el_nums.push(Vec::new());
 
+        #[allow(clippy::needless_range_loop)]
         for n in 0..n_max {
             if m == 0 || n == n_max - 1 {
                 el_nums[m].push(0);
@@ -916,19 +827,46 @@ pub fn pyramid(p: &Polytope) -> Polytope {
     pyramid_with_height(p, 1.0)
 }
 
-pub fn multipyramid_with_height(polytopes: &[&Polytope], h: f64) -> Polytope {
+pub fn multipyramid_with_heights(polytopes: &[&Polytope], heights: &[f64]) -> Polytope {
     let mut polytopes = polytopes.iter();
     let mut r = (*polytopes.next().unwrap()).clone();
 
+    let mut heights = heights.iter();
     for p in polytopes {
-        r = duopyramid_with_height(&p, &r, h);
+        r = duopyramid_with_height(&p, &r, *heights.next().unwrap_or(&1.0));
     }
 
     r
 }
 
 pub fn multipyramid(polytopes: &[&Polytope]) -> Polytope {
-    multipyramid_with_height(polytopes, 1.0)
+    multipyramid_with_heights(polytopes, &[])
+}
+
+pub fn simplex(d: usize) -> Polytope {
+    let point = point();
+    let mut heights = Vec::with_capacity(d);
+
+    for n in 1..(d + 1) {
+        let n = n as f64;
+        heights.push(((n + 1.0) / (2.0 * n)).sqrt());
+    }
+
+    let mut simplex = multipyramid_with_heights(&vec![&point; d + 1], &heights);
+    simplex.recenter();
+    simplex
+}
+
+pub fn hypercube(d: usize) -> Polytope {
+    let dyad = dyad();
+
+    multiprism(&vec![&dyad; d])
+}
+
+pub fn orthoplex(d: usize) -> Polytope {
+    let dyad = dyad();
+
+    multitegum(&vec![&dyad; d])
 }
 
 #[cfg(test)]
@@ -979,19 +917,19 @@ mod tests {
     #[test]
     /// Checks the element counts of a tetrahedron.
     fn tet_nums() {
-        test_shape(tet(), vec![4, 6, 4, 1]);
+        test_shape(simplex(3), vec![4, 6, 4, 1]);
     }
 
     #[test]
-    /// Checks the element conuts of a cube.
+    /// Checks the element counts of a cube.
     fn cube_nums() {
-        test_shape(cube(), vec![8, 12, 6, 1]);
+        test_shape(hypercube(3), vec![8, 12, 6, 1]);
     }
 
     #[test]
     /// Checks the element counts of an octahedron.
     fn oct_nums() {
-        test_shape(oct(), vec![6, 12, 8, 1]);
+        test_shape(orthoplex(3), vec![6, 12, 8, 1]);
     }
 
     #[test]
@@ -1033,7 +971,7 @@ mod tests {
     /// Checks the element num of a triangular trioprism.
     fn trittip_nums() {
         let trig = reg_polygon(3, 1);
-        let trittip = multiprism(&vec![&trig; 3]);
+        let trittip = multiprism(&[&trig; 3]);
 
         test_shape(trittip, vec![27, 81, 108, 81, 36, 9, 1]);
     }
@@ -1061,7 +999,7 @@ mod tests {
     /// Checks the element num of a triangular triotegum.
     fn trittit_nums() {
         let trig = reg_polygon(3, 1);
-        let trittit = multitegum(&vec![&trig; 3]);
+        let trittit = multitegum(&[&trig; 3]);
 
         test_shape(trittit, vec![9, 36, 81, 108, 81, 27, 1]);
     }
@@ -1080,8 +1018,16 @@ mod tests {
     /// Checks the element num of a triangular triopyramid.
     fn tritippy_nums() {
         let trig = reg_polygon(3, 1);
-        let tritippy = multipyramid(&vec![&trig; 3]);
+        let tritippy = multipyramid(&[&trig; 3]);
 
         test_shape(tritippy, vec![9, 36, 84, 126, 126, 84, 36, 9, 1]);
+    }
+
+    #[test]
+    fn cube_element() {
+        let cube = hypercube(3);
+        let square = cube.get_element(2, 4);
+
+        assert_eq!(square.el_nums(), vec![4, 4, 1]);
     }
 }

@@ -2,7 +2,7 @@ use bevy::prelude::Mesh;
 use bevy::render::mesh::Indices;
 use bevy::render::pipeline::PrimitiveTopology;
 use serde::{Deserialize, Serialize};
-use std::convert::TryInto;
+use std::{collections::VecDeque, convert::TryInto};
 
 use petgraph::{graph::Graph, prelude::NodeIndex, Undirected};
 
@@ -139,7 +139,9 @@ impl Polytope {
 
         for face in faces {
             let edge_i = *face.first().expect("no indices in face");
-            let vert_i = edges[edge_i][0];
+            let vert_i = edges
+                .get(edge_i)
+                .expect("Index out of bounds: you probably screwed up the polytope's indices.")[0];
 
             for verts in face[1..].iter().map(|&i| {
                 edges[i]
@@ -158,11 +160,11 @@ impl Polytope {
     }
 
     /// Returns the rank of the polytope.
-    fn rank(&self) -> usize {
+    pub fn rank(&self) -> usize {
         self.elements.len()
     }
 
-    fn dimension(&self) -> usize {
+    pub fn dimension(&self) -> usize {
         if self.vertices.is_empty() {
             0
         } else {
@@ -172,7 +174,7 @@ impl Polytope {
 
     /// Gets the element counts of a polytope.
     /// The n-th entry corresponds to the amount of n-elements.
-    fn el_nums(&self) -> Vec<usize> {
+    pub fn el_nums(&self) -> Vec<usize> {
         let mut nums = Vec::with_capacity(self.elements.len() + 1);
         nums.push(self.vertices.len());
 
@@ -184,9 +186,25 @@ impl Polytope {
     }
 
     /// Scales a polytope by a given factor.
-    fn scale(&mut self, k: f64) {
+    pub fn scale(&mut self, k: f64) {
         for v in &mut self.vertices {
             *v *= k;
+        }
+    }
+
+    pub fn shift(&mut self, o: Point) {
+        for v in &mut self.vertices {
+            *v -= o.clone();
+        }
+    }
+
+    pub fn recenter(&mut self) {
+        self.shift(self.gravicenter())
+    }
+
+    pub fn apply(&mut self, m: &Matrix) {
+        for v in &mut self.vertices {
+            *v = m.clone() * v.clone();
         }
     }
 
@@ -243,6 +261,93 @@ impl Polytope {
         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
         mesh.set_indices(Some(Indices::U16(indices)));
         mesh
+    }
+
+    pub fn get_element(&self, rank: usize, idx: usize) -> Self {
+        struct Sub {
+            rank: usize,
+            idx: usize,
+        }
+
+        let mut sub_indices: Vec<Vec<Option<usize>>> = Vec::with_capacity(rank);
+        let mut index_subs: Vec<Vec<usize>> = Vec::with_capacity(rank);
+
+        let vertices = &self.vertices;
+        let elements = &self.elements;
+        let el_nums = self.el_nums();
+
+        for el_num in el_nums {
+            sub_indices.push(vec![None; el_num]);
+            index_subs.push(vec![]);
+        }
+
+        let mut sub_deque = VecDeque::new();
+        sub_deque.push_back(Sub { rank, idx });
+
+        let mut c = vec![0; rank];
+        while let Some(sub) = sub_deque.pop_front() {
+            let d = sub.rank - 1;
+            let i = sub.idx;
+
+            let els = &elements[d];
+
+            for &j in &els[i] {
+                if sub_indices[d][j] == None {
+                    sub_indices[d][j] = Some(c[d]);
+                    index_subs[d].push(j);
+                    c[d] += 1;
+
+                    if d > 0 {
+                        sub_deque.push_back(Sub { rank: d, idx: j });
+                    }
+                }
+            }
+        }
+
+        let mut new_vertices = Vec::with_capacity(index_subs[0].len());
+        for &i in &index_subs[0] {
+            new_vertices.push(vertices[i].clone());
+        }
+
+        let mut new_elements = Vec::with_capacity(rank);
+        for d in 1..rank {
+            new_elements.push(Vec::with_capacity(index_subs[d].len()));
+            for &i in &index_subs[d] {
+                let mut el = elements[d - 1][i].clone();
+                for j in 0..el.len() {
+                    el[j] = sub_indices[d - 1][el[j]].unwrap();
+                }
+                new_elements[d - 1].push(el);
+            }
+        }
+
+        let facets = elements[rank - 1][idx].len();
+        let mut components = vec![Vec::with_capacity(facets)];
+        for i in 0..facets {
+            components[0].push(i);
+        }
+        new_elements.push(components);
+
+        Polytope::new(new_vertices, new_elements)
+    }
+
+    pub fn verf(&self, idx: usize) -> Polytope {
+        let dual = shapes::dual(self);
+        let facet = dual.get_element(self.rank() - 1, idx);
+
+        shapes::dual(&facet)
+    }
+
+    pub fn gravicenter(&self) -> Point {
+        let dim = self.dimension();
+        let mut g: Point = vec![0.0; dim].into();
+        let vertices = &self.vertices;
+
+        for v in vertices {
+            g += v;
+        }
+
+        g / (vertices.len() as f64)
     }
 }
 
