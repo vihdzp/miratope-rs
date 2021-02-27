@@ -77,6 +77,7 @@ fn setup(
     let mut heap = antiprism(7, 1);
     let r = heap.midradius();
     heap = heap.scale(1.0 / r);
+    dbg!(heap.circumcenter());
 
     let poly: Polytope = dual_compound(&heap);
     println!("{}", off::to_src(&poly, Default::default()));

@@ -1,3 +1,5 @@
+//! Contains various methods that can be applied to specific polytopes.
+
 use std::collections::HashMap;
 
 use nalgebra::Dynamic;
@@ -87,35 +89,6 @@ pub fn dual_compound(p: &Polytope) -> Polytope {
     compound(&[p, &p.dual()])
 }
 
-/// Projects a [`Point`] onto the hyperplane defined by a vector of [`Points`][`Point`].
-pub fn project(p: &Point, h: Vec<Point>) -> Point {
-    const EPS: f64 = 1e-9;
-
-    let mut h = h.iter();
-    let o = h.next().unwrap();
-    let mut basis: Vec<Point> = Vec::new();
-
-    for q in h {
-        let mut q = q - o;
-
-        for b in &basis {
-            q -= b * (q.dot(&b)) / b.norm_squared();
-        }
-
-        if q.norm() > EPS {
-            basis.push(q);
-        }
-    }
-
-    let mut p = p - o;
-
-    for b in &basis {
-        p -= b * (p.dot(&b)) / b.norm_squared();
-    }
-
-    -p
-}
-
 /// Builds the vertices of a dual polytope from its facets.
 fn dual_vertices(vertices: &[Point], elements: &[ElementList], o: &Point) -> Vec<Point> {
     const EPS: f64 = 1e-9;
@@ -164,9 +137,12 @@ fn dual_vertices(vertices: &[Point], elements: &[ElementList], o: &Point) -> Vec
                 }
 
                 // We project the dual center onto the hyperplane defined by the vertices.
-                let h = facet_verts.iter().map(|&v| vertices[v].clone()).collect();
+                let h = facet_verts
+                    .iter()
+                    .map(|&v| vertices[v].clone())
+                    .collect::<Vec<_>>();
 
-                project(o, h)
+                Polytope::project(o, &h)
             })
             .collect()
     }

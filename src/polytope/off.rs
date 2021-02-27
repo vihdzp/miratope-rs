@@ -57,14 +57,13 @@ fn get_el_nums<'a>(dim: usize, toks: &mut impl Iterator<Item = &'a str>) -> Vec<
     else if dim == 1 {
         let comps = el_nums[0] / 2;
         el_nums.push(comps);
-    }
-    // A polygon always has as many vertices as edges.
-    else if dim == 2 {
-        el_nums.push(el_nums[0]);
-    }
+    } else {
+        // A polygon always has as many vertices as edges.
+        if dim == 2 {
+            el_nums.push(el_nums[0]);
+        }
 
-    // 2-elements go before 1-elements, we're undoing that.
-    if dim >= 2 {
+        // 2-elements go before 1-elements, we're undoing that.
         el_nums.swap(1, 2);
     }
 

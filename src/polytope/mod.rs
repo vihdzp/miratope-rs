@@ -315,6 +315,7 @@ impl Polytope {
         facet.dual()
     }
 
+    /// Gets the gravicenter of a polytope.
     pub fn gravicenter(&self) -> Point {
         let dim = self.dimension();
         let mut g: Point = vec![0.0; dim].into();
@@ -349,6 +350,69 @@ impl Polytope {
         let (sub1, sub2) = (edge[0], edge[1]);
 
         (&vertices[sub1] + &vertices[sub2]).norm() / 2.0
+    }
+
+    pub fn proj(a: &Point, b: &Point) -> Point {
+        b * (a.dot(b)) / b.norm_squared()
+    }
+
+    pub fn circumcenter(&self) -> Option<Point> {
+        let mut vertices = self.vertices.iter();
+        const EPS: f64 = 1e-9;
+
+        let v0 = vertices.next().unwrap().clone();
+        let mut o: Point = vec![0.0; v0.nrows()].into();
+        let mut basis: Vec<Point> = Vec::new();
+
+        for v in vertices {
+            let v = v - &v0;
+
+            let mut v_proj = v.clone();
+            for b in &basis {
+                v_proj -= Self::proj(&v, b);
+            }
+
+            if v_proj.norm() > EPS {
+                // Calculates the new circumcenter.
+                let k = ((&o - &v).norm_squared() - o.norm_squared()) / (2.0 * v.dot(&v_proj));
+                o += k * &v_proj;
+
+                basis.push(v_proj);
+            } else if (o.norm() - (&o - &v).norm()).abs() > EPS {
+                return None;
+            }
+        }
+
+        Some(o + v0)
+    }
+
+    /// Projects a [`Point`] onto the hyperplane defined by a slice of [`Points`][`Point`].
+    pub fn project(p: &Point, hyperplane: &[Point]) -> Point {
+        const EPS: f64 = 1e-9;
+
+        let mut hyperplane = hyperplane.iter();
+        let r = hyperplane.next().unwrap();
+        let mut basis: Vec<Point> = Vec::new();
+
+        for q in hyperplane {
+            let mut q = q - r;
+
+            for b in &basis {
+                q -= b * (q.dot(&b)) / b.norm_squared();
+            }
+
+            if q.norm() > EPS {
+                basis.push(q);
+            }
+        }
+
+        let mut p = r - p;
+
+        for b in &basis {
+            p -= b * (p.dot(b)) / b.norm_squared();
+        }
+
+        p
     }
 }
 
