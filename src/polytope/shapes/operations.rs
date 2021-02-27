@@ -1,11 +1,61 @@
 //! Contains various methods that can be applied to specific polytopes.
 
-use std::collections::HashMap;
+use std::collections::VecDeque;
 
 use nalgebra::Dynamic;
 
-use super::super::{Element, ElementList, Matrix, Point, Polytope};
+use super::super::{Matrix, Point, Polytope};
 use super::*;
+
+pub struct Hypersphere {
+    center: Point,
+    radius: f64,
+}
+
+impl Hypersphere {
+    /// Represents the unit hypersphere in a certain number of dimensions.
+    pub fn unit(dim: usize) -> Hypersphere {
+        Hypersphere {
+            center: vec![0.0; dim].into(),
+            radius: 1.0,
+        }
+    }
+}
+
+pub struct Hyperplane {
+    pub points: Vec<Point>,
+}
+
+impl Hyperplane {
+    /// Projects a [`Point`] onto the hyperplane defined by a slice of [`Points`][`Point`].
+    pub fn project(&self, p: &Point) -> Point {
+        const EPS: f64 = 1e-9;
+
+        let mut hyperplane = self.points.iter();
+        let r = hyperplane.next().unwrap();
+        let mut basis: Vec<Point> = Vec::new();
+
+        for q in hyperplane {
+            let mut q = q - r;
+
+            for b in &basis {
+                q -= b * (q.dot(&b)) / b.norm_squared();
+            }
+
+            if q.norm() > EPS {
+                basis.push(q);
+            }
+        }
+
+        let mut p = r - p;
+
+        for b in &basis {
+            p -= b * (p.dot(b)) / b.norm_squared();
+        }
+
+        p
+    }
+}
 
 /// Generates matrices for rotations by the first multiples of a given angle
 /// through the xy plane.
@@ -101,85 +151,6 @@ pub fn dual_compound(p: &Polytope) -> Polytope {
     compound(&[p, &p.dual().scale(r * r)])
 }
 
-/// Builds the vertices of a dual polytope from its facets.
-fn dual_vertices(vertices: &[Point], elements: &[ElementList], o: &Point) -> Vec<Point> {
-    const EPS: f64 = 1e-9;
-
-    let rank = elements.len();
-
-    // Gets the unique sub-elements from a list of elements.
-    let unique_subs = |els: &Vec<&Vec<usize>>| -> Element {
-        let mut uniq = HashMap::new();
-
-        for &el in els {
-            for &sub in el {
-                uniq.insert(sub, ());
-            }
-        }
-
-        uniq.keys().cloned().collect()
-    };
-
-    // We find the indices of the vertices on the facet.
-    let projections: Vec<Point>;
-
-    if rank >= 2 {
-        let facets = &elements[rank - 2];
-
-        projections = facets
-            .iter()
-            .map(|f| {
-                // We repeatedly retrieve the next subelements of the facets until we get to the vertices.
-                let facet_verts;
-
-                if rank >= 3 {
-                    let ridges = &elements[rank - 3];
-                    let mut els = f.iter().map(|&el| &ridges[el]).collect();
-
-                    for d in (0..(rank - 3)).rev() {
-                        let uniq = unique_subs(&els);
-                        els = uniq.iter().map(|&el| &elements[d][el]).collect();
-                    }
-
-                    facet_verts = unique_subs(&els);
-                }
-                // If our polytope is 2D, we already know the vertices of the facets.
-                else {
-                    facet_verts = f.clone();
-                }
-
-                // We project the dual center onto the hyperplane defined by the vertices.
-                let h = facet_verts
-                    .iter()
-                    .map(|&v| vertices[v].clone())
-                    .collect::<Vec<_>>();
-
-                Polytope::project(o, &h)
-            })
-            .collect()
-    }
-    // If our polytope is 1D, the vertices themselves are the facets.
-    else {
-        projections = vertices.into();
-    }
-
-    // Reciprocates the projected points.
-    projections
-        .iter()
-        .map(|v| {
-            let v = v - o;
-            let s = v.norm_squared();
-
-            // We avoid division by 0.
-            if s < EPS {
-                panic!("Facet passes through the dual center.")
-            }
-
-            v / s + o
-        })
-        .collect()
-}
-
 impl Polytope {
     /// Scales a polytope by a given factor.
     pub fn scale(mut self, k: f64) -> Self {
@@ -215,8 +186,146 @@ impl Polytope {
         self
     }
 
+    pub fn get_element_vertices(&self, rank: usize, idx: usize) -> Vec<Point> {
+        self.get_element(rank, idx).vertices
+    }
+
+    pub fn get_element(&self, rank: usize, idx: usize) -> Self {
+        struct Sub {
+            rank: usize,
+            idx: usize,
+        }
+
+        let mut sub_indices: Vec<Vec<Option<usize>>> = Vec::with_capacity(rank);
+        let mut index_subs: Vec<Vec<usize>> = Vec::with_capacity(rank);
+
+        let vertices = &self.vertices;
+        if rank == 0 {
+            return Polytope::new(vec![vertices[idx].clone()], vec![]);
+        }
+
+        let elements = &self.elements;
+        let el_nums = self.el_nums();
+
+        for el_num in el_nums {
+            sub_indices.push(vec![None; el_num]);
+            index_subs.push(vec![]);
+        }
+
+        let mut sub_deque = VecDeque::new();
+        sub_deque.push_back(Sub { rank, idx });
+
+        let mut c = vec![0; rank];
+        while let Some(sub) = sub_deque.pop_front() {
+            let d = sub.rank - 1;
+            let i = sub.idx;
+
+            let els = &elements[d];
+
+            for &j in &els[i] {
+                if sub_indices[d][j] == None {
+                    sub_indices[d][j] = Some(c[d]);
+                    index_subs[d].push(j);
+                    c[d] += 1;
+
+                    if d > 0 {
+                        sub_deque.push_back(Sub { rank: d, idx: j });
+                    }
+                }
+            }
+        }
+
+        let mut new_vertices = Vec::with_capacity(index_subs[0].len());
+        for &i in &index_subs[0] {
+            new_vertices.push(vertices[i].clone());
+        }
+
+        let mut new_elements = Vec::with_capacity(rank);
+        for d in 1..rank {
+            new_elements.push(Vec::with_capacity(index_subs[d].len()));
+            for &i in &index_subs[d] {
+                let mut el = elements[d - 1][i].clone();
+
+                for sub in &mut el {
+                    *sub = sub_indices[d - 1][*sub].unwrap();
+                }
+
+                new_elements[d - 1].push(el);
+            }
+        }
+
+        let facets = elements[rank - 1][idx].len();
+        let mut components = vec![Vec::with_capacity(facets)];
+        for i in 0..facets {
+            components[0].push(i);
+        }
+        new_elements.push(components);
+
+        Polytope::new(new_vertices, new_elements)
+    }
+
+    /// Gets the [vertex figure](https://polytope.miraheze.org/wiki/Vertex_figure)
+    /// of a polytope, corresponding to a given vertex.
+    pub fn verf(&self, idx: usize) -> Polytope {
+        let dual = self.dual();
+        let facet = dual.get_element(self.rank() - 1, idx);
+
+        facet.dual()
+    }
+
+    /// Builds the vertices of a dual polytope from its facets.
+    fn dual_vertices(&self, sphere: &Hypersphere) -> Vec<Point> {
+        const EPS: f64 = 1e-9;
+
+        let vertices = &self.vertices;
+        let elements = &self.elements;
+        let rank = elements.len();
+        let o = &sphere.center;
+
+        // We find the indices of the vertices on the facet.
+        let mut projections: Vec<Point>;
+
+        if rank >= 2 {
+            let facets = &elements[rank - 2];
+            let facets_len = facets.len();
+
+            projections = Vec::with_capacity(facets_len);
+
+            for idx in 0..facets_len {
+                let facet_verts = self.get_element_vertices(rank - 1, idx);
+
+                // We project the dual center onto the hyperplane defined by the vertices.
+                let h = Hyperplane {
+                    points: facet_verts,
+                };
+
+                projections.push(h.project(o));
+            }
+        }
+        // If our polytope is 1D, the vertices themselves are the facets.
+        else {
+            projections = vertices.clone();
+        }
+
+        // Reciprocates the projected points.
+        projections
+            .iter()
+            .map(|v| {
+                let v = v - o;
+                let s = v.norm_squared();
+
+                // We avoid division by 0.
+                if s < EPS {
+                    panic!("Facet passes through the dual center.")
+                }
+
+                v / s + o
+            })
+            .collect()
+    }
+
     /// Builds a dual polytope with a given the center for reciprocation.
-    pub fn dual_with_center(&self, o: &Point) -> Polytope {
+    pub fn dual_with_sphere(&self, sphere: &Hypersphere) -> Polytope {
         let rank = self.rank();
 
         // If we're dealing with a point, let's skip all of the bs:
@@ -225,11 +334,9 @@ impl Polytope {
         }
 
         let el_nums = self.el_nums();
-
-        let vertices = &self.vertices;
         let elements = &self.elements;
 
-        let du_vertices = dual_vertices(vertices, elements, o);
+        let du_vertices = self.dual_vertices(sphere);
         let mut du_elements = Vec::with_capacity(elements.len());
 
         // Builds the dual incidence graph.
@@ -267,8 +374,8 @@ impl Polytope {
         }
     }
 
-    /// Builds the dual polytope of `p`. Uses the origin as the center for reciprocation.
+    /// Builds the dual of a polytope. Defaults to the origin as the center for reciprocation.
     pub fn dual(&self) -> Polytope {
-        self.dual_with_center(&vec![0.0; self.dimension()].into())
+        self.dual_with_sphere(&Hypersphere::unit(self.dimension()))
     }
 }

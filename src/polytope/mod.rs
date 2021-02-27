@@ -3,7 +3,6 @@ use bevy::render::mesh::Indices;
 use bevy::render::pipeline::PrimitiveTopology;
 use petgraph::{graph::Graph, prelude::NodeIndex, Undirected};
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
 
 pub mod convex;
 pub mod off;
@@ -238,85 +237,6 @@ impl Polytope {
         mesh
     }
 
-    pub fn get_element(&self, rank: usize, idx: usize) -> Self {
-        struct Sub {
-            rank: usize,
-            idx: usize,
-        }
-
-        let mut sub_indices: Vec<Vec<Option<usize>>> = Vec::with_capacity(rank);
-        let mut index_subs: Vec<Vec<usize>> = Vec::with_capacity(rank);
-
-        let vertices = &self.vertices;
-        let elements = &self.elements;
-        let el_nums = self.el_nums();
-
-        for el_num in el_nums {
-            sub_indices.push(vec![None; el_num]);
-            index_subs.push(vec![]);
-        }
-
-        let mut sub_deque = VecDeque::new();
-        sub_deque.push_back(Sub { rank, idx });
-
-        let mut c = vec![0; rank];
-        while let Some(sub) = sub_deque.pop_front() {
-            let d = sub.rank - 1;
-            let i = sub.idx;
-
-            let els = &elements[d];
-
-            for &j in &els[i] {
-                if sub_indices[d][j] == None {
-                    sub_indices[d][j] = Some(c[d]);
-                    index_subs[d].push(j);
-                    c[d] += 1;
-
-                    if d > 0 {
-                        sub_deque.push_back(Sub { rank: d, idx: j });
-                    }
-                }
-            }
-        }
-
-        let mut new_vertices = Vec::with_capacity(index_subs[0].len());
-        for &i in &index_subs[0] {
-            new_vertices.push(vertices[i].clone());
-        }
-
-        let mut new_elements = Vec::with_capacity(rank);
-        for d in 1..rank {
-            new_elements.push(Vec::with_capacity(index_subs[d].len()));
-            for &i in &index_subs[d] {
-                let mut el = elements[d - 1][i].clone();
-
-                for sub in &mut el {
-                    *sub = sub_indices[d - 1][*sub].unwrap();
-                }
-
-                new_elements[d - 1].push(el);
-            }
-        }
-
-        let facets = elements[rank - 1][idx].len();
-        let mut components = vec![Vec::with_capacity(facets)];
-        for i in 0..facets {
-            components[0].push(i);
-        }
-        new_elements.push(components);
-
-        Polytope::new(new_vertices, new_elements)
-    }
-
-    /// Gets the [vertex figure](https://polytope.miraheze.org/wiki/Vertex_figure)
-    /// of a polytope, corresponding to a given vertex.
-    pub fn verf(&self, idx: usize) -> Polytope {
-        let dual = self.dual();
-        let facet = dual.get_element(self.rank() - 1, idx);
-
-        facet.dual()
-    }
-
     /// Gets the gravicenter of a polytope.
     pub fn gravicenter(&self) -> Point {
         let dim = self.dimension();
@@ -419,35 +339,6 @@ impl Polytope {
         }
 
         Some(o + v0)
-    }
-
-    /// Projects a [`Point`] onto the hyperplane defined by a slice of [`Points`][`Point`].
-    pub fn project(p: &Point, hyperplane: &[Point]) -> Point {
-        const EPS: f64 = 1e-9;
-
-        let mut hyperplane = hyperplane.iter();
-        let r = hyperplane.next().unwrap();
-        let mut basis: Vec<Point> = Vec::new();
-
-        for q in hyperplane {
-            let mut q = q - r;
-
-            for b in &basis {
-                q -= b * (q.dot(&b)) / b.norm_squared();
-            }
-
-            if q.norm() > EPS {
-                basis.push(q);
-            }
-        }
-
-        let mut p = r - p;
-
-        for b in &basis {
-            p -= b * (p.dot(b)) / b.norm_squared();
-        }
-
-        p
     }
 }
 

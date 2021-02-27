@@ -149,8 +149,9 @@ pub fn antiprism_with_height(mut n: usize, d: usize, height: f64) -> Polytope {
     let mut vertices = Vec::with_capacity(2 * n);
     let mut edges = Vec::with_capacity(4 * n);
     let mut faces = Vec::with_capacity(2 * n + 2);
-    let mut components = vec![Vec::with_capacity(2 * n + 2)];
+    let mut component = Vec::with_capacity(2 * n + 2);
 
+    // Goes through the vertices in the ring of triangles in order.
     for k in 0..(2 * n) {
         // Generates vertices.
         let angle = (k as f64) * theta;
@@ -165,9 +166,10 @@ pub fn antiprism_with_height(mut n: usize, d: usize, height: f64) -> Polytope {
         faces.push(vec![2 * k, 2 * k + 1, (2 * k + 2) % (4 * n)]);
 
         // Generates component.
-        components[0].push(k);
+        component.push(k);
     }
 
+    // Adds the bases.
     let (mut base1, mut base2) = (Vec::with_capacity(n), Vec::with_capacity(n));
     for k in 0..n {
         base1.push(4 * k + 1);
@@ -176,12 +178,14 @@ pub fn antiprism_with_height(mut n: usize, d: usize, height: f64) -> Polytope {
     faces.push(base1);
     faces.push(base2);
 
-    components[0].push(2 * n);
-    components[0].push(2 * n + 1);
+    component.push(2 * n);
+    component.push(2 * n + 1);
 
     // Compounds of antiprisms with antiprismatic symmetry must be handled
     // differently than compounds of antiprisms with prismatic symmetry.
     let angle = theta * (d / component_num % 2 + 1) as f64;
+
+    let components = vec![component];
     compound_from_trans(
         &Polytope::new(vertices, vec![edges, faces, components]),
         rotations(angle / component_num as f64, component_num, 3),
@@ -227,9 +231,9 @@ pub fn hypercube(d: usize) -> Polytope {
 /// Creates a regular [orthoplex](https://polytope.miraheze.org/wiki/Orthoplex)
 /// with unit edge length.
 pub fn orthoplex(d: usize) -> Polytope {
-    let dyad = dyad();
+    let dyad = dyad().scale(SQRT_2);
 
-    multitegum(&vec![&dyad; d]).scale(SQRT_2)
+    multitegum(&vec![&dyad; d])
 }
 
 #[cfg(test)]

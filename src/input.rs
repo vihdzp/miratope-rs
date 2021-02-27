@@ -98,7 +98,7 @@ fn cam_events_from_kb(
     keyboard: Res<Input<KeyCode>>,
     cam_inputs: &mut Events<CameraInputEvent>,
 ) -> (f32, f32) {
-    const SPIN_RATE: f32 = std::f32::consts::TAU / 3.0;
+    const SPIN_RATE: f32 = std::f32::consts::TAU / 5.0;
     let real_scale = time.delta_seconds();
     let scale = if keyboard.pressed(KeyCode::LControl) | keyboard.pressed(KeyCode::RControl) {
         real_scale * 3.0
