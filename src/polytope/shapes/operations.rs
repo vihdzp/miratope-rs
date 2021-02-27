@@ -7,7 +7,7 @@ use nalgebra::Dynamic;
 use super::super::{Element, ElementList, Matrix, Point, Polytope};
 use super::*;
 
-/// Generates matrices for rotations by the first `num` multiples of `angle`
+/// Generates matrices for rotations by the first multiples of a given angle
 /// through the xy plane.
 pub fn rotations(angle: f64, num: usize, dim: usize) -> Vec<Matrix> {
     let mut rotations = Vec::with_capacity(num);
@@ -31,14 +31,22 @@ pub fn rotations(angle: f64, num: usize, dim: usize) -> Vec<Matrix> {
     rotations
 }
 
-pub fn central_inv(dim: usize) -> Vec<Matrix> {
+/// Generates an array containing only the identity matrix and its negative.
+pub fn central_inv(dim: usize) -> [Matrix; 2] {
     let dim = Dynamic::new(dim);
     let matrix = nalgebra::Matrix::identity_generic(dim, dim);
 
-    vec![matrix.clone(), -matrix]
+    [matrix.clone(), -matrix]
 }
 
+/// Merges various polytopes into a compound.
+///
+/// # Assumptions
+/// * All polytopes are of the same dimension and rank.
+/// * The list of polytopes is non-empty.
 pub fn compound(polytopes: &[&Polytope]) -> Polytope {
+    debug_assert!(!polytopes.is_empty());
+
     let mut polytopes = polytopes.iter();
     let p = polytopes.next().unwrap();
     let rank = p.rank();
@@ -85,8 +93,12 @@ pub fn compound_from_trans(p: &Polytope, trans: Vec<Matrix>) -> Polytope {
     compound(&polytopes.iter().collect::<Vec<_>>())
 }
 
+/// Generates the compound of a polytope and its dual. The dual is rescaled so
+/// as to have the same midradius as the original polytope.
 pub fn dual_compound(p: &Polytope) -> Polytope {
-    compound(&[p, &p.dual()])
+    let r = p.midradius();
+
+    compound(&[p, &p.dual().scale(r * r)])
 }
 
 /// Builds the vertices of a dual polytope from its facets.

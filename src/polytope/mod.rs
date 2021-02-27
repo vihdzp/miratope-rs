@@ -308,6 +308,8 @@ impl Polytope {
         Polytope::new(new_vertices, new_elements)
     }
 
+    /// Gets the [vertex figure](https://polytope.miraheze.org/wiki/Vertex_figure)
+    /// of a polytope, corresponding to a given vertex.
     pub fn verf(&self, idx: usize) -> Polytope {
         let dual = self.dual();
         let facet = dual.get_element(self.rank() - 1, idx);
@@ -328,18 +330,51 @@ impl Polytope {
         g / (vertices.len() as f64)
     }
 
+    /// Gets the edge lengths of all edges in the polytope, in order.
     pub fn edge_lengths(&self) -> Vec<f64> {
         let vertices = &self.vertices;
-        let edges = &self.elements[0];
-        let mut edge_lengths = Vec::with_capacity(edges.len());
+        let mut edge_lengths = Vec::new();
 
-        for edge in edges {
-            let (sub1, sub2) = (edge[0], edge[1]);
+        // If there are no edges, we just return the empty vector.
+        if let Some(edges) = self.elements.get(0) {
+            edge_lengths.reserve_exact(edges.len());
 
-            edge_lengths.push((&vertices[sub1] - &vertices[sub2]).norm());
+            for edge in edges {
+                let (sub1, sub2) = (edge[0], edge[1]);
+
+                edge_lengths.push((&vertices[sub1] - &vertices[sub2]).norm());
+            }
         }
 
         edge_lengths
+    }
+
+    pub fn is_equilateral_with_len(&self, len: f64) -> bool {
+        const EPS: f64 = 1e-9;
+        let edge_lengths = self.edge_lengths().into_iter();
+
+        // Checks that every other edge length is equal to the first.
+        for edge_len in edge_lengths {
+            if (edge_len - len).abs() > EPS {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// Checks whether a polytope is equilateral to a fixed precision.
+    pub fn is_equilateral(&self) -> bool {
+        if let Some(edges) = self.elements.get(0) {
+            if let Some(edge) = edges.get(0) {
+                let vertices = edge.iter().map(|&v| &self.vertices[v]).collect::<Vec<_>>();
+                let (v0, v1) = (vertices[0], vertices[1]);
+
+                return self.is_equilateral_with_len((v0 - v1).norm());
+            }
+        }
+
+        true
     }
 
     /// I haven't actually implemented this in the general case.

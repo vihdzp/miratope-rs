@@ -4,7 +4,9 @@
 //! Still in alpha development.
 //!
 //! ## What can Miratope do now?
-//! Not much. We're still in the early stages of porting the original Miratope's functionality.
+//! Miratope can already load some polytopes and find out various properties
+//! about them, and it can operate on them via various methods. We're still in
+//! the early stages of porting the original Miratope's functionality, though.
 //!
 //! ## What are Miratope's goals?
 //! We plan to eventually support all of the original Miratope's features,
@@ -74,11 +76,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let mut heap = antiprism(7, 1);
-    let r = heap.midradius();
-    heap = heap.scale(1.0 / r);
-    dbg!(heap.circumcenter());
-
+    let heap = antiprism(7, 1);
     let poly: Polytope = dual_compound(&heap);
     println!("{}", off::to_src(&poly, Default::default()));
 

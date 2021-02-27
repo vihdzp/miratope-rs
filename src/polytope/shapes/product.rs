@@ -374,7 +374,7 @@ pub fn multipyramid_with_heights(polytopes: &[&Polytope], heights: &[f64]) -> Po
 
     let mut heights = heights.iter();
     for p in polytopes {
-        r = duopyramid_with_height(&p, &r, *heights.next().unwrap_or(&1.0));
+        r = duopyramid_with_height(&p, &r, *heights.next().unwrap_or(&1.0)).recenter();
     }
 
     r
@@ -392,13 +392,13 @@ impl Polytope {
     }
 
     /// Builds a prism from a given polytope with unit height. Internally calls
-    /// [`prism_with_height`].
+    /// [`prism_with_height`](`Polytope::prism_with_height`).
     pub fn prism(&self) -> Polytope {
         self.prism_with_height(1.0)
     }
 
     pub fn tegum_with_height(&self, height: f64) -> Polytope {
-        duotegum(self, &dyad().scale(height))
+        duotegum(self, &dyad().scale(2.0 * height))
     }
 
     pub fn tegum(&self) -> Polytope {
@@ -413,5 +413,102 @@ impl Polytope {
 
     pub fn pyramid(&self) -> Polytope {
         self.pyramid_with_height(1.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{test_el_nums, test_equilateral};
+
+    #[test]
+    /// Checks a pentagonal prism.
+    fn hip() {
+        let peg = super::reg_polygon(5, 1);
+        let pip = peg.prism();
+
+        test_el_nums(&pip, vec![10, 15, 7, 1]);
+        test_equilateral(&pip, 1.0);
+    }
+
+    #[test]
+    /// Checks a triangular-pentagonal duoprism.
+    fn trapedip() {
+        let trig = super::reg_polygon(3, 1);
+        let peg = super::reg_polygon(5, 1);
+        let trapedip = super::duoprism(&trig, &peg);
+
+        test_el_nums(&trapedip, vec![15, 30, 23, 8, 1]);
+        test_equilateral(&trapedip, 1.0);
+    }
+
+    #[test]
+    /// Checks a triangular trioprism.
+    fn trittip() {
+        let trig = super::reg_polygon(3, 1);
+        let trittip = super::multiprism(&[&trig; 3]);
+
+        test_el_nums(&trittip, vec![27, 81, 108, 81, 36, 9, 1]);
+        test_equilateral(&trittip, 1.0);
+    }
+
+    #[test]
+    /// Checks a pentagonal bipyramid.
+    fn pedpy() {
+        let peg = super::reg_polygon(5, 1);
+        let height = ((5.0 - 5f64.sqrt()) / 10.0).sqrt();
+        let pedpy = peg.tegum_with_height(height);
+
+        test_el_nums(&pedpy, vec![7, 15, 10, 1]);
+        test_equilateral(&pedpy, 1.0);
+    }
+
+    #[test]
+    /// Checks a triangular-pentagonal duotegum.
+    fn trapedit() {
+        let trig = super::reg_polygon(3, 1);
+        let peg = super::reg_polygon(5, 1);
+        let trapedit = super::duotegum(&trig, &peg);
+
+        test_el_nums(&trapedit, vec![8, 23, 30, 15, 1]);
+    }
+
+    #[test]
+    /// Checks a triangular triotegum.
+    fn trittit() {
+        let trig = super::reg_polygon(3, 1);
+        let trittit = super::multitegum(&[&trig; 3]);
+
+        test_el_nums(&trittit, vec![9, 36, 81, 108, 81, 27, 1]);
+    }
+
+    #[test]
+    /// Checks a pentagonal pyramid.
+    fn peppy() {
+        let peg = super::reg_polygon(5, 1);
+        let height = ((5.0 - 5f64.sqrt()) / 10.0).sqrt();
+        let peppy = peg.pyramid_with_height(height);
+
+        test_el_nums(&peppy, vec![6, 10, 6, 1]);
+        test_equilateral(&peppy, 1.0);
+    }
+
+    #[test]
+    /// Checks a triangular-pentagonal duopyramid.
+    fn trapdupy() {
+        let trig = super::reg_polygon(3, 1);
+        let peg = super::reg_polygon(5, 1);
+        let trapdupy = super::duopyramid(&trig, &peg);
+
+        test_el_nums(&trapdupy, vec![8, 23, 32, 23, 8, 1]);
+    }
+
+    #[test]
+    /// Checks a triangular triopyramid.
+    fn tritippy() {
+        let trig = super::reg_polygon(3, 1);
+        let tritippy = super::multipyramid_with_heights(&[&trig; 3], &[1.0 / 3f64.sqrt(), 0.5]);
+
+        test_el_nums(&tritippy, vec![9, 36, 84, 126, 126, 84, 36, 9, 1]);
+        test_equilateral(&tritippy, 1.0);
     }
 }

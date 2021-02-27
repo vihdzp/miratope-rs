@@ -1,5 +1,5 @@
 use gcd::Gcd;
-use std::f64::consts::PI as PI64;
+use std::f64::consts::{PI as PI64, SQRT_2};
 
 use super::super::{Point, Polytope};
 use super::*;
@@ -34,71 +34,96 @@ pub fn polygon(vertices: Vec<Point>) -> Polytope {
     Polytope::new(vertices, vec![edges, vec![component]])
 }
 
-/// Generates a semiregular polygon, with order n rotational symmetry and winding number d.
-/// Bowties correspond to shapes where `d == 0`.
-pub fn sreg_polygon(mut n: usize, d: usize, mut len_a: f64, mut len_b: f64) -> Polytope {
-    let comp_num;
-    let comp_angle;
+/// Generates a [bowtie](https://polytope.miraheze.org/wiki/Bowtie) with given
+/// edge lengths.
+fn bowtie_vertices(mut len_a: f64, mut len_b: f64) -> Vec<Point> {
+    // Guarantees len_a ≤ len_b.
+    if len_a > len_b {
+        std::mem::swap(&mut len_a, &mut len_b);
+    }
+
+    // The coordinates of the bowtie.
+    let (a, b) = (len_a / 2.0, (len_b * len_b - len_a * len_a).sqrt() / 2.0);
+
+    vec![
+        vec![a, b].into(),
+        vec![-a, -b].into(),
+        vec![a, -b].into(),
+        vec![-a, b].into(),
+    ]
+}
+
+fn sreg_vertices(mut n: usize, d: usize, len_a: f64, len_b: f64) -> Vec<Point> {
+    // Builds the triangle from three adjacent vertices, and finds its side
+    // lengths and angles.
+    //
+    // This triangle has side lengths len_a, len_b, len_c, and the opposite
+    // respective angles are alpha, beta, gamma.
+    let sq_a = len_a * len_a;
+    let sq_b = len_b * len_b;
+
+    let gamma = PI64 * (1.0 - (d as f64) / (n as f64));
+    let sq_c = sq_a + sq_b - 2.0 * len_a * len_b * gamma.cos();
+    let len_c = sq_c.sqrt();
+
+    let mut alpha = ((sq_b + sq_c - sq_a) / (2.0 * len_b * len_c)).acos();
+    let mut beta = ((sq_c + sq_a - sq_b) / (2.0 * len_c * len_a)).acos();
+
+    let radius = len_c / (2.0 * gamma.sin());
+
+    // Fixes the angles in case anything goes wrong in the calculation.
+    let theta = PI64 * (d as f64) / (n as f64);
+    if alpha.is_nan() {
+        alpha = theta;
+    }
+    if beta.is_nan() {
+        beta = theta;
+    }
+
+    // We only want to generate a single component.
+    n /= n.gcd(d);
 
     let regular = len_a == 0.0 || len_b == 0.0;
     let vertex_num = if regular { n } else { 2 * n };
     let mut vertices = Vec::with_capacity(vertex_num);
 
-    // Bowties are a special case that must be considered separately.
-    if d == 0 {
-        if len_a > len_b {
-            std::mem::swap(&mut len_a, &mut len_b);
+    // Adds vertices.
+    let mut angle = 0f64;
+    for _ in 0..n {
+        if len_a != 0.0 {
+            vertices.push(vec![angle.cos() * radius, angle.sin() * radius].into());
+            angle += 2.0 * alpha;
         }
 
-        let (a, b) = (len_a / 2.0, (len_b * len_b - len_a * len_a).sqrt() / 2.0);
+        if len_b != 0.0 {
+            vertices.push(vec![angle.cos() * radius, angle.sin() * radius].into());
+            angle += 2.0 * beta;
+        }
+    }
 
-        vertices = vec![
-            vec![a, b].into(),
-            vec![-a, -b].into(),
-            vec![a, -b].into(),
-            vec![-a, b].into(),
-        ];
+    vertices
+}
+
+/// Generates a semiregular polygon, with order n rotational symmetry and winding number d.
+/// Bowties correspond to shapes where `d == 0`.
+pub fn sreg_polygon(n: usize, d: usize, len_a: f64, len_b: f64) -> Polytope {
+    let vertices;
+
+    let comp_num;
+    let comp_angle;
+
+    // Bowties are a special case that must be considered separately.
+    if d == 0 {
+        vertices = bowtie_vertices(len_a, len_b);
 
         comp_num = n / 2;
         comp_angle = PI64 / comp_num as f64;
     } else {
-        // Builds the triangle from three adjacent vertices, and finds its side lengths and angles.
-        let gamma = PI64 * (1.0 - (2.0 * d as f64) / (n as f64));
-        let len_c = (len_a * len_a + len_b * len_b - 2.0 * len_a * len_b * gamma.cos()).sqrt();
-        let mut alpha =
-            ((len_b * len_b + len_c * len_c - len_a * len_a) / (2.0 * len_b * len_c)).acos();
-        let mut beta =
-            ((len_c * len_c + len_a * len_a - len_b * len_b) / (2.0 * len_c * len_a)).acos();
-        let radius = gamma / (2.0 * gamma.sin());
-
-        // Fixes the angles in case anything goes wrong in the calculation.
-        let theta = 2.0 * PI64 * (d as f64) / (n as f64);
-        if alpha.is_nan() {
-            alpha = theta;
-        }
-        if beta.is_nan() {
-            beta = theta;
-        }
+        vertices = sreg_vertices(n, d, len_a, len_b);
 
         comp_num = n.gcd(d);
-        n /= comp_num;
-
-        // Adds vertices.
-        let mut angle = 0f64;
-        for _ in 0..n {
-            if len_a != 0.0 {
-                vertices.push(vec![angle.cos() * radius, angle.sin() * radius].into());
-                angle += alpha;
-            }
-
-            if len_b != 0.0 {
-                vertices.push(vec![angle.cos() * radius, angle.sin() * radius].into());
-                angle += beta;
-            }
-        }
-
         comp_angle = 2.0 * PI64 / (n as f64 * comp_num as f64);
-    }
+    };
 
     compound_from_trans(&polygon(vertices), rotations(comp_angle, comp_num, 2))
 }
@@ -177,189 +202,144 @@ pub fn antiprism(n: usize, d: usize) -> Polytope {
     antiprism_with_height(n, d, height)
 }
 
+/// Creates a regular [simplex](https://polytope.miraheze.org/wiki/Simplex) with
+/// unit edge length.
 pub fn simplex(d: usize) -> Polytope {
-    let mut simplex = point();
     let point = point();
+    let mut heights = Vec::with_capacity(d - 1);
 
     for n in 1..(d + 1) {
         let n = n as f64;
-        let height = ((n + 1.0) / (2.0 * n)).sqrt();
-
-        simplex = duopyramid_with_height(&simplex, &point, height).recenter();
+        heights.push(((n + 1.0) / (2.0 * n)).sqrt());
     }
 
-    simplex
+    multipyramid_with_heights(&vec![&point; d + 1], &heights)
 }
 
+/// Creates a regular [hypercube](https://polytope.miraheze.org/wiki/Hypercube)
+/// with unit edge length.
 pub fn hypercube(d: usize) -> Polytope {
     let dyad = dyad();
 
     multiprism(&vec![&dyad; d])
 }
 
+/// Creates a regular [orthoplex](https://polytope.miraheze.org/wiki/Orthoplex)
+/// with unit edge length.
 pub fn orthoplex(d: usize) -> Polytope {
     let dyad = dyad();
 
-    multitegum(&vec![&dyad; d])
+    multitegum(&vec![&dyad; d]).scale(SQRT_2)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    /// Used to test a particular polytope.
-    /// We assume that the polytope has no hemi facets.
-    fn test_shape(mut p: Polytope, mut el_nums: Vec<usize>) {
-        // Checks that element counts match up.
-        assert_eq!(p.el_nums(), el_nums);
-
-        // Checks that the dual element counts match up as well.
-        let len = el_nums.len();
-        p = p.dual();
-        el_nums[0..len - 1].reverse();
-        assert_eq!(p.el_nums(), el_nums);
-    }
+    use super::{test_el_nums, test_equilateral};
 
     #[test]
     /// Checks the element counts of a point.
-    fn point_nums() {
-        test_shape(point(), vec![1]);
+    fn point() {
+        let point = super::point();
+
+        test_el_nums(&point, vec![1]);
+        test_equilateral(&point, 0.0);
     }
 
     #[test]
     /// Checks the element counts of a dyad.
-    fn dyad_nums() {
-        test_shape(dyad(), vec![2, 1]);
+    fn dyad() {
+        let dyad = super::dyad();
+
+        test_el_nums(&dyad, vec![2, 1]);
+        test_equilateral(&dyad, 1.0);
     }
 
     #[test]
     /// Checks the element counts of a few regular polygons.
-    fn reg_polygon_nums() {
-        test_shape(reg_polygon(5, 1), vec![5, 5, 1]);
-        test_shape(reg_polygon(7, 2), vec![7, 7, 1]);
-        test_shape(reg_polygon(6, 2), vec![6, 6, 2]);
+    fn reg_polygon() {
+        let star = super::reg_polygon(5, 1);
+        let hag = super::reg_polygon(7, 2);
+        let shig = super::reg_polygon(6, 2);
+
+        test_el_nums(&star, vec![5, 5, 1]);
+        test_el_nums(&hag, vec![7, 7, 1]);
+        test_el_nums(&shig, vec![6, 6, 2]);
+
+        test_equilateral(&star, 1.0);
+        test_equilateral(&hag, 1.0);
+        test_equilateral(&shig, 1.0);
     }
 
     #[test]
     /// Checks the element counts of a few regular polygons.
-    fn sreg_polygon_nums() {
-        test_shape(sreg_polygon(5, 1, 1.0, 1.0), vec![10, 10, 1]);
-        test_shape(sreg_polygon(7, 2, 1.0, 1.0), vec![14, 14, 1]);
-        test_shape(sreg_polygon(6, 2, 1.0, 1.0), vec![12, 12, 2]);
+    fn sreg_polygon() {
+        let trunc_star = super::sreg_polygon(5, 1, 1.0, 1.0);
+        let trunc_hag = super::sreg_polygon(7, 2, 1.0, 1.0);
+        let trunc_shig = super::sreg_polygon(6, 2, 1.0, 1.0);
+
+        test_el_nums(&trunc_star, vec![10, 10, 1]);
+        test_el_nums(&trunc_hag, vec![14, 14, 1]);
+        test_el_nums(&trunc_shig, vec![12, 12, 2]);
+
+        test_equilateral(&trunc_star, 1.0);
+        test_equilateral(&trunc_hag, 1.0);
+        test_equilateral(&trunc_shig, 1.0);
     }
 
     #[test]
     /// Checks the element counts of a tetrahedron.
-    fn tet_nums() {
-        test_shape(simplex(3), vec![4, 6, 4, 1]);
+    fn tet() {
+        let tet = super::simplex(3);
+
+        test_el_nums(&tet, vec![4, 6, 4, 1]);
+        test_equilateral(&tet, 1.0);
     }
 
     #[test]
     /// Checks the element counts of a cube.
-    fn cube_nums() {
-        test_shape(hypercube(3), vec![8, 12, 6, 1]);
+    fn cube() {
+        let cube = super::hypercube(3);
+
+        test_el_nums(&cube, vec![8, 12, 6, 1]);
+        test_equilateral(&cube, 1.0);
     }
 
     #[test]
     /// Checks the element counts of an octahedron.
-    fn oct_nums() {
-        test_shape(orthoplex(3), vec![6, 12, 8, 1]);
+    fn oct() {
+        let oct = super::orthoplex(3);
+
+        test_el_nums(&oct, vec![6, 12, 8, 1]);
+        test_equilateral(&oct, 1.0);
     }
 
     #[test]
     /// Checks the element counts of a few antiprisms.
-    fn antiprism_nums() {
-        test_shape(antiprism(5, 1), vec![10, 20, 12, 1]);
-        test_shape(antiprism(7, 2), vec![14, 28, 16, 1]);
-        test_shape(antiprism(6, 2), vec![12, 24, 16, 2]);
+    fn antiprism() {
+        let stap = super::antiprism(5, 1);
+        let shap = super::antiprism(7, 2);
+        let shigp = super::antiprism(6, 2); //wrong obsa lol
+
+        test_el_nums(&stap, vec![10, 20, 12, 1]);
+        test_el_nums(&shap, vec![14, 28, 16, 1]);
+        test_el_nums(&shigp, vec![12, 24, 16, 2]);
+
+        test_equilateral(&stap, 1.0);
+        test_equilateral(&shap, 1.0);
+        test_equilateral(&shigp, 1.0);
     }
 
     #[test]
     #[should_panic(expected = "Facet passes through the dual center.")]
-    fn bowtie_dual() {
-        let bowtie = sreg_polygon(2, 0, 2.0, 1.0);
+    fn bowtie() {
+        let bowtie = super::sreg_polygon(2, 0, 2.0, 1.0);
 
-        bowtie.dual();
-    }
-
-    #[test]
-    /// Checks the element counts of a hexagonal prism.
-    fn hip_nums() {
-        let hig = reg_polygon(6, 1);
-        let hip = hig.prism();
-
-        test_shape(hip, vec![12, 18, 8, 1]);
-    }
-
-    #[test]
-    /// Checks the element counts of a triangular-pentagonal duoprism.
-    fn trapedip_nums() {
-        let trig = reg_polygon(3, 1);
-        let peg = reg_polygon(5, 1);
-        let trapedip = duoprism(&trig, &peg);
-
-        test_shape(trapedip, vec![15, 30, 23, 8, 1]);
-    }
-
-    #[test]
-    /// Checks the element num of a triangular trioprism.
-    fn trittip_nums() {
-        let trig = reg_polygon(3, 1);
-        let trittip = multiprism(&[&trig; 3]);
-
-        test_shape(trittip, vec![27, 81, 108, 81, 36, 9, 1]);
-    }
-
-    #[test]
-    /// Checks the element counts of a hexagonal bipyramid.
-    fn hib_nums() {
-        let hig = reg_polygon(6, 1);
-        let hib = hig.tegum();
-
-        test_shape(hib, vec![8, 18, 12, 1]);
-    }
-
-    #[test]
-    /// Checks the element num of a triangular-pentagonal duotegum.
-    fn trapedit_nums() {
-        let trig = reg_polygon(3, 1);
-        let peg = reg_polygon(5, 1);
-        let trapedit = duotegum(&trig, &peg);
-
-        test_shape(trapedit, vec![8, 23, 30, 15, 1]);
-    }
-
-    #[test]
-    /// Checks the element num of a triangular triotegum.
-    fn trittit_nums() {
-        let trig = reg_polygon(3, 1);
-        let trittit = multitegum(&[&trig; 3]);
-
-        test_shape(trittit, vec![9, 36, 81, 108, 81, 27, 1]);
-    }
-
-    #[test]
-    /// Checks the element num of a triangular-pentagonal duopyramid.
-    fn trapdupy_nums() {
-        let trig = reg_polygon(3, 1);
-        let peg = reg_polygon(5, 1);
-        let trapdupy = duopyramid(&trig, &peg);
-
-        test_shape(trapdupy, vec![8, 23, 32, 23, 8, 1]);
-    }
-
-    #[test]
-    /// Checks the element num of a triangular triopyramid.
-    fn tritippy_nums() {
-        let trig = reg_polygon(3, 1);
-        let tritippy = multipyramid(&[&trig; 3]);
-
-        test_shape(tritippy, vec![9, 36, 84, 126, 126, 84, 36, 9, 1]);
+        test_el_nums(&bowtie, vec![4, 4, 1]);
     }
 
     #[test]
     fn cube_element() {
-        let cube = hypercube(3);
+        let cube = super::hypercube(3);
         let square = cube.get_element(2, 4);
 
         assert_eq!(square.el_nums(), vec![4, 4, 1]);
