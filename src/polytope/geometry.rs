@@ -48,7 +48,7 @@ impl Hyperplane {
         Hyperplane {
             basis: Vec::new(),
             rank: 0,
-            points: vec![p.clone()],
+            points: vec![p],
         }
     }
 
