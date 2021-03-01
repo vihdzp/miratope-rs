@@ -4,58 +4,11 @@ use std::collections::VecDeque;
 
 use nalgebra::Dynamic;
 
-use super::super::{Matrix, Point, Polytope};
+use super::super::{
+    geometry::{Hyperplane, Hypersphere, Matrix, Point},
+    Polytope,
+};
 use super::*;
-
-pub struct Hypersphere {
-    center: Point,
-    radius: f64,
-}
-
-impl Hypersphere {
-    /// Represents the unit hypersphere in a certain number of dimensions.
-    pub fn unit(dim: usize) -> Hypersphere {
-        Hypersphere {
-            center: vec![0.0; dim].into(),
-            radius: 1.0,
-        }
-    }
-}
-
-pub struct Hyperplane {
-    pub points: Vec<Point>,
-}
-
-impl Hyperplane {
-    /// Projects a [`Point`] onto the hyperplane defined by a slice of [`Points`][`Point`].
-    pub fn project(&self, p: &Point) -> Point {
-        const EPS: f64 = 1e-9;
-
-        let mut hyperplane = self.points.iter();
-        let r = hyperplane.next().unwrap();
-        let mut basis: Vec<Point> = Vec::new();
-
-        for q in hyperplane {
-            let mut q = q - r;
-
-            for b in &basis {
-                q -= b * (q.dot(&b)) / b.norm_squared();
-            }
-
-            if q.norm() > EPS {
-                basis.push(q);
-            }
-        }
-
-        let mut p = r - p;
-
-        for b in &basis {
-            p -= b * (p.dot(b)) / b.norm_squared();
-        }
-
-        p
-    }
-}
 
 /// Generates matrices for rotations by the first multiples of a given angle
 /// through the xy plane.
@@ -186,6 +139,36 @@ impl Polytope {
         self
     }
 
+    pub fn proj(a: &Point, b: &Point) -> Point {
+        b * (a.dot(b)) / b.norm_squared()
+    }
+
+    pub fn circumsphere(&self) -> Option<Hypersphere> {
+        let mut vertices = self.vertices.iter();
+        const EPS: f64 = 1e-9;
+
+        let v0 = vertices.next().expect("Polytope has no vertices!").clone();
+        let mut o: Point = v0.clone();
+        let mut h = Hyperplane::new(v0.clone());
+
+        for v in vertices {
+            if let Some(b) = h.add(&v) {
+                // Calculates the new circumcenter.
+                let k = ((&o - v).norm_squared() - (&o - &v0).norm_squared())
+                    / (2.0 * (v - &v0).dot(&b));
+
+                o += k * b;
+            } else if ((&o - &v0).norm() - (&o - v).norm()).abs() > EPS {
+                return None;
+            }
+        }
+
+        Some(Hypersphere {
+            radius: (&o - v0).norm(),
+            center: o,
+        })
+    }
+
     pub fn get_element_vertices(&self, rank: usize, idx: usize) -> Vec<Point> {
         self.get_element(rank, idx).vertices
     }
@@ -295,9 +278,7 @@ impl Polytope {
                 let facet_verts = self.get_element_vertices(rank - 1, idx);
 
                 // We project the dual center onto the hyperplane defined by the vertices.
-                let h = Hyperplane {
-                    points: facet_verts,
-                };
+                let h = Hyperplane::from_points(&facet_verts);
 
                 projections.push(h.project(o));
             }

@@ -357,8 +357,8 @@ pub fn duotegum(p: &Polytope, q: &Polytope) -> Polytope {
 pub fn multitegum(polytopes: &[&Polytope]) -> Polytope {
     let mut multitegum = point();
 
-    for p in polytopes {
-        multitegum = duotegum(&p, &multitegum);
+    for &p in polytopes {
+        multitegum = duotegum(p, &multitegum);
     }
 
     multitegum
@@ -373,8 +373,8 @@ pub fn multipyramid_with_heights(polytopes: &[&Polytope], heights: &[f64]) -> Po
     let mut r = (*polytopes.next().unwrap()).clone();
 
     let mut heights = heights.iter();
-    for p in polytopes {
-        r = duopyramid_with_height(&p, &r, *heights.next().unwrap_or(&1.0)).recenter();
+    for &p in polytopes {
+        r = duopyramid_with_height(p, &r, *heights.next().unwrap_or(&1.0)).recenter();
     }
 
     r
@@ -397,10 +397,14 @@ impl Polytope {
         self.prism_with_height(1.0)
     }
 
+    /// Builds a tegum from a given polytope with a given height. Internally calls
+    /// [`duotegum`] with the polytope and a [`dyad`].
     pub fn tegum_with_height(&self, height: f64) -> Polytope {
         duotegum(self, &dyad().scale(2.0 * height))
     }
 
+    /// Builds a tegum from a given polytope with unit height. Internally calls
+    /// [`tegum_with_height`](`Polytope::tegum_with_height`).
     pub fn tegum(&self) -> Polytope {
         self.tegum_with_height(1.0)
     }
@@ -418,7 +422,8 @@ impl Polytope {
 
 #[cfg(test)]
 mod tests {
-    use super::{test_el_nums, test_equilateral};
+    use super::super::super::geometry::Hypersphere;
+    use super::{test_circumsphere, test_el_nums, test_equilateral};
 
     #[test]
     /// Checks a pentagonal prism.
@@ -428,6 +433,7 @@ mod tests {
 
         test_el_nums(&pip, vec![10, 15, 7, 1]);
         test_equilateral(&pip, 1.0);
+        test_circumsphere(&pip, &Hypersphere::with_radius(3, 0.986715155325983));
     }
 
     #[test]
@@ -439,6 +445,7 @@ mod tests {
 
         test_el_nums(&trapedip, vec![15, 30, 23, 8, 1]);
         test_equilateral(&trapedip, 1.0);
+        test_circumsphere(&trapedip, &Hypersphere::with_radius(4, 1.02807593643821));
     }
 
     #[test]
@@ -449,6 +456,7 @@ mod tests {
 
         test_el_nums(&trittip, vec![27, 81, 108, 81, 36, 9, 1]);
         test_equilateral(&trittip, 1.0);
+        test_circumsphere(&trittip, &Hypersphere::with_radius(6, 1.0));
     }
 
     #[test]

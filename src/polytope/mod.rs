@@ -4,14 +4,15 @@ use bevy::render::pipeline::PrimitiveTopology;
 use petgraph::{graph::Graph, prelude::NodeIndex, Undirected};
 use serde::{Deserialize, Serialize};
 
+use geometry::Point;
+
 pub mod convex;
+pub mod geometry;
 pub mod off;
 pub mod shapes;
 
 pub type Element = Vec<usize>;
 pub type ElementList = Vec<Element>;
-pub type Point = nalgebra::DVector<f64>;
-pub type Matrix = nalgebra::DMatrix<f64>;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PolytopeSerde {
@@ -162,10 +163,12 @@ impl Polytope {
     }
 
     pub fn dimension(&self) -> usize {
-        if self.vertices.is_empty() {
-            0
+        let vertex = self.vertices.get(0);
+
+        if let Some(vertex) = vertex {
+            vertex.len()
         } else {
-            self.vertices[0].len()
+            0
         }
     }
 
@@ -305,40 +308,6 @@ impl Polytope {
         let (sub1, sub2) = (edge[0], edge[1]);
 
         (&vertices[sub1] + &vertices[sub2]).norm() / 2.0
-    }
-
-    pub fn proj(a: &Point, b: &Point) -> Point {
-        b * (a.dot(b)) / b.norm_squared()
-    }
-
-    pub fn circumcenter(&self) -> Option<Point> {
-        let mut vertices = self.vertices.iter();
-        const EPS: f64 = 1e-9;
-
-        let v0 = vertices.next().unwrap().clone();
-        let mut o: Point = vec![0.0; v0.nrows()].into();
-        let mut basis: Vec<Point> = Vec::new();
-
-        for v in vertices {
-            let v = v - &v0;
-
-            let mut v_proj = v.clone();
-            for b in &basis {
-                v_proj -= Self::proj(&v, b);
-            }
-
-            if v_proj.norm() > EPS {
-                // Calculates the new circumcenter.
-                let k = ((&o - &v).norm_squared() - o.norm_squared()) / (2.0 * v.dot(&v_proj));
-                o += k * &v_proj;
-
-                basis.push(v_proj);
-            } else if (o.norm() - (&o - &v).norm()).abs() > EPS {
-                return None;
-            }
-        }
-
-        Some(o + v0)
     }
 }
 

@@ -1,7 +1,7 @@
 use gcd::Gcd;
 use std::f64::consts::{PI as PI64, SQRT_2};
 
-use super::super::{Point, Polytope};
+use super::super::{geometry::Point, Polytope};
 use super::*;
 
 /// Generates the unique 0D polytope.
@@ -238,10 +238,11 @@ pub fn orthoplex(d: usize) -> Polytope {
 
 #[cfg(test)]
 mod tests {
-    use super::{test_el_nums, test_equilateral};
+    use super::super::super::geometry::Hypersphere;
+    use super::{test_circumsphere, test_el_nums, test_equilateral};
 
     #[test]
-    /// Checks the element counts of a point.
+    /// Checks a point.
     fn point() {
         let point = super::point();
 
@@ -250,16 +251,17 @@ mod tests {
     }
 
     #[test]
-    /// Checks the element counts of a dyad.
+    /// Checks a dyad.
     fn dyad() {
         let dyad = super::dyad();
 
         test_el_nums(&dyad, vec![2, 1]);
         test_equilateral(&dyad, 1.0);
+        test_circumsphere(&dyad, &Hypersphere::with_radius(1, 0.5))
     }
 
     #[test]
-    /// Checks the element counts of a few regular polygons.
+    /// Checks a few regular polygons.
     fn reg_polygon() {
         let star = super::reg_polygon(5, 1);
         let hag = super::reg_polygon(7, 2);
@@ -272,10 +274,14 @@ mod tests {
         test_equilateral(&star, 1.0);
         test_equilateral(&hag, 1.0);
         test_equilateral(&shig, 1.0);
+
+        test_circumsphere(&star, &Hypersphere::with_radius(2, 0.850650808352040));
+        test_circumsphere(&hag, &Hypersphere::with_radius(2, 0.639524003844966));
+        test_circumsphere(&shig, &Hypersphere::with_radius(2, 0.577350269189626));
     }
 
     #[test]
-    /// Checks the element counts of a few regular polygons.
+    /// Checks a few semi-regular polygons.
     fn sreg_polygon() {
         let trunc_star = super::sreg_polygon(5, 1, 1.0, 1.0);
         let trunc_hag = super::sreg_polygon(7, 2, 1.0, 1.0);
@@ -288,49 +294,60 @@ mod tests {
         test_equilateral(&trunc_star, 1.0);
         test_equilateral(&trunc_hag, 1.0);
         test_equilateral(&trunc_shig, 1.0);
+
+        test_circumsphere(&trunc_star, &Hypersphere::with_radius(2, 1.61803398874989));
+        test_circumsphere(&trunc_hag, &Hypersphere::with_radius(2, 1.15238243548124));
+        test_circumsphere(&trunc_shig, &Hypersphere::with_radius(2, 1.0));
     }
 
     #[test]
-    /// Checks the element counts of a tetrahedron.
+    /// Checks a tetrahedron.
     fn tet() {
         let tet = super::simplex(3);
 
         test_el_nums(&tet, vec![4, 6, 4, 1]);
         test_equilateral(&tet, 1.0);
+        test_circumsphere(&tet, &Hypersphere::with_radius(3, 0.612372435695794));
     }
 
     #[test]
-    /// Checks the element counts of a cube.
+    /// Checks  a cube.
     fn cube() {
         let cube = super::hypercube(3);
 
         test_el_nums(&cube, vec![8, 12, 6, 1]);
         test_equilateral(&cube, 1.0);
+        test_circumsphere(&cube, &Hypersphere::with_radius(3, 0.866025403784439));
     }
 
     #[test]
-    /// Checks the element counts of an octahedron.
+    /// Checks an octahedron.
     fn oct() {
         let oct = super::orthoplex(3);
 
         test_el_nums(&oct, vec![6, 12, 8, 1]);
         test_equilateral(&oct, 1.0);
+        test_circumsphere(&oct, &Hypersphere::with_radius(3, 0.707106781186548));
     }
 
     #[test]
     /// Checks the element counts of a few antiprisms.
     fn antiprism() {
-        let stap = super::antiprism(5, 1);
+        let pap = super::antiprism(5, 1);
         let shap = super::antiprism(7, 2);
         let shigp = super::antiprism(6, 2); //wrong obsa lol
 
-        test_el_nums(&stap, vec![10, 20, 12, 1]);
+        test_el_nums(&pap, vec![10, 20, 12, 1]);
         test_el_nums(&shap, vec![14, 28, 16, 1]);
         test_el_nums(&shigp, vec![12, 24, 16, 2]);
 
-        test_equilateral(&stap, 1.0);
+        test_equilateral(&pap, 1.0);
         test_equilateral(&shap, 1.0);
         test_equilateral(&shigp, 1.0);
+
+        test_circumsphere(&pap, &Hypersphere::with_radius(3, 0.951056516295154));
+        test_circumsphere(&shap, &Hypersphere::with_radius(3, 0.762886832630778));
+        test_circumsphere(&shigp, &Hypersphere::with_radius(3, 0.707106781186548));
     }
 
     #[test]
@@ -338,6 +355,7 @@ mod tests {
     fn bowtie() {
         let bowtie = super::sreg_polygon(2, 0, 2.0, 1.0);
 
+        test_circumsphere(&bowtie, &Hypersphere::with_radius(2, 1.11803398874989));
         test_el_nums(&bowtie, vec![4, 4, 1]);
     }
 

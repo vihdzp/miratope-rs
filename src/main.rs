@@ -49,7 +49,7 @@ use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use no_cull_pipeline::PbrNoBackfaceBundle;
 use polytope::shapes::*;
-use polytope::{off, ElementList, Point, Polytope};
+use polytope::{geometry::Point, off, ElementList, Polytope};
 
 mod input;
 mod no_cull_pipeline;

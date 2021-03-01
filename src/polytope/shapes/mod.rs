@@ -6,7 +6,7 @@ pub use construct::*;
 pub use operations::*;
 pub use product::*;
 
-use super::Polytope;
+use super::{geometry::Hypersphere, Polytope};
 
 /// Used to test a particular polytope.
 /// We assume that the polytope is equilateral and has no hemi facets.
@@ -24,4 +24,19 @@ fn test_el_nums(p: &Polytope, mut el_nums: Vec<usize>) {
 fn test_equilateral(p: &Polytope, len: f64) {
     // Checks that the polytope is equilateral.
     assert!(p.is_equilateral_with_len(len), "Polytope not equilateral.");
+}
+
+fn test_circumsphere(p: &Polytope, sphere: &Hypersphere) {
+    const EPS: f64 = 1e-9;
+
+    let circumsphere = p
+        .circumsphere()
+        .expect("Polytope does not have a circumsphere!");
+
+    assert!(
+        circumsphere.approx(sphere),
+        "Circumsphere {} does not match expected circumsphere {}.",
+        circumsphere,
+        sphere
+    );
 }
