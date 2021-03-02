@@ -1,7 +1,7 @@
 use gcd::Gcd;
-use std::f64::consts::{PI as PI64, SQRT_2};
+use std::f64::consts::{PI as PI64, SQRT_2, TAU as TAU64};
 
-use super::super::{geometry::Point, Polytope};
+use super::super::{convex, geometry::Point, Polytope};
 use super::*;
 
 /// Generates the unique 0D polytope.
@@ -234,6 +234,27 @@ pub fn orthoplex(d: usize) -> Polytope {
     let dyad = dyad().scale(SQRT_2);
 
     multitegum(&vec![&dyad; d])
+}
+
+pub fn step_prism(n: usize, rotations: &[usize]) -> Polytope {
+    let dim = rotations.len() * 2;
+    let mut vertices = Vec::with_capacity(n);
+
+    for i in 0..n {
+        let mut v = Vec::with_capacity(dim);
+
+        let n = n as f64;
+        for &r in rotations {
+            let (x, y) = (TAU64 * (r * i) as f64 / n).sin_cos();
+
+            v.push(x);
+            v.push(y);
+        }
+
+        vertices.push(v.into());
+    }
+
+    convex::convex_hull(&vertices)
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
 use super::geometry::Point;
+use super::Polytope;
 use nalgebra::DMatrix;
 
 enum Sign {
@@ -34,4 +35,6 @@ fn sign_hypervolume(simplex: &[Point]) -> Sign {
     sign(m.determinant())
 }
 
-// pub fn convex_hull(vertices: &[Point]) -> Polytope {}
+pub fn convex_hull(_vertices: &[Point]) -> Polytope {
+    todo!()
+}
