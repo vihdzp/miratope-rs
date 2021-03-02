@@ -21,7 +21,7 @@ fn sign(x: f64) -> Sign {
 
 /// Returns the sign of the hypervolume of a simplex specified by a set of
 /// n-dimensional points.
-fn sign_hypervolume(simplex: &Vec<Point>) -> Sign {
+fn sign_hypervolume(simplex: &[Point]) -> Sign {
     let dim = simplex.len() - 1;
     let mut m = DMatrix::from_element(dim + 1, dim + 1, 1.0);
 
@@ -34,4 +34,4 @@ fn sign_hypervolume(simplex: &Vec<Point>) -> Sign {
     sign(m.determinant())
 }
 
-// pub fn convex_hull(vertices: &Vec<Point>) -> Polytope {}
+// pub fn convex_hull(vertices: &[Point]) -> Polytope {}
