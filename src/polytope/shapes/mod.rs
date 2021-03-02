@@ -1,3 +1,5 @@
+//! Contains methods to build, analyze, and combine all sorts of polytopes.
+
 pub mod construct;
 pub mod operations;
 pub mod product;

@@ -139,10 +139,8 @@ impl Polytope {
         self
     }
 
-    pub fn proj(a: &Point, b: &Point) -> Point {
-        b * (a.dot(b)) / b.norm_squared()
-    }
-
+    /// Calculates the circumsphere of a polytope. Returns it if the polytope
+    /// has one, and returns `None` otherwise.
     pub fn circumsphere(&self) -> Option<Hypersphere> {
         let mut vertices = self.vertices.iter();
         const EPS: f64 = 1e-9;
@@ -152,13 +150,17 @@ impl Polytope {
         let mut h = Hyperplane::new(v0.clone());
 
         for v in vertices {
+            // If the new vertex does not lie on the hyperplane of the others:
             if let Some(b) = h.add(&v) {
                 // Calculates the new circumcenter.
                 let k = ((&o - v).norm_squared() - (&o - &v0).norm_squared())
                     / (2.0 * (v - &v0).dot(&b));
 
                 o += k * b;
-            } else if ((&o - &v0).norm() - (&o - v).norm()).abs() > EPS {
+            }
+            // If the new vertex lies on the others' hyperplane, but is not at
+            // the correct distance from the first vertex:
+            else if ((&o - &v0).norm() - (&o - v).norm()).abs() > EPS {
                 return None;
             }
         }
@@ -248,7 +250,7 @@ impl Polytope {
     }
 
     /// Gets the [vertex figure](https://polytope.miraheze.org/wiki/Vertex_figure)
-    /// of a polytope, corresponding to a given vertex.
+    /// of a polytope corresponding to a given vertex.
     pub fn verf(&self, idx: usize) -> Polytope {
         let dual = self.dual();
         let facet = dual.get_element(self.rank() - 1, idx);
@@ -279,7 +281,6 @@ impl Polytope {
 
                 // We project the dual center onto the hyperplane defined by the vertices.
                 let h = Hyperplane::from_points(&facet_verts);
-
                 projections.push(h.project(o));
             }
         }

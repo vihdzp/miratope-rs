@@ -1,3 +1,6 @@
+//! Contains all of the methods used to operate on
+//! (polytopes)[https://polytope.miraheze.org/wiki/Polytope].
+
 use bevy::prelude::Mesh;
 use bevy::render::mesh::Indices;
 use bevy::render::pipeline::PrimitiveTopology;

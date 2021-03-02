@@ -1,3 +1,6 @@
+//! Contains a few structs and methods to faciliate geometry in n-dimensional
+//! space.
+
 pub type Point = nalgebra::DVector<f64>;
 pub type Matrix = nalgebra::DMatrix<f64>;
 
@@ -16,6 +19,8 @@ impl fmt::Display for Hypersphere {
 }
 
 impl Hypersphere {
+    /// Constructs a hypersphere with a given dimension and radius, centered at
+    /// the origin.
     pub fn with_radius(dim: usize, radius: f64) -> Hypersphere {
         Hypersphere {
             center: vec![0.0; dim].into(),
