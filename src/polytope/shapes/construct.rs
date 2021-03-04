@@ -332,7 +332,7 @@ mod tests {
     }
 
     #[test]
-    /// Checks  a cube.
+    /// Checks a cube.
     fn cube() {
         let cube = super::hypercube(3);
 

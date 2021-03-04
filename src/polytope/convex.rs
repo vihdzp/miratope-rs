@@ -1,14 +1,15 @@
-use std::{
-    cmp::Ordering,
-    collections::{BTreeSet, HashMap},
-};
+use std::{cmp::Ordering, collections::HashMap};
 
 use super::{
     geometry::{Hyperplane, Point},
     ElementList, Polytope,
 };
-use nalgebra::DMatrix;
 
+use nalgebra::DMatrix;
+use scapegoat::SGSet as BTreeSet;
+use std::fmt::Debug;
+
+#[derive(Debug)]
 enum Sign {
     Positive,
     Zero,
@@ -16,7 +17,7 @@ enum Sign {
 }
 
 /// Represents a vertex set in a convex hull.
-#[derive(PartialEq, PartialOrd, Eq, Ord, Clone)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Debug)]
 struct VertexSet {
     /// The sorted indices of the vertices on the ridge.
     vertices: Vec<usize>,
@@ -29,14 +30,15 @@ struct VertexSet {
     orientation: bool,
 }
 
-/// Determines whether two permutations of a vector have the same permutation.
-/// Uses cycle sort to sort p0 into p1, and records the parity of the number of swaps.
+/// Determines whether two permutations of a vector have different parities.
+/// Uses cycle sort to sort a vector into the other, and records the parity of
+/// the number of swaps.
 fn parity(mut p0: Vec<usize>, p1: &[usize]) -> bool {
-    let mut parity = true;
+    let mut parity = false;
     let mut hash = HashMap::new();
 
     // Maps each value in p0 to its index in the array.
-    for (i, val) in p1.iter().enumerate() {
+    for (i, &val) in p1.iter().enumerate() {
         hash.insert(val, i);
     }
 
@@ -74,7 +76,7 @@ fn sign(x: f64) -> Sign {
 
     if x > EPS {
         Sign::Positive
-    } else if x < EPS {
+    } else if x < -EPS {
         Sign::Negative
     } else {
         Sign::Zero
@@ -83,7 +85,7 @@ fn sign(x: f64) -> Sign {
 
 /// Returns the sign of the hypervolume of a simplex specified by a set of
 /// n-dimensional points.
-fn sign_hypervolume(simplex: &[&Point]) -> Sign {
+fn sign_hypervolume(simplex: &[&Point], orientation: bool) -> Sign {
     let dim = simplex.len() - 1;
     let mut m = DMatrix::from_element(dim + 1, dim + 1, 1.0);
 
@@ -95,7 +97,8 @@ fn sign_hypervolume(simplex: &[&Point]) -> Sign {
         }
     }
 
-    sign(m.determinant())
+    let flip = if orientation { 1.0 } else { -1.0 };
+    sign(flip * m.determinant())
 }
 
 /// Finds a single ridge on the convex hull. As a side effect, sorts the
@@ -144,16 +147,27 @@ fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> usize {
     let mut facet: Vec<_> = ridge.vertices.iter().map(|&idx| &vertices[idx]).collect();
 
     let mut vertex_iter = vertices.iter().enumerate();
-    let (_, v0) = vertex_iter.next().unwrap();
 
     // The previous to last vertex on the facet will always be one of the
     // leftmost vertices found so far.
-    facet.push(v0);
 
+    // We find a starting vertex not on the ridge.
+    loop {
+        let (i, v0) = vertex_iter.next().unwrap();
+        // The ridge should be sorted, so we can optimize this.
+        if !ridge.vertices.contains(&i) {
+            leftmost_vertices.push(i);
+            facet.push(v0);
+
+            break;
+        }
+    }
+
+    // We compare with all of the other vertices.
     for (i, v) in vertex_iter {
         facet.push(v);
 
-        match sign_hypervolume(&facet) {
+        match dbg!(sign_hypervolume(&facet, ridge.orientation)) {
             // If the new vertex is to the left of the previous leftmost one:
             Sign::Positive => {
                 // Resets leftmost vertices.
@@ -166,12 +180,13 @@ fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> usize {
             }
             // If the new vertex is as left as the previous leftmost one:
             Sign::Zero => {
-                leftmost_vertices.push(i);
+                // Binary search would be better.
+                if !ridge.vertices.contains(&i) {
+                    leftmost_vertices.push(i);
+                }
             }
             // If the new vertex is to the right of the previous leftmost one:
-            Sign::Negative => {
-                break;
-            }
+            Sign::Negative => {}
         }
 
         facet.pop();
@@ -209,10 +224,20 @@ fn get_new_ridges(old_ridge: &VertexSet, new_vertex: usize) -> Vec<VertexSet> {
     new_ridges
 }
 
+fn is_sorted(el: &[usize]) -> bool {
+    for i in 0..(el.len() - 1) {
+        if el[i] >= el[i + 1] {
+            return false;
+        }
+    }
+
+    true
+}
+
 fn common_subs(el0: &[usize], el1: &[usize]) -> Vec<usize> {
-    // Nightly Rust!
-    // debug_assert!(el0.is_sorted());
-    // debug_assert!(el1.is_sorted());
+    // Nightly Rust has el.is_sorted().
+    debug_assert!(is_sorted(el0));
+    debug_assert!(is_sorted(el1));
 
     let mut common = Vec::new();
     let (mut i, mut j) = (0, 0);
@@ -237,8 +262,8 @@ fn common_subs(el0: &[usize], el1: &[usize]) -> Vec<usize> {
 }
 
 fn check_subelement(vertices: &[Point], el: &[usize], d: usize) -> bool {
-    // A (d - 1)-element must have at least d vertices.
-    if el.len() < d {
+    // A d-element must have at least d + 1 vertices.
+    if el.len() < d + 1 {
         return false;
     }
 
@@ -266,6 +291,7 @@ fn check_subelement(vertices: &[Point], el: &[usize], d: usize) -> bool {
 /// Gift wrapping is only able to find the vertices of the facets of the polytope.
 /// This function retrieves all other elements from them.
 fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polytope {
+    dbg!(facets.len());
     let dim = vertices[0].len();
     let mut elements = Vec::with_capacity(dim);
 
@@ -280,55 +306,66 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polyto
     elements.push(vec![component]);
 
     // Add everything else.
-    let mut els = facets;
+    let mut els_verts = facets;
 
-    for d in (1..dim).rev() {
-        let mut new_subs: HashMap<Vec<usize>, usize> = HashMap::new();
-        let len = els.len();
-        let mut new_els = Vec::with_capacity(len);
+    for d in (1..(dim - 1)).rev() {
+        let mut subs: HashMap<Vec<usize>, usize> = HashMap::new();
+        let len = dbg!(els_verts.len());
+
+        // Each element of `els_verts` contains the indices of the vertices,
+        // and not the subelements of the element. This vector fixes that.
+        let mut els_subs = Vec::with_capacity(len);
 
         for _ in 0..len {
-            new_els.push(vec![]);
+            els_subs.push(vec![]);
         }
 
-        for i in 0..(len - 1) {
-            for j in (i + 1)..len {
+        for i in 0..len {
+            for j in (i + 1)..dbg!(len) {
                 // The intersection of the two elements.
-                let el = common_subs(&els[i], &els[j]);
+                let el = common_subs(dbg!(&els_verts[i]), dbg!(&els_verts[j]));
 
                 // Checks that el actually has the correct rank.
                 if !check_subelement(&vertices, &el, d) {
-                    break;
+                    continue;
                 }
 
-                match new_subs.get(&el) {
+                match subs.get(&el) {
                     Some(&idx) => {
-                        if !new_els[i].contains(&idx) {
-                            new_els[i].push(idx);
+                        if !els_subs[i].contains(&idx) {
+                            els_subs[i].push(idx);
                         }
 
-                        if !new_els[j].contains(&idx) {
-                            new_els[j].push(idx);
+                        if !els_subs[j].contains(&idx) {
+                            els_subs[j].push(idx);
                         }
                     }
                     None => {
-                        let idx = new_subs.len();
+                        let idx = subs.len();
 
-                        new_els[i].push(idx);
-                        new_els[j].push(idx);
+                        els_subs[i].push(idx);
+                        els_subs[j].push(idx);
 
-                        new_subs.insert(el, idx);
+                        subs.insert(el, idx);
                     }
                 }
             }
         }
 
-        els = new_els.to_vec();
-        elements.push(new_els);
+        dbg!(subs.len());
+        els_verts = Vec::new();
+        els_verts.resize(subs.len(), vec![]);
+
+        for (sub, idx) in subs {
+            els_verts[idx] = sub;
+        }
+
+        elements.push(els_subs);
     }
 
+    elements.push(els_verts);
     elements.reverse();
-    Polytope::new(vertices, elements)
+    Polytope::new(vertices, dbg!(elements))
 }
 
 /// Builds the convex hull of a set of vertices. Uses the gift wrapping algorithm.
@@ -339,22 +376,24 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
     // Gets first ridge, reorders elements in the process.
     ridges.insert(get_hull_ridge(&mut vertices));
 
-    // In the future, we should replace this by ridges.pop_front().
-    while let Some(old_ridge) = ridges.iter().next() {
+    while let Some(old_ridge) = ridges.pop_first() {
+        println!("Old ridge");
+        dbg!(&old_ridge);
+
         let new_vertex = leftmost_vertex(&vertices, &old_ridge);
-        let new_ridges = get_new_ridges(old_ridge, new_vertex);
+        let new_ridges = get_new_ridges(&old_ridge, new_vertex);
 
         let mut facet = old_ridge.vertices.clone();
         facet.push(new_vertex);
         facet.sort_unstable();
 
-        // In theory, this facet should always be a new one.
-        debug_assert!(!facets.contains(&facet));
+        // We skip the facet if it isn't new.
+        println!("New facet");
+        if facets.contains(dbg!(&facet)) {
+            break;
+        }
 
         for new_ridge in new_ridges {
-            // Surely there's a better way to do this: by calling `contains`, I
-            // should already know where to insert or remove the ridge.
-
             // If this is the second time we find this ridge, it means we've
             // already added both of the facets corresponding to it.
             if ridges.contains(&new_ridge) {
@@ -369,5 +408,12 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
         facets.push(facet);
     }
 
+    println!("Gift wrapping done!");
     get_polytope_from_facets(vertices, facets)
+}
+
+impl Polytope {
+    pub fn convex_hull(&self) -> Polytope {
+        convex_hull(self.vertices.clone())
+    }
 }
