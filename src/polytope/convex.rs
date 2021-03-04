@@ -323,11 +323,12 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polyto
             }
         }
 
-        els = new_els.iter().cloned().collect();
+        els = new_els.to_vec();
         elements.push(new_els);
     }
 
-    Polytope::new(vertices, elements.iter().cloned().rev().collect())
+    elements.reverse();
+    Polytope::new(vertices, elements)
 }
 
 /// Builds the convex hull of a set of vertices. Uses the gift wrapping algorithm.
