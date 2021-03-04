@@ -1,4 +1,7 @@
-use std::{cmp::Ordering, collections::HashMap};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+};
 
 use super::{
     geometry::{Hyperplane, Point},
@@ -119,11 +122,11 @@ fn get_hull_ridge(vertices: &mut [Point]) -> VertexSet {
     let dim = v0.len();
     let mut h = Hyperplane::new(v0.clone());
 
-    let mut ridge = Vec::new();
+    let mut ridge = vec![0];
 
     // Takes the first `dim` points in lexicographic order, so that no three are
     // collinear, no four are coplanar... these ought to create a ridge.
-    while h.rank != dim - 1 {
+    while h.rank != dim - 2 {
         let (i, v) = vertices
             .next()
             .expect("Polytope has higher dimension than rank!");
@@ -167,7 +170,7 @@ fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> usize {
     for (i, v) in vertex_iter {
         facet.push(v);
 
-        match dbg!(sign_hypervolume(&facet, ridge.orientation)) {
+        match sign_hypervolume(&facet, ridge.orientation) {
             // If the new vertex is to the left of the previous leftmost one:
             Sign::Positive => {
                 // Resets leftmost vertices.
@@ -193,7 +196,7 @@ fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> usize {
     }
 
     // The hyperplane of the ridge.
-    let h = Hyperplane::from_points(&facet.iter().cloned().cloned().collect::<Vec<_>>());
+    let h = Hyperplane::from_points(&facet.into_iter().cloned().collect::<Vec<_>>());
 
     // From the leftmost vertices, finds the one closest to the ridge.
     *leftmost_vertices
@@ -321,9 +324,9 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polyto
         }
 
         for i in 0..len {
-            for j in (i + 1)..dbg!(len) {
+            for j in (i + 1)..len {
                 // The intersection of the two elements.
-                let el = common_subs(dbg!(&els_verts[i]), dbg!(&els_verts[j]));
+                let el = common_subs(&els_verts[i], &els_verts[j]);
 
                 // Checks that el actually has the correct rank.
                 if !check_subelement(&vertices, &el, d) {
@@ -370,16 +373,13 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polyto
 
 /// Builds the convex hull of a set of vertices. Uses the gift wrapping algorithm.
 pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
-    let mut facets = Vec::new();
+    let mut facets = HashSet::new();
     let mut ridges = BTreeSet::new();
 
     // Gets first ridge, reorders elements in the process.
-    ridges.insert(get_hull_ridge(&mut vertices));
+    ridges.insert(dbg!(get_hull_ridge(&mut vertices)));
 
     while let Some(old_ridge) = ridges.pop_first() {
-        println!("Old ridge");
-        dbg!(&old_ridge);
-
         let new_vertex = leftmost_vertex(&vertices, &old_ridge);
         let new_ridges = get_new_ridges(&old_ridge, new_vertex);
 
@@ -388,10 +388,12 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
         facet.sort_unstable();
 
         // We skip the facet if it isn't new.
-        println!("New facet");
-        if facets.contains(dbg!(&facet)) {
-            break;
+        if facets.contains(&facet) {
+            continue;
         }
+
+        println!("New facet");
+        dbg!(&facet);
 
         for new_ridge in new_ridges {
             // If this is the second time we find this ridge, it means we've
@@ -405,11 +407,11 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
             }
         }
 
-        facets.push(facet);
+        facets.insert(facet);
     }
 
     println!("Gift wrapping done!");
-    get_polytope_from_facets(vertices, facets)
+    get_polytope_from_facets(vertices, facets.into_iter().collect())
 }
 
 impl Polytope {
