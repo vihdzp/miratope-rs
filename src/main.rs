@@ -76,7 +76,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let heap = reg_polygon(15, 2).tegum();
+    let heap = reg_polygon(100, 2).tegum_with_height(5.0);
     let poly: Polytope = heap.convex_hull();
     println!("{}", off::to_src(&poly, Default::default()));
 

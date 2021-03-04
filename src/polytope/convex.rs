@@ -124,8 +124,8 @@ fn get_hull_ridge(vertices: &mut [Point]) -> VertexSet {
 
     let mut ridge = vec![0];
 
-    // Takes the first `dim` points in lexicographic order, so that no three are
-    // collinear, no four are coplanar... these ought to create a ridge.
+    // Takes the first `dim - 1` points in lexicographic order, so that no three
+    // are collinear, no four are coplanar... these ought to create a ridge.
     while h.rank != dim - 2 {
         let (i, v) = vertices
             .next()
@@ -313,7 +313,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polyto
 
     for d in (1..(dim - 1)).rev() {
         let mut subs: HashMap<Vec<usize>, usize> = HashMap::new();
-        let len = dbg!(els_verts.len());
+        let len = els_verts.len();
 
         // Each element of `els_verts` contains the indices of the vertices,
         // and not the subelements of the element. This vector fixes that.
@@ -355,7 +355,6 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polyto
             }
         }
 
-        dbg!(subs.len());
         els_verts = Vec::new();
         els_verts.resize(subs.len(), vec![]);
 
@@ -368,7 +367,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polyto
 
     elements.push(els_verts);
     elements.reverse();
-    Polytope::new(vertices, dbg!(elements))
+    Polytope::new(vertices, elements)
 }
 
 /// Builds the convex hull of a set of vertices. Uses the gift wrapping algorithm.
@@ -377,7 +376,7 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
     let mut ridges = BTreeSet::new();
 
     // Gets first ridge, reorders elements in the process.
-    ridges.insert(dbg!(get_hull_ridge(&mut vertices)));
+    ridges.insert(get_hull_ridge(&mut vertices));
 
     while let Some(old_ridge) = ridges.pop_first() {
         let new_vertex = leftmost_vertex(&vertices, &old_ridge);

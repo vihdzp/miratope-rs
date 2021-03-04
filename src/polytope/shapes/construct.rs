@@ -110,7 +110,7 @@ pub fn sreg_polygon(n: usize, d: usize, len_a: f64, len_b: f64) -> Polytope {
     let vertices;
 
     let comp_num;
-    let comp_angle;
+    let mut comp_angle;
 
     // Bowties are a special case that must be considered separately.
     if d == 0 {
@@ -123,6 +123,10 @@ pub fn sreg_polygon(n: usize, d: usize, len_a: f64, len_b: f64) -> Polytope {
 
         comp_num = n.gcd(d);
         comp_angle = 2.0 * PI64 / (n as f64 * comp_num as f64);
+
+        if len_a == 0.0 || len_b == 0.0 {
+            comp_angle *= 2.0;
+        }
     };
 
     compound_from_trans(&polygon(vertices), rotations(comp_angle, comp_num, 2))
