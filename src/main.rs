@@ -77,7 +77,7 @@ fn setup(
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
     let heap = antiprism(7, 1);
-    let poly: Polytope = dual_compound(&heap);
+    let poly: Polytope = heap.dual_compound();
     println!("{}", off::to_src(&poly, Default::default()));
 
     pipelines.set_untracked(

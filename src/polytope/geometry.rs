@@ -57,7 +57,8 @@ impl Hyperplane {
         }
     }
 
-    /// Adds a point to the hyperplane. Returns whether the rank increased or not.
+    /// Adds a point to the hyperplane. If the rank increases, returns a new
+    /// basis vector for the hyperplane.
     pub fn add(&mut self, p: &Point) -> Option<Point> {
         const EPS: f64 = 1e-9;
 
@@ -73,6 +74,7 @@ impl Hyperplane {
         None
     }
 
+    /// Creates a hyperplane from a vector of points.
     pub fn from_points(points: &[Point]) -> Hyperplane {
         let mut points = points.iter();
         let mut h = Hyperplane::new(
@@ -89,20 +91,13 @@ impl Hyperplane {
         h
     }
 
-    /// Every hyperplane can be represented as a set of linear combinations,
-    /// offset by some vector. This function returns any such vector.
-    pub fn offset(&self) -> &Point {
-        debug_assert!(
-            !self.points.is_empty(),
-            "A hyperplane can't contain no points!"
-        );
-
-        &self.points[0]
-    }
-
     /// Projects a [`Point`] onto the hyperplane.
     pub fn project(&self, p: &Point) -> Point {
-        let offset = self.offset();
+        let offset = self
+            .points
+            .get(0)
+            .expect("A hyperplane can't contain no points!");
+
         let p = p - offset;
         let mut q = offset.clone();
 
@@ -111,5 +106,10 @@ impl Hyperplane {
         }
 
         q
+    }
+
+    /// Calculates the distance from a [`Point`] to the hyperplane.
+    pub fn distance(&self, p: &Point) -> f64 {
+        (p - self.project(p)).norm()
     }
 }
