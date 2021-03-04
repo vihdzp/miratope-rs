@@ -254,7 +254,7 @@ pub fn step_prism(n: usize, rotations: &[usize]) -> Polytope {
         vertices.push(v.into());
     }
 
-    convex::convex_hull(&vertices)
+    convex::convex_hull(vertices)
 }
 
 #[cfg(test)]

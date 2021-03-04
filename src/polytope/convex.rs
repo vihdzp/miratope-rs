@@ -5,7 +5,7 @@ use std::{
 
 use super::{
     geometry::{Hyperplane, Point},
-    Element, ElementList, Polytope,
+    ElementList, Polytope,
 };
 use nalgebra::DMatrix;
 
@@ -31,8 +31,7 @@ struct VertexSet {
 
 /// Determines whether two permutations of a vector have the same permutation.
 /// Uses cycle sort to sort p0 into p1, and records the parity of the number of swaps.
-fn parity(p0: &Vec<usize>, p1: &Vec<usize>) -> bool {
-    let mut p0 = p0.clone();
+fn parity(mut p0: Vec<usize>, p1: &[usize]) -> bool {
     let mut parity = true;
     let mut hash = HashMap::new();
 
@@ -65,7 +64,7 @@ impl VertexSet {
         let old_vertices = self.vertices.clone();
         self.vertices.sort_unstable();
 
-        self.orientation ^= parity(&old_vertices, &self.vertices);
+        self.orientation ^= parity(old_vertices, &self.vertices);
     }
 }
 
@@ -126,7 +125,7 @@ fn get_hull_ridge(vertices: &mut [Point]) -> VertexSet {
             .next()
             .expect("Polytope has higher dimension than rank!");
 
-        if let Some(_) = h.add(v) {
+        if h.add(v).is_some() {
             ridge.push(i);
         }
     }
@@ -210,7 +209,7 @@ fn get_new_ridges(old_ridge: &VertexSet, new_vertex: usize) -> Vec<VertexSet> {
     new_ridges
 }
 
-fn common_subs(el0: &Element, el1: &Element) -> Vec<usize> {
+fn common_subs(el0: &[usize], el1: &[usize]) -> Vec<usize> {
     // Nightly Rust!
     // debug_assert!(el0.is_sorted());
     // debug_assert!(el1.is_sorted());
@@ -237,7 +236,7 @@ fn common_subs(el0: &Element, el1: &Element) -> Vec<usize> {
     common
 }
 
-fn check_subelement(vertices: &[Point], el: &Element, d: usize) -> bool {
+fn check_subelement(vertices: &[Point], el: &[usize], d: usize) -> bool {
     // A (d - 1)-element must have at least d vertices.
     if el.len() < d {
         return false;
@@ -266,7 +265,7 @@ fn check_subelement(vertices: &[Point], el: &Element, d: usize) -> bool {
 
 /// Gift wrapping is only able to find the vertices of the facets of the polytope.
 /// This function retrieves all other elements from them.
-fn get_polytope_from_facets(vertices: &Vec<Point>, facets: ElementList) -> Polytope {
+fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polytope {
     let dim = vertices[0].len();
     let mut elements = Vec::with_capacity(dim);
 
@@ -281,7 +280,7 @@ fn get_polytope_from_facets(vertices: &Vec<Point>, facets: ElementList) -> Polyt
     elements.push(vec![component]);
 
     // Add everything else.
-    let mut els = facets.clone();
+    let mut els = facets;
 
     for d in (1..dim).rev() {
         let mut new_subs: HashMap<Vec<usize>, usize> = HashMap::new();
@@ -324,16 +323,15 @@ fn get_polytope_from_facets(vertices: &Vec<Point>, facets: ElementList) -> Polyt
             }
         }
 
-        els = new_els.iter().map(|s| s.clone()).collect();
+        els = new_els.iter().cloned().collect();
         elements.push(new_els);
     }
 
-    Polytope::new(vertices.clone(), elements.iter().cloned().rev().collect())
+    Polytope::new(vertices, elements.iter().cloned().rev().collect())
 }
 
 /// Builds the convex hull of a set of vertices. Uses the gift wrapping algorithm.
-pub fn convex_hull(vertices: &Vec<Point>) -> Polytope {
-    let mut vertices = vertices.clone();
+pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
     let mut facets = Vec::new();
     let mut ridges = BTreeSet::new();
 
@@ -347,7 +345,7 @@ pub fn convex_hull(vertices: &Vec<Point>) -> Polytope {
 
         let mut facet = old_ridge.vertices.clone();
         facet.push(new_vertex);
-        facet.sort();
+        facet.sort_unstable();
 
         // In theory, this facet should always be a new one.
         debug_assert!(!facets.contains(&facet));
@@ -370,5 +368,5 @@ pub fn convex_hull(vertices: &Vec<Point>) -> Polytope {
         facets.push(facet);
     }
 
-    get_polytope_from_facets(&vertices, facets)
+    get_polytope_from_facets(vertices, facets)
 }
