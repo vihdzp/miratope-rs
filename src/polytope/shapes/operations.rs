@@ -143,7 +143,7 @@ impl Polytope {
 
         for v in vertices {
             // If the new vertex does not lie on the hyperplane of the others:
-            if let Some(b) = h.add(&v) {
+            if let Some(b) = h.add(v.clone()) {
                 // Calculates the new circumcenter.
                 let k = ((&o - v).norm_squared() - (&o - &v0).norm_squared())
                     / (2.0 * (v - &v0).dot(&b));
@@ -272,7 +272,7 @@ impl Polytope {
                 let facet_verts = self.get_element_vertices(rank - 1, idx);
 
                 // We project the dual center onto the hyperplane defined by the vertices.
-                let h = Hyperplane::from_points(&facet_verts);
+                let h = Hyperplane::from_points(facet_verts);
                 projections.push(h.project(o));
             }
         }

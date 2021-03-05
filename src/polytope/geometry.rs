@@ -59,10 +59,10 @@ impl Hyperplane {
 
     /// Adds a point to the hyperplane. If the rank increases, returns a new
     /// basis vector for the hyperplane.
-    pub fn add(&mut self, p: &Point) -> Option<Point> {
+    pub fn add(&mut self, p: Point) -> Option<Point> {
         const EPS: f64 = 1e-9;
 
-        let mut v = p - self.project(p);
+        let mut v = &p - self.project(&p);
         if v.normalize_mut() > EPS {
             self.points.push(p.clone());
             self.basis.push(v.clone());
@@ -75,8 +75,8 @@ impl Hyperplane {
     }
 
     /// Creates a hyperplane from a vector of points.
-    pub fn from_points(points: &[Point]) -> Hyperplane {
-        let mut points = points.iter();
+    pub fn from_points(points: Vec<Point>) -> Hyperplane {
+        let mut points = points.into_iter();
         let mut h = Hyperplane::new(
             points
                 .next()

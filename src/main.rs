@@ -48,8 +48,7 @@ use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use no_cull_pipeline::PbrNoBackfaceBundle;
-use polytope::shapes::*;
-use polytope::{geometry::Point, off, ElementList, Polytope};
+use polytope::{geometry::Point, off, shapes, ElementList, Polytope};
 
 mod input;
 mod no_cull_pipeline;
@@ -76,9 +75,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let heap = reg_polygon(100, 2).tegum_with_height(5.0);
-    let poly: Polytope = heap.convex_hull();
-    println!("{}", off::to_src(&poly, Default::default()));
+    let poly: Polytope = shapes::hypercube(3).convex_hull();
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,

@@ -12,7 +12,7 @@ use nalgebra::DMatrix;
 use scapegoat::SGSet as BTreeSet;
 use std::fmt::Debug;
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 enum Sign {
     Positive,
     Zero,
@@ -131,7 +131,7 @@ fn get_hull_ridge(vertices: &mut [Point]) -> VertexSet {
             .next()
             .expect("Polytope has higher dimension than rank!");
 
-        if h.add(v).is_some() {
+        if h.add(v.clone()).is_some() {
             ridge.push(i);
         }
     }
@@ -146,19 +146,20 @@ fn get_hull_ridge(vertices: &mut [Point]) -> VertexSet {
 /// Finds the index of the closest leftmost vertex relative to a ridge.
 /// "Leftmost" will depend on the orientation of the ridge.
 fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> usize {
+    debug_assert!(is_sorted(&ridge.vertices));
+
     let mut leftmost_vertices = Vec::new();
     let mut facet: Vec<_> = ridge.vertices.iter().map(|&idx| &vertices[idx]).collect();
 
     let mut vertex_iter = vertices.iter().enumerate();
 
-    // The previous to last vertex on the facet will always be one of the
-    // leftmost vertices found so far.
-
     // We find a starting vertex not on the ridge.
+    let mut h = Hyperplane::from_points(facet.iter().cloned().cloned().collect());
     loop {
         let (i, v0) = vertex_iter.next().unwrap();
+
         // The ridge should be sorted, so we can optimize this.
-        if !ridge.vertices.contains(&i) {
+        if h.add(v0.clone()).is_some() {
             leftmost_vertices.push(i);
             facet.push(v0);
 
@@ -166,37 +167,29 @@ fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> usize {
         }
     }
 
+    // The previous to last vertex on the facet will always be one of the
+    // leftmost vertices found so far.
+
     // We compare with all of the other vertices.
     for (i, v) in vertex_iter {
         facet.push(v);
 
-        match sign_hypervolume(&facet, ridge.orientation) {
-            // If the new vertex is to the left of the previous leftmost one:
-            Sign::Positive => {
-                // Resets leftmost vertices.
-                leftmost_vertices.clear();
-                leftmost_vertices.push(i);
+        // If the new vertex is to the left of the previous leftmost one:
+        if sign_hypervolume(&facet, ridge.orientation) == Sign::Positive {
+            // Resets leftmost vertices.
+            leftmost_vertices.clear();
+            leftmost_vertices.push(i);
 
-                // Adds new leftmost to the facet.
-                let len = facet.len();
-                facet.swap(len - 2, len - 1);
-            }
-            // If the new vertex is as left as the previous leftmost one:
-            Sign::Zero => {
-                // Binary search would be better.
-                if !ridge.vertices.contains(&i) {
-                    leftmost_vertices.push(i);
-                }
-            }
-            // If the new vertex is to the right of the previous leftmost one:
-            Sign::Negative => {}
+            // Adds new leftmost to the facet.
+            let len = facet.len();
+            facet.swap(len - 2, len - 1);
         }
 
         facet.pop();
     }
 
     // The hyperplane of the ridge.
-    let h = Hyperplane::from_points(&facet.into_iter().cloned().collect::<Vec<_>>());
+    let h = Hyperplane::from_points(facet.into_iter().cloned().collect::<Vec<_>>());
 
     // From the leftmost vertices, finds the one closest to the ridge.
     *leftmost_vertices
@@ -227,6 +220,7 @@ fn get_new_ridges(old_ridge: &VertexSet, new_vertex: usize) -> Vec<VertexSet> {
     new_ridges
 }
 
+/// Checks whether an array is sorted in increasing order. Used only for debugs.
 fn is_sorted(el: &[usize]) -> bool {
     for i in 0..(el.len() - 1) {
         if el[i] >= el[i + 1] {
@@ -237,7 +231,10 @@ fn is_sorted(el: &[usize]) -> bool {
     true
 }
 
-fn common_subs(el0: &[usize], el1: &[usize]) -> Vec<usize> {
+/// Finds the common elements of two arrays.
+/// # Assumptions:
+/// * Both arrays must be sorted in increasing order.
+fn common(el0: &[usize], el1: &[usize]) -> Vec<usize> {
     // Nightly Rust has el.is_sorted().
     debug_assert!(is_sorted(el0));
     debug_assert!(is_sorted(el1));
@@ -264,7 +261,8 @@ fn common_subs(el0: &[usize], el1: &[usize]) -> Vec<usize> {
     common
 }
 
-fn check_subelement(vertices: &[Point], el: &[usize], d: usize) -> bool {
+/// Checks whether a given vertex set actually generates a valid d-polytope.
+fn check_subelement(vertices: &[Point], el: &Vec<usize>, d: usize) -> bool {
     // A d-element must have at least d + 1 vertices.
     if el.len() < d + 1 {
         return false;
@@ -276,9 +274,9 @@ fn check_subelement(vertices: &[Point], el: &[usize], d: usize) -> bool {
     if d >= 4 {
         // The hyperplane of the intersection of the elements.
         let h = Hyperplane::from_points(
-            &el.iter()
+            el.iter()
                 .map(|&sub| vertices[sub].clone())
-                .collect::<Vec<_>>(),
+                .collect::<Vec<Point>>(),
         );
 
         // If this hyperplane does not have the correct dimension, it
@@ -294,11 +292,10 @@ fn check_subelement(vertices: &[Point], el: &[usize], d: usize) -> bool {
 /// Gift wrapping is only able to find the vertices of the facets of the polytope.
 /// This function retrieves all other elements from them.
 fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polytope {
-    dbg!(facets.len());
     let dim = vertices[0].len();
     let mut elements = Vec::with_capacity(dim);
 
-    // Add a single component.
+    // Adds a single component.
     let len = facets.len();
     let mut component = Vec::with_capacity(len);
 
@@ -308,11 +305,11 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polyto
 
     elements.push(vec![component]);
 
-    // Add everything else.
+    // Adds everything else.
     let mut els_verts = facets;
 
     for d in (1..(dim - 1)).rev() {
-        let mut subs: HashMap<Vec<usize>, usize> = HashMap::new();
+        let mut subs = HashMap::new();
         let len = els_verts.len();
 
         // Each element of `els_verts` contains the indices of the vertices,
@@ -323,10 +320,12 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polyto
             els_subs.push(vec![]);
         }
 
-        for i in 0..len {
+        // Checks every pair of d-elements to see if their intersection forms
+        // a (d - 1)-element.
+        for i in 0..(len - 1) {
             for j in (i + 1)..len {
                 // The intersection of the two elements.
-                let el = common_subs(&els_verts[i], &els_verts[j]);
+                let el = common(&els_verts[i], &els_verts[j]);
 
                 // Checks that el actually has the correct rank.
                 if !check_subelement(&vertices, &el, d) {
@@ -378,6 +377,7 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
     // Gets first ridge, reorders elements in the process.
     ridges.insert(get_hull_ridge(&mut vertices));
 
+    // While there's still a ridge we need to check...
     while let Some(old_ridge) = ridges.pop_first() {
         let new_vertex = leftmost_vertex(&vertices, &old_ridge);
         let new_ridges = get_new_ridges(&old_ridge, new_vertex);
@@ -391,9 +391,7 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
             continue;
         }
 
-        println!("New facet");
-        dbg!(&facet);
-
+        // For each new ridge:
         for new_ridge in new_ridges {
             // If this is the second time we find this ridge, it means we've
             // already added both of the facets corresponding to it.
@@ -409,7 +407,6 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
         facets.insert(facet);
     }
 
-    println!("Gift wrapping done!");
     get_polytope_from_facets(vertices, facets.into_iter().collect())
 }
 
