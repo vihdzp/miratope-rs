@@ -145,7 +145,7 @@ fn get_hull_ridge(vertices: &mut [Point]) -> VertexSet {
 
 /// Finds the index of the closest leftmost vertex relative to a ridge.
 /// "Leftmost" will depend on the orientation of the ridge.
-fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> usize {
+fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> Vec<usize> {
     debug_assert!(is_sorted(&ridge.vertices));
 
     let mut leftmost_vertices = Vec::new();
@@ -188,22 +188,15 @@ fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> usize {
         facet.pop();
     }
 
-    // The hyperplane of the ridge.
-    let h = Hyperplane::from_points(facet.into_iter().cloned().collect::<Vec<_>>());
-
-    // From the leftmost vertices, finds the one closest to the ridge.
-    *leftmost_vertices
-        .iter()
-        .min_by(|&&v1, &&v2| {
-            h.distance(&vertices[v1])
-                .partial_cmp(&h.distance(&vertices[v2]))
-                .unwrap()
-        })
-        .unwrap()
+    debug_assert!(!leftmost_vertices.is_empty());
+    leftmost_vertices
 }
 
 /// Gets the new ridges that have to be searched, in the correct orientation.
-fn get_new_ridges(old_ridge: &VertexSet, new_vertex: usize) -> Vec<VertexSet> {
+fn get_new_ridges(old_ridge: &VertexSet, new_vertices: &[usize]) -> Vec<VertexSet> {
+    // THIS CURRENTLY ONLY DEALS WITH SIMPLICIAL FACETS.
+    let new_vertex = new_vertices[0];
+
     let len = old_ridge.vertices.len();
     let mut new_ridges = Vec::with_capacity(len);
 
@@ -379,11 +372,11 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
 
     // While there's still a ridge we need to check...
     while let Some(old_ridge) = ridges.pop_first() {
-        let new_vertex = leftmost_vertex(&vertices, &old_ridge);
-        let new_ridges = get_new_ridges(&old_ridge, new_vertex);
+        let mut new_vertices = leftmost_vertex(&vertices, &old_ridge);
+        let new_ridges = get_new_ridges(&old_ridge, &new_vertices);
 
         let mut facet = old_ridge.vertices.clone();
-        facet.push(new_vertex);
+        facet.append(&mut new_vertices);
         facet.sort_unstable();
 
         // We skip the facet if it isn't new.

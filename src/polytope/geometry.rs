@@ -49,6 +49,7 @@ pub struct Hyperplane {
 }
 
 impl Hyperplane {
+    /// Generates a new hyperplane, passing through a given point.
     pub fn new(p: Point) -> Hyperplane {
         Hyperplane {
             basis: Vec::new(),
