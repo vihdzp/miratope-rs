@@ -21,6 +21,8 @@
 //!   * [Petrials](https://polytope.miraheze.org/wiki/Petrial)
 //!   * [Prism products](https://polytope.miraheze.org/wiki/Prism_product)
 //!   * [Tegum products](https://polytope.miraheze.org/wiki/Tegum_product)
+//!   * [Pyramid products](https://polytope.miraheze.org/wiki/Pyramid_product)
+//!   * [Convex hulls](https://polytope.miraheze.org/wiki/Convex_hull)
 //! * Loading and saving into various formats
 //!   * Support for the [Stella OFF format](https://www.software3d.com/StellaManual.php?prod=stella4D#import)
 //!   * Support for the [GeoGebra GGB format](https://wiki.geogebra.org/en/Reference:File_Format)
