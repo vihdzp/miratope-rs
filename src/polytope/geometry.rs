@@ -65,7 +65,7 @@ impl Hyperplane {
 
         let mut v = &p - self.project(&p);
         if v.normalize_mut() > EPS {
-            self.points.push(p.clone());
+            self.points.push(p);
             self.basis.push(v.clone());
             self.rank += 1;
 
@@ -81,8 +81,7 @@ impl Hyperplane {
         let mut h = Hyperplane::new(
             points
                 .next()
-                .expect("A hyperplane can't be created from an empty point array!")
-                .clone(),
+                .expect("A hyperplane can't be created from an empty point array!"),
         );
 
         for p in points {

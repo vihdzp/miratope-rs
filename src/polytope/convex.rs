@@ -255,7 +255,7 @@ fn common(el0: &[usize], el1: &[usize]) -> Vec<usize> {
 }
 
 /// Checks whether a given vertex set actually generates a valid d-polytope.
-fn check_subelement(vertices: &[Point], el: &Vec<usize>, d: usize) -> bool {
+fn check_subelement(vertices: &[Point], el: &[usize], d: usize) -> bool {
     // A d-element must have at least d + 1 vertices.
     if el.len() < d + 1 {
         return false;
