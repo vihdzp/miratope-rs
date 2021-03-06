@@ -96,14 +96,6 @@ pub fn compound_from_trans(p: &Polytope, trans: Vec<Matrix>) -> Polytope {
     compound(&polytopes.iter().collect::<Vec<_>>())
 }
 
-/// Generates the compound of a polytope and its dual. The dual is rescaled so
-/// as to have the same midradius as the original polytope.
-pub fn dual_compound(p: &Polytope) -> Polytope {
-    let r = p.midradius();
-
-    compound(&[p, &p.dual().scale(r * r)])
-}
-
 impl Polytope {
     /// Scales a polytope by a given factor.
     pub fn scale(mut self, k: f64) -> Self {
@@ -151,7 +143,7 @@ impl Polytope {
 
         for v in vertices {
             // If the new vertex does not lie on the hyperplane of the others:
-            if let Some(b) = h.add(&v) {
+            if let Some(b) = h.add(v.clone()) {
                 // Calculates the new circumcenter.
                 let k = ((&o - v).norm_squared() - (&o - &v0).norm_squared())
                     / (2.0 * (v - &v0).dot(&b));
@@ -280,7 +272,7 @@ impl Polytope {
                 let facet_verts = self.get_element_vertices(rank - 1, idx);
 
                 // We project the dual center onto the hyperplane defined by the vertices.
-                let h = Hyperplane::from_points(&facet_verts);
+                let h = Hyperplane::from_points(facet_verts);
                 projections.push(h.project(o));
             }
         }
@@ -359,5 +351,13 @@ impl Polytope {
     /// Builds the dual of a polytope. Defaults to the origin as the center for reciprocation.
     pub fn dual(&self) -> Polytope {
         self.dual_with_sphere(&Hypersphere::unit(self.dimension()))
+    }
+
+    /// Generates the compound of a polytope and its dual. The dual is rescaled so
+    /// as to have the same midradius as the original polytope.
+    pub fn dual_compound(&self) -> Polytope {
+        let r = self.midradius();
+
+        compound(&[self, &self.dual().scale(r * r)])
     }
 }

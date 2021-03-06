@@ -324,7 +324,11 @@ fn write_faces(
 
         // There should be as many graph indices as edges on the face.
         // Otherwise, something went wrong.
-        debug_assert_eq!(hash_edges.len(), f.len());
+        debug_assert_eq!(
+            hash_edges.len(),
+            f.len(),
+            "Faces don't have the same number of edges as there are in the polytope!"
+        );
 
         // Adds the edges to the graph.
         for &e in f {

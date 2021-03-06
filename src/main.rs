@@ -21,6 +21,8 @@
 //!   * [Petrials](https://polytope.miraheze.org/wiki/Petrial)
 //!   * [Prism products](https://polytope.miraheze.org/wiki/Prism_product)
 //!   * [Tegum products](https://polytope.miraheze.org/wiki/Tegum_product)
+//!   * [Pyramid products](https://polytope.miraheze.org/wiki/Pyramid_product)
+//!   * [Convex hulls](https://polytope.miraheze.org/wiki/Convex_hull)
 //! * Loading and saving into various formats
 //!   * Support for the [Stella OFF format](https://www.software3d.com/StellaManual.php?prod=stella4D#import)
 //!   * Support for the [GeoGebra GGB format](https://wiki.geogebra.org/en/Reference:File_Format)
@@ -48,8 +50,7 @@ use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use no_cull_pipeline::PbrNoBackfaceBundle;
-use polytope::shapes::*;
-use polytope::{geometry::Point, off, ElementList, Polytope};
+use polytope::{geometry::Point, shapes, ElementList, Polytope};
 
 mod input;
 mod no_cull_pipeline;
@@ -76,9 +77,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let heap = antiprism(7, 1);
-    let poly: Polytope = dual_compound(&heap);
-    println!("{}", off::to_src(&poly, Default::default()));
+    let poly: Polytope = shapes::step_prism(23, &[1, 3]).convex_hull();
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,

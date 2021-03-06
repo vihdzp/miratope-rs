@@ -2,21 +2,25 @@ A renderer for polytopes, spinned off from [Miratope JS](https://github.com/Offi
 Still in alpha development.
 
 ## What can Miratope do now?
-Not much. We're still in the early stages of porting the original Miratope's functionality.
+Miratope can already load some polytopes and find out various properties
+about them, and it can operate on them via various methods. We're still in
+the early stages of porting the original Miratope's functionality, though.
 
 ## What are Miratope's goals?
 We plan to eventually support all of the original Miratope's features,
 as well as the following:
 
 * Various families of polytopes to build and render
-* All [regular polytopes](https://polytope.miraheze.org/wiki/Regular_polytope)
-* All 3D and 4D known [uniform polytopes](https://polytope.miraheze.org/wiki/Uniform_polytope)
-* Many of the known [CRFs](https://polytope.miraheze.org/wiki/Convex_regular-faced_polytope)
+  * All [regular polytopes](https://polytope.miraheze.org/wiki/Regular_polytope)
+  * All 3D and 4D known [uniform polytopes](https://polytope.miraheze.org/wiki/Uniform_polytope)
+  * Many of the known [CRFs](https://polytope.miraheze.org/wiki/Convex_regular-faced_polytope)
 * Many operations to apply to these polytopes
   * [Duals](https://polytope.miraheze.org/wiki/Dual)
   * [Petrials](https://polytope.miraheze.org/wiki/Petrial)
   * [Prism products](https://polytope.miraheze.org/wiki/Prism_product)
   * [Tegum products](https://polytope.miraheze.org/wiki/Tegum_product)
+  * [Pyramid products](https://polytope.miraheze.org/wiki/Pyramid_product)
+  * [Convex hulls](https://polytope.miraheze.org/wiki/Convex_hull)
 * Loading and saving into various formats
   * Support for the [Stella OFF format](https://www.software3d.com/StellaManual.php?prod=stella4D#import)
   * Support for the [GeoGebra GGB format](https://wiki.geogebra.org/en/Reference:File_Format)

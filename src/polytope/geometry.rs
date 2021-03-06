@@ -49,6 +49,7 @@ pub struct Hyperplane {
 }
 
 impl Hyperplane {
+    /// Generates a new hyperplane, passing through a given point.
     pub fn new(p: Point) -> Hyperplane {
         Hyperplane {
             basis: Vec::new(),
@@ -57,13 +58,14 @@ impl Hyperplane {
         }
     }
 
-    /// Adds a point to the hyperplane. Returns whether the rank increased or not.
-    pub fn add(&mut self, p: &Point) -> Option<Point> {
+    /// Adds a point to the hyperplane. If the rank increases, returns a new
+    /// basis vector for the hyperplane.
+    pub fn add(&mut self, p: Point) -> Option<Point> {
         const EPS: f64 = 1e-9;
 
-        let mut v = p - self.project(p);
+        let mut v = &p - self.project(&p);
         if v.normalize_mut() > EPS {
-            self.points.push(p.clone());
+            self.points.push(p);
             self.basis.push(v.clone());
             self.rank += 1;
 
@@ -73,13 +75,13 @@ impl Hyperplane {
         None
     }
 
-    pub fn from_points(points: &[Point]) -> Hyperplane {
-        let mut points = points.iter();
+    /// Creates a hyperplane from a vector of points.
+    pub fn from_points(points: Vec<Point>) -> Hyperplane {
+        let mut points = points.into_iter();
         let mut h = Hyperplane::new(
             points
                 .next()
-                .expect("A hyperplane can't be created from an empty point array!")
-                .clone(),
+                .expect("A hyperplane can't be created from an empty point array!"),
         );
 
         for p in points {
@@ -89,20 +91,13 @@ impl Hyperplane {
         h
     }
 
-    /// Every hyperplane can be represented as a set of linear combinations,
-    /// offset by some vector. This function returns any such vector.
-    pub fn offset(&self) -> &Point {
-        debug_assert!(
-            !self.points.is_empty(),
-            "A hyperplane can't contain no points!"
-        );
-
-        &self.points[0]
-    }
-
     /// Projects a [`Point`] onto the hyperplane.
     pub fn project(&self, p: &Point) -> Point {
-        let offset = self.offset();
+        let offset = self
+            .points
+            .get(0)
+            .expect("A hyperplane can't contain no points!");
+
         let p = p - offset;
         let mut q = offset.clone();
 
@@ -111,5 +106,10 @@ impl Hyperplane {
         }
 
         q
+    }
+
+    /// Calculates the distance from a [`Point`] to the hyperplane.
+    pub fn distance(&self, p: &Point) -> f64 {
+        (p - self.project(p)).norm()
     }
 }
