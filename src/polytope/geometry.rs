@@ -45,16 +45,16 @@ impl Hypersphere {
 pub struct Hyperplane {
     pub basis: Vec<Point>,
     pub rank: usize,
-    points: Vec<Point>,
+    pub offset: Point,
 }
 
 impl Hyperplane {
     /// Generates a new hyperplane, passing through a given point.
-    pub fn new(p: Point) -> Hyperplane {
+    pub fn new(offset: Point) -> Hyperplane {
         Hyperplane {
             basis: Vec::new(),
             rank: 0,
-            points: vec![p],
+            offset,
         }
     }
 
@@ -65,7 +65,6 @@ impl Hyperplane {
 
         let mut v = &p - self.project(&p);
         if v.normalize_mut() > EPS {
-            self.points.push(p);
             self.basis.push(v.clone());
             self.rank += 1;
 
@@ -93,13 +92,8 @@ impl Hyperplane {
 
     /// Projects a [`Point`] onto the hyperplane.
     pub fn project(&self, p: &Point) -> Point {
-        let offset = self
-            .points
-            .get(0)
-            .expect("A hyperplane can't contain no points!");
-
-        let p = p - offset;
-        let mut q = offset.clone();
+        let p = p - &self.offset;
+        let mut q = self.offset.clone();
 
         for b in &self.basis {
             q += b * (p.dot(b)) / b.norm_squared();
