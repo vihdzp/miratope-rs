@@ -19,18 +19,34 @@ enum Sign {
     Negative,
 }
 
-/// Represents a vertex set in a convex hull.
-#[derive(PartialEq, PartialOrd, Eq, Ord, Clone, Debug)]
-struct VertexSet {
-    /// The sorted indices of the vertices on the ridge.
+/// Represents a facet in a convex hull.
+#[derive(Clone, Debug)]
+struct Facet {
+    /// The indices of the vertices on the facet.
     vertices: Vec<usize>,
 
-    /// The vertices in each ridge are oriented. The fact that we need to order
-    /// them makes this inconvenient.
-    ///
-    /// This variable stores whether two vertices have to be swapped to have the
-    /// correct orientation.
-    orientation: bool,
+    /// The indices of the ridges on the facet.
+    ridges: Vec<usize>,
+
+    /// The indices of the vertices "outside" of this facet.
+    outer: Vec<usize>,
+
+    /// A normal vector for the facet, used to determine orientation.
+    normal: Point,
+
+    /// A unique identifier.
+    id: u32,
+}
+
+struct Ridge {
+    /// The indices of the vertices on the ridge.
+    vertices: Vec<usize>,
+
+    /// The indices of the facets on the ridge.
+    facets: Vec<usize>,
+
+    /// A unique identifier.
+    id: u32,
 }
 
 /// Determines whether two permutations of a vector have different parities.
@@ -63,15 +79,35 @@ fn parity(mut p0: Vec<usize>, p1: &[usize]) -> bool {
     parity
 }
 
-impl VertexSet {
-    /// Sorts the vertices and updates the orientation accordingly.
-    fn sort(&mut self) {
-        let old_vertices = self.vertices.clone();
-        self.vertices.sort_unstable();
-
-        self.orientation ^= parity(old_vertices, &self.vertices);
+fn sgn(x: f64) -> f64 {
+    if x > 0.0 {
+        1.0
+    } else if x < 0.0 {
+        -1.0
+    } else {
+        0.0
     }
 }
+
+impl Facet {
+    /// Returns the clones of the vertices the facet refers to.
+    fn clone_vertices(&self, vertices: &[Point]) -> Vec<Point> {
+        self.vertices
+            .iter()
+            .map(|&idx| vertices[idx].clone())
+            .collect()
+    }
+
+    /// Returns the signed distance of a point to the facet.
+    fn signed_distance(&self, vertices: &[Point], p: &Point) -> f64 {
+        let h = Hyperplane::from_points(self.clone_vertices(vertices));
+        let v = p - h.project(&p);
+
+        v.norm() * sgn(v.dot(&self.normal))
+    }
+}
+
+fn connect(f: &mut Facet, r: &mut Ridge) {}
 
 /// Returns the sign of a number, up to some imprecision.
 fn sign(x: f64) -> Sign {
@@ -104,19 +140,8 @@ fn sign_hypervolume(simplex: &[&Point], orientation: bool) -> Sign {
     sign(flip * m.determinant())
 }
 
-/// Finds a single ridge on the convex hull. As a side effect, sorts the
-/// vertices of the polytope lexicographically.
-fn get_hull_ridge(vertices: &mut [Point]) -> VertexSet {
-    // Sorts the vertices lexicographically, by turning them into vecs and
-    // applying their ordering.
-    vertices.sort_unstable_by(|a, b| {
-        a.iter()
-            .cloned()
-            .collect::<Vec<_>>()
-            .partial_cmp(&b.iter().cloned().collect::<Vec<_>>())
-            .expect("NaN vertex found!")
-    });
-
+/// Finds a single simplex on the convex hull.
+fn get_hull_simplex(vertices: &[Point]) -> Facet {
     let mut vertices = vertices.iter().enumerate();
     let (_, v0) = vertices.next().unwrap();
     let dim = v0.len();
@@ -124,93 +149,25 @@ fn get_hull_ridge(vertices: &mut [Point]) -> VertexSet {
 
     let mut ridge = vec![0];
 
-    // Takes the first `dim - 1` points in lexicographic order, so that no three
-    // are collinear, no four are coplanar... these ought to create a ridge.
-    while h.rank != dim - 2 {
+    // Takes the first `dim` points in lexicographic order, so that no three
+    // are collinear, no four are coplanar... these ought to create a facet.
+    while h.rank != dim - 1 {
         let (i, v) = vertices
             .next()
             .expect("Polytope has higher dimension than rank!");
 
         if h.add(v.clone()).is_some() {
-            ridge.push(i);
+            facet.push(i);
         }
     }
 
+    // Getting the ridges goes here.
+
     // The starting orientation is irrelevant.
-    VertexSet {
+    Facet {
         vertices: ridge,
         orientation: true,
     }
-}
-
-/// Finds the index of the closest leftmost vertex relative to a ridge.
-/// "Leftmost" will depend on the orientation of the ridge.
-fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> Vec<usize> {
-    debug_assert!(is_sorted(&ridge.vertices));
-
-    let mut leftmost_vertices = Vec::new();
-    let mut facet: Vec<_> = ridge.vertices.iter().map(|&idx| &vertices[idx]).collect();
-
-    let mut vertex_iter = vertices.iter().enumerate();
-
-    // We find a starting vertex not on the ridge.
-    let mut h = Hyperplane::from_points(facet.iter().cloned().cloned().collect());
-    loop {
-        let (i, v0) = vertex_iter.next().unwrap();
-
-        // The ridge should be sorted, so we can optimize this.
-        if h.add(v0.clone()).is_some() {
-            leftmost_vertices.push(i);
-            facet.push(v0);
-
-            break;
-        }
-    }
-
-    // The previous to last vertex on the facet will always be one of the
-    // leftmost vertices found so far.
-
-    // We compare with all of the other vertices.
-    for (i, v) in vertex_iter {
-        facet.push(v);
-
-        // If the new vertex is to the left of the previous leftmost one:
-        if sign_hypervolume(&facet, ridge.orientation) == Sign::Positive {
-            // Resets leftmost vertices.
-            leftmost_vertices.clear();
-            leftmost_vertices.push(i);
-
-            // Adds new leftmost to the facet.
-            let len = facet.len();
-            facet.swap(len - 2, len - 1);
-        }
-
-        facet.pop();
-    }
-
-    debug_assert!(!leftmost_vertices.is_empty());
-    leftmost_vertices
-}
-
-/// Gets the new ridges that have to be searched, in the correct orientation.
-fn get_new_ridges(old_ridge: &VertexSet, new_vertices: &[usize]) -> Vec<VertexSet> {
-    // THIS CURRENTLY ONLY DEALS WITH SIMPLICIAL FACETS.
-    let new_vertex = new_vertices[0];
-
-    let len = old_ridge.vertices.len();
-    let mut new_ridges = Vec::with_capacity(len);
-
-    // We simply add the new vertex in each position of the ridge.
-    // These ridges should have the correct orientation.
-    for k in 0..len {
-        let mut new_ridge = old_ridge.clone();
-        new_ridge.vertices[k] = new_vertex;
-        new_ridge.sort();
-
-        new_ridges.push(new_ridge);
-    }
-
-    new_ridges
 }
 
 /// Checks whether an array is sorted in increasing order. Used only for debugs.
@@ -362,42 +319,41 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polyto
     Polytope::new(vertices, elements)
 }
 
+/// Finds the furthest away outer vertex of a face.
+fn find_eye_point(vertices: &[Point], facet: &Facet) -> usize {
+    assert!(!facet.vertices.is_empty());
+
+    let h = Hyperplane::from_points(facet.clone_vertices(vertices));
+
+    // There's probably a one line implementation of this that is ultimately
+    // clearer.
+    let mut max_idx = 0;
+    let mut max_distance = 0.0;
+    for v in facet.outer {
+        let distance = h.distance(&vertices[v]);
+
+        if distance > max_distance {
+            max_idx = v;
+            max_distance = distance;
+        }
+    }
+
+    max_idx
+}
+
+fn new_facets(vertices: &[Point], facet: &Facet, eye_point: usize, hull_point: &Point) {}
+
 /// Builds the convex hull of a set of vertices. Uses the gift wrapping algorithm.
 pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
-    let mut facets = HashSet::new();
-    let mut ridges = BTreeSet::new();
+    let mut facets = HashMap::new();
+    let mut ridges = HashMap::new();
 
-    // Gets first ridge, reorders elements in the process.
-    ridges.insert(get_hull_ridge(&mut vertices));
+    // Gets first facet.
+    ridges.insert(get_hull_simplex(&mut vertices));
 
     // While there's still a ridge we need to check...
-    while let Some(old_ridge) = ridges.pop_first() {
-        let mut new_vertices = leftmost_vertex(&vertices, &old_ridge);
-        let new_ridges = get_new_ridges(&old_ridge, &new_vertices);
-
-        let mut facet = old_ridge.vertices.clone();
-        facet.append(&mut new_vertices);
-        facet.sort_unstable();
-
-        // We skip the facet if it isn't new.
-        if facets.contains(&facet) {
-            continue;
-        }
-
-        // For each new ridge:
-        for new_ridge in new_ridges {
-            // If this is the second time we find this ridge, it means we've
-            // already added both of the facets corresponding to it.
-            if ridges.contains(&new_ridge) {
-                ridges.remove(&new_ridge);
-            }
-            // Else, we still need to find the other facet.
-            else {
-                ridges.insert(new_ridge);
-            }
-        }
-
-        facets.insert(facet);
+    while let Some(old_ridge) = ridges.iter().get(0) {
+        let eye_point;
     }
 
     get_polytope_from_facets(vertices, facets.into_iter().collect())
