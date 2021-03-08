@@ -49,8 +49,9 @@
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
+use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 use no_cull_pipeline::PbrNoBackfaceBundle;
-use polytope::{geometry::Point, shapes, ElementList, Polytope};
+use polytope::{geometry::Point, off, shapes, ElementList, Polytope};
 
 mod input;
 mod no_cull_pipeline;
@@ -58,10 +59,16 @@ mod polytope;
 
 fn main() {
     App::build()
+        .add_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
         .add_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
+        .add_plugin(EguiPlugin)
         .add_plugin(input::InputPlugin)
         .add_startup_system(setup.system())
+        .add_startup_system(load_assets.system())
+        .add_system(update_ui_scale_factor.system())
+        .add_system(ui_example.system())
+        .add_system_to_stage(stage::POST_UPDATE, update_changed_polytopes.system())
         .run();
 }
 
@@ -69,6 +76,60 @@ const WIREFRAME_SELECTED_MATERIAL: HandleUntyped =
     HandleUntyped::weak_from_u64(StandardMaterial::TYPE_UUID, 0x82A3A5DD3A34CC21);
 const WIREFRAME_UNSELECTED_MATERIAL: HandleUntyped =
     HandleUntyped::weak_from_u64(StandardMaterial::TYPE_UUID, 0x82A3A5DD3A34CC22);
+const BEVY_TEXTURE_ID: u64 = 0;
+
+#[derive(Default)]
+struct UiState {
+    label: String,
+    value: f32,
+    inverted: bool,
+}
+
+fn load_assets(_world: &mut World, resources: &mut Resources) {
+    let mut egui_context = resources.get_mut::<EguiContext>().unwrap();
+    let asset_server = resources.get::<AssetServer>().unwrap();
+
+    let texture_handle = asset_server.load("icon.png");
+    egui_context.set_egui_texture(BEVY_TEXTURE_ID, texture_handle);
+}
+
+fn update_ui_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Res<Windows>) {
+    if let Some(window) = windows.get_primary() {
+        egui_settings.scale_factor = 1.0 / window.scale_factor();
+    }
+}
+
+fn ui_example(mut egui_ctx: ResMut<EguiContext>, mut query: Query<&mut Polytope>) {
+    let ctx = &mut egui_ctx.ctx;
+
+    egui::TopPanel::top("top_panel").show(ctx, |ui| {
+        // The top panel is often a good place for a menu bar:
+        egui::menu::bar(ui, |ui| {
+            egui::menu::menu(ui, "File", |ui| {
+                if ui.button("Quit").clicked() {
+                    std::process::exit(0);
+                }
+            });
+        });
+
+        if ui.button("Dual").clicked() {
+            for mut p in query.iter_mut() {
+                println!("Dual");
+                *p = p.dual();
+            }
+        }
+
+        if ui.button("Verf").clicked() {
+            for mut p in query.iter_mut() {
+                println!("Verf");
+
+                if let Some(verf) = p.verf(0) {
+                    *p = verf
+                };
+            }
+        }
+    });
+}
 
 fn setup(
     commands: &mut Commands,
@@ -77,7 +138,8 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly: Polytope = shapes::step_prism(23, &[1, 3]).convex_hull();
+    let poly: Polytope = shapes::step_prism(22, &[1, 3]);
+    println!("{}", off::to_src(&poly, Default::default()));
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
@@ -97,8 +159,11 @@ fn setup(
     commands
         .spawn(PbrNoBackfaceBundle {
             mesh: meshes.add(poly.get_mesh()),
+            visible: Visible {
+                is_visible: false,
+                ..Default::default()
+            },
             material: materials.add(Color::rgb(0.93, 0.5, 0.93).into()),
-            transform: Transform::from_translation(Vec3::new(0.0, 0.5, 0.0)),
             ..Default::default()
         })
         .with_children(|cb| {
@@ -108,6 +173,7 @@ fn setup(
                 ..Default::default()
             });
         })
+        .with(poly)
         .spawn(LightBundle {
             transform: Transform::from_translation(Vec3::new(-2.0, 2.5, 2.0)),
             ..Default::default()
@@ -115,8 +181,9 @@ fn setup(
         // camera anchor
         .spawn((
             GlobalTransform::default(),
-            Transform::from_translation(Vec3::new(-0.02, 0.025, 0.05))
-                .looking_at(Vec3::default(), Vec3::unit_y()),
+            Transform::from_translation(Vec3::new(0.02, -0.025, -0.05))
+                * Transform::from_translation(Vec3::new(-0.02, 0.025, 0.05))
+                    .looking_at(Vec3::default(), Vec3::unit_y()),
         ))
         .with_children(|cb| {
             // camera
@@ -129,4 +196,24 @@ fn setup(
                 ..Default::default()
             });
         });
+}
+
+fn update_changed_polytopes(
+    mut meshes: ResMut<Assets<Mesh>>,
+    polies: Query<(&Polytope, &Handle<Mesh>, &Children), Changed<Polytope>>,
+    wfs: Query<&Handle<Mesh>, Without<Polytope>>,
+) {
+    for (poly, mesh_handle, children) in polies.iter() {
+        let mesh: &mut Mesh = meshes.get_mut(mesh_handle).unwrap();
+        *mesh = poly.get_mesh();
+
+        for child in children.iter() {
+            if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {
+                let wf: &mut Mesh = meshes.get_mut(wf_handle).unwrap();
+                *wf = poly.get_wireframe();
+
+                break;
+            }
+        }
+    }
 }

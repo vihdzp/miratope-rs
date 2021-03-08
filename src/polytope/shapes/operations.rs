@@ -163,11 +163,11 @@ impl Polytope {
         })
     }
 
-    pub fn get_element_vertices(&self, rank: usize, idx: usize) -> Vec<Point> {
-        self.get_element(rank, idx).vertices
+    pub fn get_element_vertices(&self, rank: usize, idx: usize) -> Option<Vec<Point>> {
+        Some(self.get_element(rank, idx)?.vertices)
     }
 
-    pub fn get_element(&self, rank: usize, idx: usize) -> Self {
+    pub fn get_element(&self, rank: usize, idx: usize) -> Option<Self> {
         struct Sub {
             rank: usize,
             idx: usize,
@@ -178,7 +178,7 @@ impl Polytope {
 
         let vertices = &self.vertices;
         if rank == 0 {
-            return Polytope::new(vec![vertices[idx].clone()], vec![]);
+            return Some(Polytope::new(vec![vertices.get(idx)?.clone()], vec![]));
         }
 
         let elements = &self.elements;
@@ -238,16 +238,16 @@ impl Polytope {
         }
         new_elements.push(components);
 
-        Polytope::new(new_vertices, new_elements)
+        Some(Polytope::new(new_vertices, new_elements))
     }
 
     /// Gets the [vertex figure](https://polytope.miraheze.org/wiki/Vertex_figure)
     /// of a polytope corresponding to a given vertex.
-    pub fn verf(&self, idx: usize) -> Polytope {
+    pub fn verf(&self, idx: usize) -> Option<Polytope> {
         let dual = self.dual();
-        let facet = dual.get_element(self.rank() - 1, idx);
+        let facet = dual.get_element(self.rank() - 1, idx)?;
 
-        facet.dual()
+        Some(facet.dual())
     }
 
     /// Builds the vertices of a dual polytope from its facets.
@@ -257,7 +257,11 @@ impl Polytope {
         let vertices = &self.vertices;
         let elements = &self.elements;
         let rank = elements.len();
-        let o = &sphere.center;
+
+        // We project the sphere's center onto the polytope's hyperplane to
+        // avoid weirdness.
+        let h = Hyperplane::from_points(vertices.clone());
+        let o = h.project(&sphere.center);
 
         // We find the indices of the vertices on the facet.
         let mut projections: Vec<Point>;
@@ -272,8 +276,8 @@ impl Polytope {
                 let facet_verts = self.get_element_vertices(rank - 1, idx);
 
                 // We project the dual center onto the hyperplane defined by the vertices.
-                let h = Hyperplane::from_points(facet_verts);
-                projections.push(h.project(o));
+                let h = Hyperplane::from_points(facet_verts.unwrap());
+                projections.push(h.project(&o));
             }
         }
         // If our polytope is 1D, the vertices themselves are the facets.
@@ -285,7 +289,7 @@ impl Polytope {
         projections
             .iter()
             .map(|v| {
-                let v = v - o;
+                let v = v - &o;
                 let s = v.norm_squared();
 
                 // We avoid division by 0.
@@ -293,7 +297,7 @@ impl Polytope {
                     panic!("Facet passes through the dual center.")
                 }
 
-                v / s + o
+                v / s + &o
             })
             .collect()
     }

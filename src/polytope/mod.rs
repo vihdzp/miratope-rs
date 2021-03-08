@@ -240,6 +240,7 @@ impl Polytope {
         mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 0.0]; vertices.len()]);
         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
         mesh.set_indices(Some(Indices::U16(indices)));
+
         mesh
     }
 

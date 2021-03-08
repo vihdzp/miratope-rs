@@ -389,6 +389,6 @@ mod tests {
         let cube = super::hypercube(3);
         let square = cube.get_element(2, 4);
 
-        assert_eq!(square.el_nums(), vec![4, 4, 1]);
+        assert_eq!(square.unwrap().el_nums(), vec![4, 4, 1]);
     }
 }
