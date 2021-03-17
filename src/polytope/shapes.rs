@@ -1,175 +1,142 @@
-use std::f64::consts::PI;
-use std::{f64, usize};
 
-use super::Polytope;
+use std::f64::consts::{PI, TAU};
 
-pub fn polygon(n: u32, d: u32) -> Polytope {
-    let n = n as usize;
-    let a = 2.0 * PI / (n as f64) * (d as f64);
-    let s = a.sin() * 2.0;
+use gcd::Gcd;
 
-    let mut vertices = Vec::with_capacity(n);
-    let mut edges = Vec::with_capacity(n);
-    let mut components = vec![Vec::with_capacity(n)];
+use super::{Concrete, convex, geometry::Point};
 
-    for k in 0..n {
-        let ka = (k as f64) * a;
-        vertices.push(vec![ka.cos() / s, ka.sin() / s].into());
-        edges.push(vec![k, (k + 1) % n]);
-        components[0].push(k);
+impl Concrete {
+    /// Generates a [bowtie](https://polytope.miraheze.org/wiki/Bowtie) with
+    /// given edge lengths.
+    fn bowtie_vertices(mut len_a: f64, mut len_b: f64) -> Vec<Point> {
+        // Guarantees len_a ≤ len_b.
+        if len_a > len_b {
+            std::mem::swap(&mut len_a, &mut len_b);
+        }
+
+        // The coordinates of the bowtie.
+        let (a, b) = (len_a / 2.0, (len_b * len_b - len_a * len_a).sqrt() / 2.0);
+
+        vec![
+            vec![a, b].into(),
+            vec![-a, -b].into(),
+            vec![a, -b].into(),
+            vec![-a, b].into(),
+        ]
     }
 
-    Polytope::new(vertices, vec![edges, components])
-}
+    fn sreg_vertices(mut n: usize, d: usize, len_a: f64, len_b: f64) -> Vec<Point> {
+        // Builds the triangle from three adjacent vertices, and finds its side
+        // lengths and angles.
+        //
+        // This triangle has side lengths len_a, len_b, len_c, and the opposite
+        // respective angles are alpha, beta, gamma.
+        let sq_a = len_a * len_a;
+        let sq_b = len_b * len_b;
 
-pub fn tet() -> Polytope {
-    let x = 2f64.sqrt() / 4.0;
+        let gamma = PI * (1.0 - (d as f64) / (n as f64));
+        let sq_c = sq_a + sq_b - 2.0 * len_a * len_b * gamma.cos();
+        let len_c = sq_c.sqrt();
 
-    let vertices = vec![
-        vec![x, x, x].into(),
-        vec![-x, -x, x].into(),
-        vec![-x, x, -x].into(),
-        vec![x, -x, -x].into(),
-    ];
-    let edges = vec![
-        vec![0, 1],
-        vec![0, 2],
-        vec![0, 3],
-        vec![1, 2],
-        vec![1, 3],
-        vec![2, 3],
-    ];
-    let faces = vec![vec![0, 1, 3], vec![0, 2, 4], vec![1, 2, 5], vec![3, 4, 5]];
-    let components = vec![vec![0, 1, 2, 3, 4]];
+        let mut alpha = ((sq_b + sq_c - sq_a) / (2.0 * len_b * len_c)).acos();
+        let mut beta = ((sq_c + sq_a - sq_b) / (2.0 * len_c * len_a)).acos();
 
-    Polytope::new(vertices, vec![edges, faces, components])
-}
+        let radius = len_c / (2.0 * gamma.sin());
 
-pub fn cube() -> Polytope {
-    let x = 0.5;
+        // Fixes the angles in case anything goes wrong in the calculation.
+        let theta = PI * (d as f64) / (n as f64);
+        if alpha.is_nan() {
+            alpha = theta;
+        }
+        if beta.is_nan() {
+            beta = theta;
+        }
 
-    let vertices = vec![
-        vec![x, x, x].into(),
-        vec![x, x, -x].into(),
-        vec![x, -x, -x].into(),
-        vec![x, -x, x].into(),
-        vec![-x, x, x].into(),
-        vec![-x, x, -x].into(),
-        vec![-x, -x, -x].into(),
-        vec![-x, -x, x].into(),
-    ];
-    let edges = vec![
-        vec![0, 1],
-        vec![1, 2],
-        vec![2, 3],
-        vec![3, 0],
-        vec![4, 5],
-        vec![5, 6],
-        vec![6, 7],
-        vec![7, 3],
-        vec![0, 4],
-        vec![1, 5],
-        vec![2, 6],
-        vec![3, 7],
-    ];
-    let faces = vec![
-        vec![0, 1, 2, 3],
-        vec![4, 5, 6, 7],
-        vec![0, 4, 8, 9],
-        vec![1, 5, 9, 10],
-        vec![2, 6, 10, 11],
-        vec![3, 7, 11, 8],
-    ];
-    let components = vec![vec![0, 1, 2, 3, 4, 5]];
+        // We only want to generate a single component.
+        n /= n.gcd(d);
 
-    Polytope::new(vertices, vec![edges, faces, components])
-}
+        let regular = len_a == 0.0 || len_b == 0.0;
+        let vertex_num = if regular { n } else { 2 * n };
+        let mut vertices = Vec::with_capacity(vertex_num);
 
-pub fn oct() -> Polytope {
-    let x = 1.0 / 2f64.sqrt();
+        // Adds vertices.
+        let mut angle = 0f64;
+        for _ in 0..n {
+            if len_a != 0.0 {
+                vertices.push(vec![angle.cos() * radius, angle.sin() * radius].into());
+                angle += 2.0 * alpha;
+            }
 
-    let vertices = vec![
-        vec![x, 0.0, 0.0].into(),
-        vec![-x, 0.0, 0.0].into(),
-        vec![0.0, x, 0.0].into(),
-        vec![0.0, 0.0, x].into(),
-        vec![0.0, -x, 0.0].into(),
-        vec![0.0, 0.0, -x].into(),
-    ];
-    let edges = vec![
-        vec![0, 2],
-        vec![0, 3],
-        vec![0, 4],
-        vec![0, 5],
-        vec![1, 2],
-        vec![1, 3],
-        vec![1, 4],
-        vec![1, 5],
-        vec![2, 3],
-        vec![3, 4],
-        vec![4, 5],
-        vec![5, 2],
-    ];
-    let faces = vec![
-        vec![0, 1, 8],
-        vec![4, 5, 8],
-        vec![1, 2, 9],
-        vec![5, 6, 9],
-        vec![2, 3, 10],
-        vec![6, 7, 10],
-        vec![3, 0, 11],
-        vec![7, 4, 11],
-    ];
-    let components = vec![vec![0, 1, 2, 3, 4, 5, 6, 7]];
+            if len_b != 0.0 {
+                vertices.push(vec![angle.cos() * radius, angle.sin() * radius].into());
+                angle += 2.0 * beta;
+            }
+        }
 
-    Polytope::new(vertices, vec![edges, faces, components])
-}
-
-/// Creates an [[https://polytope.miraheze.org/wiki/Antiprism | antiprism]] with unit edge length and a given height.
-pub fn antiprism_with_height(n: u32, d: u32, mut h: f64) -> Polytope {
-    let n = n as usize;
-    let a = PI / (n as f64) * (d as f64);
-    let s = a.sin() * 2.0;
-
-    let mut vertices = Vec::with_capacity(2 * n);
-    let mut edges = Vec::with_capacity(4 * n);
-    let mut faces = Vec::with_capacity(2 * n + 2);
-    let mut components = vec![Vec::with_capacity(2 * n + 2)];
-
-    for k in 0..(2 * n) {
-        // Generates vertices.
-        let ka = (k as f64) * a;
-        vertices.push(vec![ka.cos() / s, ka.sin() / s, h].into());
-        h *= -1.0;
-
-        // Generates edges.
-        edges.push(vec![k, (k + 1) % (2 * n)]);
-        edges.push(vec![k, (k + 2) % (2 * n)]);
-
-        // Generates faces.
-        faces.push(vec![2 * k, 2 * k + 1, (2 * k + 2) % (4 * n)]);
-
-        // Generates component.
-        components[0].push(k);
+        vertices
     }
 
-    let (mut base1, mut base2) = (Vec::with_capacity(n), Vec::with_capacity(n));
-    for k in 0..n {
-        base1.push(4 * k + 1);
-        base2.push(4 * k + 3);
+    /// Generates a semiregular polygon, with order n rotational symmetry and
+    /// winding number d.
+    /// Bowties correspond to shapes where `d == 0`.
+    pub fn sreg_polygon(n: usize, d: usize, len_a: f64, len_b: f64) -> Concrete {
+        let vertices;
+
+        let comp_num;
+        let mut comp_angle;
+
+        // Bowties are a special case that must be considered separately.
+        if d == 0 {
+            vertices = Concrete::bowtie_vertices(len_a, len_b);
+
+            comp_num = n / 2;
+            comp_angle = PI / comp_num as f64;
+        } else {
+            vertices = Concrete::sreg_vertices(n, d, len_a, len_b);
+
+            comp_num = n.gcd(d);
+            comp_angle = 2.0 * PI / (n as f64 * comp_num as f64);
+
+            if len_a == 0.0 || len_b == 0.0 {
+                comp_angle *= 2.0;
+            }
+        };
+        /*
+        compound_from_trans(
+            &Concrete::polygon(vertices),
+            rotations(comp_angle, comp_num, 2),
+        )*/
+
+        todo!()
     }
-    faces.push(base1);
-    faces.push(base2);
 
-    components[0].push(2 * n);
-    components[0].push(2 * n + 1);
+    /// Generates a regular polygon with Schläfli symbol {n / d}.
+    pub fn reg_polygon(n: usize, d: usize) -> Concrete {
+        if d == 0 {
+            panic!("Invalid parameter d = 0.")
+        }
 
-    Polytope::new(vertices, vec![edges, faces, components])
-}
+        Concrete::sreg_polygon(n, d, 1.0, 0.0)
+    }
 
-pub fn antiprism(n: u32, d: u32) -> Polytope {
-    let a = PI / (n as f64);
-    let h = (a.cos() - (2.0 * a).cos()).sqrt() / (4.0 * a.sin());
+    pub fn step_prism(n: usize, rotations: &[usize]) -> Concrete {
+        let dim = rotations.len() * 2;
+        let mut vertices = Vec::with_capacity(n);
 
-    antiprism_with_height(n, d, h)
+        for i in 0..n {
+            let mut v = Vec::with_capacity(dim);
+
+            let n = n as f64;
+            for &r in rotations {
+                let (x, y) = (TAU * (r * i) as f64 / n).sin_cos();
+
+                v.push(x);
+                v.push(y);
+            }
+
+            vertices.push(v.into());
+        }
+
+        convex::convex_hull(vertices)
+    }
 }
