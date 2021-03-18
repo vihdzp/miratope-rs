@@ -2,8 +2,9 @@
 //! (polytopes)[https://polytope.miraheze.org/wiki/Polytope].
 
 use std::{
-    collections::HashMap,
+    collections::HashSet,
     f64::consts::SQRT_2,
+    hash::Hash,
     ops::{Deref, DerefMut, Index, IndexMut},
 };
 
@@ -15,9 +16,9 @@ use geometry::{Hyperplane, Point};
 use self::geometry::{Hypersphere, Matrix};
 
 pub mod convex;
+pub mod geometry;
 pub mod off;
 pub mod shapes;
-pub mod geometry;
 
 const ELEMENT_NAMES: [&str; 11] = [
     "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta", "Xenna", "Daka",
@@ -324,18 +325,19 @@ impl Abstract {
     fn dual_mut(&mut self) -> &mut Self {
         let rank = self.rank();
 
-        for r in 0..rank {
+        for r in 0..=rank {
             // Clears all subelements of the previous rank.
             for mut el in self[r - 1].iter_mut() {
                 el.subs = Vec::new();
             }
 
-            // Makes the subelements of the previous rank point to the
-            // corresponding superelements of the current rank.
+            // Gets the elements of the previous and current rank mutably.
             let (part1, part2) = self.split_at_mut(r);
             let prev_rank = part1.last_mut().unwrap();
             let cur_rank = &part2[0];
 
+            // Makes the subelements of the previous rank point to the
+            // corresponding superelements of the current rank.
             for (idx, el) in cur_rank.iter().enumerate() {
                 for &sub in &el.subs {
                     prev_rank[sub].subs.push(idx);
@@ -353,22 +355,33 @@ impl Abstract {
         self
     }
 
-    /// Gets the element with a given rank and index as a polytope.
-    fn get_element(&self, rank: isize, idx: usize) -> Option<Self> {
-        Some(self.get_element_with_vertices(rank, idx)?.0)
-    }
-
-    /// Gets the element with a given rank and index as a polytope. Also returns
-    /// a vector specifying which indices of the original rank 0 elements map
-    /// onto the new rank 0 elements.
-    fn get_element_with_vertices(&self, rank: isize, idx: usize) -> Option<(Self, Vec<usize>)> {
-        let el = self.get(rank)?.get(idx)?;
-
-        let mut abs = Abstract::new();
-        for _ in -1..rank {
-            abs.push(ElementList::new());
+    /// Gets the indices of the vertices of a given element in a polytope.
+    fn get_element_vertices(&self, rank: isize, idx: usize) -> Option<Vec<usize>> {
+        // A nullitope doesn't have vertices.
+        if rank == -1 {
+            return None;
         }
 
+        let mut indices = vec![idx];
+
+        // Gets subindices of subindices, until reaching the vertices.
+        for r in (1..=rank).rev() {
+            let mut hash_subs = HashSet::new();
+
+            for idx in indices {
+                for &sub in &self[r][idx].subs {
+                    hash_subs.insert(sub);
+                }
+            }
+
+            indices = hash_subs.into_iter().collect();
+        }
+
+        Some(indices)
+    }
+
+    /// Gets the element with a given rank and index as a polytope.
+    fn get_element(&self, _rank: isize, _idx: usize) -> Option<Self> {
         todo!()
     }
 
@@ -376,6 +389,23 @@ impl Abstract {
         // assert incidence.
 
         todo!()
+    }
+
+    /// Checks whether all of the subelements refer to valid elements in the
+    /// polytope. If this returns `false`, then either the polytope hasn't been
+    /// fully built up, or there's something seriously wrong.
+    fn check_incidences(&self) -> bool {
+        for r in -1..self.rank() {
+            for element in self[r].iter() {
+                for &sub in &element.subs {
+                    if self[r - 1].get(sub).is_none() {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
     }
 
     /// Determines whether the polytope has a single minimal element and a
@@ -519,7 +549,7 @@ impl Polytope for Abstract {
             els.0.len()
         } else {
             0
-        } 
+        }
     }
 
     /// Gets the number of elements of all ranks.
@@ -807,31 +837,30 @@ impl Concrete {
         const EPS: f64 = 1e-9;
 
         // If we're dealing with a nullitope or point, the dual is itself.
+        //
+        // TODO: maybe also reciprocate the point geometrically?
         let rank = self.rank();
         if rank < 1 {
             return Some(self);
         }
 
         // We project the sphere's center onto the polytope's hyperplane to
-        // avoid weirdness.
+        // avoid skew weirdness.
         let h = Hyperplane::from_points(self.vertices.clone());
         let o = h.project(&sphere.center);
 
-        // We find the indices of the vertices on the facet.
-        let mut projections: Vec<Point>;
+        let mut projections;
 
+        // We project our inversion center onto each of the facets.
         if rank >= 2 {
-            let facets = &self.abs[rank - 2];
-            let facets_len = facets.len();
+            let facet_count = self.el_count(rank - 1);
+            projections = Vec::with_capacity(facet_count);
 
-            projections = Vec::with_capacity(facets_len);
-
-            for idx in 0..facets_len {
-                let facet_verts = self.get_element_vertices(rank - 1, idx);
-
-                // We project the dual center onto the hyperplane defined by the vertices.
-                let h = Hyperplane::from_points(facet_verts.unwrap());
-                projections.push(h.project(&o));
+            for idx in 0..facet_count {
+                projections.push(
+                    Hyperplane::from_points(self.get_element_vertices(rank - 1, idx).unwrap())
+                        .project(&o),
+                );
             }
         }
         // If our polytope is 1D, the vertices themselves are the facets.
@@ -840,22 +869,21 @@ impl Concrete {
         }
 
         // Reciprocates the projected points.
-        let mut reciprocals = Vec::with_capacity(projections.len());
-
-        for v in projections {
-            let v = v - &o;
+        for v in projections.iter_mut() {
+            *v -= &o;
             let s = v.norm_squared();
 
             // If any face passes through the dual center, the dual does
-            // not exist.
+            // not exist, and we return early.
             if s < EPS {
                 return None;
             }
 
-            reciprocals.push(v / s + &o)
+            *v /= s;
+            *v += &o;
         }
 
-        self.vertices = reciprocals;
+        self.vertices = projections;
 
         // Takes the abstract dual.
         self.abs.dual_mut();
@@ -863,19 +891,22 @@ impl Concrete {
         Some(self)
     }
 
+    /// Gets the (geometric) vertices of an element on the polytope.
     pub fn get_element_vertices(&self, rank: isize, idx: usize) -> Option<Vec<Point>> {
-        Some(self.get_element(rank, idx)?.vertices)
-    }
-
-    pub fn get_element(&self, rank: isize, idx: usize) -> Option<Self> {
-        let (abs, vertex_indices) = self.abs.get_element_with_vertices(rank, idx)?;
-
-        Some(Concrete {
-            vertices: vertex_indices
+        Some(
+            self.abs
+                .get_element_vertices(rank, idx)?
                 .iter()
                 .map(|&v| self.vertices[v].clone())
                 .collect(),
-            abs,
+        )
+    }
+
+    /// Gets an element of a polytope, as its own polytope.
+    pub fn get_element(&self, rank: isize, idx: usize) -> Option<Self> {
+        Some(Concrete {
+            vertices: self.get_element_vertices(rank, idx)?,
+            abs: self.abs.get_element(rank, idx)?,
         })
     }
 

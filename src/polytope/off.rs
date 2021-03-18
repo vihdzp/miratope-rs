@@ -1,12 +1,10 @@
-use std::io::Result;
-use std::path::Path;
-use std::{collections::HashMap, fs::read};
+use std::{collections::HashMap, io::Result, path::Path};
 
-use petgraph::{Graph, graph::NodeIndex, visit::Dfs};
+use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 
 use super::*;
 
-use super::{super::*, Abstract, Concrete, Element, ElementList, Polytope, RankVec};
+use super::{Abstract, Concrete, Element, ElementList, Polytope, RankVec};
 
 /// Gets the name for an element with a given rank.
 fn element_name(rank: isize) -> String {

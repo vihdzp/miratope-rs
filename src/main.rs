@@ -51,7 +51,9 @@ use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 use no_cull_pipeline::PbrNoBackfaceBundle;
-use polytope::{geometry::Point, off, Concrete, Polytope, Renderable};
+
+#[allow(unused_imports)]
+use polytope::{Concrete, Polytope, Renderable};
 
 mod input;
 mod no_cull_pipeline;
@@ -99,6 +101,7 @@ fn update_ui_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Res<
     }
 }
 
+/// A system for a basic ui.
 fn ui(mut egui_ctx: ResMut<EguiContext>, mut query: Query<&mut Renderable>) {
     let ctx = &mut egui_ctx.ctx;
 
@@ -133,6 +136,7 @@ fn ui(mut egui_ctx: ResMut<EguiContext>, mut query: Query<&mut Renderable>) {
     });
 }
 
+/// Initializes the scene.
 fn setup(
     commands: &mut Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -140,7 +144,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::step_prism(22, &[1, 3]);
+    let poly = Concrete::simplex(3);
     // println!("{}", off::to_src(&poly, Default::default()));
     let poly = Renderable::new(poly);
 

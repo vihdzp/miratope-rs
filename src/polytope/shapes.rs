@@ -1,9 +1,8 @@
-
 use std::f64::consts::{PI, TAU};
 
 use gcd::Gcd;
 
-use super::{Concrete, convex, geometry::Point};
+use super::{convex, geometry::Point, Concrete};
 
 impl Concrete {
     /// Generates a [bowtie](https://polytope.miraheze.org/wiki/Bowtie) with
@@ -79,7 +78,9 @@ impl Concrete {
     /// Generates a semiregular polygon, with order n rotational symmetry and
     /// winding number d.
     /// Bowties correspond to shapes where `d == 0`.
-    pub fn sreg_polygon(n: usize, d: usize, len_a: f64, len_b: f64) -> Concrete {
+
+    pub fn sreg_polygon(_n: usize, _d: usize, _len_a: f64, _len_b: f64) -> Concrete {
+        /*
         let vertices;
 
         let comp_num;
@@ -101,7 +102,7 @@ impl Concrete {
                 comp_angle *= 2.0;
             }
         };
-        /*
+
         compound_from_trans(
             &Concrete::polygon(vertices),
             rotations(comp_angle, comp_num, 2),
