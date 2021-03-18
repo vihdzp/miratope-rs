@@ -5,7 +5,7 @@ use std::{
 
 use super::{
     geometry::{Hyperplane, Point},
-    ElementList, Polytope,
+    Abstract, Concrete, Element, ElementList,
 };
 
 use nalgebra::DMatrix;
@@ -36,6 +36,8 @@ struct VertexSet {
 /// Determines whether two permutations of a vector have different parities.
 /// Uses cycle sort to sort a vector into the other, and records the parity of
 /// the number of swaps.
+///
+/// Has O(n) complexity.
 fn parity(mut p0: Vec<usize>, p1: &[usize]) -> bool {
     let mut parity = false;
     let mut hash = HashMap::new();
@@ -255,16 +257,18 @@ fn common(el0: &[usize], el1: &[usize]) -> Vec<usize> {
 }
 
 /// Checks whether a given vertex set actually generates a valid d-polytope.
-fn check_subelement(vertices: &[Point], el: &[usize], d: usize) -> bool {
+fn check_subelement(vertices: &[Point], el: &[usize], rank: isize) -> bool {
+    let rank = rank as usize;
+
     // A d-element must have at least d + 1 vertices.
-    if el.len() < d + 1 {
+    if el.len() < rank + 1 {
         return false;
     }
 
     // It is possible for two d-elements to share more than d
     // elements without them being a common (d - 1)-element, but
     // only when d >= 4.
-    if d >= 4 {
+    if rank >= 4 {
         // The hyperplane of the intersection of the elements.
         let h = Hyperplane::from_points(
             el.iter()
@@ -274,7 +278,7 @@ fn check_subelement(vertices: &[Point], el: &[usize], d: usize) -> bool {
 
         // If this hyperplane does not have the correct dimension, it
         // can't actually be a subelement.
-        if h.rank != d - 1 {
+        if h.rank != rank - 1 {
             return false;
         }
     }
@@ -284,33 +288,29 @@ fn check_subelement(vertices: &[Point], el: &[usize], d: usize) -> bool {
 
 /// Gift wrapping is only able to find the vertices of the facets of the polytope.
 /// This function retrieves all other elements from them.
-fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polytope {
+fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concrete {
     let dim = vertices[0].len();
-    let mut elements = Vec::with_capacity(dim);
 
-    // Adds a single component.
-    let len = facets.len();
-    let mut component = Vec::with_capacity(len);
-
-    for i in 0..len {
-        component.push(i);
+    // Initializes the abstract polytope.
+    let mut abs = Abstract::with_rank(dim as isize);
+    abs.push_min();
+    for _ in 0..(dim as isize) {
+        abs.push(ElementList::new());
     }
-
-    elements.push(vec![component]);
 
     // Adds everything else.
     let mut els_verts = facets;
 
-    for d in (1..(dim - 1)).rev() {
-        let mut subs = HashMap::new();
+    for r in (2..(dim as isize)).rev() {
+        let mut subs_map = HashMap::new();
         let len = els_verts.len();
 
         // Each element of `els_verts` contains the indices of the vertices,
         // and not the subelements of the element. This vector fixes that.
-        let mut els_subs = Vec::with_capacity(len);
+        let mut els_subs = ElementList::with_capacity(len);
 
         for _ in 0..len {
-            els_subs.push(vec![]);
+            els_subs.push(Element::new());
         }
 
         // Checks every pair of d-elements to see if their intersection forms
@@ -318,52 +318,58 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Polyto
         for i in 0..(len - 1) {
             for j in (i + 1)..len {
                 // The intersection of the two elements.
-                let el = common(&els_verts[i], &els_verts[j]);
+                let el = common(&els_verts[i].subs, &els_verts[j].subs);
 
                 // Checks that el actually has the correct rank.
-                if !check_subelement(&vertices, &el, d) {
+                if !check_subelement(&vertices, &el, r - 1) {
                     continue;
                 }
 
-                match subs.get(&el) {
+                match subs_map.get(&el) {
                     Some(&idx) => {
-                        if !els_subs[i].contains(&idx) {
-                            els_subs[i].push(idx);
+                        if !els_subs[i].subs.contains(&idx) {
+                            els_subs[i].subs.push(idx);
                         }
 
-                        if !els_subs[j].contains(&idx) {
-                            els_subs[j].push(idx);
+                        if !els_subs[j].subs.contains(&idx) {
+                            els_subs[j].subs.push(idx);
                         }
                     }
                     None => {
-                        let idx = subs.len();
+                        let idx = subs_map.len();
 
-                        els_subs[i].push(idx);
-                        els_subs[j].push(idx);
+                        els_subs[i].subs.push(idx);
+                        els_subs[j].subs.push(idx);
 
-                        subs.insert(el, idx);
+                        subs_map.insert(el, idx);
                     }
                 }
             }
         }
 
-        els_verts = Vec::new();
-        els_verts.resize(subs.len(), vec![]);
+        els_verts = ElementList::new();
+        els_verts.resize(subs_map.len(), Element { subs: vec![] });
 
-        for (sub, idx) in subs {
-            els_verts[idx] = sub;
+        for (subs, idx) in subs_map {
+            els_verts[idx] = Element { subs };
         }
 
-        elements.push(els_subs);
+        abs[r] = els_subs;
     }
 
-    elements.push(els_verts);
-    elements.reverse();
-    Polytope::new(vertices, elements)
+    // At this point, els_verts contains, for each edge, the indices of its
+    // vertices, which are precisely the rank 1 elements of the polytope.
+    abs[1] = els_verts;
+
+    // Adds the vertices and the maximal element.
+    abs[0] = ElementList::vertices(vertices.len());
+    abs.push_max();
+
+    Concrete::new(vertices, abs)
 }
 
 /// Builds the convex hull of a set of vertices. Uses the gift wrapping algorithm.
-pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
+pub fn convex_hull(mut vertices: Vec<Point>) -> Concrete {
     let mut facets = HashSet::new();
     let mut ridges = BTreeSet::new();
 
@@ -375,9 +381,11 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
         let mut new_vertices = leftmost_vertex(&vertices, &old_ridge);
         let new_ridges = get_new_ridges(&old_ridge, &new_vertices);
 
-        let mut facet = old_ridge.vertices.clone();
-        facet.append(&mut new_vertices);
-        facet.sort_unstable();
+        let mut facet = Element {
+            subs: old_ridge.vertices.clone(),
+        };
+        facet.subs.append(&mut new_vertices);
+        facet.subs.sort_unstable();
 
         // We skip the facet if it isn't new.
         if facets.contains(&facet) {
@@ -400,11 +408,11 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Polytope {
         facets.insert(facet);
     }
 
-    get_polytope_from_facets(vertices, facets.into_iter().collect())
+    get_polytope_from_facets(vertices, ElementList(facets.into_iter().collect()))
 }
 
-impl Polytope {
-    pub fn convex_hull(&self) -> Polytope {
+impl Concrete {
+    pub fn convex_hull(&self) -> Concrete {
         convex_hull(self.vertices.clone())
     }
 }

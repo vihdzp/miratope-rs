@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-
 //! A renderer for polytopes, spinned off from [Miratope JS](https://github.com/OfficialURL/miratope).
 //! Still in alpha development.
 //!
@@ -51,7 +50,9 @@ use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 use no_cull_pipeline::PbrNoBackfaceBundle;
-use polytope::{geometry::Point, off, shapes, ElementList, Polytope};
+
+#[allow(unused_imports)]
+use polytope::{Concrete, Polytope, Renderable};
 
 mod input;
 mod no_cull_pipeline;
@@ -67,7 +68,7 @@ fn main() {
         .add_startup_system(setup.system())
         .add_startup_system(load_assets.system())
         .add_system(update_ui_scale_factor.system())
-        .add_system(ui_example.system())
+        .add_system(ui.system())
         .add_system_to_stage(stage::POST_UPDATE, update_changed_polytopes.system())
         .run();
 }
@@ -99,7 +100,8 @@ fn update_ui_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Res<
     }
 }
 
-fn ui_example(mut egui_ctx: ResMut<EguiContext>, mut query: Query<&mut Polytope>) {
+/// A system for a basic UI.
+fn ui(mut egui_ctx: ResMut<EguiContext>, mut query: Query<&mut Renderable>) {
     let ctx = &mut egui_ctx.ctx;
 
     egui::TopPanel::top("top_panel").show(ctx, |ui| {
@@ -112,25 +114,30 @@ fn ui_example(mut egui_ctx: ResMut<EguiContext>, mut query: Query<&mut Polytope>
             });
         });
 
+        // Dual button.
         if ui.button("Dual").clicked() {
             for mut p in query.iter_mut() {
-                println!("Dual");
-                *p = p.dual();
+                match p.concrete.dual_mut() {
+                    Some(_) => println!("Dual succeeded"),
+                    None => println!("Dual failed"),
+                }
             }
         }
 
+        // Verf button.
         if ui.button("Verf").clicked() {
             for mut p in query.iter_mut() {
                 println!("Verf");
 
-                if let Some(verf) = p.verf(0) {
-                    *p = verf
+                if let Some(verf) = p.concrete.verf(0) {
+                    *p = Renderable::new(verf);
                 };
             }
         }
     });
 }
 
+/// Initializes the scene.
 fn setup(
     commands: &mut Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -138,8 +145,9 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly: Polytope = shapes::step_prism(22, &[1, 3]);
-    println!("{}", off::to_src(&poly, Default::default()));
+    let poly = Concrete::hypercube(3);
+    // println!("{}", off::to_src(&poly, Default::default()));
+    let poly = Renderable::new(poly);
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
@@ -200,8 +208,8 @@ fn setup(
 
 fn update_changed_polytopes(
     mut meshes: ResMut<Assets<Mesh>>,
-    polies: Query<(&Polytope, &Handle<Mesh>, &Children), Changed<Polytope>>,
-    wfs: Query<&Handle<Mesh>, Without<Polytope>>,
+    polies: Query<(&Renderable, &Handle<Mesh>, &Children), Changed<Renderable>>,
+    wfs: Query<&Handle<Mesh>, Without<Renderable>>,
 ) {
     for (poly, mesh_handle, children) in polies.iter() {
         let mesh: &mut Mesh = meshes.get_mut(mesh_handle).unwrap();
