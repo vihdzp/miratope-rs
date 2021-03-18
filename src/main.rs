@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-
 //! A renderer for polytopes, spinned off from [Miratope JS](https://github.com/OfficialURL/miratope).
 //! Still in alpha development.
 //!
@@ -101,7 +100,7 @@ fn update_ui_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Res<
     }
 }
 
-/// A system for a basic ui.
+/// A system for a basic UI.
 fn ui(mut egui_ctx: ResMut<EguiContext>, mut query: Query<&mut Renderable>) {
     let ctx = &mut egui_ctx.ctx;
 
@@ -115,6 +114,7 @@ fn ui(mut egui_ctx: ResMut<EguiContext>, mut query: Query<&mut Renderable>) {
             });
         });
 
+        // Dual button.
         if ui.button("Dual").clicked() {
             for mut p in query.iter_mut() {
                 match p.concrete.dual_mut() {
@@ -124,6 +124,7 @@ fn ui(mut egui_ctx: ResMut<EguiContext>, mut query: Query<&mut Renderable>) {
             }
         }
 
+        // Verf button.
         if ui.button("Verf").clicked() {
             for mut p in query.iter_mut() {
                 println!("Verf");

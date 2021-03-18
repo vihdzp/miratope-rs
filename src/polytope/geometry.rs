@@ -1,4 +1,4 @@
-//! Contains a few structs and methods to faciliate geometry in n-dimensional
+//! Contains a few structs and methods to faciliate geometry in *n*–dimensional
 //! space.
 
 pub type Point = nalgebra::DVector<f64>;

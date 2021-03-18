@@ -1,8 +1,9 @@
-//! Contains all of the methods used to operate on
-//! (polytopes)[https://polytope.miraheze.org/wiki/Polytope].
+//! Contains the definitions of the different traits and structs for
+//! [polytopes](https://polytope.miraheze.org/wiki/Polytope), as well as some
+//! basic methods to operate on them.
 
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     f64::consts::SQRT_2,
     hash::Hash,
     ops::{Deref, DerefMut, Index, IndexMut},
@@ -20,39 +21,81 @@ pub mod geometry;
 pub mod off;
 pub mod shapes;
 
+/// The names for 0-elements, 1-elements, 2-elements, and so on.
 const ELEMENT_NAMES: [&str; 11] = [
     "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta", "Xenna", "Daka",
 ];
+
+/// The word "Components".
 const COMPONENTS: &str = "Components";
 
 /// The trait for methods common to all polytopes.
 pub trait Polytope: Sized + Clone {
     // Base properties.
+
+    /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
     fn rank(&self) -> isize;
+
+    /// The number of elements of a given rank.
     fn el_count(&self, rank: isize) -> usize;
+
+    /// The element counts of the polytope.
     fn el_counts(&self) -> RankVec<usize>;
 
-    // Base polytopes to build.
+    /// Returns an instance of the
+    /// [nullitope](https://polytope.miraheze.org/wiki/Nullitope), the unique
+    /// polytope of rank &minus;1.
     fn nullitope() -> Self;
+
+    /// Returns an instance of the
+    /// [point](https://polytope.miraheze.org/wiki/Point), the unique polytope
+    /// of rank 0.
     fn point() -> Self;
+
+    /// Returns an instance of the
+    /// [dyad](https://polytope.miraheze.org/wiki/Dyad), the unique polytope of
+    /// rank 1.
     fn dyad() -> Self {
         let point = Self::point();
         Self::duopyramid(&point, &point)
     }
+
+    /// Returns an instance of a
+    /// [polygon](https://polytope.miraheze.org/wiki/Polygon) with a given
+    /// amount of sides.
     fn polygon(n: usize) -> Self;
 
-    // A few important operations on polytopes.
+    /// Builds a
+    /// [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product) from
+    /// two polytopes.
     fn duopyramid(p: &Self, q: &Self) -> Self;
+
+    /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
+    /// from two polytopes.
     fn duoprism(p: &Self, q: &Self) -> Self;
+
+    /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
+    /// from two polytopes.
     fn duotegum(p: &Self, q: &Self) -> Self;
+
+    /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
+    /// from two polytopes.
     fn duocomb(p: &Self, q: &Self) -> Self;
 
+    /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
+    /// given base.
     fn pyramid(&self) -> Self {
         Self::duopyramid(self, &Self::point())
     }
+
+    /// Builds a [prism](https://polytope.miraheze.org/wiki/Prism) from a
+    /// given base.
     fn prism(&self) -> Self {
         Self::duoprism(self, &Self::dyad())
     }
+
+    /// Builds a [tegum](https://polytope.miraheze.org/wiki/Bipyramid) from a
+    /// given base.
     fn tegum(&self) -> Self {
         Self::duotegum(self, &Self::dyad())
     }
@@ -109,8 +152,8 @@ pub trait Polytope: Sized + Clone {
     }
 }
 
-/// A vector indexed by rank. Wraps around operations that offset by 1 for our
-/// own convenience.
+/// A `Vec` indexed by [rank](https://polytope.miraheze.org/wiki/Rank). Wraps
+/// around operations that offset by a constant for our own convenience.
 #[derive(Debug, Clone)]
 pub struct RankVec<T>(Vec<T>);
 
@@ -130,6 +173,8 @@ impl<T> RankVec<T> {
         self.len() as isize - 2
     }
 
+    /// Returns a reference to the element at a given position or `None` if out
+    /// of bounds.
     fn get(&self, index: isize) -> Option<&T> {
         if index < -1 {
             None
@@ -138,10 +183,13 @@ impl<T> RankVec<T> {
         }
     }
 
+    /// Divides one mutable slice into two at an index.
     fn split_at_mut(&mut self, mid: isize) -> (&mut [T], &mut [T]) {
         self.0.split_at_mut((mid + 1) as usize)
     }
 
+    /// Returns a mutable reference to an element or `None` if the index is out
+    /// of bounds.
     fn get_mut(&mut self, index: isize) -> Option<&mut T> {
         if index < -1 {
             None
@@ -150,6 +198,7 @@ impl<T> RankVec<T> {
         }
     }
 
+    /// Swaps two elements in the vector.
     fn swap(&mut self, a: isize, b: isize) {
         self.0.swap((a + 1) as usize, (b + 1) as usize);
     }
@@ -183,7 +232,7 @@ impl<T> IndexMut<isize> for RankVec<T> {
     }
 }
 
-/// Represents a single element in an abstract polytope.
+/// Represents a single element in an [`Abstract`].
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Element {
     /// The indices of the subelements of the polytope.
@@ -213,7 +262,8 @@ impl Element {
     }
 }
 
-/// Represents a list of elements of the same rank.
+/// Represents a list of [`Elements`](Element) of the same
+/// [rank](https://polytope.miraheze.org/wiki/Rank).
 #[derive(Debug, Clone)]
 pub struct ElementList(Vec<Element>);
 
@@ -267,7 +317,9 @@ impl DerefMut for ElementList {
 }
 
 #[derive(Debug, Clone)]
-/// Represents the ranked poset corresponding to an abstract polytope.
+/// Represents the [ranked poset](https://en.wikipedia.org/wiki/Graded_poset)
+/// corresponding to an
+/// [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
 pub struct Abstract(RankVec<ElementList>);
 
 impl Abstract {
@@ -391,6 +443,23 @@ impl Abstract {
         todo!()
     }
 
+    /// Calls [has_min_max_elements](Abstract::has_min_max_elements),
+    /// [check_incidences](Abstract::check_incidences),
+    /// [is_dyadic](Abstract::is_dyadic), and
+    /// [is_strongly_connected](Abstract::is_strongly_connected).
+    fn full_check(&self) -> bool {
+        self.has_min_max_elements()
+            && self.check_incidences()
+            && self.is_dyadic()
+            && self.is_strongly_connected()
+    }
+
+    /// Determines whether the polytope has a single minimal element and a
+    /// single maximal element. A valid polytope should always return `true`.
+    fn has_min_max_elements(&self) -> bool {
+        self.el_count(-1) == 1 && self.el_count(self.rank()) == 1
+    }
+
     /// Checks whether all of the subelements refer to valid elements in the
     /// polytope. If this returns `false`, then either the polytope hasn't been
     /// fully built up, or there's something seriously wrong.
@@ -408,10 +477,49 @@ impl Abstract {
         true
     }
 
-    /// Determines whether the polytope has a single minimal element and a
-    /// single maximal element. A valid polytope should always return `true`.
-    fn has_min_max_elements(&self) -> bool {
-        self.get(-1).unwrap().len() == 1 && self.get(self.rank()).unwrap().len() == 1
+    /// Determines whether the polytope satisfies the diamond property. A valid
+    /// non-fissary polytope should always return `true`.
+    fn is_dyadic(&self) -> bool {
+        #[derive(PartialEq)]
+        enum Count {
+            Once,
+            Twice,
+        }
+
+        // For every element, by looking through the subelements of its
+        // subelements, we need to find each exactly twice.
+        for r in 1..self.rank() {
+            for el in self[r].iter() {
+                let mut hash_sub_subs = HashMap::new();
+
+                for &sub in &el.subs {
+                    let sub_el = &self[r - 1][sub];
+
+                    for &sub_sub in &sub_el.subs {
+                        match hash_sub_subs.get(&sub_sub) {
+                            // Found for the first time.
+                            None => hash_sub_subs.insert(sub_sub, Count::Once),
+
+                            // Found for the second time.
+                            Some(Count::Once) => hash_sub_subs.insert(sub_sub, Count::Twice),
+
+                            // Found for the third time?! Abort!
+                            Some(Count::Twice) => return false,
+                        };
+                    }
+                }
+
+                // If any subsubelement was found only once, this also
+                // violates the diamond property.
+                for (_, count) in hash_sub_subs.into_iter() {
+                    if count == Count::Once {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
     }
 
     /// Determines whether the polytope is connected. A valid non-compound
@@ -423,12 +531,6 @@ impl Abstract {
     /// Determines whether the polytope is strongly connected. A valid
     /// non-compound polytope should always return `true`.
     fn is_strongly_connected(&self) -> bool {
-        todo!()
-    }
-
-    /// Determines whether the polytope satisfies the diamond property. A valid
-    /// non-fissary polytope should always return `true`.
-    fn is_dyadic(&self) -> bool {
         todo!()
     }
 
@@ -629,8 +731,9 @@ impl DerefMut for Abstract {
 }
 
 #[derive(Debug, Clone)]
-/// Represents a "concrete" polytope, which is an abstract polytope together
-/// with some corresponding vertices.
+/// Represents a
+/// [concrete polytope](https://polytope.miraheze.org/wiki/Polytope), which is
+/// an [`Abstract`] together with the corresponding vertices.
 pub struct Concrete {
     /// The list of vertices as points in Euclidean space.
     pub vertices: Vec<Point>,
