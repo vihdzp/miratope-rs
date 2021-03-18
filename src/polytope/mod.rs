@@ -448,10 +448,8 @@ impl Abstract {
     /// [is_dyadic](Abstract::is_dyadic), and
     /// [is_strongly_connected](Abstract::is_strongly_connected).
     fn full_check(&self) -> bool {
-        self.has_min_max_elements()
-            && self.check_incidences()
-            && self.is_dyadic()
-            && self.is_strongly_connected()
+        self.has_min_max_elements() && self.check_incidences() && self.is_dyadic()
+        // && self.is_strongly_connected()
     }
 
     /// Determines whether the polytope has a single minimal element and a
@@ -1315,5 +1313,175 @@ impl Renderable {
         mesh.set_indices(Some(Indices::U16(indices)));
 
         mesh
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    /// Checks that a nullitope is generated correctly.
+    fn nullitope_check() {
+        let nullitope = Abstract::nullitope();
+
+        assert_eq!(
+            nullitope.el_counts().0,
+            vec![1],
+            "Nullitope element counts don't match expected value."
+        );
+        assert!(nullitope.full_check(), "Nullitopes are invalid.");
+    }
+
+    #[test]
+    /// Checks that a point is generated correctly.
+    fn point_check() {
+        let point = Abstract::point();
+
+        assert_eq!(
+            point.el_counts().0,
+            vec![1, 1],
+            "Point element counts don't match expected value."
+        );
+        assert!(point.full_check(), "Points are invalid.");
+    }
+
+    #[test]
+    /// Checks that a dyad is generated correctly.
+    fn dyad_check() {
+        let dyad = Abstract::dyad();
+
+        assert_eq!(
+            dyad.el_counts().0,
+            vec![1, 2, 1],
+            "Dyad element counts don't match expected value."
+        );
+        assert!(dyad.full_check(), "Dyads are invalid.");
+    }
+
+    #[test]
+    /// Checks that polygons are generated correctly.
+    fn polygon_check() {
+        for n in 2..=10 {
+            let polygon = Abstract::polygon(n);
+
+            assert_eq!(
+                polygon.el_counts().0,
+                vec![1, n, n, 1],
+                "{}-gon element counts don't match expected value.",
+                n
+            );
+            assert!(polygon.full_check(), "{}-gons are invalid.", n);
+        }
+    }
+
+    #[test]
+    /// Checks that polygonal duopyramids are generated correctly.
+    fn duopyramid_check() {
+        let mut polygons = Vec::new();
+        for n in 2..=5 {
+            polygons.push(Abstract::polygon(n));
+        }
+
+        for m in 2..=5 {
+            for n in m..=5 {
+                let duopyramid = Abstract::duopyramid(&polygons[m - 2], &polygons[n - 2]);
+
+                assert_eq!(
+                    duopyramid.el_counts().0,
+                    vec![
+                        1,
+                        m + n,
+                        m + n + m * n,
+                        2 * m * n + 2,
+                        m + n + m * n,
+                        m + n,
+                        1
+                    ],
+                    "{}-{} duopyramid element counts don't match expected value.",
+                    m,
+                    n
+                );
+                assert!(
+                    duopyramid.full_check(),
+                    "{}-{} duopyramid are invalid.",
+                    m,
+                    n
+                );
+            }
+        }
+    }
+
+    #[test]
+    /// Checks that polygonal duoprisms are generated correctly.
+    fn duoprism_check() {
+        let mut polygons = Vec::new();
+        for n in 2..=5 {
+            polygons.push(Abstract::polygon(n));
+        }
+
+        for m in 2..=5 {
+            for n in m..=5 {
+                let duoprism = Abstract::duoprism(&polygons[m - 2], &polygons[n - 2]);
+
+                assert_eq!(
+                    duoprism.el_counts().0,
+                    vec![1, m * n, 2 * m * n, m + n + m * n, m + n, 1],
+                    "{}-{} duoprism element counts don't match expected value.",
+                    m,
+                    n
+                );
+                assert!(duoprism.full_check(), "{}-{} duoprisms are invalid.", m, n);
+            }
+        }
+    }
+
+    #[test]
+    /// Checks that polygonal duotegums are generated correctly.
+    fn duotegum_check() {
+        let mut polygons = Vec::new();
+        for n in 2..=5 {
+            polygons.push(Abstract::polygon(n));
+        }
+
+        for m in 2..=5 {
+            for n in m..=5 {
+                let duotegum = Abstract::duotegum(&polygons[m - 2], &polygons[n - 2]);
+
+                assert_eq!(
+                    duotegum.el_counts().0,
+                    vec![1, m + n, m + n + m * n, 2 * m * n, m * n, 1],
+                    "{}-{} duotegum element counts don't match expected value.",
+                    m,
+                    n
+                );
+                assert!(duotegum.full_check(), "{}-{} duotegums are invalid.", m, n);
+            }
+        }
+    }
+
+    #[test]
+    /// Checks that polygonal duocombs are generated correctly.
+    fn duocomb_check() {
+        let mut polygons = Vec::new();
+        for n in 2..=5 {
+            polygons.push(Abstract::polygon(n));
+        }
+
+        for m in 2..=5 {
+            for n in m..=5 {
+                let duocomb = Abstract::duocomb(&polygons[m - 2], &polygons[n - 2]);
+
+                assert_eq!(
+                    duocomb.el_counts().0,
+                    vec![1, m * n, 2 * m * n, m * n, 1],
+                    "{}-{} duocomb element counts don't match expected value.",
+                    m,
+                    n
+                );
+                assert!(duocomb.full_check(), "{}-{} duocombs are invalid.", m, n);
+            }
+        }
     }
 }

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Result, path::Path};
+use std::{collections::HashMap, io::Result, path::Path, str::FromStr};
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 
@@ -14,9 +14,11 @@ fn element_name(rank: isize) -> String {
     }
 }
 
-/// Removes all whitespace and comments from the OFF file.
+/// Returns an iterator over the OFF file, with all whitespace and comments
+/// removed.
 fn data_tokens(src: &str) -> impl Iterator<Item = &str> {
     let mut comment = false;
+
     str::split(&src, move |c: char| {
         if c == '#' {
             comment = true;
@@ -28,16 +30,28 @@ fn data_tokens(src: &str) -> impl Iterator<Item = &str> {
     .filter(|s| !s.is_empty())
 }
 
+/// Reads the next integer or float from the OFF file.
+fn next_tok<'a, T>(toks: &mut impl Iterator<Item = &'a str>) -> T
+where
+    T: FromStr,
+    <T as FromStr>::Err: std::fmt::Debug,
+{
+    toks.next()
+        .expect("OFF file ended unexpectedly.")
+        .parse()
+        .expect("Could not parse number.")
+}
+
 /// Gets the number of elements from the OFF file.
-/// This includes components iff dim ≤ 2, as this makes things easier down the line.
+/// This includes components iff dim ≤ 2, as this makes things easier down the
+/// line.
 fn get_el_nums<'a>(rank: isize, toks: &mut impl Iterator<Item = &'a str>) -> Vec<usize> {
     let rank = rank as usize;
     let mut el_nums = Vec::with_capacity(rank);
 
     // Reads entries one by one.
     for _ in 0..rank {
-        let num_elem = toks.next().expect("OFF file ended unexpectedly.");
-        el_nums.push(num_elem.parse().expect("could not parse as integer"));
+        el_nums.push(next_tok(toks));
     }
 
     // A point has a single component (itself)
@@ -75,8 +89,7 @@ fn parse_vertices<'a>(
         let mut vert = Vec::with_capacity(dim);
 
         for _ in 0..dim {
-            let coord = toks.next().expect("OFF file ended unexpectedly.");
-            vert.push(coord.parse().expect("Float parsing failed!"));
+            vert.push(next_tok(toks));
         }
 
         vertices.push(vert.into());
@@ -89,6 +102,7 @@ fn parse_vertices<'a>(
 /// Since the OFF file doesn't store edges explicitly, this is harder than reading
 /// general elements.
 fn parse_edges_and_faces<'a>(
+    rank: isize,
     num_edges: usize,
     num_faces: usize,
     toks: &mut impl Iterator<Item = &'a str>,
@@ -100,23 +114,14 @@ fn parse_edges_and_faces<'a>(
 
     // Add each face to the element list.
     for _ in 0..num_faces {
-        let face_sub_num = toks
-            .next()
-            .expect("OFF file ended unexpectedly.")
-            .parse()
-            .expect("Integer parsing failed!");
+        let face_sub_num = next_tok(toks);
 
         let mut face = Element::new();
         let mut face_verts = Vec::with_capacity(face_sub_num);
 
         // Reads all vertices of the face.
         for _ in 0..face_sub_num {
-            face_verts.push(
-                toks.next()
-                    .expect("OFF file ended unexpectedly.")
-                    .parse()
-                    .expect("Integer parsing failed!"),
-            );
+            face_verts.push(next_tok(toks));
         }
 
         // Gets all edges of the face.
@@ -135,7 +140,15 @@ fn parse_edges_and_faces<'a>(
             }
         }
 
-        faces.push(face);
+        // If these are truly faces and not just components, we add them.
+        if rank != 2 {
+            faces.push(face);
+        }
+    }
+
+    // If this is a polygon, we add a single maximal element as a face.
+    if rank == 2 {
+        faces = ElementList::max(edges.len());
     }
 
     // The number of edges in the file should match the number of read edges, though this isn't obligatory.
@@ -151,11 +164,7 @@ pub fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) ->
 
     // Adds every d-element to the element list.
     for _ in 0..num_el {
-        let el_sub_num = toks
-            .next()
-            .expect("OFF file ended unexpectedly.")
-            .parse()
-            .expect("Integer parsing failed!");
+        let el_sub_num = next_tok(toks);
         let mut subs = Vec::with_capacity(el_sub_num);
 
         // Reads all sub-elements of the d-element.
@@ -204,7 +213,7 @@ pub fn from_src(src: String) -> Concrete {
 
     // Reads edges and faces.
     if rank >= 2 {
-        let (edges, faces) = parse_edges_and_faces(num_elems[1], num_elems[2], &mut toks);
+        let (edges, faces) = parse_edges_and_faces(rank, num_elems[1], num_elems[2], &mut toks);
         abs.push(edges);
         abs.push(faces);
     }
@@ -215,7 +224,10 @@ pub fn from_src(src: String) -> Concrete {
     }
 
     // Caps the abstract polytope, returns the concrete one.
-    abs.push_max();
+    if rank != 2 {
+        abs.push_max();
+    }
+
     Concrete { vertices, abs }
 }
 
@@ -298,13 +310,13 @@ fn write_vertices(off: &mut String, opt: &OFFOptions, vertices: &[Point]) {
 fn write_faces(
     off: &mut String,
     opt: &OFFOptions,
-    dim: usize,
+    rank: usize,
     edges: &ElementList,
     faces: &ElementList,
 ) {
     // # Faces
     if opt.comments {
-        let el_name = if dim > 2 {
+        let el_name = if rank > 2 {
             element_name(2)
         } else {
             super::COMPONENTS.to_string()
@@ -315,6 +327,7 @@ fn write_faces(
         off.push('\n');
     }
 
+    // TODO: write components instead of faces in 2D case.
     for face in faces.iter() {
         off.push_str(&face.subs.len().to_string());
 
@@ -446,43 +459,42 @@ mod tests {
     use super::*;
 
     /// Used to test a particular polytope.
-    fn test_shape(mut p: Concrete, el_nums: Vec<usize>) {
+    fn test_shape(p: Concrete, el_nums: Vec<usize>) {
         // Checks that element counts match up.
-        for r in -1..=p.rank() {
-            assert_eq!(p.el_count(r), el_nums[(r + 1) as usize]);
-        }
+        assert_eq!(p.el_counts().0, el_nums);
 
         // Checks that the polytope can be reloaded correctly.
-        p = from_src(to_src(&p, Default::default()));
-        for r in -1..=p.rank() {
-            assert_eq!(p.el_count(r), el_nums[(r + 1) as usize]);
-        }
+        assert_eq!(
+            from_src(to_src(&p, Default::default())).el_counts().0,
+            el_nums
+        );
     }
 
     #[test]
     /// Checks that a point has the correct amount of elements.
     fn point_nums() {
-        let point: Concrete = from_src("0OFF".to_string()).into();
+        let point = from_src("0OFF".to_string());
 
-        test_shape(point, vec![1])
+        test_shape(point, vec![1, 1])
     }
 
     #[test]
     /// Checks that a dyad has the correct amount of elements.
     fn dyad_nums() {
-        let dyad: Concrete = from_src("1OFF 2 -1 1 0 1".to_string()).into();
+        let dyad = from_src("1OFF 2 -1 1 0 1".to_string());
 
-        test_shape(dyad, vec![2, 1])
+        test_shape(dyad, vec![1, 2, 1])
     }
 
+    /*
     #[test]
     /// Checks that a hexagon has the correct amount of elements.
     fn hig_nums() {
-        let hig: Concrete = from_src(
+        let hig =from_src(
             "2OFF 6 1 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 6 0 1 2 3 4 5".to_string()
-        ).into();
+        );
 
-        test_shape(hig, vec![6, 6, 1])
+        test_shape(hig, vec![1, 6, 6, 1])
     }
 
     #[test]
@@ -492,47 +504,45 @@ mod tests {
             "2OFF 6 2 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 3 0 2 4 3 1 3 5".to_string()
         ).into();
 
-        test_shape(shig, vec![6, 6, 2])
+        test_shape(shig, vec![1, 6, 6, 1])
     }
+    */
 
     #[test]
     /// Checks that a tetrahedron has the correct amount of elements.
     fn tet_nums() {
-        let tet: Concrete = from_src(
+        let tet = from_src(
             "OFF 4 4 6 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2".to_string(),
-        )
-        .into();
+        );
 
-        test_shape(tet, vec![4, 6, 4, 1])
+        test_shape(tet, vec![1, 4, 6, 4, 1])
     }
 
     #[test]
     /// Checks that a 2-tetrahedron compund has the correct amount of elements.
     fn so_nums() {
-        let so: Concrete = from_src(
+        let so = from_src(
             "OFF 8 8 12 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 -1 -1 -1 -1 1 1 1 -1 1 1 1 -1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2 3 4 5 6 3 7 4 6 3 4 5 7 3 7 5 6 ".to_string(),
-        )
-        .into();
+        );
 
-        test_shape(so, vec![8, 12, 8, 2])
+        test_shape(so, vec![1, 8, 12, 8, 1])
     }
 
     #[test]
     /// Checks that a pentachoron has the correct amount of elements.
     fn pen_nums() {
-        let pen: Concrete = from_src(
+        let pen = from_src(
             "4OFF 5 10 10 5 0.158113883008419 0.204124145231932 0.288675134594813 0.5 0.158113883008419 0.204124145231932 0.288675134594813 -0.5 0.158113883008419 0.204124145231932 -0.577350269189626 0 0.158113883008419 -0.612372435695794 0 0 -0.632455532033676 0 0 0 3 0 3 4 3 0 2 4 3 2 3 4 3 0 2 3 3 0 1 4 3 1 3 4 3 0 1 3 3 1 2 4 3 0 1 2 3 1 2 3 4 0 1 2 3 4 0 4 5 6 4 1 4 7 8 4 2 5 7 9 4 3 6 8 9"
                 .to_string(),
-        )
-        .into();
+        );
 
-        test_shape(pen, vec![5, 10, 10, 5, 1])
+        test_shape(pen, vec![1, 5, 10, 10, 5, 1])
     }
 
     #[test]
     /// Checks that comments are correctly parsed.
     fn comments() {
-        let tet: Concrete = from_src(
+        let tet = from_src(
             "# So
             OFF # this
             4 4 6 # is
@@ -546,10 +556,9 @@ mod tests {
             3 0 1 3#it
             3 3 1 2#works!#"
                 .to_string(),
-        )
-        .into();
+        );
 
-        test_shape(tet, vec![4, 6, 4, 1])
+        test_shape(tet, vec![1, 4, 6, 4, 1])
     }
 
     #[test]
