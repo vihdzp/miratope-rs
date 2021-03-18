@@ -145,7 +145,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::simplex(3);
+    let poly = Concrete::hypercube(3);
     // println!("{}", off::to_src(&poly, Default::default()));
     let poly = Renderable::new(poly);
 

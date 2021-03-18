@@ -560,25 +560,36 @@ impl Abstract {
         }
 
         // We add the elements of a given rank in lexicographic order of the
-        // ranks. This function determines how many elements of the same rank
-        // are added by the time we add those of the form (p_rank, q_rank).
-        //
-        // TODO: memoize values instead of using recursion. Use a closure so
-        // that we can capture the environment. Maybe use memo-fn once that no
-        // longer crashes VS Code?
-        fn offset(
-            p_rank: isize,
-            q_rank: isize,
-            p_low: isize,
-            q_hi: isize,
-            p: &Abstract,
-            q: &Abstract,
-        ) -> usize {
-            if p_rank < p_low || q_rank > q_hi {
-                0
+        // ranks. This vector memoizes how many elements of the same rank are
+        // added by the time we add those of the form (p_rank, q_rank). It
+        // stores this value in offset_memo[p_rank - p_low][q_rank - q_hi].
+        let mut offset_memo: Vec<Vec<_>> = Vec::new();
+        for p_rank in p_low..=p_hi {
+            let mut offset_memo_row = Vec::new();
+
+            for q_rank in q_low..=q_hi {
+                let offset = if p_rank == p_low || q_rank == q_hi {
+                    0
+                } else {
+                    offset_memo[(p_rank - p_low - 1) as usize][(q_rank - q_low + 1) as usize]
+                };
+
+                offset_memo_row.push(offset + p.el_count(p_rank) * q.el_count(q_rank));
+            }
+
+            offset_memo.push(offset_memo_row);
+        }
+
+        // Gets the value stored in offset_memo[p_rank - p_low][q_rank - q_hi],
+        // or returns 0 if the indices are out of range.
+        let offset = |p_rank, q_rank| -> _ {
+            if let Some(offset_memo_row) = offset_memo.get((p_rank - p_low) as usize) {
+                offset_memo_row
+                    .get((q_rank - q_low) as usize)
+                    .copied()
+                    .unwrap_or(0)
             } else {
-                offset(p_rank - 1, q_rank + 1, p_low, q_hi, p, q)
-                    + p.el_count(p_rank) * q.el_count(q_rank)
+                0
             }
         };
 
@@ -586,7 +597,7 @@ impl Abstract {
         // a pair of an element from p and an element from q. This function
         // finds the position we placed it in.
         let get_element_index = |p_rank, p_idx, q_rank, q_idx| -> _ {
-            offset(p_rank - 1, q_rank + 1, p_low, q_hi, p, q) + p_idx * q.el_count(q_rank) + q_idx
+            offset(p_rank - 1, q_rank + 1) + p_idx * q.el_count(q_rank) + q_idx
         };
 
         // Adds elements in order of rank.
