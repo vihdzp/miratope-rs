@@ -540,8 +540,8 @@ impl Abstract {
     ///
     /// The elements of this product are in one to one correspondence to pairs
     /// of elements in the set of polytopes. The elements of a specific rank are
-    /// sorted first by lexicographic order of the ranks, then by the order of
-    /// the elements.
+    /// sorted first by lexicographic order of the ranks, then by lexicographic
+    /// order of the elements.
     fn product(p: &Self, q: &Self, min: bool, max: bool) -> Self {
         let p_rank = p.rank();
         let q_rank = q.rank();
@@ -554,6 +554,7 @@ impl Abstract {
 
         let rank = p_rank + q_rank + 1 - (!min as isize) - (!max as isize);
 
+        // Initializes the product with empty element lists.
         let mut product = Self::with_rank(rank);
         for _ in -1..=rank {
             product.push(ElementList::new());
@@ -568,13 +569,13 @@ impl Abstract {
             let mut offset_memo_row = Vec::new();
 
             for q_rank in q_low..=q_hi {
-                let offset = if p_rank == p_low || q_rank == q_hi {
-                    0
-                } else {
-                    offset_memo[(p_rank - p_low - 1) as usize][(q_rank - q_low + 1) as usize]
-                };
-
-                offset_memo_row.push(offset + p.el_count(p_rank) * q.el_count(q_rank));
+                offset_memo_row.push(
+                    if p_rank == p_low || q_rank == q_hi {
+                        0
+                    } else {
+                        offset_memo[(p_rank - p_low - 1) as usize][(q_rank - q_low + 1) as usize]
+                    } + p.el_count(p_rank) * q.el_count(q_rank),
+                );
             }
 
             offset_memo.push(offset_memo_row);
@@ -582,7 +583,8 @@ impl Abstract {
 
         // Gets the value stored in offset_memo[p_rank - p_low][q_rank - q_hi],
         // or returns 0 if the indices are out of range.
-        let offset = |p_rank, q_rank| -> _ {
+        let offset = |p_rank: isize, q_rank: isize| -> _ {
+            // The usize casts may overflow, but we really don't care about it.
             if let Some(offset_memo_row) = offset_memo.get((p_rank - p_low) as usize) {
                 offset_memo_row
                     .get((q_rank - q_low) as usize)
