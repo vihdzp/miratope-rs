@@ -31,8 +31,6 @@ const COMPONENTS: &str = "Components";
 
 /// The trait for methods common to all polytopes.
 pub trait Polytope: Sized + Clone {
-    // Base properties.
-
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
     fn rank(&self) -> isize;
 
@@ -41,6 +39,10 @@ pub trait Polytope: Sized + Clone {
 
     /// The element counts of the polytope.
     fn el_counts(&self) -> RankVec<usize>;
+
+    /// Whether the polytope is
+    /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
+    fn orientable(&self) -> bool;
 
     /// Returns an instance of the
     /// [nullitope](https://polytope.miraheze.org/wiki/Nullitope), the unique
@@ -55,10 +57,7 @@ pub trait Polytope: Sized + Clone {
     /// Returns an instance of the
     /// [dyad](https://polytope.miraheze.org/wiki/Dyad), the unique polytope of
     /// rank 1.
-    fn dyad() -> Self {
-        let point = Self::point();
-        Self::duopyramid(&point, &point)
-    }
+    fn dyad() -> Self;
 
     /// Returns an instance of a
     /// [polygon](https://polytope.miraheze.org/wiki/Polygon) with a given
@@ -81,6 +80,14 @@ pub trait Polytope: Sized + Clone {
     /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
     /// from two polytopes.
     fn duocomb(p: &Self, q: &Self) -> Self;
+
+    /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
+    /// polytope.
+    fn ditope(&self) -> Self;
+
+    /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
+    /// polytope in place.
+    fn ditope_mut(&mut self);
 
     /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
     /// given base.
@@ -339,6 +346,11 @@ impl Abstract {
         Abstract(RankVec(vec))
     }
 
+    /// Returns a reference to the minimal element of the polytope.
+    fn min(&self) -> &Element {
+        &self[0][0]
+    }
+
     /// Pushes a minimal element with no superelements into the polytope. To be
     /// used in circumstances where the elements are built up in layers.
     fn push_min(&mut self) {
@@ -374,7 +386,7 @@ impl Abstract {
     }
 
     /// Converts a polytope into its dual in place.
-    fn dual_mut(&mut self) -> &mut Self {
+    fn dual_mut(&mut self) {
         let rank = self.rank();
 
         for r in 0..=rank {
@@ -403,8 +415,6 @@ impl Abstract {
         // Now that all of the incidences are backwards, there's only one thing
         // left to do... flip!
         self.reverse();
-
-        self
     }
 
     /// Gets the indices of the vertices of a given element in a polytope.
@@ -686,6 +696,15 @@ impl Polytope for Abstract {
         Abstract::from_vec(vec![ElementList::min(), ElementList::max(1)])
     }
 
+    /// Returns the unique polytope of rank 1.
+    fn dyad() -> Self {
+        Abstract::from_vec(vec![
+            ElementList::min(),
+            ElementList::vertices(2),
+            ElementList::max(2),
+        ])
+    }
+
     /// Returns the unique polytope of rank 2 with a given amount of vertices.
     fn polygon(n: usize) -> Self {
         assert!(n >= 2);
@@ -722,7 +741,25 @@ impl Polytope for Abstract {
         Self::product(p, q, false, false)
     }
 
+    fn ditope(&self) -> Self {
+        let mut clone = self.clone();
+        clone.ditope_mut();
+        clone
+    }
+
+    fn ditope_mut(&mut self) {
+        let rank = self.rank();
+        let max = self[rank][0].clone();
+
+        self[rank].push(max);
+        self.push(ElementList::max(2));
+    }
+
     fn antiprism(&self) -> Self {
+        todo!()
+    }
+
+    fn orientable(&self) -> bool {
         todo!()
     }
 }
@@ -1135,6 +1172,10 @@ impl Polytope for Concrete {
         Self::new(vec![vec![].into()], Abstract::point())
     }
 
+    fn dyad() -> Self {
+        Self::new(vec![vec![-0.5].into(), vec![-0.5].into()], Abstract::dyad())
+    }
+
     fn polygon(n: usize) -> Self {
         Self::reg_polygon(n, 1)
     }
@@ -1164,6 +1205,17 @@ impl Polytope for Concrete {
         )
     }
 
+    fn ditope(&self) -> Self {
+        Self {
+            vertices: self.vertices.clone(),
+            abs: self.abs.ditope(),
+        }
+    }
+
+    fn ditope_mut(&mut self) {
+        self.abs.ditope_mut();
+    }
+
     fn antiprism(&self) -> Self {
         todo!()
     }
@@ -1190,6 +1242,10 @@ impl Polytope for Concrete {
             }
             .recenter()
         }
+    }
+
+    fn orientable(&self) -> bool {
+        self.abs.orientable()
     }
 }
 
@@ -1321,6 +1377,32 @@ mod tests {
 
     use super::*;
 
+    /// Returns a bunch of varied polytopes to run general tests on. Use only
+    /// for tests that should work on **everything** you give it!
+    fn test_polytopes() -> [Abstract; 19] {
+        [
+            Abstract::nullitope(),
+            Abstract::point(),
+            Abstract::dyad(),
+            Abstract::polygon(2),
+            Abstract::polygon(3),
+            Abstract::polygon(4),
+            Abstract::polygon(5),
+            Abstract::polygon(10),
+            Abstract::hypercube(3),
+            Abstract::hypercube(4),
+            Abstract::hypercube(5),
+            Abstract::simplex(3),
+            Abstract::simplex(4),
+            Abstract::simplex(5),
+            Abstract::orthoplex(3),
+            Abstract::orthoplex(4),
+            Abstract::orthoplex(5),
+            Abstract::duoprism(&Abstract::polygon(6), &Abstract::polygon(7)),
+            Abstract::dyad().ditope().ditope().ditope().ditope(),
+        ]
+    }
+
     #[test]
     /// Checks that a nullitope is generated correctly.
     fn nullitope_check() {
@@ -1331,7 +1413,7 @@ mod tests {
             vec![1],
             "Nullitope element counts don't match expected value."
         );
-        assert!(nullitope.full_check(), "Nullitopes are invalid.");
+        assert!(nullitope.full_check(), "Nullitope is invalid.");
     }
 
     #[test]
@@ -1344,7 +1426,7 @@ mod tests {
             vec![1, 1],
             "Point element counts don't match expected value."
         );
-        assert!(point.full_check(), "Points are invalid.");
+        assert!(point.full_check(), "Point is invalid.");
     }
 
     #[test]
@@ -1357,7 +1439,7 @@ mod tests {
             vec![1, 2, 1],
             "Dyad element counts don't match expected value."
         );
-        assert!(dyad.full_check(), "Dyads are invalid.");
+        assert!(dyad.full_check(), "Dyad is invalid.");
     }
 
     #[test]
@@ -1372,7 +1454,7 @@ mod tests {
                 "{}-gon element counts don't match expected value.",
                 n
             );
-            assert!(polygon.full_check(), "{}-gons are invalid.", n);
+            assert!(polygon.full_check(), "{}-gon is invalid.", n);
         }
     }
 
@@ -1432,7 +1514,7 @@ mod tests {
                     m,
                     n
                 );
-                assert!(duoprism.full_check(), "{}-{} duoprisms are invalid.", m, n);
+                assert!(duoprism.full_check(), "{}-{} duoprism is invalid.", m, n);
             }
         }
     }
@@ -1456,7 +1538,7 @@ mod tests {
                     m,
                     n
                 );
-                assert!(duotegum.full_check(), "{}-{} duotegums are invalid.", m, n);
+                assert!(duotegum.full_check(), "{}-{} duotegum is invalid.", m, n);
             }
         }
     }
@@ -1480,8 +1562,107 @@ mod tests {
                     m,
                     n
                 );
-                assert!(duocomb.full_check(), "{}-{} duocombs are invalid.", m, n);
+                assert!(duocomb.full_check(), "{}-{} duocomb is invalid.", m, n);
             }
+        }
+    }
+
+    /// Calculates `n` choose `k`.
+    fn choose(n: usize, k: usize) -> usize {
+        let mut res = 1;
+
+        for r in 0..k {
+            res *= n - r;
+            res /= r + 1;
+        }
+
+        res
+    }
+
+    #[test]
+    /// Checks that simplices are generated correctly.
+    fn simplex_check() {
+        for n in -1..=5 {
+            let simplex = Abstract::simplex(n);
+
+            for k in -1..=n {
+                assert_eq!(
+                    simplex.el_count(k),
+                    choose((n + 1) as usize, (k + 1) as usize),
+                    "{}-simplex {}-element counts don't match up",
+                    n,
+                    k
+                );
+            }
+
+            assert!(simplex.full_check(), "{}-simplex is invalid.", n)
+        }
+    }
+
+    #[test]
+    /// Checks that hypercubes are generated correctly.
+    fn hypercube_check() {
+        for n in -1..=5 {
+            let hypercube = Abstract::hypercube(n);
+
+            for k in 0..=n {
+                assert_eq!(
+                    hypercube.el_count(k),
+                    choose(n as usize, k as usize) * 2u32.pow((n - k) as u32) as usize,
+                    "{}-hypercube {}-element counts don't match up",
+                    n,
+                    k
+                );
+            }
+
+            assert!(hypercube.full_check(), "{}-hypercube is invalid.", n)
+        }
+    }
+
+    #[test]
+    /// Checks that orthoplices are generated correctly.
+    fn orthoplex_check() {
+        for n in -1..=5 {
+            let orthoplex = Abstract::orthoplex(n);
+
+            for k in -1..n {
+                assert_eq!(
+                    orthoplex.el_count(k),
+                    choose(n as usize, (k + 1) as usize) * 2u32.pow((k + 1) as u32) as usize,
+                    "{}-orthoplex {}-element counts don't match up",
+                    n,
+                    k
+                );
+            }
+
+            assert!(orthoplex.full_check(), "{}-orthoplex is invalid.", n)
+        }
+    }
+
+    #[test]
+    /// Checks that duals are generated correctly.
+    fn dual_check() {
+        let mut polytopes = test_polytopes();
+
+        for (idx, poly) in polytopes.iter_mut().enumerate() {
+            let el_counts = poly.el_counts();
+
+            poly.dual_mut();
+
+            // The element counts of the dual should be the same as the reversed
+            // element counts of the original.
+            let mut du_el_counts_rev = poly.el_counts();
+            du_el_counts_rev.reverse();
+            assert_eq!(
+                el_counts.0, du_el_counts_rev.0,
+                "Dual element counts of test polytope #{} don't match expected value.",
+                idx
+            );
+            assert!(
+                poly.full_check(),
+                "Dual of test polytope #{} is invalid.",
+                idx
+            );
         }
     }
 }
