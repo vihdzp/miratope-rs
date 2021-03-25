@@ -59,22 +59,25 @@ fn cd_parse(input: &String) -> Option<CDGraph> {
 
 //Reads and creates a node
 fn create_node(graph: Graph<NodeVal, EdgeVal, Undirected>, diagram: &str, caret: usize) -> Option<NodeIndex> {
-    //TODO:
-    //Default to single character
-    //If there's parenthesis, look for the other
-    let close = diagram.find(")");
-    if close == None {
-      //Missing Parenthesis
-    };
-    let node: &str = &diagram[caret..close.unwrap()+1];
+    let close: usize = 0;
+    match &diagram[caret..caret+1] {
+        "(" => {
+            match diagram[caret..].find(")") {
+                Some(ind) => close = ind,
+                None => return None
+            }
+        },
+        _ => close = caret+1,
+    }
+    let node: &str = &diagram[caret..close+1];
     caret += node.len();
     match node_to_val(node) {
         Some(val) => graph.add_node(val),
-        None => None//Invalid Node!,
+        None => None //Invalid Node!,
 }
 
 //Creates an edge from mem
-fn make_edge(diagram: &str, caret: u32) -> Option<EdgeIndex> {
+fn make_edge(graph: Graph<NodeVal, EdgeVal, Undirected>, diagram: &str, caret: u32) -> Option<EdgeIndex> {
 
 }
 
