@@ -4,7 +4,7 @@ use std::f64;
 use regex::Regex;
 
 //Possible numbers and non-numbers that could appear in CD edges
-enum NumExt {
+enum EdgeVal {
     //Real Numbers 3, 5, 3/4, etc.
     Rational(i64, i64),
     //Infinity ∞
@@ -14,19 +14,19 @@ enum NumExt {
     Non,
 }
 
-enum Node {
+enum NodeVal {
     Unringed,
     Ringed(f64),
-    Snub(f64),
+    Snub,
 }
 
 //Types of Graphs for polytopes
 enum CDGraph {
     //Classic
-    Single{graph: Graph<NumExt, NumExt, Undirected>},
-    Compound{count: u32, graphs: Vec<Graph<NumExt, NumExt, Undirected>>},
-    LaceTower{lace_len: NumExt, count: u32, graphs: Vec<Graph<NumExt, NumExt, Undirected>>},
-    LaceRing{lace_len: NumExt, count: u32, graphs: Vec<Graph<NumExt, NumExt, Undirected>>},
+    Single{graph: Graph<NodeVal, EdgeVal, Undirected>},
+    Compound{count: u32, graphs: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
+    LaceTower{lace_len: f64, count: u32, graphs: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
+    LaceRing{lace_len: f64, count: u32, graphs: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
 }
 
 //Main function for parsing CDs from strings to CDGraphs
@@ -57,56 +57,64 @@ fn cd_parse(input: &String) -> Option<CDGraph> {
     };
 }
 
-fn create_link(diagram: &str, caret: u32) -> Option<NumExt> {
-    let node = diagram[caret..diagram.find(")")+1];
-    if caret = 0 {
-        caret += node.len();
-        match node_to_val(node) {
-            Some(val) => graph.add_node(val),
-            None => return None,
-        }
-    }
-    //TODO: implement edge creation
+//Reads and creates a node
+fn create_node(graph: Graph<NodeVal, EdgeVal, Undirected>, diagram: &str, caret: usize) -> Option<NodeIndex> {
+    //TODO:
+    //Default to single character
+    //If there's parenthesis, look for the other
+    let close = diagram.find(")");
+    if close == None {
+      //Missing Parenthesis
+    };
+    let node: &str = &diagram[caret..close.unwrap()+1];
+    caret += node.len();
     match node_to_val(node) {
         Some(val) => graph.add_node(val),
-        None => return None,
-    }
+        None => None//Invalid Node!,
 }
 
-fn flag_edge(diagram: &str, caret: u32) -> Option<NumExt> {
+//Creates an edge from mem
+fn make_edge(diagram: &str, caret: u32) -> Option<EdgeIndex> {
+
+}
+
+//Reads an edge from a CD and stores into mem
+fn flag_edge(diagram: &str, caret: u32) -> Option<(NodeIndex, NodeIndex, EdgeValue)> {
     
 }
 
-fn single_cd_parse(diagram: &str) -> Option<Graph<NumExt, NumExt, Undirected>> {
-    use NumExt::*;
-    let mut graph = Graph::new_undirected();
-    let mut caret: u32 = 0;
-    let mut mem: (u32, u32, NumExt) = (0, 0, Non);
+//Parses singleton cds
+fn single_cd_parse(diagram: &str) -> Option<Graph<NodeVal, EdgeVal, Undirected>> {
+    let mut graph: Graph<NodeVal, EdgeVal, Undirected> = Graph::new_undirected();
+    let mut caret: usize = 0;
+    let mut mem: Option<(u32, u32, EdgeVal)> = None;
     //Initial node
-    /*
-    match create_link(diagram, caret) {
 
-    }
-    */
+    //Make Node
+    let close = diagram.find(")");
+    if close == None {
+      //Invalid Diagram!
+    };
+    
     //The rest
     while caret < diagram.len() {
-        /*
-        match flag_edge(diagram, caret) {
-
-        }
-        */
+        //Read Edge
+        //Make Node
+        //Make Edge
     };
-    graph
+    Some(graph)
 }
 
 /*
-fn multi_cd_parse(diagram: &str) -> Option<Vec<Graph<NumExt, NumExt, Undirected>>> {
+//Parses compound and lace cds
+fn multi_cd_parse(diagram: &str) -> Option<Vec<Graph<EdgeVal, EdgeVal, Undirected>>> {
 
 }
 */
 
-fn edge_to_val(c: &str) -> Option<NumExt> {
-    use NumExt::*;
+//Converts string slices of cd edges to wrapped EdgeVals
+fn edge_to_val(c: &str) -> Option<EdgeVal> {
+    use EdgeVal::*;
     if Regex::new(r#"^\d+/\d+$"#).unwrap().is_match(c) {
         let bar = c.find("/").unwrap();
         return Some(Rational((c[..bar].parse::<i64>().unwrap()),(c[bar+1..].parse::<i64>().unwrap())))
@@ -121,39 +129,49 @@ fn edge_to_val(c: &str) -> Option<NumExt> {
         };
     };
 }
-//Converts string slices of cd node values to wrapped floats
-fn node_to_val(c: &str) -> Option<f64> {
+
+//Converts string slices of cd node values to wrapped NodeVals
+fn node_to_val(c: &str) -> Option<NodeVal> {
+    use NodeVal::*;
     if (c.len() == 3 || c.len() == 1) & !(Regex::new(r#"([^oxqfvhkuwFe]|\([^oxqfvhkuwFe]\))"#).unwrap().is_match(c)) {
         //For established letter-values
         let c = c.replace("(", "");
         let c = c.replace(")", "");
         match &c[..] {
-            "o" => return Some(0f64),
-            "x" => return Some(1f64),
-            "q" => return Some(2f64.sqrt()),
-            "f" => return Some((5f64.sqrt()+1f64)/2f64),
-            "v" => return Some((5f64.sqrt()-1f64)/2f64),
-            "h" => return Some(3f64.sqrt()),
-            "k" => return Some((2f64.sqrt()+2f64).sqrt()),
-            "u" => return Some(2f64),
-            "w" => return Some(2f64.sqrt()+1f64),
-            "F" => return Some((5f64.sqrt()+3f64)/2f64),
-            "e" => return Some(3f64.sqrt()+1f64),
+            "o" => return Some(Unringed),
+            "v" => return Some(Ringed((5f64.sqrt()-1f64)/2f64)),
+            "x" => return Some(Ringed(1f64)),
+            "q" => return Some(Ringed(2f64.sqrt())),
+            "f" => return Some(Ringed((5f64.sqrt()+1f64)/2f64)),
+            "h" => return Some(Ringed(3f64.sqrt())),
+            "k" => return Some(Ringed((2f64.sqrt()+2f64).sqrt())),
+            "u" => return Some(Ringed(2f64)),
+            "w" => return Some(Ringed(2f64.sqrt()+1f64)),
+            "F" => return Some(Ringed((5f64.sqrt()+3f64)/2f64)),
+            "e" => return Some(Ringed(3f64.sqrt()+1f64)),
+            "Q" => return Some(Ringed(2f64.sqrt()*2f64)),
+            "d" => return Some(Ringed(3f64)),
+            "V" => return Some(Ringed(5f64.sqrt()+1f64)),
+            "U" => return Some(Ringed(2f64.sqrt()+2f64)),
+            "A" => return Some(Ringed((5f64.sqrt()+5f64)/4f64)),
+            "X" => return Some(Ringed(2f64.sqrt()*2f64+1f64)),
+            "B" => return Some(Ringed(5f64.sqrt()+2f64)),
+            "s" => return Some(Snub),
             _ => return None
         };
     } else if Regex::new(r#"^\(\d(\.\d+)?\)$"#).unwrap().is_match(c) {
         //For custom lengths
         let c = c.replace("(", "");
         let c = c.replace(")", "");    
-        return Some(c.parse::<f64>().unwrap())
+        return Some(Ringed(c.parse::<f64>().unwrap()))
     } else {
         return None
     };
 }
 
-//Inverts the value held by a NumExt
-fn num_retro(val: NumExt) -> NumExt {
-    use NumExt::*;
+//Inverts the value held by a EdgeVal
+fn num_retro(val: EdgeVal) -> EdgeVal {
+    use EdgeVal::*;
     match val {
         Rational(n, d) => Rational(n, n-d),
         Inf(dir) => {let ret = !dir; Inf(ret)},
@@ -162,7 +180,7 @@ fn num_retro(val: NumExt) -> NumExt {
 }
 
 //(ONLY FOR MEANT FOR DEBUGGING), prints the contexts of a graph to the console
-fn cd_inspect(graph: &Graph<NumExt, NumExt, Undirected>) {
+fn cd_inspect(graph: &Graph<EdgeVal, EdgeVal, Undirected>) {
     let ncount = &graph.node_count();
     let ecount = &graph.edge_count();
     // Print node and edge count
@@ -178,22 +196,22 @@ fn cd_inspect(graph: &Graph<NumExt, NumExt, Undirected>) {
 }
 
 //(ONLY FOR MEANT FOR DEBUGGING), prints the contents of one node to the console
-fn node_inspect(graph: &Graph<NumExt, NumExt, Undirected>, i: usize, n: NodeIndex) {
+fn node_inspect(graph: &Graph<EdgeVal, EdgeVal, Undirected>, i: usize, n: NodeIndex) {
     match &graph.node_weight(n) {
         Option::None => println!("Node {} carries nothing", i),
         Option::Some(c) => {
             match c {
-                NumExt::Rational(n, d) => println!("Node {} carries {}/{}", i, n, d),
-                NumExt::Inf(false) => println!("Node {} carries prograde ∞", i),
-                NumExt::Inf(true) => println!("Node {} carries retrograde ∞", i),
-                NumExt::Non => println!("Node {} carries Ø", i),
+                EdgeVal::Rational(n, d) => println!("Node {} carries {}/{}", i, n, d),
+                EdgeVal::Inf(false) => println!("Node {} carries prograde ∞", i),
+                EdgeVal::Inf(true) => println!("Node {} carries retrograde ∞", i),
+                EdgeVal::Non => println!("Node {} carries Ø", i),
             };
         },
     };
 }
 
 //(ONLY FOR MEANT FOR DEBUGGING), prints the contents of one edge to the console
-fn edge_inspect(graph: &Graph<NumExt, NumExt, Undirected>, i: usize, n: EdgeIndex) {
+fn edge_inspect(graph: &Graph<EdgeVal, EdgeVal, Undirected>, i: usize, n: EdgeIndex) {
     match &graph.edge_endpoints(n) {
         Option::None => println!("What? Edge {} doesn't connect any nodes", i),
         Option::Some((e1, e2)) => println!("Edge {} connects Nodes {} and {}", i, e1.index(), e2.index()),
@@ -202,10 +220,10 @@ fn edge_inspect(graph: &Graph<NumExt, NumExt, Undirected>, i: usize, n: EdgeInde
         Option::None => println!("Edge {} carries nothing", i),
         Option::Some(c) => {
             match c {
-                NumExt::Rational(n, d) => println!("Edge {} carries {}/{}", i, n, d),
-                NumExt::Inf(false) => println!("Edge {} carries prograde ∞", i),
-                NumExt::Inf(true) => println!("Edge {} carries retrograde ∞", i),
-                NumExt::Non => println!("Edge {} carries Ø", i),
+                EdgeVal::Rational(n, d) => println!("Edge {} carries {}/{}", i, n, d),
+                EdgeVal::Inf(false) => println!("Edge {} carries prograde ∞", i),
+                EdgeVal::Inf(true) => println!("Edge {} carries retrograde ∞", i),
+                EdgeVal::Non => println!("Edge {} carries Ø", i),
             };
         },
     };
