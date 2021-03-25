@@ -89,6 +89,14 @@ pub trait Polytope: Sized + Clone {
     /// polytope in place.
     fn ditope_mut(&mut self);
 
+    /// Builds a [horotope](https://polytope.miraheze.org/wiki/Horotope) of a
+    /// given polytope.
+    fn horotope(&self) -> Self;
+
+    /// Builds a [horotope](https://polytope.miraheze.org/wiki/Horotope) of a
+    /// given polytope in place.
+    fn horotope_mut(&mut self);
+
     /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
     /// given base.
     fn pyramid(&self) -> Self {
@@ -107,19 +115,36 @@ pub trait Polytope: Sized + Clone {
         Self::duotegum(self, &Self::dyad())
     }
 
+    /// Takes the
+    /// [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product) of
+    /// a set of polytopes.
     fn multipyramid(factors: &[&Self]) -> Self {
         Self::multiproduct(&Self::duopyramid, factors, Self::nullitope())
     }
+
+    /// Takes the
+    /// [prism product](https://polytope.miraheze.org/wiki/Prism_product) of a
+    /// set of polytopes.
     fn multiprism(factors: &[&Self]) -> Self {
         Self::multiproduct(&Self::duoprism, factors, Self::point())
     }
+
+    /// Takes the
+    /// [tegum product](https://polytope.miraheze.org/wiki/Tegum_product) of a
+    /// set of polytopes.
     fn multitegum(factors: &[&Self]) -> Self {
         Self::multiproduct(&Self::duotegum, factors, Self::point())
     }
+
+    /// Takes the
+    /// [comb product](https://polytope.miraheze.org/wiki/Comb_product) of a set
+    /// of polytopes.
     fn multicomb(factors: &[&Self]) -> Self {
         Self::multiproduct(&Self::duocomb, factors, Self::point())
     }
 
+    /// Helper method for applying an associative binary function on a list of
+    /// entries.
     fn multiproduct(
         product: &dyn Fn(&Self, &Self) -> Self,
         factors: &[&Self],
@@ -128,7 +153,11 @@ pub trait Polytope: Sized + Clone {
         match factors.len() {
             // An empty product just evaluates to the identity element.
             0 => identity,
+
+            // A product of one entry is just equal to the entry itself.
             1 => factors[0].clone(),
+
+            // Evaluates larger products recursively.
             _ => {
                 let (&first, factors) = factors.split_first().unwrap();
 
@@ -376,6 +405,10 @@ impl Abstract {
     fn push_max(&mut self) {
         let facet_count = self.el_count(self.rank());
         self.push(ElementList::max(facet_count));
+    }
+
+    fn insert(&mut self, index: isize, value: ElementList) {
+        self.0.insert((index + 1) as usize, value);
     }
 
     /// Converts a polytope into its dual.
@@ -753,6 +786,19 @@ impl Polytope for Abstract {
 
         self[rank].push(max);
         self.push(ElementList::max(2));
+    }
+
+    fn horotope(&self) -> Self {
+        let mut clone = self.clone();
+        clone.horotope_mut();
+        clone
+    }
+
+    fn horotope_mut(&mut self) {
+        let min = self[-1][0].clone();
+
+        self[-1].push(min);
+        self.insert(-1, ElementList::max(2));
     }
 
     fn antiprism(&self) -> Self {
@@ -1216,6 +1262,18 @@ impl Polytope for Concrete {
         self.abs.ditope_mut();
     }
 
+    fn horotope(&self) -> Self {
+        Self {
+            vertices: vec![vec![-0.5].into(), vec![0.5].into()],
+            abs: self.abs.horotope(),
+        }
+    }
+
+    fn horotope_mut(&mut self) {
+        self.vertices = vec![vec![-0.5].into(), vec![0.5].into()];
+        self.abs.horotope_mut();
+    }
+
     fn antiprism(&self) -> Self {
         todo!()
     }
@@ -1265,7 +1323,7 @@ impl IndexMut<isize> for Concrete {
     }
 }
 
-/// Represents a [`Concrete`] polytope, together with a triangulation used to
+/// Represents a [`Concrete`], together with a triangulation used to
 /// render it.
 #[derive(Debug, Clone)]
 pub struct Renderable {
@@ -1374,7 +1432,6 @@ impl Renderable {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     /// Returns a bunch of varied polytopes to run general tests on. Use only
