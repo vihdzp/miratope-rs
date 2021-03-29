@@ -51,6 +51,7 @@ use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
+use polytope::off;
 #[allow(unused_imports)]
 use polytope::{Concrete, Polytope, Renderable};
 
@@ -145,8 +146,8 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::hypercube(3);
-    // println!("{}", off::to_src(&poly, Default::default()));
+    let poly = Concrete::orthoplex(3);
+    println!("{}", off::to_src(&poly, Default::default()));
     let poly = Renderable::new(poly);
 
     pipelines.set_untracked(

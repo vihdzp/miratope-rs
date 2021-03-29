@@ -172,6 +172,7 @@ pub trait Polytope: Sized + Clone {
     fn simplex(rank: isize) -> Self {
         Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize])
     }
+
     fn hypercube(rank: isize) -> Self {
         if rank == -1 {
             Self::nullitope()
@@ -179,6 +180,7 @@ pub trait Polytope: Sized + Clone {
             Self::multiprism(&vec![&Self::dyad(); rank as usize])
         }
     }
+
     fn orthoplex(rank: isize) -> Self {
         if rank == -1 {
             Self::nullitope()
@@ -1219,7 +1221,7 @@ impl Polytope for Concrete {
     }
 
     fn dyad() -> Self {
-        Self::new(vec![vec![-0.5].into(), vec![-0.5].into()], Abstract::dyad())
+        Self::new(vec![vec![-0.5].into(), vec![0.5].into()], Abstract::dyad())
     }
 
     fn polygon(n: usize) -> Self {
@@ -1338,6 +1340,7 @@ pub struct Renderable {
 }
 
 impl Renderable {
+    /// Generates the triangulation of a `Concrete`.
     pub fn new(concrete: Concrete) -> Self {
         // let vertices = &concrete.vertices;
         let edges = concrete.abs.get(1).unwrap();
@@ -1372,12 +1375,14 @@ impl Renderable {
         }
     }
 
+    /// Gets the coordinates of the vertices, after projecting down into 3D.
     fn get_vertex_coords(&self) -> Vec<[f32; 3]> {
         self.concrete
             .vertices
             .iter()
             .chain(self.extra_vertices.iter())
             .map(|point| {
+                // For now, we do a simple orthogonal projection.
                 let mut iter = point.iter().copied().take(3);
                 let x = iter.next().unwrap_or(0.0);
                 let y = iter.next().unwrap_or(0.0);
@@ -1387,6 +1392,7 @@ impl Renderable {
             .collect()
     }
 
+    /// Generates a mesh from the polytope.
     pub fn get_mesh(&self) -> Mesh {
         let vertices = self.get_vertex_coords();
         let mut indices = Vec::with_capacity(self.triangles.len() * 3);
@@ -1408,9 +1414,10 @@ impl Renderable {
         mesh
     }
 
+    /// Generates the wireframe for a polytope.
     pub fn get_wireframe(&self) -> Mesh {
         let edges = self.concrete.abs.get(1).unwrap();
-        let vertices: Vec<_> = self.get_vertex_coords();
+        let vertices = self.get_vertex_coords();
         let mut indices = Vec::with_capacity(edges.len() * 2);
         for edge in edges.iter() {
             indices.push(edge.subs[0] as u16);
