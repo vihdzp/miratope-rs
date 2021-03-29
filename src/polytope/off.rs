@@ -238,18 +238,18 @@ pub fn from_path(fp: &impl AsRef<Path>) -> Result<Concrete> {
 
 /// A set of options to be used when saving the OFF file.
 #[derive(Clone, Copy)]
-pub struct OFFOptions {
+pub struct OffOptions {
     /// Whether the OFF file should have comments specifying each face type.
     pub comments: bool,
 }
 
-impl Default for OFFOptions {
+impl Default for OffOptions {
     fn default() -> Self {
-        OFFOptions { comments: true }
+        OffOptions { comments: true }
     }
 }
 
-fn write_el_counts(off: &mut String, opt: &OFFOptions, mut el_counts: RankVec<usize>) {
+fn write_el_counts(off: &mut String, opt: &OffOptions, mut el_counts: RankVec<usize>) {
     let rank = el_counts.rank();
 
     // # Vertices, Faces, Edges, ...
@@ -288,7 +288,7 @@ fn write_el_counts(off: &mut String, opt: &OFFOptions, mut el_counts: RankVec<us
 }
 
 /// Writes the vertices of a polytope into an OFF file.
-fn write_vertices(off: &mut String, opt: &OFFOptions, vertices: &[Point]) {
+fn write_vertices(off: &mut String, opt: &OffOptions, vertices: &[Point]) {
     // # Vertices
     if opt.comments {
         off.push_str("\n# ");
@@ -309,7 +309,7 @@ fn write_vertices(off: &mut String, opt: &OFFOptions, vertices: &[Point]) {
 /// Gets and writes the faces of a polytope into an OFF file.
 fn write_faces(
     off: &mut String,
-    opt: &OFFOptions,
+    opt: &OffOptions,
     rank: usize,
     edges: &ElementList,
     faces: &ElementList,
@@ -383,7 +383,7 @@ fn write_faces(
 }
 
 /// Writes the n-elements of a polytope into an OFF file.
-fn write_els(off: &mut String, opt: &OFFOptions, rank: isize, els: &[Element]) {
+fn write_els(off: &mut String, opt: &OffOptions, rank: isize, els: &[Element]) {
     // # n-elements
     if opt.comments {
         off.push_str("\n# ");
@@ -405,7 +405,7 @@ fn write_els(off: &mut String, opt: &OFFOptions, rank: isize, els: &[Element]) {
 }
 
 /// Converts a polytope into an OFF file.
-pub fn to_src(p: &Concrete, opt: OFFOptions) -> String {
+pub fn to_src(p: &Concrete, opt: OffOptions) -> String {
     let rank = p.rank();
     let vertices = &p.vertices;
     let abs = &p.abs;
@@ -450,7 +450,7 @@ pub fn to_src(p: &Concrete, opt: OFFOptions) -> String {
 }
 
 /// Writes a polytope's OFF file in a specified file path.
-pub fn to_path(fp: &impl AsRef<Path>, p: &Concrete, opt: OFFOptions) -> Result<()> {
+pub fn to_path(fp: &impl AsRef<Path>, p: &Concrete, opt: OffOptions) -> Result<()> {
     std::fs::write(fp, to_src(p, opt))
 }
 
