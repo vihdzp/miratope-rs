@@ -76,12 +76,12 @@ where
     fn insert(&mut self, el: Matrix<Self::T>);
 
     /// Gets the next element and the next generator to attempt to multiply.
-    fn next_el_gen(&mut self) -> Option<(&Matrix<Self::T>, &Matrix<Self::T>)>;
+    fn next_el_gen(&mut self) -> Option<[&Matrix<Self::T>; 2]>;
 
     /// Multiplies the current element times the current generator, sees if it's
     /// a new element.
     fn try_next(&mut self) -> GroupNext {
-        if let Some((el, gen)) = self.next_el_gen() {
+        if let Some([el, gen]) = self.next_el_gen() {
             let new_el = el.clone() * gen.clone();
 
             if self.contains(&new_el) {
@@ -189,16 +189,40 @@ impl GenGroup for IntGroup {
         self.elements.push(el);
     }
 
-    fn next_el_gen(&mut self) -> Option<(&Matrix<i32>, &Matrix<i32>)> {
+    fn next_el_gen(&mut self) -> Option<[&Matrix<i32>; 2]> {
         let el = self.elements.get(self.el_idx)?;
         let gen = self.generators.get(self.gen_idx).unwrap();
 
+        // Advances the indices.
         self.gen_idx += 1;
         if self.gen_idx == self.generators.len() {
             self.gen_idx = 0;
             self.el_idx += 1;
         }
 
-        Some((el, gen))
+        Some([el, gen])
     }
+}
+
+/// A `Group` with floating point matrices, which are more general but
+/// necessitate much more clever data structures.
+struct FltGroup {
+    /// The generators for the group.
+    generators: Vec<Matrix<i32>>,
+
+    /// The elements that have been generated. Will be put into a more clever
+    /// structure that's asymptotically more efficient and doesn't need storing
+    /// everything at once eventually.
+    elements: Vec<Matrix<i32>>,
+
+    /// Stores the index in [`elements`] of the element that is currently being
+    /// handled. All previous ones will have already had their right neighbors
+    /// found. Quirk of the current data structure, subject to change.
+    el_idx: usize,
+
+    /// Stores the index in [`generators`] of the generator that's being
+    /// checked. All previous once will have already been multiplied to the
+    /// right of the current element. Quirk of the current data structure,
+    /// subject to change.
+    gen_idx: usize,
 }
