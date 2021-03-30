@@ -4,34 +4,101 @@ use dyn_clone::DynClone;
 use nalgebra::{DMatrix as Matrix, DVector as Vector};
 use std::{
     f64::consts::PI,
-    mem,
+    iter, mem,
     ops::{Deref, DerefMut},
 };
 
+/// An iterator such that `dyn` objects using it can be cloned. Used to get
+/// around orphan rules.
+trait GroupIter: Iterator<Item = Matrix<f64>> + DynClone {}
+impl<T: Iterator<Item = Matrix<f64>> + DynClone> GroupIter for T {}
+dyn_clone::clone_trait_object!(GroupIter);
+
 /// A [group](https://en.wikipedia.org/wiki/Group_(mathematics)) of matrices,
 /// acting on a space of a certain dimension.
-pub trait Group: Iterator<Item = Matrix<f64>> + DynClone {
-    /// Returns the dimension of the space the group acts on.
-    fn dimension(&self) -> usize;
+#[derive(Clone)]
+pub struct Group {
+    dimension: usize,
+    iter: Box<dyn GroupIter>,
+}
 
+impl Group {
     /// Gets all of the elements of the group. Consumes the iterator.
-    fn elements(&mut self) -> Vec<Matrix<f64>> {
-        self.collect()
+    fn elements(self) -> Vec<Matrix<f64>> {
+        self.iter.collect()
     }
 
     /// Gets the number of elements of the group. Consumes the iterators.
-    fn order(&mut self) -> usize {
-        self.count()
+    fn order(self) -> usize {
+        self.iter.count()
     }
 
-    /// TODO: figure out a way to have a default implementation for this.
-    fn rotations(self) -> RotGroup;
+    /// Buils the rotation subgroup of a group.
+    fn rotations(self) -> Self {
+        // The determinant might not be exactly 1, so we're extra lenient and
+        // just test for positive determinants.
+        Self {
+            dimension: self.dimension,
+            iter: Box::new(self.iter.filter(|el| el.determinant() > 0.0)),
+        }
+    }
 
-    /// TODO: figure out a way to have a default implementation for this.
-    fn quaternions(self) -> RotGroup;
+    /// Generates the trivial group of a certain dimension.
+    fn trivial(dim: usize) -> Self {
+        Self {
+            dimension: dim,
+            iter: Box::new(iter::once(Matrix::identity(dim, dim))),
+        }
+    }
+
+    /// Generates the trivial group of a certain dimension.
+    fn central_inv(dim: usize) -> Self {
+        Self {
+            dimension: dim,
+            iter: Box::new(
+                vec![Matrix::identity(dim, dim), -Matrix::identity(dim, dim)].into_iter(),
+            ),
+        }
+    }
+
+    /// Generates a Coxeter group from its [`CoxMatrix`], or returns `None` if
+    /// the group doesn't fit as a matrix group in spherical space.
+    fn cox_group(cox: CoxMatrix) -> Option<Self> {
+        const EPS: f64 = 1e-6;
+
+        let dim = cox.ncols();
+        let mut generators = Vec::with_capacity(dim);
+
+        // Builds each generator from the top down as a triangular matrix, so
+        // that the dot products match the values in the Coxeter matrix.
+        for i in 0..dim {
+            let mut gen_i = Vector::from_element(dim, 0.0);
+
+            for (j, gen_j) in generators.iter().enumerate() {
+                let dot = gen_i.dot(gen_j);
+                gen_i[j] = ((PI / cox[(i, j)] as f64).cos() - dot) / gen_j[j];
+            }
+
+            // The vector doesn't fit in spherical space.
+            let norm_sq = gen_i.norm_squared();
+            if norm_sq >= 1.0 - EPS {
+                return None;
+            } else {
+                gen_i[i] = (1.0 - norm_sq).sqrt();
+            }
+
+            generators.push(gen_i);
+        }
+
+        Some(Self {
+            dimension: dim,
+            iter: Box::new(GenIter::new(
+                dim,
+                generators.into_iter().map(refl_mat).collect(),
+            )),
+        })
+    }
 }
-
-dyn_clone::clone_trait_object!(Group);
 
 /// The result of trying to get the next element in a group.
 pub enum GroupNext {
@@ -45,48 +112,14 @@ pub enum GroupNext {
     New(Matrix<f64>),
 }
 
-/// The group of all rotations (matrices with determinant 1) of another group.
-#[derive(Clone)]
-pub struct RotGroup(Box<dyn Group>);
-
-impl Group for RotGroup {
-    fn dimension(&self) -> usize {
-        self.0.dimension()
-    }
-
-    fn rotations(self) -> RotGroup {
-        self
-    }
-
-    fn quaternions(self) -> RotGroup {
-        todo!()
-    }
-}
-
-impl Iterator for RotGroup {
-    type Item = Matrix<f64>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let el = self.0.next()?;
-
-            // The determinant might not be exactly 1, so we're extra lenient
-            // and just test for positive determinants.
-            if el.determinant() > 0.0 {
-                return Some(el);
-            }
-        }
-    }
-}
-
-/// Represents a
-/// [Coxeter matrix](https://en.wikipedia.org/wiki/Coxeter_group#Coxeter_matrix_and_Schl%C3%A4fli_matrix),
+/// Represents a [Coxeter
+/// matrix](https://en.wikipedia.org/wiki/Coxeter_group#Coxeter_matrix_and_Schl%C3%A4fli_matrix),
 /// which encodes the angles between the mirrors of the generators of a Coxeter
 /// group.
-struct CoxMatrix(Matrix<i32>);
+struct CoxMatrix(Matrix<f64>);
 
 impl Deref for CoxMatrix {
-    type Target = Matrix<i32>;
+    type Target = Matrix<f64>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -100,7 +133,7 @@ impl DerefMut for CoxMatrix {
 }
 
 impl CoxMatrix {
-    fn from_lin_diagram(diagram: Vec<i32>) -> Self {
+    fn from_lin_diagram(diagram: Vec<f64>) -> Self {
         let dim = diagram.len() + 1;
 
         CoxMatrix(Matrix::from_fn(dim, dim, |mut i, mut j| {
@@ -110,9 +143,9 @@ impl CoxMatrix {
             }
 
             match j - i {
-                0 => 1,
+                0 => 1.0,
                 1 => diagram[i],
-                _ => 2,
+                _ => 2.0,
             }
         }))
     }
@@ -158,7 +191,10 @@ macro_rules! cox {
 /// [k-d tree](https://en.wikipedia.org/wiki/K-d_tree) would achieve the same
 /// complexity, but it would be much harder to implement.
 #[derive(Clone)]
-pub struct GenGroup {
+pub struct GenIter {
+    /// The number of dimensions the group acts on.
+    dimensions: usize,
+
     /// The generators for the group.
     generators: Vec<Matrix<f64>>,
 
@@ -179,24 +215,7 @@ pub struct GenGroup {
     gen_idx: usize,
 }
 
-impl Group for GenGroup {
-    fn dimension(&self) -> usize {
-        self.generators
-            .get(0)
-            .expect("GenGroup has no generators.")
-            .ncols()
-    }
-
-    fn rotations(self) -> RotGroup {
-        RotGroup(Box::new(self))
-    }
-
-    fn quaternions(self) -> RotGroup {
-        todo!()
-    }
-}
-
-impl Iterator for GenGroup {
+impl Iterator for GenIter {
     type Item = Matrix<f64>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -241,10 +260,11 @@ pub fn refl_mat(n: Vector<f64>) -> Matrix<f64> {
     )
 }
 
-impl GenGroup {
+impl GenIter {
     /// Builds a new group from a set of generators.
-    fn new(generators: Vec<Matrix<f64>>) -> Self {
+    fn new(dimensions: usize, generators: Vec<Matrix<f64>>) -> Self {
         Self {
+            dimensions,
             generators,
             elements: Vec::new(),
             el_idx: 0,
@@ -298,7 +318,7 @@ impl GenGroup {
         }
         // If this is the first element we generate.
         else if self.elements.is_empty() {
-            let dim = self.dimension();
+            let dim = self.dimensions;
             let i = Matrix::identity(dim, dim);
             self.insert(i.clone());
             GroupNext::New(i)
@@ -308,46 +328,16 @@ impl GenGroup {
             GroupNext::None
         }
     }
-
-    /// Generates a Coxeter group from its [`CoxMatrix`], or returns `None` if
-    /// the group doesn't fit as a matrix group in spherical space.
-    fn cox_group(cox: CoxMatrix) -> Option<Self> {
-        const EPS: f64 = 1e-6;
-
-        let dim = cox.ncols();
-        let mut generators = Vec::with_capacity(dim);
-
-        // Builds each generator from the top down as a triangular matrix, so
-        // that the dot products match the values in the Coxeter matrix.
-        for i in 0..dim {
-            let mut gen_i = Vector::from_element(dim, 0.0);
-
-            for (j, gen_j) in generators.iter().enumerate() {
-                let dot = gen_i.dot(gen_j);
-                gen_i[j] = ((PI / cox[(i, j)] as f64).cos() - dot) / gen_j[j];
-            }
-
-            // The vector doesn't fit in spherical space.
-            let norm_sq = gen_i.norm_squared();
-            if norm_sq >= 1.0 - EPS {
-                return None;
-            } else {
-                gen_i[i] = (1.0 - norm_sq).sqrt();
-            }
-
-            generators.push(gen_i);
-        }
-
-        Some(Self::new(generators.into_iter().map(refl_mat).collect()))
-    }
 }
 
 #[cfg(test)]
 mod tests {
+    use gcd::Gcd;
+
     use super::*;
 
     /// Tests a given symmetry group.
-    fn test<T: Group + Clone>(group: T, order: usize, rot_order: usize, name: &str) {
+    fn test(group: Group, order: usize, rot_order: usize, name: &str) {
         assert_eq!(
             group.clone().order(),
             order,
@@ -363,17 +353,45 @@ mod tests {
         );
     }
 
+    /// Tests the trivial group in various dimensions.
+    #[test]
+    fn i() {
+        for n in 1..=10 {
+            test(Group::trivial(n), 1, 1, &format!("I^{}", n))
+        }
+    }
+
+    /// Tests the group consisting of the identity and a central inversion in
+    /// various dimensions.
+    #[test]
+    fn c2() {
+        for n in 1..=10 {
+            test(
+                Group::central_inv(n),
+                2,
+                (n + 1) % 2 + 1,
+                &format!("<-I^{}>", n),
+            )
+        }
+    }
+
     /// Tests the I2(*n*) symmetries, which correspond to the symmetries of a
     /// regular *n*-gon.
     #[test]
     fn i2() {
         for n in 2..=10 {
-            test(
-                GenGroup::cox_group(cox!(n as i32)).unwrap(),
-                2 * n,
-                n,
-                &format!("I2({})", n),
-            );
+            for d in 1..n {
+                if n.gcd(d) != 1 {
+                    continue;
+                }
+
+                test(
+                    Group::cox_group(cox!(n as f64 / d as f64)).unwrap(),
+                    2 * n,
+                    n,
+                    &format!("I2({})", n),
+                );
+            }
         }
     }
 
@@ -387,7 +405,7 @@ mod tests {
             order *= n + 1;
 
             test(
-                GenGroup::cox_group(cox!(3; n - 1)).unwrap(),
+                Group::cox_group(cox!(3.0; n - 1)).unwrap(),
                 order,
                 order / 2,
                 &format!("A{}", n),
@@ -403,14 +421,14 @@ mod tests {
 
         for n in 2..=5 {
             // A better cox! macro would make this unnecessary.
-            let mut cox = vec![3; n - 1];
-            cox[0] = 4;
+            let mut cox = vec![3.0; n - 1];
+            cox[0] = 4.0;
             let cox = CoxMatrix::from_lin_diagram(cox);
 
             order *= n * 2;
 
             test(
-                GenGroup::cox_group(cox).unwrap(),
+                Group::cox_group(cox).unwrap(),
                 order,
                 order / 2,
                 &format!("B{}", n),
@@ -422,9 +440,9 @@ mod tests {
     /// regular dodecahedron and a regular hecatonicosachoron.
     #[test]
     fn h() {
-        test(GenGroup::cox_group(cox!(5, 3)).unwrap(), 120, 60, &"H3");
+        test(Group::cox_group(cox!(5.0, 3.0)).unwrap(), 120, 60, &"H3");
         test(
-            GenGroup::cox_group(cox!(5, 3, 3)).unwrap(),
+            Group::cox_group(cox!(5.0, 3.0, 3.0)).unwrap(),
             14400,
             7200,
             &"H4",
