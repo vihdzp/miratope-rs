@@ -2,12 +2,92 @@
 
 use dyn_clone::DynClone;
 use itertools::iproduct;
-use nalgebra::{DMatrix as Matrix, DVector as Vector};
+use nalgebra::{DMatrix as Matrix, DVector as Vector, Quaternion};
 use std::{
     f64::consts::PI,
     iter, mem,
     ops::{Deref, DerefMut},
 };
+
+/// Converts a 3D rotation matrix into a quaternion. Uses the code from
+/// [Day (2015)](https://d3cw3dd2w32x2b.cloudfront.net/wp-content/uploads/2015/01/matrix-to-quat.pdf).
+fn mat_to_quat(mat: Matrix<f64>) -> Quaternion<f64> {
+    debug_assert!(mat.determinant() > 0.0);
+
+    let t;
+    let q;
+
+    if mat[(2, 2)] < 0.0 {
+        if mat[(0, 0)] > mat[(1, 1)] {
+            t = 1.0 + mat[(0, 0)] - mat[(1, 1)] - mat[(2, 2)];
+            q = Quaternion::new(
+                t,
+                mat[(0, 1)] + mat[(1, 0)],
+                mat[(2, 0)] + mat[(0, 2)],
+                mat[(1, 2)] - mat[(2, 1)],
+            );
+        } else {
+            t = 1.0 - mat[(0, 0)] + mat[(1, 1)] - mat[(2, 2)];
+            q = Quaternion::new(
+                mat[(0, 1)] + mat[(1, 0)],
+                t,
+                mat[(1, 2)] + mat[(2, 1)],
+                mat[(2, 0)] - mat[(0, 2)],
+            );
+        }
+    } else {
+        if mat[(0, 0)] < -mat[(1, 1)] {
+            t = 1.0 - mat[(0, 0)] - mat[(1, 1)] + mat[(2, 2)];
+            q = Quaternion::new(
+                mat[(2, 0)] + mat[(0, 2)],
+                mat[(1, 2)] + mat[(2, 1)],
+                t,
+                mat[(0, 1)] - mat[(1, 0)],
+            );
+        } else {
+            t = 1.0 + mat[(0, 0)] + mat[(1, 1)] + mat[(2, 2)];
+            q = Quaternion::new(
+                mat[(1, 2)] - mat[(2, 1)],
+                mat[(2, 0)] - mat[(0, 2)],
+                mat[(0, 1)] - mat[(1, 0)],
+                t,
+            );
+        }
+    }
+
+    q * 0.5 / t.sqrt()
+}
+
+/// Converts a quaternion into a matrix, depending on whether it's a left or
+/// right quaternion multiplication. Adapts the formulae from
+/// [Wikipedia](https://en.wikipedia.org/wiki/Rotations_in_4-dimensional_Euclidean_space#Relation_to_quaternions).
+fn quat_to_mat(quat: Quaternion<f64>, left: bool) -> Matrix<f64> {
+    let left = if left { 1.0 } else { -1.0 };
+
+    Matrix::from_iterator(
+        4,
+        4,
+        vec![
+            quat.w,
+            quat.i,
+            quat.j,
+            quat.k,
+            -quat.i,
+            quat.w,
+            left * quat.k,
+            -left * quat.j,
+            -quat.j,
+            -left * quat.k,
+            quat.w,
+            left * quat.i,
+            -quat.k,
+            left * quat.j,
+            -left * quat.i,
+            quat.w,
+        ]
+        .into_iter(),
+    )
+}
 
 /// An iterator such that `dyn` objects using it can be cloned. Used to get
 /// around orphan rules.
@@ -19,7 +99,7 @@ dyn_clone::clone_trait_object!(GroupIter);
 /// acting on a space of a certain dimension.
 #[derive(Clone)]
 pub struct Group {
-    dimension: usize,
+    dim: usize,
     iter: Box<dyn GroupIter>,
 }
 
@@ -30,24 +110,50 @@ impl Group {
     }
 
     /// Gets the number of elements of the group. Consumes the iterators.
-    fn order(self) -> usize {
+    pub fn order(self) -> usize {
         self.iter.count()
     }
 
     /// Buils the rotation subgroup of a group.
-    fn rotations(self) -> Self {
+    pub fn rotations(self) -> Self {
         // The determinant might not be exactly 1, so we're extra lenient and
         // just test for positive determinants.
         Self {
-            dimension: self.dimension,
+            dim: self.dim,
             iter: Box::new(self.iter.filter(|el| el.determinant() > 0.0)),
         }
+    }
+
+    pub fn quaternions(self, orientation: bool) -> Option<Self> {
+        if self.dim != 3 {
+            return None;
+        }
+
+        Some(Self {
+            dim: 4,
+            iter: Box::new(
+                self.rotations()
+                    .iter
+                    .map(move |el| {
+                        let q = mat_to_quat(el);
+                        let m = quat_to_mat(q, orientation);
+                        iter::once(m.clone()).chain(iter::once(-m))
+                    })
+                    .flatten(),
+            ),
+        })
+    }
+
+    /// Returns a new `Group` whose elements have all been generated already,
+    /// so that they can be used multiple times quickly.
+    pub fn cache(self) -> Self {
+        self.elements().into()
     }
 
     /// Generates the trivial group of a certain dimension.
     fn trivial(dim: usize) -> Self {
         Self {
-            dimension: dim,
+            dim,
             iter: Box::new(iter::once(Matrix::identity(dim, dim))),
         }
     }
@@ -55,7 +161,7 @@ impl Group {
     /// Generates the trivial group of a certain dimension.
     fn central_inv(dim: usize) -> Self {
         Self {
-            dimension: dim,
+            dim,
             iter: Box::new(
                 vec![Matrix::identity(dim, dim), -Matrix::identity(dim, dim)].into_iter(),
             ),
@@ -92,7 +198,7 @@ impl Group {
         }
 
         Some(Self {
-            dimension: dim,
+            dim,
             iter: Box::new(GenIter::new(
                 dim,
                 generators.into_iter().map(refl_mat).collect(),
@@ -103,12 +209,12 @@ impl Group {
     /// Generates the direct product of two groups. The dimension will be the
     /// sum of the dimensions of the groups.
     fn direct_product(g: Self, h: Self) -> Self {
-        let g_dim = g.dimension;
-        let h_dim = h.dimension;
-        let dim = g.dimension + h.dimension;
+        let g_dim = g.dim;
+        let h_dim = h.dim;
+        let dim = g.dim + h.dim;
 
         Self {
-            dimension: dim,
+            dim,
             iter: Box::new(iproduct!(g.iter, h.iter).map(move |(mat1, mat2)| {
                 let mut mat = Matrix::zeros(dim, dim);
 
@@ -126,6 +232,18 @@ impl Group {
 
                 mat
             })),
+        }
+    }
+}
+
+impl From<Vec<Matrix<f64>>> for Group {
+    fn from(elements: Vec<Matrix<f64>>) -> Self {
+        Self {
+            dim: elements
+                .get(0)
+                .expect("Group must have at least one element.")
+                .ncols(),
+            iter: Box::new(elements.into_iter()),
         }
     }
 }
@@ -205,7 +323,7 @@ macro_rules! cox {
     )
 }
 
-/// A `Group` [generated](https://en.wikipedia.org/wiki/Generator_(mathematics))
+/// An iterator for a `Group` [generated](https://en.wikipedia.org/wiki/Generator_(mathematics))
 /// by a set of floating point matrices. Its elements are built in a BFS order.
 /// It contains a lookup table, used to figure out whether an element has
 /// already been found or not.
@@ -226,7 +344,7 @@ macro_rules! cox {
 #[derive(Clone)]
 pub struct GenIter {
     /// The number of dimensions the group acts on.
-    dimensions: usize,
+    dim: usize,
 
     /// The generators for the group.
     generators: Vec<Matrix<f64>>,
@@ -285,6 +403,7 @@ pub fn refl_mat(n: Vector<f64>) -> Matrix<f64> {
     let dim = n.nrows();
     let nn = n.norm_squared();
 
+    // Reflects every basis vector, builds a matrix from all of their images.
     Matrix::from_columns(
         &Matrix::identity(dim, dim)
             .column_iter()
@@ -295,9 +414,9 @@ pub fn refl_mat(n: Vector<f64>) -> Matrix<f64> {
 
 impl GenIter {
     /// Builds a new group from a set of generators.
-    fn new(dimensions: usize, generators: Vec<Matrix<f64>>) -> Self {
+    fn new(dim: usize, generators: Vec<Matrix<f64>>) -> Self {
         Self {
-            dimensions,
+            dim,
             generators,
             elements: Vec::new(),
             el_idx: 0,
@@ -351,7 +470,7 @@ impl GenIter {
         }
         // If this is the first element we generate.
         else if self.elements.is_empty() {
-            let dim = self.dimensions;
+            let dim = self.dim;
             let i = Matrix::identity(dim, dim);
             self.insert(i.clone());
             GroupNext::New(i)
@@ -371,6 +490,8 @@ mod tests {
 
     /// Tests a given symmetry group.
     fn test(group: Group, order: usize, rot_order: usize, name: &str) {
+        let group = group.cache();
+
         assert_eq!(
             group.clone().order(),
             order,
@@ -434,6 +555,16 @@ mod tests {
 
             test(cox!(3.0; n - 1), order, order / 2, &format!("A{}", n))
         }
+    }
+
+    #[test]
+    fn a_quat() {
+        test(
+            cox!(3.0, 3.0).quaternions(true).unwrap(),
+            24,
+            24,
+            &"Quaternion A3",
+        )
     }
 
     /// Tests the B*n* symmetries, which correspond to the symmetries of the
