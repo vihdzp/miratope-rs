@@ -35,24 +35,22 @@ fn mat_to_quat(mat: Matrix<f64>) -> Quaternion<f64> {
                 mat[(2, 0)] - mat[(0, 2)],
             );
         }
+    } else if mat[(0, 0)] < -mat[(1, 1)] {
+        t = 1.0 - mat[(0, 0)] - mat[(1, 1)] + mat[(2, 2)];
+        q = Quaternion::new(
+            mat[(2, 0)] + mat[(0, 2)],
+            mat[(1, 2)] + mat[(2, 1)],
+            t,
+            mat[(0, 1)] - mat[(1, 0)],
+        );
     } else {
-        if mat[(0, 0)] < -mat[(1, 1)] {
-            t = 1.0 - mat[(0, 0)] - mat[(1, 1)] + mat[(2, 2)];
-            q = Quaternion::new(
-                mat[(2, 0)] + mat[(0, 2)],
-                mat[(1, 2)] + mat[(2, 1)],
-                t,
-                mat[(0, 1)] - mat[(1, 0)],
-            );
-        } else {
-            t = 1.0 + mat[(0, 0)] + mat[(1, 1)] + mat[(2, 2)];
-            q = Quaternion::new(
-                mat[(1, 2)] - mat[(2, 1)],
-                mat[(2, 0)] - mat[(0, 2)],
-                mat[(0, 1)] - mat[(1, 0)],
-                t,
-            );
-        }
+        t = 1.0 + mat[(0, 0)] + mat[(1, 1)] + mat[(2, 2)];
+        q = Quaternion::new(
+            mat[(1, 2)] - mat[(2, 1)],
+            mat[(2, 0)] - mat[(0, 2)],
+            mat[(0, 1)] - mat[(1, 0)],
+            t,
+        );
     }
 
     q * 0.5 / t.sqrt()
@@ -124,7 +122,7 @@ impl Group {
         }
     }
 
-    pub fn quaternions(self, orientation: bool) -> Option<Self> {
+    fn quaternions(self, left: bool) -> Option<Self> {
         if self.dim != 3 {
             return None;
         }
@@ -136,12 +134,20 @@ impl Group {
                     .iter
                     .map(move |el| {
                         let q = mat_to_quat(el);
-                        let m = quat_to_mat(q, orientation);
+                        let m = quat_to_mat(q, left);
                         iter::once(m.clone()).chain(iter::once(-m))
                     })
                     .flatten(),
             ),
         })
+    }
+
+    pub fn left_quaternions(self) -> Option<Self> {
+        self.quaternions(true)
+    }
+
+    pub fn right_quaternions(self) -> Option<Self> {
+        self.quaternions(false)
     }
 
     /// Returns a new `Group` whose elements have all been generated already,
@@ -206,32 +212,17 @@ impl Group {
         })
     }
 
-    /// Generates the direct product of two groups. The dimension will be the
-    /// sum of the dimensions of the groups.
-    fn direct_product(g: Self, h: Self) -> Self {
-        let g_dim = g.dim;
-        let h_dim = h.dim;
-        let dim = g.dim + h.dim;
-
+    /// Generates the direct product of two groups. Uses the specified function
+    /// to uniquely map the ordered pairs of matrices into other matrices.
+    fn direct_product(
+        g: Self,
+        h: Self,
+        dim: usize,
+        product: &'static dyn Fn((Matrix<f64>, Matrix<f64>)) -> Matrix<f64>,
+    ) -> Self {
         Self {
             dim,
-            iter: Box::new(iproduct!(g.iter, h.iter).map(move |(mat1, mat2)| {
-                let mut mat = Matrix::zeros(dim, dim);
-
-                for i in 0..g_dim {
-                    for j in 0..g_dim {
-                        mat[(i, j)] = mat1[(i, j)];
-                    }
-                }
-
-                for i in 0..h_dim {
-                    for j in 0..h_dim {
-                        mat[(i + g_dim, j + g_dim)] = mat2[(i, j)];
-                    }
-                }
-
-                mat
-            })),
+            iter: Box::new(iproduct!(g.iter, h.iter).map(product)),
         }
     }
 }
@@ -245,6 +236,39 @@ impl From<Vec<Matrix<f64>>> for Group {
                 .ncols(),
             iter: Box::new(elements.into_iter()),
         }
+    }
+}
+
+mod product {
+    use nalgebra::DMatrix as Matrix;
+
+    /// Takes the normal matrix product of a pair of matrices.
+    pub fn matrix((mat1, mat2): (Matrix<f64>, Matrix<f64>)) -> Matrix<f64> {
+        mat1 * mat2
+    }
+
+    /// Takes the [direct sum](https://en.wikipedia.org/wiki/Block_matrix#Direct_sum)
+    /// of a pair of matrices.
+    pub fn direct_sum((mat1, mat2): (Matrix<f64>, Matrix<f64>)) -> Matrix<f64> {
+        let dim1 = mat1.ncols();
+        let dim2 = mat2.ncols();
+        let dim = dim1 + dim2;
+
+        let mut mat = Matrix::zeros(dim, dim);
+
+        for i in 0..dim1 {
+            for j in 0..dim1 {
+                mat[(i, j)] = mat1[(i, j)];
+            }
+        }
+
+        for i in 0..dim2 {
+            for j in 0..dim2 {
+                mat[(i + dim1, j + dim1)] = mat2[(i, j)];
+            }
+        }
+
+        mat
     }
 }
 
@@ -567,6 +591,22 @@ mod tests {
         )
     }
 
+    #[test]
+    fn double_an() {
+        let mut order = 4;
+
+        for n in 2..=5 {
+            order *= n + 1;
+
+            test(
+                Group::direct_product(cox!(3.0; n - 1), Group::central_inv(n), n, &product::matrix),
+                order,
+                order / 2,
+                &format!("A{}", n),
+            )
+        }
+    }
+
     /// Tests the B*n* symmetries, which correspond to the symmetries of the
     /// regular hypercube and orthoplex.
     #[test]
@@ -609,7 +649,7 @@ mod tests {
     /// Tests the direct product of A3 with itself.
     fn a3xa3() {
         let a3 = cox!(3.0, 3.0);
-        let g = Group::direct_product(a3.clone(), a3.clone());
+        let g = Group::direct_product(a3.clone(), a3.clone(), 6, &product::direct_sum);
         test(g, 576, 288, &"A3×A3");
     }
 }
