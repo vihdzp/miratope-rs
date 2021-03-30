@@ -271,7 +271,7 @@ impl<T> IndexMut<isize> for RankVec<T> {
     }
 }
 
-/// Represents a single element in an [`Abstract`].
+/// A single element in an [`Abstract`].
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Element {
     /// The indices of the subelements of the polytope.
@@ -301,7 +301,7 @@ impl Element {
     }
 }
 
-/// Represents a list of [`Elements`](Element) of the same
+/// A list of [`Elements`](Element) of the same
 /// [rank](https://polytope.miraheze.org/wiki/Rank).
 #[derive(Debug, Clone)]
 pub struct ElementList(Vec<Element>);
@@ -356,8 +356,8 @@ impl DerefMut for ElementList {
 }
 
 #[derive(Debug, Clone)]
-/// Represents the [ranked poset](https://en.wikipedia.org/wiki/Graded_poset)
-/// corresponding to an
+/// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
+/// to an
 /// [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
 pub struct Abstract(RankVec<ElementList>);
 
@@ -1329,8 +1329,7 @@ impl IndexMut<isize> for Concrete {
     }
 }
 
-/// Represents a [`Concrete`], together with a triangulation used to
-/// render it.
+/// A [`Concrete`], together with a triangulation used to render it.
 #[derive(Debug, Clone)]
 pub struct Renderable {
     /// The underlying concrete polytope.

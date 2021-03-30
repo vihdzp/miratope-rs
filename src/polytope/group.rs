@@ -1,6 +1,6 @@
-use std::ops::Mul;
+//! Contains
 
-use nalgebra::{DMatrix as Matrix, Scalar};
+use nalgebra::DMatrix as Matrix;
 
 /// A [group](https://en.wikipedia.org/wiki/Group_(mathematics)) of matrices,
 /// acting on a space of a certain dimension.
@@ -11,6 +11,11 @@ pub trait Group: Iterator<Item = Matrix<f64>> {
     /// Gets all of the elements of the group. Consumes the iterator.
     fn elements(&mut self) -> Vec<Matrix<f64>> {
         self.collect()
+    }
+
+    /// Gets the number of elements of the group. Consumes the iterators.
+    fn order(&mut self) -> usize {
+        self.count()
     }
 }
 
@@ -51,82 +56,34 @@ impl Iterator for RotGroup {
     }
 }
 
-/// A group [generated](https://en.wikipedia.org/wiki/Generator_(mathematics))
-/// by a set of matrices. Its elements are built in a BFS order. It contains
-/// some sort of lookup table, implementation dependent, used to figure out
-/// whether an element has already been found or not.
-pub trait GenGroup: Group
-where
-    f64: From<Self::T>,
-    Matrix<Self::T>: Mul<Output = Matrix<Self::T>>,
-{
-    /// The type of the entries of the matrix. Should be a numeric type.
-    type T: Scalar + Copy;
-
-    /// Builds a new group from a set of generators.
-    fn new(generators: Vec<Matrix<Self::T>>) -> Self;
-
-    /// Returns the set of generators of the group.
-    fn generators(&self) -> &Vec<Matrix<Self::T>>;
-
-    /// Determines whether a given element has already been found.
-    fn contains(&self, el: &Matrix<Self::T>) -> bool;
-
-    /// Inserts a new element into the group.
-    fn insert(&mut self, el: Matrix<Self::T>);
-
-    /// Gets the next element and the next generator to attempt to multiply.
-    fn next_el_gen(&mut self) -> Option<[&Matrix<Self::T>; 2]>;
-
-    /// Multiplies the current element times the current generator, sees if it's
-    /// a new element.
-    fn try_next(&mut self) -> GroupNext {
-        if let Some([el, gen]) = self.next_el_gen() {
-            let new_el = el.clone() * gen.clone();
-
-            if self.contains(&new_el) {
-                GroupNext::Repeat
-            } else {
-                self.insert(new_el.clone());
-
-                // Converts the matrix into a floating point matrix.
-                GroupNext::New(Matrix::from_iterator(
-                    new_el.nrows(),
-                    new_el.ncols(),
-                    new_el.into_iter().map(|&x| x.into()),
-                ))
-            }
-        } else {
-            GroupNext::None
-        }
-    }
-}
-
-/// Implements [`Group`] for every [`GenGroup`].
-impl<T: GenGroup<T = U>, U: Scalar + Copy> Group for T
-where
-    f64: From<U>,
-    Matrix<U>: Mul<Output = Matrix<U>>,
-{
-    fn dimension(&self) -> usize {
-        self.generators()
-            .get(0)
-            .expect("GenGroup has no generators.")
-            .ncols()
-    }
-}
-
-/// A `Group` with integer matrices, which allows for exact arithmetic.
-struct IntGroup {
+/// A `Group` [generated](https://en.wikipedia.org/wiki/Generator_(mathematics))
+/// by a set of floating point matrices. Its elements are built in a BFS order.
+/// It contains a lookup table, used to figure out whether an element has
+/// already been found or not.
+///
+/// # Todo
+/// Currently, to figure out whether an element has been found or not, we do a
+/// linear search on the entire set of elements that we've found so far. This
+/// means that generating a group with *n* elements has O(*n*²) asymptotic
+/// complexity, which will be really bad if we ever want to implement big groups
+/// like E6, E7, or God forbid E8.
+///
+/// If all of our matrices had integer entries, which is the case for a lot of
+/// Coxeter groups, we could instead use a `HashSet` to reduce the complexity
+/// to O(*n* log(*n*)). For floating point entries, where we'll rather want to
+/// find the "closest" element to another one (to account for imprecision), a
+/// [k-d tree](https://en.wikipedia.org/wiki/K-d_tree) would achieve the same
+/// complexity, but it would be much harder to implement.
+pub struct GenGroup {
     /// The generators for the group.
-    generators: Vec<Matrix<i32>>,
+    generators: Vec<Matrix<f64>>,
 
     /// The elements that have been generated. Will be put into a more clever
     /// structure that's asymptotically more efficient and doesn't need storing
     /// everything at once eventually.
-    elements: Vec<Matrix<i32>>,
+    elements: Vec<Matrix<f64>>,
 
-    /// Stores the index in [`elements`] of the element that is currently being
+    /// Stores the index in (`elements`)[GenGroup.elements] of the element that is currently being
     /// handled. All previous ones will have already had their right neighbors
     /// found. Quirk of the current data structure, subject to change.
     el_idx: usize,
@@ -138,7 +95,16 @@ struct IntGroup {
     gen_idx: usize,
 }
 
-impl Iterator for IntGroup {
+impl Group for GenGroup {
+    fn dimension(&self) -> usize {
+        self.generators
+            .get(0)
+            .expect("GenGroup has no generators.")
+            .ncols()
+    }
+}
+
+impl Iterator for GenGroup {
     type Item = Matrix<f64>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -152,12 +118,27 @@ impl Iterator for IntGroup {
     }
 }
 
-/// Every [`IntGroup`] is generated.
-impl GenGroup for IntGroup {
-    type T = i32;
+/// Determines whether two matrices are "approximately equal" elementwise.
+fn matrix_approx(mat1: &Matrix<f64>, mat2: &Matrix<f64>) -> bool {
+    const EPS: f64 = 1e-6;
 
-    /// Initializes a new group with a set of generators.
-    fn new(generators: Vec<Matrix<i32>>) -> Self {
+    let mat1 = mat1.iter();
+    let mut mat2 = mat2.iter();
+
+    for x in mat1 {
+        let y = mat2.next().unwrap();
+
+        if (x - y).abs() > EPS {
+            return false;
+        }
+    }
+
+    true
+}
+
+impl GenGroup {
+    /// Builds a new group from a set of generators.
+    fn new(generators: Vec<Matrix<f64>>) -> Self {
         let dim = generators
             .get(0)
             .expect("Vector of generators is empty.")
@@ -171,25 +152,23 @@ impl GenGroup for IntGroup {
         }
     }
 
-    /// Returns the set of generators of the group.
-    fn generators(&self) -> &Vec<Matrix<Self::T>> {
-        &self.generators
+    /// Determines whether a given element has already been found.
+    fn contains(&self, el: &Matrix<f64>) -> bool {
+        self.elements
+            .iter()
+            .find(|&search| matrix_approx(search, el))
+            .is_some()
     }
 
-    /// Internal function, used to see if a given element has already been
-    /// found. Avoids infinite loops, works precisely due to the fact we're
-    /// doing exact arithmetic.
-    ///
-    /// TODO: use a more clever data structure.
-    fn contains(&self, el: &Matrix<i32>) -> bool {
-        self.elements.contains(el)
-    }
-
-    fn insert(&mut self, el: Matrix<i32>) {
+    /// Inserts a new element into the group. Assumes that we've already checked
+    /// that the element is new.
+    fn insert(&mut self, el: Matrix<f64>) {
         self.elements.push(el);
     }
 
-    fn next_el_gen(&mut self) -> Option<[&Matrix<i32>; 2]> {
+    /// Gets the next element and the next generator to attempt to multiply.
+    /// Advances the iterator.
+    fn next_el_gen(&mut self) -> Option<[&Matrix<f64>; 2]> {
         let el = self.elements.get(self.el_idx)?;
         let gen = self.generators.get(self.gen_idx).unwrap();
 
@@ -202,27 +181,27 @@ impl GenGroup for IntGroup {
 
         Some([el, gen])
     }
-}
 
-/// A `Group` with floating point matrices, which are more general but
-/// necessitate much more clever data structures.
-struct FltGroup {
-    /// The generators for the group.
-    generators: Vec<Matrix<i32>>,
+    /// Multiplies the current element times the current generator, determines
+    /// if it is a new element. Advances the iterator.
+    fn try_next(&mut self) -> GroupNext {
+        // If there's a next element and generator.
+        if let Some([el, gen]) = self.next_el_gen() {
+            let new_el = el * gen;
 
-    /// The elements that have been generated. Will be put into a more clever
-    /// structure that's asymptotically more efficient and doesn't need storing
-    /// everything at once eventually.
-    elements: Vec<Matrix<i32>>,
-
-    /// Stores the index in [`elements`] of the element that is currently being
-    /// handled. All previous ones will have already had their right neighbors
-    /// found. Quirk of the current data structure, subject to change.
-    el_idx: usize,
-
-    /// Stores the index in [`generators`] of the generator that's being
-    /// checked. All previous once will have already been multiplied to the
-    /// right of the current element. Quirk of the current data structure,
-    /// subject to change.
-    gen_idx: usize,
+            // If the group element is a repeat.
+            if self.contains(&new_el) {
+                GroupNext::Repeat
+            }
+            // If we found something new.
+            else {
+                self.insert(new_el.clone());
+                GroupNext::New(new_el)
+            }
+        }
+        // If we already went through the entire group.
+        else {
+            GroupNext::None
+        }
+    }
 }
