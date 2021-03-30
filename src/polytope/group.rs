@@ -338,9 +338,7 @@ impl GenGroup {
             generators.push(gen_i);
         }
 
-        Some(Self::new(
-            generators.into_iter().map(|n| refl_mat(n)).collect(),
-        ))
+        Some(Self::new(generators.into_iter().map(refl_mat).collect()))
     }
 }
 
