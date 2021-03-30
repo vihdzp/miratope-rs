@@ -146,7 +146,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::orthoplex(3);
+    let poly = Concrete::orthoplex(3).prism();
     println!("{}", off::to_src(&poly, Default::default()));
     let poly = Renderable::new(poly);
 

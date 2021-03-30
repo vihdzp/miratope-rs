@@ -18,6 +18,7 @@ use self::geometry::{Hypersphere, Matrix};
 
 pub mod convex;
 pub mod geometry;
+pub mod group;
 pub mod off;
 pub mod shapes;
 
@@ -1287,12 +1288,15 @@ impl Polytope for Concrete {
             let dim = rank as usize;
             let mut vertices = Vec::with_capacity(dim + 1);
 
+            // Adds all points with a single entry equal to √2/2, and all others
+            // equal to 0.
             for i in 0..dim {
                 let mut v = vec![0.0; dim];
                 v[i] = SQRT_2 / 2.0;
                 vertices.push(v.into());
             }
 
+            // Adds the remaining vertex, all of whose coordinates are equal.
             let a = (1.0 - ((dim + 1) as f64).sqrt()) * SQRT_2 / (2.0 * dim as f64);
             vertices.push(vec![a; dim].into());
 
