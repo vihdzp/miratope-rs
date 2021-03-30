@@ -1,6 +1,7 @@
 //! Contains methods to generate many symmetry groups.
 
 use dyn_clone::DynClone;
+use itertools::iproduct;
 use nalgebra::{DMatrix as Matrix, DVector as Vector};
 use std::{
     f64::consts::PI,
@@ -98,6 +99,35 @@ impl Group {
             )),
         })
     }
+
+    /// Generates the direct product of two groups. The dimension will be the
+    /// sum of the dimensions of the groups.
+    fn direct_product(g: Self, h: Self) -> Self {
+        let g_dim = g.dimension;
+        let h_dim = h.dimension;
+        let dim = g.dimension + h.dimension;
+
+        Self {
+            dimension: dim,
+            iter: Box::new(iproduct!(g.iter, h.iter).map(move |(mat1, mat2)| {
+                let mut mat = Matrix::zeros(dim, dim);
+
+                for i in 0..g_dim {
+                    for j in 0..g_dim {
+                        mat[(i, j)] = mat1[(i, j)];
+                    }
+                }
+
+                for i in 0..h_dim {
+                    for j in 0..h_dim {
+                        mat[(i + g_dim, j + g_dim)] = mat2[(i, j)];
+                    }
+                }
+
+                mat
+            })),
+        }
+    }
 }
 
 /// The result of trying to get the next element in a group.
@@ -161,14 +191,17 @@ impl CoxMatrix {
 /// assert_eq!(cox!(4, 3).order(), 48);
 /// # }
 /// ```
+///
+/// # Panics
+/// Panics if the linear diagram doesn't fit in Euclidean space.
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! cox {
     ($($x:expr),+) => (
-        CoxMatrix::from_lin_diagram(vec![$($x),+])
+        Group::cox_group(CoxMatrix::from_lin_diagram(vec![$($x),+])).unwrap()
     );
     ($x:expr; $y:expr) => (
-        CoxMatrix::from_lin_diagram(vec![$x; $y])
+        Group::cox_group(CoxMatrix::from_lin_diagram(vec![$x; $y])).unwrap()
     )
 }
 
@@ -385,12 +418,7 @@ mod tests {
                     continue;
                 }
 
-                test(
-                    Group::cox_group(cox!(n as f64 / d as f64)).unwrap(),
-                    2 * n,
-                    n,
-                    &format!("I2({})", n),
-                );
+                test(cox!(n as f64 / d as f64), 2 * n, n, &format!("I2({})", n));
             }
         }
     }
@@ -404,12 +432,7 @@ mod tests {
         for n in 2..=5 {
             order *= n + 1;
 
-            test(
-                Group::cox_group(cox!(3.0; n - 1)).unwrap(),
-                order,
-                order / 2,
-                &format!("A{}", n),
-            )
+            test(cox!(3.0; n - 1), order, order / 2, &format!("A{}", n))
         }
     }
 
@@ -440,13 +463,8 @@ mod tests {
     /// regular dodecahedron and a regular hecatonicosachoron.
     #[test]
     fn h() {
-        test(Group::cox_group(cox!(5.0, 3.0)).unwrap(), 120, 60, &"H3");
-        test(
-            Group::cox_group(cox!(5.0, 3.0, 3.0)).unwrap(),
-            14400,
-            7200,
-            &"H4",
-        );
+        test(cox!(5.0, 3.0), 120, 60, &"H3");
+        test(cox!(5.0, 3.0, 3.0), 14400, 7200, &"H4");
     }
 
     /*
@@ -455,4 +473,12 @@ mod tests {
 
     }
      */
+
+    #[test]
+    /// Tests the direct product of A3 with itself.
+    fn a3xa3() {
+        let a3 = cox!(3.0, 3.0);
+        let g = Group::direct_product(a3.clone(), a3.clone());
+        test(g, 576, 288, &"A3×A3");
+    }
 }
