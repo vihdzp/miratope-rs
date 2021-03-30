@@ -1,9 +1,18 @@
 use petgraph::{graph::Graph, Undirected};
-use petgraph::graph::{NodeIndex, EdgeIndex};
+use petgraph::graph::{NodeIndex, node_index, EdgeIndex, edge_index};
 use std::f64;
 use regex::Regex;
 
-//Possible numbers and non-numbers that could appear in CD edges
+///Possible types of CD
+enum CDTypes {
+    Single{graph: Graph<NodeVal, EdgeVal, Undirected>},
+    Compound{count: u32, graphs: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
+    LaceSimp{lace_len: f64, count: u32, graph: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
+    LaceTower{lace_len: f64, count: u32, graphs: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
+    LaceRing{lace_len: f64, count: u32, graphs: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
+}
+
+///Possible types of Edge Values
 enum EdgeVal {
     //Real Numbers 3, 5, 3/4, etc.
     Rational(i64, i64),
@@ -14,115 +23,125 @@ enum EdgeVal {
     Non,
 }
 
+///Possible types of Node Values
 enum NodeVal {
+    ///Unringed Nodes (different from Ringed(0))
     Unringed,
+    ///Ringed Nodes, can hold any float
     Ringed(f64),
+    ///Snub Nodes, should definitely make this hold a float
+    ///TODO: Agree on a way to specify the length in a snub node
     Snub,
 }
 
-//Types of Graphs for polytopes
-enum CDGraph {
-    //Classic
-    Single{graph: Graph<NodeVal, EdgeVal, Undirected>},
-    Compound{count: u32, graphs: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
-    LaceTower{lace_len: f64, count: u32, graphs: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
-    LaceRing{lace_len: f64, count: u32, graphs: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
-}
-
-//Main function for parsing CDs from strings to CDGraphs
-fn cd_parse(input: &String) -> Option<CDGraph> {
+///Main function for parsing CDs from strings to CDTypes
+fn cd_parse(input: &str) -> Option<CDTypes> {
+    use CDTypes::*;
     let input = input.replace("-", "");
-    if Regex::new(r#"[a-zA-Z][a-zA-Z]"#).unwrap().is_match(&input) {
-        if input.contains("&")||input.contains("#") {
-            if Regex::new(r#"&#([a-zA-z]|\(([a-zA-z]|\d+(/\d+)?\)))[tr]?$"#).unwrap().is_match(&input) {
-                match &input[input.len()-1..] {
-                    "t" => {//Lace Tower
-                    return Some(CDGraph::Single{graph: Graph::new_undirected()})},
-                    "r" => {//Lace Ring
-                    return Some(CDGraph::Single{graph: Graph::new_undirected()})},
-                    _ => {//Lace Prism
-                    return Some(CDGraph::Single{graph: Graph::new_undirected()})},
-                };
-            } else {
-                //Invalid Lace
-                return None
-            };
-        } else {
-            //Compound
-            return Some(CDGraph::Single{graph: Graph::new_undirected()})
-        };
-    } else {
-        //Normal
-        return Some(CDGraph::Single{graph: Graph::new_undirected()})
-    };
-}
-
-//Reads and creates a node
-fn create_node(graph: Graph<NodeVal, EdgeVal, Undirected>, diagram: &str, caret: usize) -> Option<NodeIndex> {
-    let close: usize = 0;
-    match &diagram[caret..caret+1] {
-        "(" => {
-            match diagram[caret..].find(")") {
-                Some(ind) => close = ind,
-                None => return None
-            }
-        },
-        _ => close = caret+1,
+    match single_cd_parse(&input[..]) {
+        Some(graph) => graph,
+        None => None,
     }
-    let node: &str = &diagram[caret..close+1];
-    caret += node.len();
-    match node_to_val(node) {
-        Some(val) => graph.add_node(val),
-        None => None //Invalid Node!,
 }
 
-//Creates an edge from mem
-fn make_edge(graph: Graph<NodeVal, EdgeVal, Undirected>, diagram: &str, caret: u32) -> Option<EdgeIndex> {
-
-}
-
-//Reads an edge from a CD and stores into mem
-fn flag_edge(diagram: &str, caret: u32) -> Option<(NodeIndex, NodeIndex, EdgeValue)> {
-    
-}
-
-//Parses singleton cds
+///Parses singleton cds
 fn single_cd_parse(diagram: &str) -> Option<Graph<NodeVal, EdgeVal, Undirected>> {
-    let mut graph: Graph<NodeVal, EdgeVal, Undirected> = Graph::new_undirected();
-    let mut caret: usize = 0;
-    let mut mem: Option<(u32, u32, EdgeVal)> = None;
+    let caret = Caret {
+        diagram: diagram,
+        graph: Graph::new_undirected(),
+        index: 0,
+        edgemem: (None, None, None),
+    };
     //Initial node
-
-    //Make Node
-    let close = diagram.find(")");
-    if close == None {
-      //Invalid Diagram!
-    };
-    
+    caret.create_node();
     //The rest
-    while caret < diagram.len() {
-        //Read Edge
-        //Make Node
-        //Make Edge
+    while caret.index < caret.diagram.len() {
+        caret.read_edge();
+        caret.create_node();
+        caret.make_edge();
     };
-    Some(graph)
+    Some(caret.graph)
 }
 
 /*
-//Parses compound and lace cds
+///Parses compound and lace cds
 fn multi_cd_parse(diagram: &str) -> Option<Vec<Graph<EdgeVal, EdgeVal, Undirected>>> {
-
+    if input.contains("&")||input.contains("#") {
+        if Regex::new(r#"&#([a-zA-z]|\(([a-zA-z]|\d+(/\d+)?\)))[tr]?$"#).unwrap().is_match(&input) {
+            match &input[input.len()-1..] {
+                "t" => /*Lace Tower*/ ,
+                "r" => /*Lace Ring*/,
+                _ => /*Lace Simplex*/,
+            }
+        } else {
+            /*Invalid Lace*/
+            None
+        }
+    } else {
+        /*Compound*/
+    
+    }
 }
 */
 
-//Converts string slices of cd edges to wrapped EdgeVals
+///Packages important information needed to interpret CDs
+struct Caret {
+    diagram: Vec<&str>,
+    graph: Graph<NodeVal, EdgeVal, Undirected>,
+    index: usize,
+    edgemem: (Option<NodeIndex>, Option<NodeIndex>, Option<EdgeVal>),
+}
+
+///Operations that are commonly done to parse CDs
+impl Caret {
+    ///Reads and creates a node
+    fn create_node(&self) -> Option<NodeIndex> {
+        match &self.diagram[self.index..self.index+1] {
+            "(" => {
+                match self.diagram[self.index..].find(")") {
+                    Some(ind) => close = ind,
+                    None => None,
+                }
+            },
+            _ => close = self.index+1,
+        };
+        let node: &str = &self.diagram[self.index..close+1];
+        self.index += node.len();
+        match node_to_val(node) {
+            Some(val) => Some(self.graph.add_node(val)),
+            None => None //Invalid Node!,
+        }
+    }
+
+    ///Reads an edge from a CD and stores into edgemem
+    fn read_edge(&self) -> Option<Caret> {
+
+    }
+
+    ///Creates an edge from edgemem
+    fn make_edge(&self) -> Option<EdgeIndex> {
+
+    }
+
+    ///Reads a virtual node
+    fn read_virt(&self) -> Option<Caret> {
+
+    }
+
+    ///Reads a lace suffix
+    fn read_suff(&self) -> Option<Caret> {
+
+    }
+}
+
+///Converts string slices of cd edges to wrapped EdgeVals
 fn edge_to_val(c: &str) -> Option<EdgeVal> {
     use EdgeVal::*;
     if Regex::new(r#"^\d+/\d+$"#).unwrap().is_match(c) {
         let bar = c.find("/").unwrap();
-        return Some(Rational((c[..bar].parse::<i64>().unwrap()),(c[bar+1..].parse::<i64>().unwrap())))
+        return Some(Rational(c[..bar].parse::<i64>().unwrap(), c[bar+1..].parse::<i64>().unwrap()))
     } else if Regex::new(r#"^\d+$"#).unwrap().is_match(c) {
-        return Some(Rational(c.parse::<f64>().unwrap(), 1i64))
+        return Some(Rational(c.parse::<i64>().unwrap(), 1i64))
     } else {
         match c {
             "∞" => return Some(Inf(false)),
@@ -183,7 +202,7 @@ fn num_retro(val: EdgeVal) -> EdgeVal {
 }
 
 //(ONLY FOR MEANT FOR DEBUGGING), prints the contexts of a graph to the console
-fn cd_inspect(graph: &Graph<EdgeVal, EdgeVal, Undirected>) {
+fn cd_inspect(graph: &Graph<NodeVal, EdgeVal, Undirected>) {
     let ncount = &graph.node_count();
     let ecount = &graph.edge_count();
     // Print node and edge count
@@ -199,15 +218,14 @@ fn cd_inspect(graph: &Graph<EdgeVal, EdgeVal, Undirected>) {
 }
 
 //(ONLY FOR MEANT FOR DEBUGGING), prints the contents of one node to the console
-fn node_inspect(graph: &Graph<EdgeVal, EdgeVal, Undirected>, i: usize, n: NodeIndex) {
+fn node_inspect(graph: &Graph<NodeVal, EdgeVal, Undirected>, i: usize, n: NodeIndex) {
     match &graph.node_weight(n) {
         Option::None => println!("Node {} carries nothing", i),
         Option::Some(c) => {
             match c {
-                EdgeVal::Rational(n, d) => println!("Node {} carries {}/{}", i, n, d),
-                EdgeVal::Inf(false) => println!("Node {} carries prograde ∞", i),
-                EdgeVal::Inf(true) => println!("Node {} carries retrograde ∞", i),
-                EdgeVal::Non => println!("Node {} carries Ø", i),
+                NodeVal::Unringed => println!("Node {} is unringed", i),
+                NodeVal::Ringed(n) => println!("Node {} carries {}", i, n),
+                NodeVal::Snub => println!("Node {} is snub", i),
             };
         },
     };
