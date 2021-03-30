@@ -29,21 +29,24 @@
 //!   * Automatic name generation in various languages for many shapes
 //!
 //! ## How do I use Miratope?
-//! Miratope doesn't have an interface yet, so you'll have to download the source code to do much of anything.
+//! Miratope doesn't have a very good interface yet, so you'll have to download
+//! the source code to do much of anything.
 //!
 //! ## Where do I get these "OFF files"?
-//! The OFF file format is a format for storing certain kinds of geometric shapes.
-//! Although not in widespread use, it has become the standard format for those who investigate polyhedra and polytopes.
-//! It was initially meant for the [Geomview software](https://people.sc.fsu.edu/~jburkardt/data/off/off.html),
+//! The OFF file format is a format for storing certain kinds of geometric
+//! shapes. Although not in widespread use, it has become the standard format
+//! for those who investigate polyhedra and polytopes. It was initially meant
+//! for the [Geomview software](https://people.sc.fsu.edu/~jburkardt/data/off/off.html),
 //! and was later adapted for the [Stella software](https://www.software3d.com/StellaManual.php?prod=stella4D#import).
-//! Miratope uses a further generalization of the Stella OFF format for any amount of dimensions.
+//! Miratope uses a further generalization of the Stella OFF format for any
+//! amount of dimensions.
 //!
-//! Miratope does not yet include a library of OFF files. Nevertheless, many of them can be downloaded from
-//! [OfficialURL's personal collection](https://drive.google.com/drive/u/0/folders/1nQZ-QVVBfgYSck4pkZ7he0djF82T9MVy).
+//! Miratope does not yet include a library of OFF files. Nevertheless, many of
+//! them can be downloaded from [OfficialURL's personal collection](https://drive.google.com/drive/u/0/folders/1nQZ-QVVBfgYSck4pkZ7he0djF82T9MVy).
 //! Eventually, they'll be browsable from Miratope itself.
 //!
 //! ## Why is the rendering buggy?
-//! Proper rendering, even in 3D is a work in progress.
+//! Proper rendering, even in 3D, is a work in progress.
 
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
@@ -59,17 +62,26 @@ mod input;
 mod no_cull_pipeline;
 mod polytope;
 
+/// Loads all of the necessary systems for the application to run.
 fn main() {
     App::build()
+        // Sets the background color to black.
         .add_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
+        // Enables antialiasing.
         .add_resource(Msaa { samples: 4 })
+        // Default Bevy plugins.
         .add_plugins(DefaultPlugins)
+        // Enables egui to work in the first place.
         .add_plugin(EguiPlugin)
+        // Enables camera controls.
         .add_plugin(input::InputPlugin)
+        // Setups the initial state of the application.
         .add_startup_system(setup.system())
-        .add_startup_system(load_assets.system())
+        // Scales the interface when the screen is resized.
         .add_system(update_ui_scale_factor.system())
+        // Loads the User Interface.
         .add_system(ui.system())
+        // Updates polytopes when operations are done to them.
         .add_system_to_stage(stage::POST_UPDATE, update_changed_polytopes.system())
         .run();
 }
@@ -78,23 +90,8 @@ const WIREFRAME_SELECTED_MATERIAL: HandleUntyped =
     HandleUntyped::weak_from_u64(StandardMaterial::TYPE_UUID, 0x82A3A5DD3A34CC21);
 const WIREFRAME_UNSELECTED_MATERIAL: HandleUntyped =
     HandleUntyped::weak_from_u64(StandardMaterial::TYPE_UUID, 0x82A3A5DD3A34CC22);
-const BEVY_TEXTURE_ID: u64 = 0;
 
-#[derive(Default)]
-struct UiState {
-    label: String,
-    value: f32,
-    inverted: bool,
-}
-
-fn load_assets(_world: &mut World, resources: &mut Resources) {
-    let mut egui_context = resources.get_mut::<EguiContext>().unwrap();
-    let asset_server = resources.get::<AssetServer>().unwrap();
-
-    let texture_handle = asset_server.load("icon.png");
-    egui_context.set_egui_texture(BEVY_TEXTURE_ID, texture_handle);
-}
-
+/// Resizes the UI when the screen is resized.
 fn update_ui_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Res<Windows>) {
     if let Some(window) = windows.get_primary() {
         egui_settings.scale_factor = 1.0 / window.scale_factor();
@@ -146,7 +143,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::orthoplex(3);
+    let poly = Concrete::orthoplex(3).prism();
     println!("{}", off::to_src(&poly, Default::default()));
     let poly = Renderable::new(poly);
 
@@ -207,6 +204,7 @@ fn setup(
         });
 }
 
+/// Updates polytopes after an operation.
 fn update_changed_polytopes(
     mut meshes: ResMut<Assets<Mesh>>,
     polies: Query<(&Renderable, &Handle<Mesh>, &Children), Changed<Renderable>>,

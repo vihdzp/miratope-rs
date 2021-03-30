@@ -1,3 +1,7 @@
+//! Configures a render pipeline without
+//! (backface culling)[https://en.wikipedia.org/wiki/Back-face_culling], needed
+//! so that most of the nonconvex polytopes work properly.
+
 use bevy::asset::{Assets, Handle, HandleUntyped};
 use bevy::ecs::Bundle;
 use bevy::prelude::{Draw, GlobalTransform, RenderPipelines, StandardMaterial, Transform, Visible};

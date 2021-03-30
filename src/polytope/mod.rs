@@ -18,6 +18,7 @@ use self::geometry::{Hypersphere, Matrix};
 
 pub mod convex;
 pub mod geometry;
+pub mod group;
 pub mod off;
 pub mod shapes;
 
@@ -270,7 +271,7 @@ impl<T> IndexMut<isize> for RankVec<T> {
     }
 }
 
-/// Represents a single element in an [`Abstract`].
+/// A single element in an [`Abstract`].
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Element {
     /// The indices of the subelements of the polytope.
@@ -300,7 +301,7 @@ impl Element {
     }
 }
 
-/// Represents a list of [`Elements`](Element) of the same
+/// A list of [`Elements`](Element) of the same
 /// [rank](https://polytope.miraheze.org/wiki/Rank).
 #[derive(Debug, Clone)]
 pub struct ElementList(Vec<Element>);
@@ -355,8 +356,8 @@ impl DerefMut for ElementList {
 }
 
 #[derive(Debug, Clone)]
-/// Represents the [ranked poset](https://en.wikipedia.org/wiki/Graded_poset)
-/// corresponding to an
+/// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
+/// to an
 /// [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
 pub struct Abstract(RankVec<ElementList>);
 
@@ -859,7 +860,7 @@ impl Concrete {
 
     /// Returns the number of dimensions of the space the polytope lives in,
     /// or `None` in the case of the nullitope.
-    pub fn dimension(&self) -> Option<usize> {
+    pub fn dim(&self) -> Option<usize> {
         Some(self.vertices.get(0)?.len())
     }
 
@@ -934,7 +935,7 @@ impl Concrete {
     /// Gets the gravicenter of a polytope, or `None` in the case of the
     /// nullitope.
     pub fn gravicenter(&self) -> Option<Point> {
-        let mut g: Point = vec![0.0; self.dimension()? as usize].into();
+        let mut g: Point = vec![0.0; self.dim()? as usize].into();
 
         for v in &self.vertices {
             g += v;
@@ -1018,7 +1019,7 @@ impl Concrete {
     /// facets go through the origin. Returns the dual if successful, and `None`
     /// otherwise.
     pub fn dual_mut(&mut self) -> Option<&mut Self> {
-        self.dual_mut_with_sphere(&Hypersphere::unit(self.dimension().unwrap_or(1)))
+        self.dual_mut_with_sphere(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
     /// Returns the dual of a polytope with a given reciprocation sphere, or
@@ -1118,18 +1119,18 @@ impl Concrete {
     /// Generates the vertices for either a tegum or a pyramid product with two
     /// given vertex sets and a given height.
     fn duopyramid_vertices(p: &[Point], q: &[Point], height: f64, tegum: bool) -> Vec<Point> {
-        let p_dimension = p[0].len();
-        let q_dimension = q[0].len();
+        let p_dim = p[0].len();
+        let q_dim = q[0].len();
 
-        let dimension = p_dimension + q_dimension + tegum as usize;
+        let dim = p_dim + q_dim + tegum as usize;
 
         let mut vertices = Vec::with_capacity(p.len() + q.len());
 
         // The vertices corresponding to products of p's nullitope with q's
         // vertices.
         for q_vertex in q {
-            let mut prod_vertex = Vec::with_capacity(dimension);
-            let pad = p_dimension;
+            let mut prod_vertex = Vec::with_capacity(dim);
+            let pad = p_dim;
 
             // Pads prod_vertex to the left.
             prod_vertex.resize(pad, 0.0);
@@ -1150,7 +1151,7 @@ impl Concrete {
         // The vertices corresponding to products of q's nullitope with p's
         // vertices.
         for p_vertex in p {
-            let mut prod_vertex = Vec::with_capacity(dimension);
+            let mut prod_vertex = Vec::with_capacity(dim);
 
             // Copies p_vertex into prod_vertex.
             for &c in p_vertex.iter() {
@@ -1158,7 +1159,7 @@ impl Concrete {
             }
 
             // Pads prod_vertex to the right.
-            prod_vertex.resize(p_dimension + q_dimension, 0.0);
+            prod_vertex.resize(p_dim + q_dim, 0.0);
 
             // Adds the height, in case of a pyramid product.
             if !tegum {
@@ -1287,12 +1288,15 @@ impl Polytope for Concrete {
             let dim = rank as usize;
             let mut vertices = Vec::with_capacity(dim + 1);
 
+            // Adds all points with a single entry equal to √2/2, and all others
+            // equal to 0.
             for i in 0..dim {
                 let mut v = vec![0.0; dim];
                 v[i] = SQRT_2 / 2.0;
                 vertices.push(v.into());
             }
 
+            // Adds the remaining vertex, all of whose coordinates are equal.
             let a = (1.0 - ((dim + 1) as f64).sqrt()) * SQRT_2 / (2.0 * dim as f64);
             vertices.push(vec![a; dim].into());
 
@@ -1325,8 +1329,7 @@ impl IndexMut<isize> for Concrete {
     }
 }
 
-/// Represents a [`Concrete`], together with a triangulation used to
-/// render it.
+/// A [`Concrete`], together with a triangulation used to render it.
 #[derive(Debug, Clone)]
 pub struct Renderable {
     /// The underlying concrete polytope.
