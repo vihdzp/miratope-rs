@@ -349,20 +349,6 @@ impl Ord for OrdMatrix {
 /// by a set of floating point matrices. Its elements are built in a BFS order.
 /// It contains a lookup table, used to figure out whether an element has
 /// already been found or not.
-///
-/// # Todo
-/// Currently, to figure out whether an element has been found or not, we do a
-/// linear search on the entire set of elements that we've found so far. This
-/// means that generating a group with *n* elements has O(*n*²) asymptotic
-/// complexity, which will be really bad if we ever want to implement big groups
-/// like E6, E7, or God forbid E8.
-///
-/// If all of our matrices had integer entries, which is the case for a lot of
-/// Coxeter groups, we could instead use a `HashSet` to reduce the complexity
-/// to O(*n* log(*n*)). For floating point entries, where we'll rather want to
-/// find the "closest" element to another one (to account for imprecision), a
-/// [k-d tree](https://en.wikipedia.org/wiki/K-d_tree) would achieve the same
-/// complexity, but it would be much harder to implement.
 #[derive(Clone)]
 pub struct GenIter {
     /// The number of dimensions the group acts on.
@@ -434,13 +420,20 @@ pub fn refl_mat(n: Vector<f64>) -> Matrix<f64> {
 impl GenIter {
     /// Builds a new group from a set of generators.
     fn new(dim: usize, generators: Vec<Matrix<f64>>) -> Self {
+        // Initializes the queue with only the identity matrix.
         let mut queue = VecDeque::new();
         queue.push_back(OrdMatrix(Matrix::identity(dim, dim)));
+
+        // We say that the identity has been found zero times. This is a special
+        // case that ensures that neither the identity is queued nor found
+        // twice.
+        let mut elements = BTreeMap::new();
+        elements.insert(OrdMatrix(Matrix::identity(dim, dim)), 0);
 
         Self {
             dim,
             generators,
-            elements: BTreeMap::new(),
+            elements,
             queue,
             gen_idx: 0,
         }
@@ -450,21 +443,22 @@ impl GenIter {
     fn insert(&mut self, el: Matrix<f64>) -> bool {
         let el = OrdMatrix(el);
 
-        // If the element is a repeat.
+        // If the element has been found before.
         if let Some(value) = self.elements.insert(el.clone(), 1) {
             // Bumps the value by 1, or removes the element if this is the last
             // time we'll find the element.
             if value != self.generators.len() - 1 {
                 self.elements.insert(el, value + 1);
             } else {
-                // self.elements.remove(&el);
+                self.elements.remove(&el);
             }
 
-            false
+            // The element is a repeat, except in the special case of the
+            // identity.
+            value == 0
         }
         // If the element is new, we add it to the queue as well.
         else {
-            &self.elements;
             self.queue.push_back(el);
 
             true
