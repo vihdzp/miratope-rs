@@ -2295,6 +2295,7 @@ dependencies = [
  "nalgebra",
  "petgraph",
  "rand 0.8.3",
+ "regex",
  "ron",
  "scapegoat",
  "serde",

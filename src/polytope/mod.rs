@@ -16,6 +16,7 @@ use geometry::{Hyperplane, Point};
 
 use self::geometry::{Hypersphere, Matrix};
 
+pub mod cd;
 pub mod convex;
 pub mod geometry;
 pub mod group;
