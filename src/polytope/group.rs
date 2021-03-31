@@ -348,7 +348,7 @@ impl Ord for OrdMatrix {
 /// An iterator for a `Group` [generated](https://en.wikipedia.org/wiki/Generator_(mathematics))
 /// by a set of floating point matrices. Its elements are built in a BFS order.
 /// It contains a lookup table, used to figure out whether an element has
-/// already been found or not.
+/// already been found or not, as well as a queue to store the next elements.
 #[derive(Clone)]
 pub struct GenIter {
     /// The number of dimensions the group acts on.
@@ -357,11 +357,12 @@ pub struct GenIter {
     /// The generators for the group.
     generators: Vec<Matrix<f64>>,
 
-    /// The elements that have been generated. Will be put into a more clever
-    /// structure that's asymptotically more efficient and doesn't need storing
-    /// everything at once eventually.
+    /// Stores the elements that have been generated and that can still be
+    /// generated again. Is integral for the algorithm to work, as without it,
+    /// duplicate group elements will just keep generating forever.
     elements: BTreeMap<OrdMatrix, usize>,
 
+    /// Stores the elements that haven't yet been processed.
     queue: VecDeque<OrdMatrix>,
 
     /// Stores the index in (`generators`)[GenGroup.generators] of the generator
@@ -395,7 +396,7 @@ fn matrix_approx(mat1: &Matrix<f64>, mat2: &Matrix<f64>) -> bool {
     for x in mat1 {
         let y = mat2.next().unwrap();
 
-        if (x - y).abs() > EPS {
+        if abs_diff_ne!(x, y, epsilon = EPS) {
             return false;
         }
     }
@@ -636,10 +637,9 @@ mod tests {
         test(cox!(5.0, 3.0, 3.0), 14400, 7200, &"H4");
     }
 
-    /// Tests the E*n* symmetries... or rather, tests one of them. E7 and E8 are
-    /// currently out of reach.
+    /// Tests the E6 symmetry group.
     #[test]
-    fn e() {
+    fn e6() {
         // In the future, we'll have better code for this, I hope.
         let e6 = Group::cox_group(CoxMatrix(Matrix::from_iterator(
             6,
