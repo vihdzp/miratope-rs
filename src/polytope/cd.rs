@@ -19,7 +19,7 @@ struct Cd(
 
 impl Display for Cd {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Print node and edge count
+        // Prints node and edge counts.
         writeln!(f, "{} Nodes", self.0.node_count())?;
         writeln!(f, "{} Edges", self.0.edge_count())?;
 
@@ -268,35 +268,35 @@ fn node_to_val(c: &str) -> Option<NodeVal> {
         let c = c.replace("(", "");
         let c = c.replace(")", "");
         match &c[..] {
-            "o" => return Some(Unringed),
-            "v" => return Some(Ringed((5f64.sqrt() - 1f64) / 2f64)),
-            "x" => return Some(Ringed(1f64)),
-            "q" => return Some(Ringed(2f64.sqrt())),
-            "f" => return Some(Ringed((5f64.sqrt() + 1f64) / 2f64)),
-            "h" => return Some(Ringed(3f64.sqrt())),
-            "k" => return Some(Ringed((2f64.sqrt() + 2f64).sqrt())),
-            "u" => return Some(Ringed(2f64)),
-            "w" => return Some(Ringed(2f64.sqrt() + 1f64)),
-            "F" => return Some(Ringed((5f64.sqrt() + 3f64) / 2f64)),
-            "e" => return Some(Ringed(3f64.sqrt() + 1f64)),
-            "Q" => return Some(Ringed(2f64.sqrt() * 2f64)),
-            "d" => return Some(Ringed(3f64)),
-            "V" => return Some(Ringed(5f64.sqrt() + 1f64)),
-            "U" => return Some(Ringed(2f64.sqrt() + 2f64)),
-            "A" => return Some(Ringed((5f64.sqrt() + 5f64) / 4f64)),
-            "X" => return Some(Ringed(2f64.sqrt() * 2f64 + 1f64)),
-            "B" => return Some(Ringed(5f64.sqrt() + 2f64)),
-            "s" => return Some(Snub),
-            _ => return None,
-        };
+            "o" => Some(Unringed),
+            "v" => Some(Ringed((5f64.sqrt() - 1f64) / 2f64)),
+            "x" => Some(Ringed(1f64)),
+            "q" => Some(Ringed(2f64.sqrt())),
+            "f" => Some(Ringed((5f64.sqrt() + 1f64) / 2f64)),
+            "h" => Some(Ringed(3f64.sqrt())),
+            "k" => Some(Ringed((2f64.sqrt() + 2f64).sqrt())),
+            "u" => Some(Ringed(2f64)),
+            "w" => Some(Ringed(2f64.sqrt() + 1f64)),
+            "F" => Some(Ringed((5f64.sqrt() + 3f64) / 2f64)),
+            "e" => Some(Ringed(3f64.sqrt() + 1f64)),
+            "Q" => Some(Ringed(2f64.sqrt() * 2f64)),
+            "d" => Some(Ringed(3f64)),
+            "V" => Some(Ringed(5f64.sqrt() + 1f64)),
+            "U" => Some(Ringed(2f64.sqrt() + 2f64)),
+            "A" => Some(Ringed((5f64.sqrt() + 5f64) / 4f64)),
+            "X" => Some(Ringed(2f64.sqrt() * 2f64 + 1f64)),
+            "B" => Some(Ringed(5f64.sqrt() + 2f64)),
+            "s" => Some(Snub),
+            _ => None,
+        }
     } else if Regex::new(r#"^\(\d(\.\d+)?\)$"#).unwrap().is_match(c) {
         //For custom lengths
-        let c = c.replace("(", "");
-        let c = c.replace(")", "");
-        return Some(Ringed(c.parse::<f64>().unwrap()));
+        let c = c.replace("(", "").replace(")", "");
+
+        Some(Ringed(c.parse::<f64>().unwrap()))
     } else {
-        return None;
-    };
+        None
+    }
 }
 
 /// Inverts the value held by a EdgeVal
