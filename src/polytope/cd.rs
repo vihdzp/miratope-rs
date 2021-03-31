@@ -5,7 +5,7 @@ use std::f64;
 use std::{fmt::Display, str::Chars};
 
 /// Possible types of CD
-struct CD(
+struct Cd(
     // Single {
     Graph<NodeVal, EdgeVal, Undirected>,
     // },
@@ -17,7 +17,7 @@ struct CD(
     */
 );
 
-impl Display for CD {
+impl Display for Cd {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Print node and edge count
         writeln!(f, "{} Nodes", self.0.node_count())?;
@@ -84,7 +84,7 @@ impl Display for NodeVal {
 }
 
 /// Main function for parsing CDs from strings.
-fn cd_parse(input: &str) -> Option<CD> {
+fn cd_parse(input: &str) -> Option<Cd> {
     let mut caret = Caret {
         diagram: input.chars(),
         graph: Graph::new_undirected(),
@@ -99,7 +99,7 @@ fn cd_parse(input: &str) -> Option<CD> {
         caret.create_node()?;
 
         if caret.make_edge().is_none() {
-            return Some(CD(caret.graph));
+            return Some(Cd(caret.graph));
         }
     }
 }
