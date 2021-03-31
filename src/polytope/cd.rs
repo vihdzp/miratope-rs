@@ -1,5 +1,5 @@
+use petgraph::graph::NodeIndex;
 use petgraph::{graph::Graph, Undirected};
-use petgraph::{graph::NodeIndex};
 use regex::Regex;
 use std::f64;
 use std::{fmt::Display, str::Chars};
