@@ -1,3 +1,5 @@
+//! Contains the methods to setup the camera.
+
 use bevy::input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 use bevy::render::camera::Camera;
@@ -22,14 +24,17 @@ impl Plugin for InputPlugin {
 pub enum CameraInputEvent {
     /// Rotate the camera about the anchor.
     RotateAnchor(Vec2),
-    /// Translate the camera wrt. its perspective.
+
+    /// Translate the camera with respect to its perspective.
     ///
     /// The translation happens with respect to the perspective of the camera,
     /// so a translation of (1, 0, 0) is likely not going to change the global
     /// transform's translation by (1, 0, 0).
     Translate(Vec3),
+
     /// Roll the camera's view.
     Roll(f32),
+
     /// Zoom the camera.
     ///
     /// The zoom tapers with distance: closer in zooms slow, etc.

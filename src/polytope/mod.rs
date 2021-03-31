@@ -19,6 +19,7 @@ use self::geometry::{Hypersphere, Matrix};
 pub mod cd;
 pub mod convex;
 pub mod geometry;
+pub mod group;
 pub mod off;
 pub mod shapes;
 
@@ -90,6 +91,14 @@ pub trait Polytope: Sized + Clone {
     /// polytope in place.
     fn ditope_mut(&mut self);
 
+    /// Builds a [horotope](https://polytope.miraheze.org/wiki/Horotope) of a
+    /// given polytope.
+    fn horotope(&self) -> Self;
+
+    /// Builds a [horotope](https://polytope.miraheze.org/wiki/Horotope) of a
+    /// given polytope in place.
+    fn horotope_mut(&mut self);
+
     /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
     /// given base.
     fn pyramid(&self) -> Self {
@@ -108,19 +117,36 @@ pub trait Polytope: Sized + Clone {
         Self::duotegum(self, &Self::dyad())
     }
 
+    /// Takes the
+    /// [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product) of
+    /// a set of polytopes.
     fn multipyramid(factors: &[&Self]) -> Self {
         Self::multiproduct(&Self::duopyramid, factors, Self::nullitope())
     }
+
+    /// Takes the
+    /// [prism product](https://polytope.miraheze.org/wiki/Prism_product) of a
+    /// set of polytopes.
     fn multiprism(factors: &[&Self]) -> Self {
         Self::multiproduct(&Self::duoprism, factors, Self::point())
     }
+
+    /// Takes the
+    /// [tegum product](https://polytope.miraheze.org/wiki/Tegum_product) of a
+    /// set of polytopes.
     fn multitegum(factors: &[&Self]) -> Self {
         Self::multiproduct(&Self::duotegum, factors, Self::point())
     }
+
+    /// Takes the
+    /// [comb product](https://polytope.miraheze.org/wiki/Comb_product) of a set
+    /// of polytopes.
     fn multicomb(factors: &[&Self]) -> Self {
         Self::multiproduct(&Self::duocomb, factors, Self::point())
     }
 
+    /// Helper method for applying an associative binary function on a list of
+    /// entries.
     fn multiproduct(
         product: &dyn Fn(&Self, &Self) -> Self,
         factors: &[&Self],
@@ -129,7 +155,11 @@ pub trait Polytope: Sized + Clone {
         match factors.len() {
             // An empty product just evaluates to the identity element.
             0 => identity,
+
+            // A product of one entry is just equal to the entry itself.
             1 => factors[0].clone(),
+
+            // Evaluates larger products recursively.
             _ => {
                 let (&first, factors) = factors.split_first().unwrap();
 
@@ -144,6 +174,7 @@ pub trait Polytope: Sized + Clone {
     fn simplex(rank: isize) -> Self {
         Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize])
     }
+
     fn hypercube(rank: isize) -> Self {
         if rank == -1 {
             Self::nullitope()
@@ -151,6 +182,7 @@ pub trait Polytope: Sized + Clone {
             Self::multiprism(&vec![&Self::dyad(); rank as usize])
         }
     }
+
     fn orthoplex(rank: isize) -> Self {
         if rank == -1 {
             Self::nullitope()
@@ -240,7 +272,7 @@ impl<T> IndexMut<isize> for RankVec<T> {
     }
 }
 
-/// Represents a single element in an [`Abstract`].
+/// A single element in an [`Abstract`].
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Element {
     /// The indices of the subelements of the polytope.
@@ -270,7 +302,7 @@ impl Element {
     }
 }
 
-/// Represents a list of [`Elements`](Element) of the same
+/// A list of [`Elements`](Element) of the same
 /// [rank](https://polytope.miraheze.org/wiki/Rank).
 #[derive(Debug, Clone)]
 pub struct ElementList(Vec<Element>);
@@ -325,8 +357,8 @@ impl DerefMut for ElementList {
 }
 
 #[derive(Debug, Clone)]
-/// Represents the [ranked poset](https://en.wikipedia.org/wiki/Graded_poset)
-/// corresponding to an
+/// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
+/// to an
 /// [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
 pub struct Abstract(RankVec<ElementList>);
 
@@ -377,6 +409,10 @@ impl Abstract {
     fn push_max(&mut self) {
         let facet_count = self.el_count(self.rank());
         self.push(ElementList::max(facet_count));
+    }
+
+    fn insert(&mut self, index: isize, value: ElementList) {
+        self.0.insert((index + 1) as usize, value);
     }
 
     /// Converts a polytope into its dual.
@@ -756,6 +792,19 @@ impl Polytope for Abstract {
         self.push(ElementList::max(2));
     }
 
+    fn horotope(&self) -> Self {
+        let mut clone = self.clone();
+        clone.horotope_mut();
+        clone
+    }
+
+    fn horotope_mut(&mut self) {
+        let min = self[-1][0].clone();
+
+        self[-1].push(min);
+        self.insert(-1, ElementList::max(2));
+    }
+
     fn antiprism(&self) -> Self {
         todo!()
     }
@@ -812,7 +861,7 @@ impl Concrete {
 
     /// Returns the number of dimensions of the space the polytope lives in,
     /// or `None` in the case of the nullitope.
-    pub fn dimension(&self) -> Option<usize> {
+    pub fn dim(&self) -> Option<usize> {
         Some(self.vertices.get(0)?.len())
     }
 
@@ -887,7 +936,7 @@ impl Concrete {
     /// Gets the gravicenter of a polytope, or `None` in the case of the
     /// nullitope.
     pub fn gravicenter(&self) -> Option<Point> {
-        let mut g: Point = vec![0.0; self.dimension()? as usize].into();
+        let mut g: Point = vec![0.0; self.dim()? as usize].into();
 
         for v in &self.vertices {
             g += v;
@@ -971,7 +1020,7 @@ impl Concrete {
     /// facets go through the origin. Returns the dual if successful, and `None`
     /// otherwise.
     pub fn dual_mut(&mut self) -> Option<&mut Self> {
-        self.dual_mut_with_sphere(&Hypersphere::unit(self.dimension().unwrap_or(1)))
+        self.dual_mut_with_sphere(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
     /// Returns the dual of a polytope with a given reciprocation sphere, or
@@ -1071,18 +1120,18 @@ impl Concrete {
     /// Generates the vertices for either a tegum or a pyramid product with two
     /// given vertex sets and a given height.
     fn duopyramid_vertices(p: &[Point], q: &[Point], height: f64, tegum: bool) -> Vec<Point> {
-        let p_dimension = p[0].len();
-        let q_dimension = q[0].len();
+        let p_dim = p[0].len();
+        let q_dim = q[0].len();
 
-        let dimension = p_dimension + q_dimension + tegum as usize;
+        let dim = p_dim + q_dim + tegum as usize;
 
         let mut vertices = Vec::with_capacity(p.len() + q.len());
 
         // The vertices corresponding to products of p's nullitope with q's
         // vertices.
         for q_vertex in q {
-            let mut prod_vertex = Vec::with_capacity(dimension);
-            let pad = p_dimension;
+            let mut prod_vertex = Vec::with_capacity(dim);
+            let pad = p_dim;
 
             // Pads prod_vertex to the left.
             prod_vertex.resize(pad, 0.0);
@@ -1103,7 +1152,7 @@ impl Concrete {
         // The vertices corresponding to products of q's nullitope with p's
         // vertices.
         for p_vertex in p {
-            let mut prod_vertex = Vec::with_capacity(dimension);
+            let mut prod_vertex = Vec::with_capacity(dim);
 
             // Copies p_vertex into prod_vertex.
             for &c in p_vertex.iter() {
@@ -1111,7 +1160,7 @@ impl Concrete {
             }
 
             // Pads prod_vertex to the right.
-            prod_vertex.resize(p_dimension + q_dimension, 0.0);
+            prod_vertex.resize(p_dim + q_dim, 0.0);
 
             // Adds the height, in case of a pyramid product.
             if !tegum {
@@ -1174,7 +1223,7 @@ impl Polytope for Concrete {
     }
 
     fn dyad() -> Self {
-        Self::new(vec![vec![-0.5].into(), vec![-0.5].into()], Abstract::dyad())
+        Self::new(vec![vec![-0.5].into(), vec![0.5].into()], Abstract::dyad())
     }
 
     fn polygon(n: usize) -> Self {
@@ -1217,6 +1266,18 @@ impl Polytope for Concrete {
         self.abs.ditope_mut();
     }
 
+    fn horotope(&self) -> Self {
+        Self {
+            vertices: vec![vec![-0.5].into(), vec![0.5].into()],
+            abs: self.abs.horotope(),
+        }
+    }
+
+    fn horotope_mut(&mut self) {
+        self.vertices = vec![vec![-0.5].into(), vec![0.5].into()];
+        self.abs.horotope_mut();
+    }
+
     fn antiprism(&self) -> Self {
         todo!()
     }
@@ -1228,12 +1289,15 @@ impl Polytope for Concrete {
             let dim = rank as usize;
             let mut vertices = Vec::with_capacity(dim + 1);
 
+            // Adds all points with a single entry equal to √2/2, and all others
+            // equal to 0.
             for i in 0..dim {
                 let mut v = vec![0.0; dim];
                 v[i] = SQRT_2 / 2.0;
                 vertices.push(v.into());
             }
 
+            // Adds the remaining vertex, all of whose coordinates are equal.
             let a = (1.0 - ((dim + 1) as f64).sqrt()) * SQRT_2 / (2.0 * dim as f64);
             vertices.push(vec![a; dim].into());
 
@@ -1266,8 +1330,7 @@ impl IndexMut<isize> for Concrete {
     }
 }
 
-/// Represents a [`Concrete`] polytope, together with a triangulation used to
-/// render it.
+/// A [`Concrete`], together with a triangulation used to render it.
 #[derive(Debug, Clone)]
 pub struct Renderable {
     /// The underlying concrete polytope.
@@ -1281,6 +1344,7 @@ pub struct Renderable {
 }
 
 impl Renderable {
+    /// Generates the triangulation of a `Concrete`.
     pub fn new(concrete: Concrete) -> Self {
         // let vertices = &concrete.vertices;
         let edges = concrete.abs.get(1).unwrap();
@@ -1315,12 +1379,14 @@ impl Renderable {
         }
     }
 
+    /// Gets the coordinates of the vertices, after projecting down into 3D.
     fn get_vertex_coords(&self) -> Vec<[f32; 3]> {
         self.concrete
             .vertices
             .iter()
             .chain(self.extra_vertices.iter())
             .map(|point| {
+                // For now, we do a simple orthogonal projection.
                 let mut iter = point.iter().copied().take(3);
                 let x = iter.next().unwrap_or(0.0);
                 let y = iter.next().unwrap_or(0.0);
@@ -1330,6 +1396,7 @@ impl Renderable {
             .collect()
     }
 
+    /// Generates a mesh from the polytope.
     pub fn get_mesh(&self) -> Mesh {
         let vertices = self.get_vertex_coords();
         let mut indices = Vec::with_capacity(self.triangles.len() * 3);
@@ -1351,9 +1418,10 @@ impl Renderable {
         mesh
     }
 
+    /// Generates the wireframe for a polytope.
     pub fn get_wireframe(&self) -> Mesh {
         let edges = self.concrete.abs.get(1).unwrap();
-        let vertices: Vec<_> = self.get_vertex_coords();
+        let vertices = self.get_vertex_coords();
         let mut indices = Vec::with_capacity(edges.len() * 2);
         for edge in edges.iter() {
             indices.push(edge.subs[0] as u16);
@@ -1375,7 +1443,6 @@ impl Renderable {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     /// Returns a bunch of varied polytopes to run general tests on. Use only

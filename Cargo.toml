@@ -6,14 +6,16 @@ edition = "2018"
 
 [dependencies]
 bevy = "0.4.0"
-scapegoat = "1.0.0"
+bevy_egui = "0.3.0"
+dyn-clone = "1.0.4"
 gcd = "2.0.1"
+itertools = "0.10.0"
 nalgebra = {version = "0.25.1", features = ["serde-serialize"]}
 petgraph = "0.5.1"
 rand = "0.8.3"
 ron = "0.6.4"
+scapegoat = "1.0.0"
 serde = {version = "1.0.123", features = ["derive"]}
-bevy_egui = "0.3.0"
 regex = "1.4.5"
 
 [profile.release]
