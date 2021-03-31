@@ -16,11 +16,11 @@ use geometry::{Hyperplane, Point};
 
 use self::geometry::{Hypersphere, Matrix};
 
+pub mod cd;
 pub mod convex;
 pub mod geometry;
 pub mod off;
 pub mod shapes;
-pub mod cd;
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
 const ELEMENT_NAMES: [&str; 11] = [
