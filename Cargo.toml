@@ -5,6 +5,7 @@ authors = ["Violeta Hernández <vi.hdz.p@gmail.com>", "Grayson Burton <ocornoc@p
 edition = "2018"
 
 [dependencies]
+approx = "0.4.0"
 bevy = "0.4.0"
 bevy_egui = "0.3.0"
 dyn-clone = "1.0.4"

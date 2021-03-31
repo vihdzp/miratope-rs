@@ -2287,6 +2287,7 @@ dependencies = [
 name = "miratope"
 version = "0.1.0"
 dependencies = [
+ "approx",
  "bevy",
  "bevy_egui",
  "dyn-clone",

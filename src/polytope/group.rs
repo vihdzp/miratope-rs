@@ -1,11 +1,19 @@
 //! Contains methods to generate many symmetry groups.
 
+// Circumvents rust-analyzer bug.
+#[allow(unused_imports)]
+use crate::cox;
+
+use super::cox::CoxMatrix;
+use crate::EPS;
+use approx::abs_diff_ne;
 use dyn_clone::DynClone;
 use itertools::iproduct;
 use nalgebra::{DMatrix as Matrix, DVector as Vector, Quaternion};
 use std::{
+    collections::{BTreeMap, VecDeque},
     f64::consts::PI,
-    iter, mem,
+    iter,
     ops::{Deref, DerefMut},
 };
 
@@ -57,34 +65,28 @@ fn mat_to_quat(mat: Matrix<f64>) -> Quaternion<f64> {
 }
 
 /// Converts a quaternion into a matrix, depending on whether it's a left or
-/// right quaternion multiplication. Adapts the formulae from
-/// [Wikipedia](https://en.wikipedia.org/wiki/Rotations_in_4-dimensional_Euclidean_space#Relation_to_quaternions).
-fn quat_to_mat(quat: Quaternion<f64>, left: bool) -> Matrix<f64> {
-    let left = if left { 1.0 } else { -1.0 };
+/// right quaternion multiplication.
+fn quat_to_mat(q: Quaternion<f64>, left: bool) -> Matrix<f64> {
+    let i = Quaternion::new(0.0, 1.0, 0.0, 0.0);
+    let j = Quaternion::new(0.0, 0.0, 1.0, 0.0);
+    let k = Quaternion::new(0.0, 0.0, 0.0, 1.0);
 
-    Matrix::from_iterator(
-        4,
-        4,
-        vec![
-            quat.w,
-            quat.i,
-            quat.j,
-            quat.k,
-            -quat.i,
-            quat.w,
-            left * quat.k,
-            -left * quat.j,
-            -quat.j,
-            -left * quat.k,
-            quat.w,
-            left * quat.i,
-            -quat.k,
-            left * quat.j,
-            -left * quat.i,
-            quat.w,
-        ]
-        .into_iter(),
-    )
+    let qi = if left { q * i } else { i * q };
+    let qj = if left { q * j } else { j * q };
+    let qk = if left { q * k } else { k * q };
+
+    let c1 = q.coords.into_iter().copied();
+    let c2 = qi.coords.into_iter().copied();
+    let c3 = qj.coords.into_iter().copied();
+    let c4 = qk.coords.into_iter().copied();
+
+    // Compensates for the wack storage order.
+    let mut mat = Matrix::from_iterator(4, 4, c1.chain(c2).chain(c3).chain(c4));
+    mat.swap_rows(2, 3);
+    mat.swap_rows(1, 2);
+    mat.swap_rows(0, 1);
+
+    mat
 }
 
 /// An iterator such that `dyn` objects using it can be cloned. Used to get
@@ -284,13 +286,12 @@ pub enum GroupNext {
     New(Matrix<f64>),
 }
 
-/// Represents a [Coxeter
-/// matrix](https://en.wikipedia.org/wiki/Coxeter_group#Coxeter_matrix_and_Schl%C3%A4fli_matrix),
-/// which encodes the angles between the mirrors of the generators of a Coxeter
-/// group.
-struct CoxMatrix(Matrix<f64>);
+#[derive(Clone, Debug)]
+/// A matrix ordered by fuzzy lexicographic ordering. Used to quickly determine
+/// whether an element in a [`GenGroup`] is a duplicate.
+struct OrdMatrix(Matrix<f64>);
 
-impl Deref for CoxMatrix {
+impl Deref for OrdMatrix {
     type Target = Matrix<f64>;
 
     fn deref(&self) -> &Self::Target {
@@ -298,53 +299,50 @@ impl Deref for CoxMatrix {
     }
 }
 
-impl DerefMut for CoxMatrix {
+impl DerefMut for OrdMatrix {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl CoxMatrix {
-    fn from_lin_diagram(diagram: Vec<f64>) -> Self {
-        let dim = diagram.len() + 1;
+impl PartialEq for OrdMatrix {
+    fn eq(&self, other: &Self) -> bool {
+        let mut other = other.iter();
 
-        CoxMatrix(Matrix::from_fn(dim, dim, |mut i, mut j| {
-            // Makes i ≤ j.
-            if i > j {
-                mem::swap(&mut i, &mut j);
-            }
+        for x in self.iter() {
+            let y = other.next().unwrap();
 
-            match j - i {
-                0 => 1.0,
-                1 => diagram[i],
-                _ => 2.0,
+            if abs_diff_ne!(x, y, epsilon = EPS) {
+                return false;
             }
-        }))
+        }
+
+        true
     }
 }
 
-/// Builds a Coxeter matrix for a given linear diagram.
-///
-/// # Examples
-///
-/// ```
-/// # #[macro_use]
-/// # fn main() {
-/// assert_eq!(cox!(4, 3).order(), 48);
-/// # }
-/// ```
-///
-/// # Panics
-/// Panics if the linear diagram doesn't fit in Euclidean space.
-#[allow(unused_macros)]
-#[macro_export]
-macro_rules! cox {
-    ($($x:expr),+) => (
-        Group::cox_group(CoxMatrix::from_lin_diagram(vec![$($x),+])).unwrap()
-    );
-    ($x:expr; $y:expr) => (
-        Group::cox_group(CoxMatrix::from_lin_diagram(vec![$x; $y])).unwrap()
-    )
+impl Eq for OrdMatrix {}
+
+impl PartialOrd for OrdMatrix {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let mut other = other.iter();
+
+        for x in self.iter() {
+            let y = other.next().unwrap();
+
+            if abs_diff_ne!(x, y, epsilon = EPS) {
+                return x.partial_cmp(y);
+            }
+        }
+
+        Some(std::cmp::Ordering::Equal)
+    }
+}
+
+impl Ord for OrdMatrix {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
 }
 
 /// An iterator for a `Group` [generated](https://en.wikipedia.org/wiki/Generator_(mathematics))
@@ -376,12 +374,9 @@ pub struct GenIter {
     /// The elements that have been generated. Will be put into a more clever
     /// structure that's asymptotically more efficient and doesn't need storing
     /// everything at once eventually.
-    elements: Vec<Matrix<f64>>,
+    elements: BTreeMap<OrdMatrix, usize>,
 
-    /// Stores the index in (`elements`)[GenGroup.elements] of the element that is currently being
-    /// handled. All previous ones will have already had their right neighbors
-    /// found. Quirk of the current data structure, subject to change.
-    el_idx: usize,
+    queue: VecDeque<OrdMatrix>,
 
     /// Stores the index in (`generators`)[GenGroup.generators] of the generator
     /// that's being checked. All previous once will have already been
@@ -439,37 +434,54 @@ pub fn refl_mat(n: Vector<f64>) -> Matrix<f64> {
 impl GenIter {
     /// Builds a new group from a set of generators.
     fn new(dim: usize, generators: Vec<Matrix<f64>>) -> Self {
+        let mut queue = VecDeque::new();
+        queue.push_back(OrdMatrix(Matrix::identity(dim, dim)));
+
         Self {
             dim,
             generators,
-            elements: Vec::new(),
-            el_idx: 0,
+            elements: BTreeMap::new(),
+            queue,
             gen_idx: 0,
         }
     }
 
-    /// Determines whether a given element has already been found.
-    fn contains(&self, el: &Matrix<f64>) -> bool {
-        self.elements.iter().any(|search| matrix_approx(search, el))
-    }
+    /// Inserts a new element into the group. Returns whether the element is new.
+    fn insert(&mut self, el: Matrix<f64>) -> bool {
+        let el = OrdMatrix(el);
 
-    /// Inserts a new element into the group. Assumes that we've already checked
-    /// that the element is new.
-    fn insert(&mut self, el: Matrix<f64>) {
-        self.elements.push(el);
+        // If the element is a repeat.
+        if let Some(value) = self.elements.insert(el.clone(), 1) {
+            // Bumps the value by 1, or removes the element if this is the last
+            // time we'll find the element.
+            if value != self.generators.len() - 1 {
+                self.elements.insert(el, value + 1);
+            } else {
+                // self.elements.remove(&el);
+            }
+
+            false
+        }
+        // If the element is new, we add it to the queue as well.
+        else {
+            &self.elements;
+            self.queue.push_back(el);
+
+            true
+        }
     }
 
     /// Gets the next element and the next generator to attempt to multiply.
     /// Advances the iterator.
-    fn next_el_gen(&mut self) -> Option<[&Matrix<f64>; 2]> {
-        let el = self.elements.get(self.el_idx)?;
-        let gen = self.generators.get(self.gen_idx).unwrap();
+    fn next_el_gen(&mut self) -> Option<[Matrix<f64>; 2]> {
+        let el = self.queue.front()?.0.clone();
+        let gen = self.generators[self.gen_idx].clone();
 
         // Advances the indices.
         self.gen_idx += 1;
         if self.gen_idx == self.generators.len() {
             self.gen_idx = 0;
-            self.el_idx += 1;
+            self.queue.pop_front();
         }
 
         Some([el, gen])
@@ -482,22 +494,14 @@ impl GenIter {
         if let Some([el, gen]) = self.next_el_gen() {
             let new_el = el * gen;
 
-            // If the group element is a repeat.
-            if self.contains(&new_el) {
-                GroupNext::Repeat
-            }
-            // If we found something new.
-            else {
-                self.insert(new_el.clone());
+            // If the group element is new.
+            if self.insert(new_el.clone()) {
                 GroupNext::New(new_el)
             }
-        }
-        // If this is the first element we generate.
-        else if self.elements.is_empty() {
-            let dim = self.dim;
-            let i = Matrix::identity(dim, dim);
-            self.insert(i.clone());
-            GroupNext::New(i)
+            // If we found a repeat.
+            else {
+                GroupNext::Repeat
+            }
         }
         // If we already went through the entire group.
         else {
@@ -584,7 +588,7 @@ mod tests {
     #[test]
     fn a_quat() {
         test(
-            cox!(3.0, 3.0).quaternions(true).unwrap(),
+            cox!(3.0, 3.0).left_quaternions().unwrap(),
             24,
             24,
             &"Quaternion A3",
@@ -638,12 +642,25 @@ mod tests {
         test(cox!(5.0, 3.0, 3.0), 14400, 7200, &"H4");
     }
 
-    /*
-     * Here goes future code to test the E*n* symmetries.
+    /// Tests the E*n* symmetries... or rather, tests one of them. E7 and E8 are
+    /// currently out of reach.
+    #[test]
     fn e() {
+        // In the future, we'll have better code for this, I hope.
+        let e6 = Group::cox_group(CoxMatrix(Matrix::from_iterator(
+            6,
+            6,
+            vec![
+                1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 3.0,
+                2.0, 3.0, 2.0, 2.0, 3.0, 1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 2.0, 2.0, 2.0,
+                3.0, 2.0, 2.0, 1.0,
+            ]
+            .into_iter(),
+        )))
+        .unwrap();
 
+        test(e6, 51840, 25920, &"E6");
     }
-     */
 
     #[test]
     /// Tests the direct product of A3 with itself.

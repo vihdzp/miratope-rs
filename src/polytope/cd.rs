@@ -1,5 +1,5 @@
-use petgraph::graph::NodeIndex;
 use petgraph::{graph::Graph, Undirected};
+use petgraph::{graph::NodeIndex};
 use regex::Regex;
 use std::f64;
 use std::{fmt::Display, str::Chars};
@@ -16,6 +16,12 @@ struct Cd(
     LaceRing{lace_len: f64, count: u32, graphs: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
     */
 );
+
+impl Cd {
+    pub fn dimension(&self) -> usize {
+        self.0.node_count()
+    }
+}
 
 impl Display for Cd {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

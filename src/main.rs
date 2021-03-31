@@ -62,6 +62,8 @@ mod input;
 mod no_cull_pipeline;
 mod polytope;
 
+const EPS: f64 = 1e-9;
+
 /// Loads all of the necessary systems for the application to run.
 fn main() {
     App::build()
