@@ -146,11 +146,10 @@ fn setup(
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
     let poly = off::from_path(&"gogishi.off").unwrap();
-//    println!("{}", off::to_src(&poly, Default::default()));
-    
-    
+    //    println!("{}", off::to_src(&poly, Default::default()));
+
     let poly = Renderable::new(poly);
-    
+
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
         no_cull_pipeline::build_no_cull_pipeline(&mut shaders),

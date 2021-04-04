@@ -901,8 +901,6 @@ impl Concrete {
 
         self
     }
-    
-    
 
     /// Calculates the circumsphere of a polytope. Returns it if the polytope
     /// has one, and returns `None` otherwise.
@@ -1391,9 +1389,15 @@ impl Renderable {
             .map(|point| {
                 let mut point2 = point.clone();
                 while point2.len() > 3 {
-                  let dim = point2.len();
-                  let project = &Matrix::from_fn(dim-1, dim, |i, j| if i == j {1.0/(proj as f64 - point[point.len()-1])} else {0.0});
-                  point2 = project * point2.clone();
+                    let dim = point2.len();
+                    let project = &Matrix::from_fn(dim - 1, dim, |i, j| {
+                        if i == j {
+                            1.0 / (proj as f64 - point[point.len() - 1])
+                        } else {
+                            0.0
+                        }
+                    });
+                    point2 = project * point2.clone();
                 }
                 // For now, we do a simple orthogonal projection.
                 let mut iter = point2.iter().copied().take(3);
