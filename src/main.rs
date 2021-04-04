@@ -152,12 +152,13 @@ fn setup(
     // extra facets and elements. Be careful.
     let poly = Group::swirl(
         cox!(3.0, 3.0),
-        Group::direct_product(cox!(3.0), Group::trivial(1)),
+        Group::direct_product(cox!(5.0), Group::trivial(1)),
     )
     .unwrap()
-    .into_polytope(vec![1.0, 0.0, 0.0, 0.0].into());
+    .into_polytope(vec![0.31, 0.41, 0.59, 0.26].into());
 
     // Creates OFFBuilder code for a polytope.
+    /*
     for v in &poly.vertices {
         print!("coordinates.push([");
         for x in v.iter() {
@@ -165,6 +166,7 @@ fn setup(
         }
         println!("]);");
     }
+    */
 
     let poly = Renderable::new(poly);
 

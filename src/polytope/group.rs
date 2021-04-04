@@ -163,10 +163,29 @@ impl Group {
         Self::matrix_product(g.left_quaternions()?, h.right_quaternions()?)
     }
 
-    /// Returns a new `Group` whose elements have all been generated already,
-    /// so that they can be used multiple times quickly.
+    /// Returns a new group whose elements have all been generated already, so
+    /// that they can be used multiple times quickly.
     pub fn cache(self) -> Self {
         self.elements().into()
+    }
+
+    /// Returns the exact same group, but now asserts that each generated
+    /// element has the appropriate dimension. Used for debugging purposes.
+    pub fn debug(self) -> Self {
+        let dim = self.dim;
+
+        Self {
+            dim,
+            iter: Box::new(self.iter.map(move |x| {
+                assert_eq!(
+                    x.ncols(),
+                    dim,
+                    "Size of matrix does not match expected dimension."
+                );
+
+                x
+            })),
+        }
     }
 
     /// Generates the trivial group of a certain dimension.
@@ -312,9 +331,11 @@ pub enum GroupNext {
     New(Matrix<f64>),
 }
 
+#[allow(clippy::upper_case_acronyms)]
 type MatrixMN<R, C> = nalgebra::Matrix<f64, R, C, VecStorage<f64, R, C>>;
 
 #[derive(Clone, Debug)]
+#[allow(clippy::upper_case_acronyms)]
 /// A matrix ordered by fuzzy lexicographic ordering. Used to quickly
 /// determine whether an element in a [`GenIter`](super::GenIter) is a
 /// duplicate.
@@ -572,18 +593,7 @@ mod tests {
     /// Tests a given symmetry group.
     fn test(group: Group, order: usize, rot_order: usize, name: &str) {
         // Makes testing multiple derived groups faster.
-        let mut group = group.cache();
-        let dim = group.dim;
-
-        // Asserts that the group's elements all have the correct dimension.
-        group.iter = Box::new(group.iter.map(move |x| {
-            assert_eq!(
-                x.ncols(),
-                dim,
-                "Group element doesn't have the expected dimension."
-            );
-            x
-        }));
+        let group = group.cache().debug();
 
         // Tests the order of the group.
         assert_eq!(
