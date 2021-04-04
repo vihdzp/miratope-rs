@@ -4,12 +4,12 @@
 #[allow(unused_imports)]
 use crate::{cox, EPS};
 
-use super::{convex, cox::CoxMatrix, geometry::Point, Concrete};
+use super::{cox::CoxMatrix, geometry::Point};
 use approx::{abs_diff_ne, relative_eq};
 use dyn_clone::DynClone;
 use nalgebra::{
-    storage::Storage, DMatrix as Matrix, DVector as Vector, Dim, Dynamic, Quaternion, VecStorage,
-    U1,
+    allocator::Allocator, storage::Owned, DMatrix as Matrix, DVector as Vector, DefaultAllocator,
+    Dim, Dynamic, Quaternion, U1,
 };
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -296,14 +296,16 @@ impl Group {
         })
     }
 
-    pub fn into_polytope(self, p: Point) -> Concrete {
+    /// Generates a polytope as the convex hull of the image of a point under a
+    /// given symmetry group.
+    pub fn into_polytope(self, p: Point) -> Vec<Point> {
         let mut points = BTreeSet::new();
 
         for m in self.iter {
             points.insert(OrdPoint::new(m * &p));
         }
 
-        convex::convex_hull(points.into_iter().map(|x| x.0).collect())
+        points.into_iter().map(|x| x.0).collect()
     }
 }
 
@@ -332,7 +334,7 @@ pub enum GroupNext {
 }
 
 #[allow(clippy::upper_case_acronyms)]
-type MatrixMN<R, C> = nalgebra::Matrix<f64, R, C, VecStorage<f64, R, C>>;
+type MatrixMN<R, C> = nalgebra::Matrix<f64, R, C, Owned<f64, R, C>>;
 
 #[derive(Clone, Debug)]
 #[allow(clippy::upper_case_acronyms)]
@@ -341,11 +343,11 @@ type MatrixMN<R, C> = nalgebra::Matrix<f64, R, C, VecStorage<f64, R, C>>;
 /// duplicate.
 pub struct OrdMatrixMN<R: Dim, C: Dim>(pub MatrixMN<R, C>)
 where
-    VecStorage<f64, R, C>: Storage<f64, R, C>;
+    DefaultAllocator: Allocator<f64, R, C>;
 
 impl<R: Dim, C: Dim> std::ops::Deref for OrdMatrixMN<R, C>
 where
-    VecStorage<f64, R, C>: Storage<f64, R, C>,
+    DefaultAllocator: Allocator<f64, R, C>,
 {
     type Target = MatrixMN<R, C>;
 
@@ -356,7 +358,7 @@ where
 
 impl<R: Dim, C: Dim> std::ops::DerefMut for OrdMatrixMN<R, C>
 where
-    VecStorage<f64, R, C>: Storage<f64, R, C>,
+    DefaultAllocator: Allocator<f64, R, C>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
@@ -365,7 +367,7 @@ where
 
 impl<R: Dim, C: Dim> PartialEq for OrdMatrixMN<R, C>
 where
-    VecStorage<f64, R, C>: Storage<f64, R, C>,
+    DefaultAllocator: Allocator<f64, R, C>,
 {
     fn eq(&self, other: &Self) -> bool {
         let mut other = other.iter();
@@ -382,11 +384,11 @@ where
     }
 }
 
-impl<R: Dim, C: Dim> Eq for OrdMatrixMN<R, C> where VecStorage<f64, R, C>: Storage<f64, R, C> {}
+impl<R: Dim, C: Dim> Eq for OrdMatrixMN<R, C> where DefaultAllocator: Allocator<f64, R, C> {}
 
 impl<R: Dim, C: Dim> PartialOrd for OrdMatrixMN<R, C>
 where
-    VecStorage<f64, R, C>: Storage<f64, R, C>,
+    DefaultAllocator: Allocator<f64, R, C>,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         let mut other = other.iter();
@@ -405,7 +407,7 @@ where
 
 impl<R: Dim, C: Dim> Ord for OrdMatrixMN<R, C>
 where
-    VecStorage<f64, R, C>: Storage<f64, R, C>,
+    DefaultAllocator: Allocator<f64, R, C>,
 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other).unwrap()
@@ -414,7 +416,7 @@ where
 
 impl<R: Dim, C: Dim> OrdMatrixMN<R, C>
 where
-    VecStorage<f64, R, C>: Storage<f64, R, C>,
+    DefaultAllocator: Allocator<f64, R, C>,
 {
     pub fn new(mat: MatrixMN<R, C>) -> Self {
         Self(mat)

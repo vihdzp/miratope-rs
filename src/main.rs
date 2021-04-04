@@ -146,11 +146,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    // Since the convex hull code is not yet built to handle polytopes with
-    // non-simplicial facets (something Wythoffians aren't known for), most
-    // things you put here will break. Those that don't will have a bunch of
-    // extra facets and elements. Be careful.
-    let poly = Group::swirl(
+    let vertices = Group::swirl(
         cox!(3.0, 3.0),
         Group::direct_product(cox!(5.0), Group::trivial(1)),
     )
@@ -158,17 +154,15 @@ fn setup(
     .into_polytope(vec![0.31, 0.41, 0.59, 0.26].into());
 
     // Creates OFFBuilder code for a polytope.
-    /*
-    for v in &poly.vertices {
+    for v in vertices {
         print!("coordinates.push([");
-        for x in v.iter() {
+        for x in v.into_iter() {
             print!("{}, ", x);
         }
         println!("]);");
     }
-    */
 
-    let poly = Renderable::new(poly);
+    let poly = Renderable::new(Concrete::hypercube(3));
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
