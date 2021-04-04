@@ -901,6 +901,8 @@ impl Concrete {
 
         self
     }
+    
+    
 
     /// Calculates the circumsphere of a polytope. Returns it if the polytope
     /// has one, and returns `None` otherwise.
@@ -1381,14 +1383,20 @@ impl Renderable {
     }
 
     /// Gets the coordinates of the vertices, after projecting down into 3D.
-    fn get_vertex_coords(&self) -> Vec<[f32; 3]> {
+    fn get_vertex_coords(&self, proj: f32) -> Vec<[f32; 3]> {
         self.concrete
             .vertices
             .iter()
             .chain(self.extra_vertices.iter())
             .map(|point| {
+                let mut point2 = point.clone();
+                while point2.len() > 3 {
+                  let dim = point2.len();
+                  let project = &Matrix::from_fn(dim-1, dim, |i, j| if i == j {1.0/(proj as f64 - point[point.len()-1])} else {0.0});
+                  point2 = project * point2.clone();
+                }
                 // For now, we do a simple orthogonal projection.
-                let mut iter = point.iter().copied().take(3);
+                let mut iter = point2.iter().copied().take(3);
                 let x = iter.next().unwrap_or(0.0);
                 let y = iter.next().unwrap_or(0.0);
                 let z = iter.next().unwrap_or(0.0);
@@ -1398,8 +1406,8 @@ impl Renderable {
     }
 
     /// Generates a mesh from the polytope.
-    pub fn get_mesh(&self) -> Mesh {
-        let vertices = self.get_vertex_coords();
+    pub fn get_mesh(&self, proj: f32) -> Mesh {
+        let vertices = self.get_vertex_coords(proj);
         let mut indices = Vec::with_capacity(self.triangles.len() * 3);
         for &[i, j, k] in &self.triangles {
             indices.push(i as u16);
@@ -1420,9 +1428,9 @@ impl Renderable {
     }
 
     /// Generates the wireframe for a polytope.
-    pub fn get_wireframe(&self) -> Mesh {
+    pub fn get_wireframe(&self, proj: f32) -> Mesh {
         let edges = self.concrete.abs.get(1).unwrap();
-        let vertices = self.get_vertex_coords();
+        let vertices = self.get_vertex_coords(proj);
         let mut indices = Vec::with_capacity(edges.len() * 2);
         for edge in edges.iter() {
             indices.push(edge.subs[0] as u16);

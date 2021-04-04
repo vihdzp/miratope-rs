@@ -145,10 +145,12 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::orthoplex(3).prism();
-    println!("{}", off::to_src(&poly, Default::default()));
+    let poly = off::from_path(&"gogishi.off").unwrap();
+//    println!("{}", off::to_src(&poly, Default::default()));
+    
+    
     let poly = Renderable::new(poly);
-
+    
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
         no_cull_pipeline::build_no_cull_pipeline(&mut shaders),
@@ -166,7 +168,7 @@ fn setup(
 
     commands
         .spawn(PbrNoBackfaceBundle {
-            mesh: meshes.add(poly.get_mesh()),
+            mesh: meshes.add(poly.get_mesh(0.1)),
             visible: Visible {
                 is_visible: false,
                 ..Default::default()
@@ -176,7 +178,7 @@ fn setup(
         })
         .with_children(|cb| {
             cb.spawn(PbrNoBackfaceBundle {
-                mesh: meshes.add(poly.get_wireframe()),
+                mesh: meshes.add(poly.get_wireframe(0.1)),
                 material: wf_unselected,
                 ..Default::default()
             });
@@ -214,12 +216,12 @@ fn update_changed_polytopes(
 ) {
     for (poly, mesh_handle, children) in polies.iter() {
         let mesh: &mut Mesh = meshes.get_mut(mesh_handle).unwrap();
-        *mesh = poly.get_mesh();
+        *mesh = poly.get_mesh(0.1);
 
         for child in children.iter() {
             if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {
                 let wf: &mut Mesh = meshes.get_mut(wf_handle).unwrap();
-                *wf = poly.get_wireframe();
+                *wf = poly.get_wireframe(0.1);
 
                 break;
             }
