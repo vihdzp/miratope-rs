@@ -4,7 +4,7 @@ use std::{
 };
 
 use super::{
-    geometry::{Subspace, Point},
+    geometry::{Point, Subspace},
     Abstract, Concrete, Element, ElementList,
 };
 
