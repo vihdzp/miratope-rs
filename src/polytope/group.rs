@@ -5,16 +5,14 @@
 use crate::cox;
 
 use super::cox::CoxMatrix;
-use crate::EPS;
 use approx::abs_diff_ne;
 use dyn_clone::DynClone;
 use itertools::iproduct;
-use nalgebra::{DMatrix as Matrix, DVector as Vector, Quaternion};
+use nalgebra::{DMatrix as Matrix, DVector as Vector, Dynamic, Quaternion, U1};
 use std::{
     collections::{BTreeMap, VecDeque},
     f64::consts::PI,
     iter,
-    ops::{Deref, DerefMut},
 };
 
 /// Converts a 3D rotation matrix into a quaternion. Uses the code from
@@ -124,6 +122,7 @@ impl Group {
         }
     }
 
+    /// Builds either a left or a right quaternion group from a 3D group.
     fn quaternions(self, left: bool) -> Option<Self> {
         if self.dim != 3 {
             return None;
@@ -144,12 +143,19 @@ impl Group {
         })
     }
 
+    /// Builds a left quaternion group from a 3D group.
     pub fn left_quaternions(self) -> Option<Self> {
         self.quaternions(true)
     }
 
+    /// Builds a right quaternion group from a 3D group.
     pub fn right_quaternions(self) -> Option<Self> {
         self.quaternions(false)
+    }
+
+    /// Returns the swirl symmetry group of two 3D groups.
+    pub fn swirl(g: Self, h: Self) -> Option<Self> {
+        Self::matrix_product(g.left_quaternions()?, h.right_quaternions()?)
     }
 
     /// Returns a new `Group` whose elements have all been generated already,
@@ -166,7 +172,8 @@ impl Group {
         }
     }
 
-    /// Generates the trivial group of a certain dimension.
+    /// Generates the group with the identity and a central inversion of a
+    /// certain dimension.
     fn central_inv(dim: usize) -> Self {
         Self {
             dim,
@@ -216,16 +223,55 @@ impl Group {
 
     /// Generates the direct product of two groups. Uses the specified function
     /// to uniquely map the ordered pairs of matrices into other matrices.
-    fn direct_product(
+    pub fn fn_product<'a>(
         g: Self,
         h: Self,
         dim: usize,
-        product: &'static dyn Fn((Matrix<f64>, Matrix<f64>)) -> Matrix<f64>,
+        product: (impl FnMut((Matrix<f64>, Matrix<f64>)) -> Matrix<f64> + Clone + 'static),
     ) -> Self {
         Self {
             dim,
             iter: Box::new(iproduct!(g.iter, h.iter).map(product)),
         }
+    }
+
+    /// Returns the group determined by all products between elements of the
+    /// first and the second group. **Is meant only for groups that commute with
+    /// one another.**
+    pub fn matrix_product(g: Self, h: Self) -> Option<Self> {
+        // The two matrices must have the same size.
+        if g.dim != h.dim {
+            return None;
+        }
+
+        let dim = g.dim;
+        Some(Self::fn_product(g, h, dim, |(mat1, mat2)| mat1 * mat2))
+    }
+
+    /// Calculates the direct product of two groups. Pairs of matrices are then
+    /// mapped to their [direct sum](https://en.wikipedia.org/wiki/Block_matrix#Direct_sum).
+    pub fn direct_product(g: Self, h: Self) -> Self {
+        let dim1 = g.dim;
+        let dim2 = h.dim;
+        let dim = dim1 + dim2;
+
+        Self::fn_product(g, h, dim, move |(mat1, mat2)| {
+            Matrix::from_fn(dim, dim, |i, j| {
+                if i < dim1 {
+                    if j < dim1 {
+                        mat1[(i, j)]
+                    } else {
+                        0.0
+                    }
+                } else {
+                    if j >= dim1 {
+                        mat2[(i - dim1, j - dim1)]
+                    } else {
+                        0.0
+                    }
+                }
+            })
+        })
     }
 }
 
@@ -241,39 +287,6 @@ impl From<Vec<Matrix<f64>>> for Group {
     }
 }
 
-mod product {
-    use nalgebra::DMatrix as Matrix;
-
-    /// Takes the normal matrix product of a pair of matrices.
-    pub fn matrix((mat1, mat2): (Matrix<f64>, Matrix<f64>)) -> Matrix<f64> {
-        mat1 * mat2
-    }
-
-    /// Takes the [direct sum](https://en.wikipedia.org/wiki/Block_matrix#Direct_sum)
-    /// of a pair of matrices.
-    pub fn direct_sum((mat1, mat2): (Matrix<f64>, Matrix<f64>)) -> Matrix<f64> {
-        let dim1 = mat1.ncols();
-        let dim2 = mat2.ncols();
-        let dim = dim1 + dim2;
-
-        let mut mat = Matrix::zeros(dim, dim);
-
-        for i in 0..dim1 {
-            for j in 0..dim1 {
-                mat[(i, j)] = mat1[(i, j)];
-            }
-        }
-
-        for i in 0..dim2 {
-            for j in 0..dim2 {
-                mat[(i + dim1, j + dim1)] = mat2[(i, j)];
-            }
-        }
-
-        mat
-    }
-}
-
 /// The result of trying to get the next element in a group.
 pub enum GroupNext {
     /// We've already found all elements of the group.
@@ -286,64 +299,108 @@ pub enum GroupNext {
     New(Matrix<f64>),
 }
 
-#[derive(Clone, Debug)]
-/// A matrix ordered by fuzzy lexicographic ordering. Used to quickly determine
-/// whether an element in a [`GenGroup`] is a duplicate.
-struct OrdMatrix(Matrix<f64>);
+mod ord_matrix {
+    use std::ops::{Deref, DerefMut};
 
-impl Deref for OrdMatrix {
-    type Target = Matrix<f64>;
+    use crate::EPS;
+    use approx::abs_diff_ne;
+    use nalgebra::{storage::Storage, Dim, Dynamic, VecStorage};
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+    // TODO: We don't need a VecStorage all of the time, but I haven't figured
+    // out a better signature.
+    type Matrix<R, C> = nalgebra::Matrix<f64, R, C, VecStorage<f64, Dynamic, Dynamic>>;
 
-impl DerefMut for OrdMatrix {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
+    #[derive(Clone, Debug)]
+    /// A matrix ordered by fuzzy lexicographic ordering. Used to quickly determine
+    /// whether an element in a [`GenGroup`] is a duplicate.
+    pub struct OrdMatrix<R: Dim, C: Dim>(pub Matrix<R, C>)
+    where
+        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>;
 
-impl PartialEq for OrdMatrix {
-    fn eq(&self, other: &Self) -> bool {
-        let mut other = other.iter();
+    impl<R: Dim, C: Dim> Deref for OrdMatrix<R, C>
+    where
+        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>,
+    {
+        type Target = Matrix<R, C>;
 
-        for x in self.iter() {
-            let y = other.next().unwrap();
-
-            if abs_diff_ne!(x, y, epsilon = EPS) {
-                return false;
-            }
+        fn deref(&self) -> &Self::Target {
+            &self.0
         }
-
-        true
     }
-}
 
-impl Eq for OrdMatrix {}
-
-impl PartialOrd for OrdMatrix {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let mut other = other.iter();
-
-        for x in self.iter() {
-            let y = other.next().unwrap();
-
-            if abs_diff_ne!(x, y, epsilon = EPS) {
-                return x.partial_cmp(y);
-            }
+    impl<R: Dim, C: Dim> DerefMut for OrdMatrix<R, C>
+    where
+        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>,
+    {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
         }
+    }
 
-        Some(std::cmp::Ordering::Equal)
+    impl<R: Dim, C: Dim> PartialEq for OrdMatrix<R, C>
+    where
+        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>,
+    {
+        fn eq(&self, other: &Self) -> bool {
+            let mut other = other.iter();
+
+            for x in self.iter() {
+                let y = other.next().unwrap();
+
+                if abs_diff_ne!(x, y, epsilon = EPS) {
+                    return false;
+                }
+            }
+
+            true
+        }
+    }
+
+    impl<R: Dim, C: Dim> Eq for OrdMatrix<R, C> where
+        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>
+    {
+    }
+
+    impl<R: Dim, C: Dim> PartialOrd for OrdMatrix<R, C>
+    where
+        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>,
+    {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            let mut other = other.iter();
+
+            for x in self.iter() {
+                let y = other.next().unwrap();
+
+                if abs_diff_ne!(x, y, epsilon = EPS) {
+                    return x.partial_cmp(y);
+                }
+            }
+
+            Some(std::cmp::Ordering::Equal)
+        }
+    }
+
+    impl<R: Dim, C: Dim> Ord for OrdMatrix<R, C>
+    where
+        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>,
+    {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            self.partial_cmp(other).unwrap()
+        }
+    }
+
+    impl<R: Dim, C: Dim> OrdMatrix<R, C>
+    where
+        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>,
+    {
+        pub fn new(mat: Matrix<R, C>) -> Self {
+            Self(mat)
+        }
     }
 }
 
-impl Ord for OrdMatrix {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
-    }
-}
+type OrdMatrix = ord_matrix::OrdMatrix<Dynamic, Dynamic>;
+type OrdPoint = ord_matrix::OrdMatrix<U1, Dynamic>;
 
 /// An iterator for a `Group` [generated](https://en.wikipedia.org/wiki/Generator_(mathematics))
 /// by a set of floating point matrices. Its elements are built in a BFS order.
@@ -423,13 +480,13 @@ impl GenIter {
     fn new(dim: usize, generators: Vec<Matrix<f64>>) -> Self {
         // Initializes the queue with only the identity matrix.
         let mut queue = VecDeque::new();
-        queue.push_back(OrdMatrix(Matrix::identity(dim, dim)));
+        queue.push_back(OrdMatrix::new(Matrix::identity(dim, dim)));
 
         // We say that the identity has been found zero times. This is a special
         // case that ensures that neither the identity is queued nor found
         // twice.
         let mut elements = BTreeMap::new();
-        elements.insert(OrdMatrix(Matrix::identity(dim, dim)), 0);
+        elements.insert(OrdMatrix::new(Matrix::identity(dim, dim)), 0);
 
         Self {
             dim,
@@ -442,7 +499,7 @@ impl GenIter {
 
     /// Inserts a new element into the group. Returns whether the element is new.
     fn insert(&mut self, el: Matrix<f64>) -> bool {
-        let el = OrdMatrix(el);
+        let el = OrdMatrix::new(el);
 
         // If the element has been found before.
         if let Some(value) = self.elements.insert(el.clone(), 1) {
@@ -513,8 +570,21 @@ mod tests {
 
     /// Tests a given symmetry group.
     fn test(group: Group, order: usize, rot_order: usize, name: &str) {
-        let group = group.cache();
+        // Makes testing multiple derived groups faster.
+        let mut group = group.cache();
+        let dim = group.dim;
 
+        // Asserts that the group's elements all have the correct dimension.
+        group.iter = Box::new(group.iter.map(move |x| {
+            assert_eq!(
+                x.ncols(),
+                dim,
+                "Group element doesn't have the expected dimension."
+            );
+            x
+        }));
+
+        // Tests the order of the group.
         assert_eq!(
             group.clone().order(),
             order,
@@ -522,6 +592,7 @@ mod tests {
             name
         );
 
+        // Tests the order of the rotational subgroup.
         assert_eq!(
             group.rotations().order(),
             rot_order,
@@ -598,7 +669,7 @@ mod tests {
             order *= n + 1;
 
             test(
-                Group::direct_product(cox!(3.0; n - 1), Group::central_inv(n), n, &product::matrix),
+                Group::matrix_product(cox!(3.0; n - 1), Group::central_inv(n)).unwrap(),
                 order,
                 order / 2,
                 &format!("A{}", n),
@@ -660,7 +731,7 @@ mod tests {
     /// Tests the direct product of A3 with itself.
     fn a3xa3() {
         let a3 = cox!(3.0, 3.0);
-        let g = Group::direct_product(a3.clone(), a3.clone(), 6, &product::direct_sum);
+        let g = Group::direct_product(a3.clone(), a3.clone());
         test(g, 576, 288, &"A3×A3");
     }
 }
