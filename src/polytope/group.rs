@@ -2,13 +2,15 @@
 
 // Circumvents rust-analyzer bug.
 #[allow(unused_imports)]
-use crate::cox;
+use crate::{cox, EPS};
 
-use super::{cox::CoxMatrix, geometry::Point};
-use approx::abs_diff_ne;
+use super::{convex, cox::CoxMatrix, geometry::Point, Concrete};
+use approx::{abs_diff_ne, relative_eq};
 use dyn_clone::DynClone;
-use itertools::iproduct;
-use nalgebra::{DMatrix as Matrix, DVector as Vector, Dynamic, Quaternion, U1};
+use nalgebra::{
+    storage::Storage, DMatrix as Matrix, DVector as Vector, Dim, Dynamic, Quaternion, VecStorage,
+    U1,
+};
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     f64::consts::PI,
@@ -18,7 +20,10 @@ use std::{
 /// Converts a 3D rotation matrix into a quaternion. Uses the code from
 /// [Day (2015)](https://d3cw3dd2w32x2b.cloudfront.net/wp-content/uploads/2015/01/matrix-to-quat.pdf).
 fn mat_to_quat(mat: Matrix<f64>) -> Quaternion<f64> {
-    debug_assert!(mat.determinant() > 0.0);
+    debug_assert!(
+        relative_eq!(mat.determinant(), 1.0, epsilon = EPS),
+        "Only matrices with determinant 1 can be turned into quaternions."
+    );
 
     let t;
     let q;
@@ -223,7 +228,7 @@ impl Group {
 
     /// Generates the direct product of two groups. Uses the specified function
     /// to uniquely map the ordered pairs of matrices into other matrices.
-    pub fn fn_product<'a>(
+    pub fn fn_product(
         g: Self,
         h: Self,
         dim: usize,
@@ -231,7 +236,7 @@ impl Group {
     ) -> Self {
         Self {
             dim,
-            iter: Box::new(iproduct!(g.iter, h.iter).map(product)),
+            iter: Box::new(itertools::iproduct!(g.iter, h.iter).map(product)),
         }
     }
 
@@ -272,14 +277,14 @@ impl Group {
         })
     }
 
-    pub fn into_polytope(self, p: Point) -> Vec<Point> {
+    pub fn into_polytope(self, p: Point) -> Concrete {
         let mut points = BTreeSet::new();
 
         for m in self.iter {
             points.insert(OrdPoint::new(m * &p));
         }
 
-        points.into_iter().map(|x| x.0).collect()
+        convex::convex_hull(points.into_iter().map(|x| x.0).collect())
     }
 }
 
@@ -307,105 +312,96 @@ pub enum GroupNext {
     New(Matrix<f64>),
 }
 
-mod ord_matrix {
-    use std::ops::{Deref, DerefMut};
+type MatrixMN<R, C> = nalgebra::Matrix<f64, R, C, VecStorage<f64, R, C>>;
 
-    use crate::EPS;
-    use approx::abs_diff_ne;
-    use nalgebra::{storage::Storage, Dim, VecStorage};
+#[derive(Clone, Debug)]
+/// A matrix ordered by fuzzy lexicographic ordering. Used to quickly
+/// determine whether an element in a [`GenIter`](super::GenIter) is a
+/// duplicate.
+pub struct OrdMatrixMN<R: Dim, C: Dim>(pub MatrixMN<R, C>)
+where
+    VecStorage<f64, R, C>: Storage<f64, R, C>;
 
-    // TODO: We don't need a VecStorage all of the time, but I haven't figured
-    // out a better signature.
-    type Matrix<R, C> = nalgebra::Matrix<f64, R, C, VecStorage<f64, R, C>>;
+impl<R: Dim, C: Dim> std::ops::Deref for OrdMatrixMN<R, C>
+where
+    VecStorage<f64, R, C>: Storage<f64, R, C>,
+{
+    type Target = MatrixMN<R, C>;
 
-    #[derive(Clone, Debug)]
-    /// A matrix ordered by fuzzy lexicographic ordering. Used to quickly determine
-    /// whether an element in a [`GenGroup`] is a duplicate.
-    pub struct OrdMatrix<R: Dim, C: Dim>(pub Matrix<R, C>)
-    where
-        VecStorage<f64, R, C>: Storage<f64, R, C>;
-
-    impl<R: Dim, C: Dim> Deref for OrdMatrix<R, C>
-    where
-        VecStorage<f64, R, C>: Storage<f64, R, C>,
-    {
-        type Target = Matrix<R, C>;
-
-        fn deref(&self) -> &Self::Target {
-            &self.0
-        }
-    }
-
-    impl<R: Dim, C: Dim> DerefMut for OrdMatrix<R, C>
-    where
-        VecStorage<f64, R, C>: Storage<f64, R, C>,
-    {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            &mut self.0
-        }
-    }
-
-    impl<R: Dim, C: Dim> PartialEq for OrdMatrix<R, C>
-    where
-        VecStorage<f64, R, C>: Storage<f64, R, C>,
-    {
-        fn eq(&self, other: &Self) -> bool {
-            let mut other = other.iter();
-
-            for x in self.iter() {
-                let y = other.next().unwrap();
-
-                if abs_diff_ne!(x, y, epsilon = EPS) {
-                    return false;
-                }
-            }
-
-            true
-        }
-    }
-
-    impl<R: Dim, C: Dim> Eq for OrdMatrix<R, C> where VecStorage<f64, R, C>: Storage<f64, R, C> {}
-
-    impl<R: Dim, C: Dim> PartialOrd for OrdMatrix<R, C>
-    where
-        VecStorage<f64, R, C>: Storage<f64, R, C>,
-    {
-        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            let mut other = other.iter();
-
-            for x in self.iter() {
-                let y = other.next().unwrap();
-
-                if abs_diff_ne!(x, y, epsilon = EPS) {
-                    return x.partial_cmp(y);
-                }
-            }
-
-            Some(std::cmp::Ordering::Equal)
-        }
-    }
-
-    impl<R: Dim, C: Dim> Ord for OrdMatrix<R, C>
-    where
-        VecStorage<f64, R, C>: Storage<f64, R, C>,
-    {
-        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-            self.partial_cmp(other).unwrap()
-        }
-    }
-
-    impl<R: Dim, C: Dim> OrdMatrix<R, C>
-    where
-        VecStorage<f64, R, C>: Storage<f64, R, C>,
-    {
-        pub fn new(mat: Matrix<R, C>) -> Self {
-            Self(mat)
-        }
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
-type OrdMatrix = ord_matrix::OrdMatrix<Dynamic, Dynamic>;
-type OrdPoint = ord_matrix::OrdMatrix<Dynamic, U1>;
+impl<R: Dim, C: Dim> std::ops::DerefMut for OrdMatrixMN<R, C>
+where
+    VecStorage<f64, R, C>: Storage<f64, R, C>,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<R: Dim, C: Dim> PartialEq for OrdMatrixMN<R, C>
+where
+    VecStorage<f64, R, C>: Storage<f64, R, C>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        let mut other = other.iter();
+
+        for x in self.iter() {
+            let y = other.next().unwrap();
+
+            if abs_diff_ne!(x, y, epsilon = EPS) {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+impl<R: Dim, C: Dim> Eq for OrdMatrixMN<R, C> where VecStorage<f64, R, C>: Storage<f64, R, C> {}
+
+impl<R: Dim, C: Dim> PartialOrd for OrdMatrixMN<R, C>
+where
+    VecStorage<f64, R, C>: Storage<f64, R, C>,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let mut other = other.iter();
+
+        for x in self.iter() {
+            let y = other.next().unwrap();
+
+            if abs_diff_ne!(x, y, epsilon = EPS) {
+                return x.partial_cmp(y);
+            }
+        }
+
+        Some(std::cmp::Ordering::Equal)
+    }
+}
+
+impl<R: Dim, C: Dim> Ord for OrdMatrixMN<R, C>
+where
+    VecStorage<f64, R, C>: Storage<f64, R, C>,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+impl<R: Dim, C: Dim> OrdMatrixMN<R, C>
+where
+    VecStorage<f64, R, C>: Storage<f64, R, C>,
+{
+    pub fn new(mat: MatrixMN<R, C>) -> Self {
+        Self(mat)
+    }
+}
+
+type OrdMatrix = OrdMatrixMN<Dynamic, Dynamic>;
+type OrdPoint = OrdMatrixMN<Dynamic, U1>;
 
 /// An iterator for a `Group` [generated](https://en.wikipedia.org/wiki/Generator_(mathematics))
 /// by a set of floating point matrices. Its elements are built in a BFS order.

@@ -62,6 +62,7 @@ mod input;
 mod no_cull_pipeline;
 mod polytope;
 
+/// Standard constant used for floating point comparisons throughout the code.
 const EPS: f64 = 1e-9;
 
 /// Loads all of the necessary systems for the application to run.
@@ -145,22 +146,27 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    // Creates OFFBuilder code for a polytope.
-    let group = Group::swirl(
+    // Since the convex hull code is not yet built to handle polytopes with
+    // non-simplicial facets (something Wythoffians aren't known for), most
+    // things you put here will break. Those that don't will have a bunch of
+    // extra facets and elements. Be careful.
+    let poly = Group::swirl(
         cox!(3.0, 3.0),
-        Group::direct_product(cox!(5.0), Group::trivial(1)),
+        Group::direct_product(cox!(3.0), Group::trivial(1)),
     )
-    .unwrap();
+    .unwrap()
+    .into_polytope(vec![1.0, 0.0, 0.0, 0.0].into());
 
-    for v in group.into_polytope(vec![1.0, 0.0, 0.0, 0.0].into()) {
+    // Creates OFFBuilder code for a polytope.
+    for v in &poly.vertices {
         print!("coordinates.push([");
-        for x in v.into_iter() {
+        for x in v.iter() {
             print!("{}, ", x);
         }
         println!("]);");
     }
 
-    let poly = Renderable::new(Concrete::hypercube(3));
+    let poly = Renderable::new(poly);
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
@@ -179,7 +185,7 @@ fn setup(
 
     commands
         .spawn(PbrNoBackfaceBundle {
-            mesh: meshes.add(poly.get_mesh(0.1)),
+            mesh: meshes.add(poly.get_mesh()),
             visible: Visible {
                 is_visible: false,
                 ..Default::default()
@@ -189,7 +195,7 @@ fn setup(
         })
         .with_children(|cb| {
             cb.spawn(PbrNoBackfaceBundle {
-                mesh: meshes.add(poly.get_wireframe(0.1)),
+                mesh: meshes.add(poly.get_wireframe()),
                 material: wf_unselected,
                 ..Default::default()
             });
@@ -227,12 +233,12 @@ fn update_changed_polytopes(
 ) {
     for (poly, mesh_handle, children) in polies.iter() {
         let mesh: &mut Mesh = meshes.get_mut(mesh_handle).unwrap();
-        *mesh = poly.get_mesh(0.1);
+        *mesh = poly.get_mesh();
 
         for child in children.iter() {
             if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {
                 let wf: &mut Mesh = meshes.get_mut(wf_handle).unwrap();
-                *wf = poly.get_wireframe(0.1);
+                *wf = poly.get_wireframe();
 
                 break;
             }

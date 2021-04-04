@@ -4,7 +4,7 @@ use std::{
 };
 
 use super::{
-    geometry::{Hyperplane, Point},
+    geometry::{Subspace, Point},
     Abstract, Concrete, Element, ElementList,
 };
 
@@ -122,7 +122,7 @@ fn get_hull_ridge(vertices: &mut [Point]) -> VertexSet {
     let mut vertices = vertices.iter().enumerate();
     let (_, v0) = vertices.next().unwrap();
     let dim = v0.len();
-    let mut h = Hyperplane::new(v0.clone());
+    let mut h = Subspace::new(v0.clone());
 
     let mut ridge = vec![0];
 
@@ -156,7 +156,7 @@ fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> Vec<usize> {
     let mut vertex_iter = vertices.iter().enumerate();
 
     // We find a starting vertex not on the ridge.
-    let mut h = Hyperplane::from_points(facet.iter().cloned().cloned().collect());
+    let mut h = Subspace::from_points(facet.iter().cloned().cloned().collect());
     loop {
         let (i, v0) = vertex_iter.next().unwrap();
 
@@ -270,7 +270,7 @@ fn check_subelement(vertices: &[Point], el: &[usize], rank: isize) -> bool {
     // only when d >= 4.
     if rank >= 4 {
         // The hyperplane of the intersection of the elements.
-        let h = Hyperplane::from_points(
+        let h = Subspace::from_points(
             el.iter()
                 .map(|&sub| vertices[sub].clone())
                 .collect::<Vec<Point>>(),

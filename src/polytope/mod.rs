@@ -12,7 +12,7 @@ use std::{
 use bevy::prelude::Mesh;
 use bevy::render::mesh::Indices;
 use bevy::render::pipeline::PrimitiveTopology;
-use geometry::{Hyperplane, Point};
+use geometry::{Point, Subspace};
 
 use self::geometry::{Hypersphere, Matrix};
 
@@ -92,13 +92,13 @@ pub trait Polytope: Sized + Clone {
     /// polytope in place.
     fn ditope_mut(&mut self);
 
-    /// Builds a [horotope](https://polytope.miraheze.org/wiki/Horotope) of a
+    /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
     /// given polytope.
-    fn horotope(&self) -> Self;
+    fn hosotope(&self) -> Self;
 
-    /// Builds a [horotope](https://polytope.miraheze.org/wiki/Horotope) of a
+    /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
     /// given polytope in place.
-    fn horotope_mut(&mut self);
+    fn hosotope_mut(&mut self);
 
     /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
     /// given base.
@@ -793,13 +793,13 @@ impl Polytope for Abstract {
         self.push(ElementList::max(2));
     }
 
-    fn horotope(&self) -> Self {
+    fn hosotope(&self) -> Self {
         let mut clone = self.clone();
-        clone.horotope_mut();
+        clone.hosotope_mut();
         clone
     }
 
-    fn horotope_mut(&mut self) {
+    fn hosotope_mut(&mut self) {
         let min = self[-1][0].clone();
 
         self[-1].push(min);
@@ -910,7 +910,7 @@ impl Concrete {
 
         let v0 = vertices.next().expect("Polytope has no vertices!").clone();
         let mut o: Point = v0.clone();
-        let mut h = Hyperplane::new(v0.clone());
+        let mut h = Subspace::new(v0.clone());
 
         for v in vertices {
             // If the new vertex does not lie on the hyperplane of the others:
@@ -1048,7 +1048,7 @@ impl Concrete {
 
         // We project the sphere's center onto the polytope's hyperplane to
         // avoid skew weirdness.
-        let h = Hyperplane::from_points(self.vertices.clone());
+        let h = Subspace::from_points(self.vertices.clone());
         let o = h.project(&sphere.center);
 
         let mut projections;
@@ -1060,7 +1060,7 @@ impl Concrete {
 
             for idx in 0..facet_count {
                 projections.push(
-                    Hyperplane::from_points(self.get_element_vertices(rank - 1, idx).unwrap())
+                    Subspace::from_points(self.get_element_vertices(rank - 1, idx).unwrap())
                         .project(&o),
                 );
             }
@@ -1267,16 +1267,16 @@ impl Polytope for Concrete {
         self.abs.ditope_mut();
     }
 
-    fn horotope(&self) -> Self {
+    fn hosotope(&self) -> Self {
         Self {
             vertices: vec![vec![-0.5].into(), vec![0.5].into()],
-            abs: self.abs.horotope(),
+            abs: self.abs.hosotope(),
         }
     }
 
-    fn horotope_mut(&mut self) {
+    fn hosotope_mut(&mut self) {
         self.vertices = vec![vec![-0.5].into(), vec![0.5].into()];
-        self.abs.horotope_mut();
+        self.abs.hosotope_mut();
     }
 
     fn antiprism(&self) -> Self {
@@ -1381,37 +1381,51 @@ impl Renderable {
     }
 
     /// Gets the coordinates of the vertices, after projecting down into 3D.
-    fn get_vertex_coords(&self, proj: f32) -> Vec<[f32; 3]> {
-        self.concrete
+    fn get_vertex_coords(&self) -> Vec<[f32; 3]> {
+        // Enables orthogonal projection.
+        const ORTHOGONAL: bool = false;
+
+        let vert_iter = self
+            .concrete
             .vertices
             .iter()
-            .chain(self.extra_vertices.iter())
-            .map(|point| {
-                let mut point2 = point.clone();
-                while point2.len() > 3 {
-                    let dim = point2.len();
-                    let project = &Matrix::from_fn(dim - 1, dim, |i, j| {
-                        if i == j {
-                            1.0 / (proj as f64 - point[point.len() - 1])
-                        } else {
-                            0.0
-                        }
-                    });
-                    point2 = project * point2.clone();
-                }
-                // For now, we do a simple orthogonal projection.
-                let mut iter = point2.iter().copied().take(3);
-                let x = iter.next().unwrap_or(0.0);
-                let y = iter.next().unwrap_or(0.0);
-                let z = iter.next().unwrap_or(0.0);
-                [x as f32, y as f32, z as f32]
-            })
-            .collect()
+            .chain(self.extra_vertices.iter());
+
+        // If the polytope is at most 3D, we just embed it into 3D space.
+        if ORTHOGONAL || self.concrete.dim().unwrap_or(0) <= 3 {
+            vert_iter
+                .map(|point| {
+                    let mut iter = point.iter().copied().take(3);
+                    let x = iter.next().unwrap_or(0.0);
+                    let y = iter.next().unwrap_or(0.0);
+                    let z = iter.next().unwrap_or(0.0);
+                    [x as f32, y as f32, z as f32]
+                })
+                .collect()
+        }
+        // Else, we project it down.
+        else {
+            // Distance from the projection planes.
+            const DIST: f64 = 2.0;
+
+            vert_iter
+                .map(|point| {
+                    let factor: f64 = point.iter().skip(3).map(|x| x + DIST).product();
+
+                    // We scale the first three coordinates accordingly.
+                    let mut iter = point.iter().copied().take(3);
+                    let x: f64 = iter.next().unwrap() / factor;
+                    let y: f64 = iter.next().unwrap() / factor;
+                    let z: f64 = iter.next().unwrap() / factor;
+                    [x as f32, y as f32, z as f32]
+                })
+                .collect()
+        }
     }
 
     /// Generates a mesh from the polytope.
-    pub fn get_mesh(&self, proj: f32) -> Mesh {
-        let vertices = self.get_vertex_coords(proj);
+    pub fn get_mesh(&self) -> Mesh {
+        let vertices = self.get_vertex_coords();
         let mut indices = Vec::with_capacity(self.triangles.len() * 3);
         for &[i, j, k] in &self.triangles {
             indices.push(i as u16);
@@ -1432,9 +1446,9 @@ impl Renderable {
     }
 
     /// Generates the wireframe for a polytope.
-    pub fn get_wireframe(&self, proj: f32) -> Mesh {
+    pub fn get_wireframe(&self) -> Mesh {
         let edges = self.concrete.abs.get(1).unwrap();
-        let vertices = self.get_vertex_coords(proj);
+        let vertices = self.get_vertex_coords();
         let mut indices = Vec::with_capacity(edges.len() * 2);
         for edge in edges.iter() {
             indices.push(edge.subs[0] as u16);
