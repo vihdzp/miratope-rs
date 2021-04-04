@@ -59,9 +59,9 @@ impl CoxMatrix {
 #[macro_export]
 macro_rules! cox {
     ($($x:expr),+) => (
-        Group::cox_group(CoxMatrix::from_lin_diagram(vec![$($x),+])).unwrap()
+       crate::polytope::group::Group::cox_group(crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![$($x),+])).unwrap()
     );
     ($x:expr; $y:expr) => (
-        Group::cox_group(CoxMatrix::from_lin_diagram(vec![$x; $y])).unwrap()
+        crate::polytope::group::Group::cox_group(crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![$x; $y])).unwrap()
     )
 }

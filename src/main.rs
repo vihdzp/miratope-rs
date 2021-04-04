@@ -54,9 +54,9 @@ use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
-use polytope::off;
+use polytope::group::Group;
 #[allow(unused_imports)]
-use polytope::{Concrete, Polytope, Renderable};
+use polytope::{off, Concrete, Polytope, Renderable};
 
 mod input;
 mod no_cull_pipeline;
@@ -145,10 +145,22 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = off::from_path(&"gogishi.off").unwrap();
-    //    println!("{}", off::to_src(&poly, Default::default()));
+    // Creates OFFBuilder code for a polytope.
+    let group = Group::swirl(
+        cox!(3.0, 3.0),
+        Group::direct_product(cox!(5.0), Group::trivial(1)),
+    )
+    .unwrap();
 
-    let poly = Renderable::new(poly);
+    for v in group.into_polytope(vec![1.0, 0.0, 0.0, 0.0].into()) {
+        print!("coordinates.push([");
+        for x in v.into_iter() {
+            print!("{}, ", x);
+        }
+        println!("]);");
+    }
+
+    let poly = Renderable::new(Concrete::hypercube(3));
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,

@@ -4,13 +4,13 @@
 #[allow(unused_imports)]
 use crate::cox;
 
-use super::cox::CoxMatrix;
+use super::{cox::CoxMatrix, geometry::Point};
 use approx::abs_diff_ne;
 use dyn_clone::DynClone;
 use itertools::iproduct;
 use nalgebra::{DMatrix as Matrix, DVector as Vector, Dynamic, Quaternion, U1};
 use std::{
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     f64::consts::PI,
     iter,
 };
@@ -103,7 +103,7 @@ pub struct Group {
 
 impl Group {
     /// Gets all of the elements of the group. Consumes the iterator.
-    fn elements(self) -> Vec<Matrix<f64>> {
+    pub fn elements(self) -> Vec<Matrix<f64>> {
         self.iter.collect()
     }
 
@@ -165,7 +165,7 @@ impl Group {
     }
 
     /// Generates the trivial group of a certain dimension.
-    fn trivial(dim: usize) -> Self {
+    pub fn trivial(dim: usize) -> Self {
         Self {
             dim,
             iter: Box::new(iter::once(Matrix::identity(dim, dim))),
@@ -174,7 +174,7 @@ impl Group {
 
     /// Generates the group with the identity and a central inversion of a
     /// certain dimension.
-    fn central_inv(dim: usize) -> Self {
+    pub fn central_inv(dim: usize) -> Self {
         Self {
             dim,
             iter: Box::new(
@@ -185,7 +185,7 @@ impl Group {
 
     /// Generates a Coxeter group from its [`CoxMatrix`], or returns `None` if
     /// the group doesn't fit as a matrix group in spherical space.
-    fn cox_group(cox: CoxMatrix) -> Option<Self> {
+    pub fn cox_group(cox: CoxMatrix) -> Option<Self> {
         const EPS: f64 = 1e-6;
 
         let dim = cox.ncols();
@@ -263,15 +263,23 @@ impl Group {
                     } else {
                         0.0
                     }
+                } else if j >= dim1 {
+                    mat2[(i - dim1, j - dim1)]
                 } else {
-                    if j >= dim1 {
-                        mat2[(i - dim1, j - dim1)]
-                    } else {
-                        0.0
-                    }
+                    0.0
                 }
             })
         })
+    }
+
+    pub fn into_polytope(self, p: Point) -> Vec<Point> {
+        let mut points = BTreeSet::new();
+
+        for m in self.iter {
+            points.insert(OrdPoint::new(m * &p));
+        }
+
+        points.into_iter().map(|x| x.0).collect()
     }
 }
 
@@ -304,22 +312,22 @@ mod ord_matrix {
 
     use crate::EPS;
     use approx::abs_diff_ne;
-    use nalgebra::{storage::Storage, Dim, Dynamic, VecStorage};
+    use nalgebra::{storage::Storage, Dim, VecStorage};
 
     // TODO: We don't need a VecStorage all of the time, but I haven't figured
     // out a better signature.
-    type Matrix<R, C> = nalgebra::Matrix<f64, R, C, VecStorage<f64, Dynamic, Dynamic>>;
+    type Matrix<R, C> = nalgebra::Matrix<f64, R, C, VecStorage<f64, R, C>>;
 
     #[derive(Clone, Debug)]
     /// A matrix ordered by fuzzy lexicographic ordering. Used to quickly determine
     /// whether an element in a [`GenGroup`] is a duplicate.
     pub struct OrdMatrix<R: Dim, C: Dim>(pub Matrix<R, C>)
     where
-        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>;
+        VecStorage<f64, R, C>: Storage<f64, R, C>;
 
     impl<R: Dim, C: Dim> Deref for OrdMatrix<R, C>
     where
-        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>,
+        VecStorage<f64, R, C>: Storage<f64, R, C>,
     {
         type Target = Matrix<R, C>;
 
@@ -330,7 +338,7 @@ mod ord_matrix {
 
     impl<R: Dim, C: Dim> DerefMut for OrdMatrix<R, C>
     where
-        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>,
+        VecStorage<f64, R, C>: Storage<f64, R, C>,
     {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.0
@@ -339,7 +347,7 @@ mod ord_matrix {
 
     impl<R: Dim, C: Dim> PartialEq for OrdMatrix<R, C>
     where
-        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>,
+        VecStorage<f64, R, C>: Storage<f64, R, C>,
     {
         fn eq(&self, other: &Self) -> bool {
             let mut other = other.iter();
@@ -356,14 +364,11 @@ mod ord_matrix {
         }
     }
 
-    impl<R: Dim, C: Dim> Eq for OrdMatrix<R, C> where
-        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>
-    {
-    }
+    impl<R: Dim, C: Dim> Eq for OrdMatrix<R, C> where VecStorage<f64, R, C>: Storage<f64, R, C> {}
 
     impl<R: Dim, C: Dim> PartialOrd for OrdMatrix<R, C>
     where
-        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>,
+        VecStorage<f64, R, C>: Storage<f64, R, C>,
     {
         fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
             let mut other = other.iter();
@@ -382,7 +387,7 @@ mod ord_matrix {
 
     impl<R: Dim, C: Dim> Ord for OrdMatrix<R, C>
     where
-        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>,
+        VecStorage<f64, R, C>: Storage<f64, R, C>,
     {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
             self.partial_cmp(other).unwrap()
@@ -391,7 +396,7 @@ mod ord_matrix {
 
     impl<R: Dim, C: Dim> OrdMatrix<R, C>
     where
-        VecStorage<f64, Dynamic, Dynamic>: Storage<f64, R, C>,
+        VecStorage<f64, R, C>: Storage<f64, R, C>,
     {
         pub fn new(mat: Matrix<R, C>) -> Self {
             Self(mat)
@@ -400,7 +405,7 @@ mod ord_matrix {
 }
 
 type OrdMatrix = ord_matrix::OrdMatrix<Dynamic, Dynamic>;
-type OrdPoint = ord_matrix::OrdMatrix<U1, Dynamic>;
+type OrdPoint = ord_matrix::OrdMatrix<Dynamic, U1>;
 
 /// An iterator for a `Group` [generated](https://en.wikipedia.org/wiki/Generator_(mathematics))
 /// by a set of floating point matrices. Its elements are built in a BFS order.
