@@ -48,6 +48,7 @@
 //! ## Why is the rendering buggy?
 //! Proper rendering, even in 3D, is a work in progress.
 
+use crate::polytope::group::pow;
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
@@ -146,8 +147,19 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly =
-        Group::step(cox!(15).rotations(), &[2]).into_polytope(vec![0.53, 0.58, 0.97, 0.93].into());
+    let poly = Group::step(cox!(7), |mut mat| {
+        if mat.determinant() > 0.0 {
+            pow(&mat, 3)
+        } else {
+            mat[(0, 1)] *= -1.0;
+            mat[(1, 1)] *= -1.0;
+            mat = pow(&mat, 3);
+            mat[(0, 1)] *= -1.0;
+            mat[(1, 1)] *= -1.0;
+            mat
+        }
+    })
+    .into_polytope(vec![0.53, 0.58, 0.97, 0.93].into());
 
     // Creates OFFBuilder code for a polytope.
     for v in &poly.vertices {

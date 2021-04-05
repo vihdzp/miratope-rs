@@ -68,26 +68,31 @@ fn mat_to_quat(mat: Matrix<f64>) -> Quaternion<f64> {
 /// Converts a quaternion into a matrix, depending on whether it's a left or
 /// right quaternion multiplication.
 fn quat_to_mat(q: Quaternion<f64>, left: bool) -> Matrix<f64> {
-    let i = Quaternion::new(0.0, 1.0, 0.0, 0.0);
-    let j = Quaternion::new(0.0, 0.0, 1.0, 0.0);
-    let k = Quaternion::new(0.0, 0.0, 0.0, 1.0);
+    let size = Dynamic::new(4);
+    let left = if left { 1.0 } else { -1.0 };
 
-    let qi = if left { q * i } else { i * q };
-    let qj = if left { q * j } else { j * q };
-    let qk = if left { q * k } else { k * q };
-
-    let c1 = q.coords.into_iter().copied();
-    let c2 = qi.coords.into_iter().copied();
-    let c3 = qj.coords.into_iter().copied();
-    let c4 = qk.coords.into_iter().copied();
-
-    // Compensates for the wack storage order.
-    let mut mat = Matrix::from_iterator(4, 4, c1.chain(c2).chain(c3).chain(c4));
-    mat.swap_rows(2, 3);
-    mat.swap_rows(1, 2);
-    mat.swap_rows(0, 1);
-
-    mat
+    Matrix::from_data(VecStorage::new(
+        size,
+        size,
+        vec![
+            q.w,
+            q.i,
+            q.j,
+            q.k,
+            -q.i,
+            q.w,
+            left * q.k,
+            -left * q.j,
+            -q.j,
+            -left * q.k,
+            q.w,
+            left * q.i,
+            -q.k,
+            left * q.j,
+            -left * q.i,
+            q.w,
+        ],
+    ))
 }
 
 /// Computes the [direct sum](https://en.wikipedia.org/wiki/Block_matrix#Direct_sum)
@@ -111,7 +116,8 @@ fn direct_sum(mat1: Matrix<f64>, mat2: Matrix<f64>) -> Matrix<f64> {
     })
 }
 
-fn pow(mat: &Matrix<f64>, mut n: usize) -> Matrix<f64> {
+/// Computes the power of a matrix.
+pub fn pow(mat: &Matrix<f64>, mut n: usize) -> Matrix<f64> {
     let i = Matrix::identity(mat.ncols(), mat.nrows());
 
     if n == 0 {
@@ -130,7 +136,7 @@ fn pow(mat: &Matrix<f64>, mut n: usize) -> Matrix<f64> {
         multiplier *= multiplier.clone();
     }
 
-    return acc;
+    acc
 }
 
 /// An iterator such that `dyn` objects using it can be cloned. Used to get
@@ -225,11 +231,9 @@ impl Group {
         Self {
             dim,
             iter: Box::new(self.map(move |x| {
-                assert_eq!(
-                    x.nrows(),
-                    dim,
-                    "Size of matrix does not match expected dimension."
-                );
+                let msg = "Size of matrix does not match expected dimension.";
+                assert_eq!(x.nrows(), dim, "{}", msg);
+                assert_eq!(x.ncols(), dim, "{}", msg);
 
                 x
             })),
@@ -255,18 +259,16 @@ impl Group {
         }
     }
 
-    /// Generates a step prism group.
-    pub fn step(g: Self, steps: &[usize]) -> Self {
-        let dim = g.dim * (steps.len() + 1);
-        let steps = steps.iter().copied().collect::<Vec<_>>();
+    /// Generates a step prism group from a base group and a homomorphism into
+    /// another group.
+    pub fn step(g: Self, f: impl Fn(Matrix<f64>) -> Matrix<f64> + Clone + 'static) -> Self {
+        let dim = g.dim * 2;
 
         Self {
             dim,
             iter: Box::new(g.map(move |mat| {
-                steps
-                    .clone()
-                    .into_iter()
-                    .fold(mat.clone(), |acc, step| direct_sum(acc, pow(&mat, step)))
+                let clone = mat.clone();
+                direct_sum(clone, f(mat))
             })),
         }
     }
@@ -315,7 +317,7 @@ impl Group {
         g: Self,
         h: Self,
         dim: usize,
-        product: (impl FnMut((Matrix<f64>, Matrix<f64>)) -> Matrix<f64> + Clone + 'static),
+        product: (impl Fn((Matrix<f64>, Matrix<f64>)) -> Matrix<f64> + Clone + 'static),
     ) -> Self {
         Self {
             dim,
@@ -883,7 +885,7 @@ mod tests {
         for n in 1..10 {
             for d in 1..n {
                 test(
-                    Group::step(cox!(n).rotations(), &[d]),
+                    Group::step(cox!(n).rotations(), move |mat| pow(&mat, d)),
                     n,
                     n,
                     "Step prismatic n-d",
