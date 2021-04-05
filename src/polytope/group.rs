@@ -106,15 +106,23 @@ pub struct Group {
     iter: Box<dyn GroupIter>,
 }
 
+impl Iterator for Group {
+    type Item = Matrix<f64>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next()
+    }
+}
+
 impl Group {
     /// Gets all of the elements of the group. Consumes the iterator.
     pub fn elements(self) -> Vec<Matrix<f64>> {
-        self.iter.collect()
+        self.collect()
     }
 
     /// Gets the number of elements of the group. Consumes the iterators.
     pub fn order(self) -> usize {
-        self.iter.count()
+        self.count()
     }
 
     /// Buils the rotation subgroup of a group.
@@ -123,7 +131,7 @@ impl Group {
         // just test for positive determinants.
         Self {
             dim: self.dim,
-            iter: Box::new(self.iter.filter(|el| el.determinant() > 0.0)),
+            iter: Box::new(self.filter(|el| el.determinant() > 0.0)),
         }
     }
 
@@ -137,7 +145,6 @@ impl Group {
             dim: 4,
             iter: Box::new(
                 self.rotations()
-                    .iter
                     .map(move |el| {
                         let q = mat_to_quat(el);
                         let m = quat_to_mat(q, left);
@@ -176,7 +183,7 @@ impl Group {
 
         Self {
             dim,
-            iter: Box::new(self.iter.map(move |x| {
+            iter: Box::new(self.map(move |x| {
                 assert_eq!(
                     x.ncols(),
                     dim,
@@ -255,7 +262,7 @@ impl Group {
     ) -> Self {
         Self {
             dim,
-            iter: Box::new(itertools::iproduct!(g.iter, h.iter).map(product)),
+            iter: Box::new(itertools::iproduct!(g, h).map(product)),
         }
     }
 
@@ -296,14 +303,89 @@ impl Group {
         })
     }
 
-    pub fn into_polytope(self, p: Point) -> Concrete {
+    /// Generates the [wreath product](https://en.wikipedia.org/wiki/Wreath_product)
+    /// of two symmetry groups.
+    pub fn wreath(g: Self, h: Self) -> Self {
+        let h = h.elements();
+        let h_len = h.len();
+        let g_dim = g.dim;
+        let dim = g_dim * h_len;
+
+        // Indexes each element in h.
+        let mut h_indices = BTreeMap::new();
+
+        for (i, h_el) in h.iter().enumerate() {
+            h_indices.insert(OrdMatrix::new(h_el.clone()), i);
+        }
+
+        // Converts h into a permutation group.
+        let mut permutations = Vec::with_capacity(h_len);
+
+        for h_el_1 in &h {
+            let mut perm = Vec::with_capacity(h.len());
+
+            for h_el_2 in &h {
+                perm.push(
+                    *h_indices
+                        .get(&OrdMatrix::new(h_el_1 * h_el_2))
+                        .expect("h is not a valid group!"),
+                );
+            }
+
+            permutations.push(perm);
+        }
+
+        // Computes the direct product of g with itself |h| times.
+        let mut g_prod = g.clone();
+        for _ in 1..h_len {
+            g_prod = Group::direct_product(g.clone(), g_prod);
+        }
+
+        Self {
+            dim,
+            iter: Box::new(
+                g_prod
+                    .map(move |g_el| {
+                        let mut matrices = Vec::new();
+
+                        for perm in &permutations {
+                            let mut new_el = Matrix::zeros(dim, dim);
+
+                            // Permutes the blocks on the diagonal of g_el.
+                            for (i, &j) in perm.iter().enumerate() {
+                                for x in 0..g_dim {
+                                    for y in 0..g_dim {
+                                        new_el[(i * g_dim + x, j * g_dim + y)] =
+                                            g_el[(i * g_dim + x, i * g_dim + y)];
+                                    }
+                                }
+                            }
+
+                            matrices.push(new_el);
+                        }
+
+                        matrices.into_iter()
+                    })
+                    .flatten(),
+            ),
+        }
+    }
+
+    /// Generates the orbit of a point under a given symmetry group.
+    pub fn orbit(self, p: Point) -> Vec<Point> {
         let mut points = BTreeSet::new();
 
-        for m in self.iter {
+        for m in self {
             points.insert(OrdPoint::new(m * &p));
         }
 
-        convex::convex_hull(points.into_iter().map(|x| x.0).collect())
+        points.into_iter().map(|x| x.0).collect()
+    }
+
+    /// Generates a polytope as the convex hull of the orbit of a point under a
+    /// given symmetry group.
+    pub fn into_polytope(self, p: Point) -> Concrete {
+        convex::convex_hull(self.orbit(p))
     }
 }
 
@@ -744,5 +826,11 @@ mod tests {
         let a3 = cox!(3.0, 3.0);
         let g = Group::direct_product(a3.clone(), a3.clone());
         test(g, 576, 288, &"A3×A3");
+    }
+
+    #[test]
+    /// Tests the wreath product of A3 with A1.
+    fn a3_wr_a1() {
+        test(Group::wreath(cox!(3.0, 3.0), cox!()), 1152, 576, &"A3 ≀ A1");
     }
 }

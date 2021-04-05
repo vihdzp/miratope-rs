@@ -58,6 +58,9 @@ impl CoxMatrix {
 /// Panics if the linear diagram doesn't fit in Euclidean space.
 #[macro_export]
 macro_rules! cox {
+    () => (
+        crate::polytope::group::Group::cox_group(crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![])).unwrap()
+    );
     ($($x:expr),+) => (
        crate::polytope::group::Group::cox_group(crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![$($x),+])).unwrap()
     );
