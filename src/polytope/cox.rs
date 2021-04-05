@@ -62,9 +62,9 @@ macro_rules! cox {
         crate::polytope::group::Group::cox_group(crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![])).unwrap()
     );
     ($($x:expr),+) => (
-       crate::polytope::group::Group::cox_group(crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![$($x),+])).unwrap()
+       crate::polytope::group::Group::cox_group(crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![$($x as f64),+])).unwrap()
     );
     ($x:expr; $y:expr) => (
-        crate::polytope::group::Group::cox_group(crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![$x; $y])).unwrap()
+        crate::polytope::group::Group::cox_group(crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![$x as f64; $y])).unwrap()
     )
 }

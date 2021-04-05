@@ -146,10 +146,11 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let orbit = Group::step(15, &[2, 3]).orbit(vec![0.53, 0.58, 0.97, 0.93].into());
+    let poly =
+        Group::step(cox!(15).rotations(), &[2]).into_polytope(vec![0.53, 0.58, 0.97, 0.93].into());
 
     // Creates OFFBuilder code for a polytope.
-    for v in &orbit {
+    for v in &poly.vertices {
         print!("coordinates.push([");
         for x in v.iter() {
             print!("{}, ", x);
@@ -157,7 +158,7 @@ fn setup(
         println!("]);");
     }
 
-    let poly = Renderable::new(Concrete::hypercube(3));
+    let poly = Renderable::new(poly);
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,

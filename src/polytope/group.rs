@@ -6,15 +6,13 @@ use crate::{cox, EPS};
 
 use super::{convex, cox::CoxMatrix, geometry::Point, Concrete};
 use approx::{abs_diff_ne, relative_eq};
-use dyn_clone::DynClone;
 use nalgebra::{
     storage::Storage, DMatrix as Matrix, DVector as Vector, Dim, Dynamic, Quaternion, VecStorage,
     U1,
 };
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
-    f64::consts::{PI, TAU},
-    iter,
+    f64::consts::PI,
 };
 
 /// Converts a 3D rotation matrix into a quaternion. Uses the code from
@@ -92,10 +90,53 @@ fn quat_to_mat(q: Quaternion<f64>, left: bool) -> Matrix<f64> {
     mat
 }
 
+/// Computes the [direct sum](https://en.wikipedia.org/wiki/Block_matrix#Direct_sum)
+/// of two matrices.
+fn direct_sum(mat1: Matrix<f64>, mat2: Matrix<f64>) -> Matrix<f64> {
+    let dim1 = mat1.nrows();
+    let dim = dim1 + mat2.nrows();
+
+    Matrix::from_fn(dim, dim, |i, j| {
+        if i < dim1 {
+            if j < dim1 {
+                mat1[(i, j)]
+            } else {
+                0.0
+            }
+        } else if j >= dim1 {
+            mat2[(i - dim1, j - dim1)]
+        } else {
+            0.0
+        }
+    })
+}
+
+fn pow(mat: &Matrix<f64>, mut n: usize) -> Matrix<f64> {
+    let i = Matrix::identity(mat.ncols(), mat.nrows());
+
+    if n == 0 {
+        return i;
+    }
+
+    let mut acc = i;
+    let mut multiplier = mat.clone();
+
+    while n > 0 {
+        if n % 2 == 1 {
+            acc *= multiplier.clone();
+        }
+
+        n /= 2;
+        multiplier *= multiplier.clone();
+    }
+
+    return acc;
+}
+
 /// An iterator such that `dyn` objects using it can be cloned. Used to get
 /// around orphan rules.
-trait GroupIter: Iterator<Item = Matrix<f64>> + DynClone {}
-impl<T: Iterator<Item = Matrix<f64>> + DynClone> GroupIter for T {}
+trait GroupIter: Iterator<Item = Matrix<f64>> + dyn_clone::DynClone {}
+impl<T: Iterator<Item = Matrix<f64>> + dyn_clone::DynClone> GroupIter for T {}
 dyn_clone::clone_trait_object!(GroupIter);
 
 /// A [group](https://en.wikipedia.org/wiki/Group_(mathematics)) of matrices,
@@ -148,7 +189,7 @@ impl Group {
                     .map(move |el| {
                         let q = mat_to_quat(el);
                         let m = quat_to_mat(q, left);
-                        iter::once(m.clone()).chain(iter::once(-m))
+                        std::iter::once(m.clone()).chain(std::iter::once(-m))
                     })
                     .flatten(),
             ),
@@ -185,7 +226,7 @@ impl Group {
             dim,
             iter: Box::new(self.map(move |x| {
                 assert_eq!(
-                    x.ncols(),
+                    x.nrows(),
                     dim,
                     "Size of matrix does not match expected dimension."
                 );
@@ -199,7 +240,7 @@ impl Group {
     pub fn trivial(dim: usize) -> Self {
         Self {
             dim,
-            iter: Box::new(iter::once(Matrix::identity(dim, dim))),
+            iter: Box::new(std::iter::once(Matrix::identity(dim, dim))),
         }
     }
 
@@ -214,26 +255,18 @@ impl Group {
         }
     }
 
-    /// Generates a step prism group, generated from a single multi-rotation.
-    pub fn step(order: usize, steps: &[usize]) -> Self {
-        let dim = steps.len() * 2;
-        let steps: Vec<_> = steps.iter().map(|&x| x as f64).collect();
+    /// Generates a step prism group.
+    pub fn step(g: Self, steps: &[usize]) -> Self {
+        let dim = g.dim * (steps.len() + 1);
+        let steps = steps.iter().copied().collect::<Vec<_>>();
 
         Self {
             dim,
-            iter: Box::new((0..order).map(move |i| {
-                let mut mat = Matrix::zeros(dim, dim);
-
-                for (j, step) in steps.iter().enumerate() {
-                    let (s, c) = (TAU * step * i as f64 / order as f64).sin_cos();
-
-                    mat[(2 * j, 2 * j)] = c;
-                    mat[(2 * j + 1, 2 * j)] = s;
-                    mat[(2 * j, 2 * j + 1)] = -s;
-                    mat[(2 * j + 1, 2 * j + 1)] = c;
-                }
-
-                mat
+            iter: Box::new(g.map(move |mat| {
+                steps
+                    .clone()
+                    .into_iter()
+                    .fold(mat.clone(), |acc, step| direct_sum(acc, pow(&mat, step)))
             })),
         }
     }
@@ -243,7 +276,7 @@ impl Group {
     pub fn cox_group(cox: CoxMatrix) -> Option<Self> {
         const EPS: f64 = 1e-6;
 
-        let dim = cox.ncols();
+        let dim = cox.nrows();
         let mut generators = Vec::with_capacity(dim);
 
         // Builds each generator from the top down as a triangular matrix, so
@@ -304,27 +337,11 @@ impl Group {
     }
 
     /// Calculates the direct product of two groups. Pairs of matrices are then
-    /// mapped to their [direct sum](https://en.wikipedia.org/wiki/Block_matrix#Direct_sum).
+    /// mapped to their direct sum.
     pub fn direct_product(g: Self, h: Self) -> Self {
-        let dim1 = g.dim;
-        let dim2 = h.dim;
-        let dim = dim1 + dim2;
+        let dim = g.dim + h.dim;
 
-        Self::fn_product(g, h, dim, move |(mat1, mat2)| {
-            Matrix::from_fn(dim, dim, |i, j| {
-                if i < dim1 {
-                    if j < dim1 {
-                        mat1[(i, j)]
-                    } else {
-                        0.0
-                    }
-                } else if j >= dim1 {
-                    mat2[(i - dim1, j - dim1)]
-                } else {
-                    0.0
-                }
-            })
-        })
+        Self::fn_product(g, h, dim, |(mat1, mat2)| direct_sum(mat1, mat2))
     }
 
     /// Generates the [wreath product](https://en.wikipedia.org/wiki/Wreath_product)
@@ -360,10 +377,10 @@ impl Group {
         }
 
         // Computes the direct product of g with itself |h| times.
-        let mut g_prod = g.clone();
-        for _ in 1..h_len {
-            g_prod = Group::direct_product(g.clone(), g_prod);
-        }
+        let g_prod = vec![&g; h_len - 1]
+            .into_iter()
+            .cloned()
+            .fold(g.clone(), |acc, g| Group::direct_product(g, acc));
 
         Self {
             dim,
@@ -419,7 +436,7 @@ impl From<Vec<Matrix<f64>>> for Group {
             dim: elements
                 .get(0)
                 .expect("Group must have at least one element.")
-                .ncols(),
+                .nrows(),
             iter: Box::new(elements.into_iter()),
         }
     }
@@ -764,18 +781,20 @@ mod tests {
         for n in 2..=5 {
             order *= n + 1;
 
-            test(cox!(3.0; n - 1), order, order / 2, &format!("A{}", n))
+            test(cox!(3; n - 1), order, order / 2, &format!("A{}", n))
         }
     }
 
     #[test]
     fn a_quat() {
-        test(
-            cox!(3.0, 3.0).left_quaternions().unwrap(),
-            24,
-            24,
-            &"Quaternion A3",
-        )
+        for &left in &[true, false] {
+            test(
+                cox!(3, 3).quaternions(left).unwrap(),
+                24,
+                24,
+                &"Quaternion A3",
+            );
+        }
     }
 
     #[test]
@@ -786,7 +805,7 @@ mod tests {
             order *= n + 1;
 
             test(
-                Group::matrix_product(cox!(3.0; n - 1), Group::central_inv(n)).unwrap(),
+                Group::matrix_product(cox!(3; n - 1), Group::central_inv(n)).unwrap(),
                 order,
                 order / 2,
                 &format!("A{}", n),
@@ -821,8 +840,8 @@ mod tests {
     /// regular dodecahedron and a regular hecatonicosachoron.
     #[test]
     fn h() {
-        test(cox!(5.0, 3.0), 120, 60, &"H3");
-        test(cox!(5.0, 3.0, 3.0), 14400, 7200, &"H4");
+        test(cox!(5, 3), 120, 60, &"H3");
+        test(cox!(5, 3, 3), 14400, 7200, &"H4");
     }
 
     /// Tests the E6 symmetry group.
@@ -847,7 +866,7 @@ mod tests {
     #[test]
     /// Tests the direct product of A3 with itself.
     fn a3xa3() {
-        let a3 = cox!(3.0, 3.0);
+        let a3 = cox!(3, 3);
         let g = Group::direct_product(a3.clone(), a3.clone());
         test(g, 576, 288, &"A3×A3");
     }
@@ -855,21 +874,20 @@ mod tests {
     #[test]
     /// Tests the wreath product of A3 with A1.
     fn a3_wr_a1() {
-        test(Group::wreath(cox!(3.0, 3.0), cox!()), 1152, 576, &"A3 ≀ A1");
+        test(Group::wreath(cox!(3, 3), cox!()), 1152, 576, &"A3 ≀ A1");
     }
 
     #[test]
     /// Tests out some step prisms.
     fn step() {
         for n in 1..10 {
-            for a in 1..n {
-                for b in a..n {
-                    if a * b / a.gcd(b) != n {
-                        continue;
-                    }
-
-                    test(Group::step(n, &[a, b]), n, n, "Step prismatic n(a, b)");
-                }
+            for d in 1..n {
+                test(
+                    Group::step(cox!(n).rotations(), &[d]),
+                    n,
+                    n,
+                    "Step prismatic n-d",
+                );
             }
         }
     }
