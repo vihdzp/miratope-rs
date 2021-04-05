@@ -13,7 +13,7 @@ use nalgebra::{
 };
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
-    f64::consts::PI,
+    f64::consts::{PI, TAU},
     iter,
 };
 
@@ -211,6 +211,30 @@ impl Group {
             iter: Box::new(
                 vec![Matrix::identity(dim, dim), -Matrix::identity(dim, dim)].into_iter(),
             ),
+        }
+    }
+
+    /// Generates a step prism group, generated from a single multi-rotation.
+    pub fn step(order: usize, steps: &[usize]) -> Self {
+        let dim = steps.len() * 2;
+        let steps: Vec<_> = steps.iter().map(|&x| x as f64).collect();
+
+        Self {
+            dim,
+            iter: Box::new((0..order).map(move |i| {
+                let mut mat = Matrix::zeros(dim, dim);
+
+                for (j, step) in steps.iter().enumerate() {
+                    let (s, c) = (TAU * step * i as f64 / order as f64).sin_cos();
+
+                    mat[(2 * j, 2 * j)] = c;
+                    mat[(2 * j + 1, 2 * j)] = s;
+                    mat[(2 * j, 2 * j + 1)] = -s;
+                    mat[(2 * j + 1, 2 * j + 1)] = c;
+                }
+
+                mat
+            })),
         }
     }
 
@@ -832,5 +856,21 @@ mod tests {
     /// Tests the wreath product of A3 with A1.
     fn a3_wr_a1() {
         test(Group::wreath(cox!(3.0, 3.0), cox!()), 1152, 576, &"A3 ≀ A1");
+    }
+
+    #[test]
+    /// Tests out some step prisms.
+    fn step() {
+        for n in 1..10 {
+            for a in 1..n {
+                for b in a..n {
+                    if a * b / a.gcd(b) != n {
+                        continue;
+                    }
+
+                    test(Group::step(n, &[a, b]), n, n, "Step prismatic n(a, b)");
+                }
+            }
+        }
     }
 }

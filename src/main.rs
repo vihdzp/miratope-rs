@@ -146,7 +146,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let orbit = Group::wreath(cox!(5.0), cox!()).orbit(vec![0.31, 0.41, 0.59, 0.26].into());
+    let orbit = Group::step(15, &[2, 3]).orbit(vec![0.53, 0.58, 0.97, 0.93].into());
 
     // Creates OFFBuilder code for a polytope.
     for v in &orbit {
