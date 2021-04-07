@@ -131,6 +131,10 @@ fn multi_cd_parse(diagram: &str) -> Option<Vec<Graph<EdgeVal, EdgeVal, Undirecte
 }
 */
 
+struct test {
+    foo: i64,
+}
+
 /// Packages important information needed to interpret CDs
 struct Caret<'a> {
     diagram: Chars<'a>,
