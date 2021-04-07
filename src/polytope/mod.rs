@@ -18,6 +18,7 @@ use self::geometry::{Hypersphere, Matrix};
 
 pub mod cd;
 pub mod convex;
+pub mod convex_plus;
 pub mod cox;
 pub mod geometry;
 pub mod group;

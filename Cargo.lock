@@ -1380,6 +1380,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "45e780567ed7abc415d12fd464571d265eb4a5710ddc97cdb1a31a4c35bb479d"
 
 [[package]]
+name = "float-ord"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1ff6201db265fe6a462c126a473d4c07cc9cb84d185fb67c913dd0ee01e7517"
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2290,6 +2296,7 @@ dependencies = [
  "bevy",
  "bevy_egui",
  "dyn-clone",
+ "float-ord",
  "gcd",
  "itertools",
  "nalgebra",
