@@ -77,7 +77,23 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly: Polytope = shapes::step_prism(23, &[1, 3]).convex_hull();
+    let vertices = Group::swirl(
+        Group::matrix_product(cox!(3, 3).rotations(), Group::central_inv(3)).unwrap(),
+        cox!(5, 3),
+    )
+    .unwrap()
+    .orbit(vec![0.31, 0.41, 0.59, 0.26].into());
+
+    // Creates OFFBuilder code for a polytope.
+    for v in &vertices {
+        print!("coordinates.push([");
+        for x in v.iter() {
+            print!("{}, ", x);
+        }
+        println!("]);");
+    }
+
+    let poly = Renderable::new(Concrete::hypercube(3));
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
