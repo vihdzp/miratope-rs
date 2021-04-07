@@ -176,6 +176,7 @@ impl<'a> Caret<'a> {
                 // If the parenthesis isn't closed.
                 return None;
             }
+            
             // If the node is a virtual node.
             '*' => {
                 // Reads the index the virtual node refers to.
@@ -192,12 +193,9 @@ impl<'a> Caret<'a> {
                     },
                 );
                 // Sets the index of the new node to be where the virtual node is refering to.
-<<<<<<< Updated upstream
                 new_node = idx
-=======
-                new_node = idx 
->>>>>>> Stashed changes
             }
+
             // If the node is a single character.
             _ => {
                 // Converts the read characters into a value and adds the node to the graph.
