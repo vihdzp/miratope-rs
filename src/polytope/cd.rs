@@ -156,6 +156,9 @@ impl<'a> Caret<'a> {
         let c = self.diagram.next()?;
         chars.push(c);
 
+        // The index of the new node.
+        let mut new_node = NodeIndex::new(self.graph.node_count() - 1);
+
         match c {
             // If the node is various characters inside parentheses.
             '(' => {
@@ -186,13 +189,9 @@ impl<'a> Caret<'a> {
                     },
                 );
 
-                // Resets the EdgeMem so that it only has the node that was just found.
-                self.edge_mem = EdgeMem {
-                    node: Some(idx),
-                    edge: None,
-                };
-
-                return Some(());
+                // Sets the index of the new node to be where the virtual node is refering to.
+                new_node = idx
+                
             }
             // If the node is a single character.
             _ => {}
@@ -201,9 +200,6 @@ impl<'a> Caret<'a> {
         // Converts the read characters into a value.
         self.graph
             .add_node(node_to_val(&chars.into_iter().collect::<String>())?);
-
-        // The index of the new node.
-        let new_node = NodeIndex::new(self.graph.node_count() - 1);
 
         // If the EdgeMem is full, we add a new edge to the graph.
         if let EdgeMem {
