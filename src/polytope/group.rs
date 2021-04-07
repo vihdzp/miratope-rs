@@ -582,7 +582,7 @@ fn matrix_approx(mat1: &Matrix<f64>, mat2: &Matrix<f64>) -> bool {
     let mut mat2 = mat2.iter();
 
     for x in mat1 {
-        let y = mat2.next().unwrap();
+        let y = mat2.next().expect("Matrices don't have the same size!");
 
         if abs_diff_ne!(x, y, epsilon = EPS) {
             return false;
@@ -765,13 +765,13 @@ mod tests {
     /// Tests the group consisting of the identity and a central inversion in
     /// various dimensions.
     #[test]
-    fn c2() {
+    fn pm_i() {
         for n in 1..=10 {
             test(
                 Group::central_inv(n),
                 2,
                 (n + 1) % 2 + 1,
-                &format!("<-I^{}>", n),
+                &format!("±I{}", n),
             )
         }
     }
@@ -797,7 +797,7 @@ mod tests {
     fn a() {
         let mut order = 2;
 
-        for n in 2..=5 {
+        for n in 2..=6 {
             order *= n + 1;
 
             test(cox!(3; n - 1), order, order / 2, &format!("A{}", n))
@@ -820,7 +820,7 @@ mod tests {
     fn double_an() {
         let mut order = 4;
 
-        for n in 2..=5 {
+        for n in 2..=6 {
             order *= n + 1;
 
             test(
@@ -838,7 +838,7 @@ mod tests {
     fn b() {
         let mut order = 2;
 
-        for n in 2..=5 {
+        for n in 2..=6 {
             // A better cox! macro would make this unnecessary.
             let mut cox = vec![3.0; n - 1];
             cox[0] = 4.0;
