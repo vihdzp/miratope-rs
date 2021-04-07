@@ -133,7 +133,7 @@ fn get_hull_ridge(vertices: &mut [Point]) -> VertexSet {
             .next()
             .expect("Polytope has higher dimension than rank!");
 
-        if h.add(v.clone()).is_some() {
+        if h.add(&v).is_some() {
             ridge.push(i);
         }
     }
@@ -161,7 +161,7 @@ fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> Vec<usize> {
         let (i, v0) = vertex_iter.next().unwrap();
 
         // The ridge should be sorted, so we can optimize this.
-        if h.add(v0.clone()).is_some() {
+        if h.add(&v0).is_some() {
             leftmost_vertices.push(i);
             facet.push(v0);
 

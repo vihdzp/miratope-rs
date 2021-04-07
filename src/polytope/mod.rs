@@ -914,7 +914,7 @@ impl Concrete {
 
         for v in vertices {
             // If the new vertex does not lie on the hyperplane of the others:
-            if let Some(b) = h.add(v.clone()) {
+            if let Some(b) = h.add(&v) {
                 // Calculates the new circumcenter.
                 let k = ((&o - v).norm_squared() - (&o - &v0).norm_squared())
                     / (2.0 * (v - &v0).dot(&b));
