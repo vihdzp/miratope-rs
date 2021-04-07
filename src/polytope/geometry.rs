@@ -60,7 +60,7 @@ impl Subspace {
         Self {
             basis: Vec::new(),
             rank: 0,
-            offset:p,
+            offset: p,
         }
     }
 
