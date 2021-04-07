@@ -166,6 +166,9 @@ impl<'a> Caret<'a> {
                 while let Some(c) = self.diagram.next() {
                     chars.push(c);
                     if c == ')' {
+                        // Converts the read characters into a value and adds the node to the graph.
+                        self.graph
+                            .add_node(node_to_val(&chars.into_iter().collect::<String>())?);
                         break;
                     }
                 }
@@ -188,17 +191,20 @@ impl<'a> Caret<'a> {
                         Err(_) => return None,
                     },
                 );
-
                 // Sets the index of the new node to be where the virtual node is refering to.
+<<<<<<< Updated upstream
                 new_node = idx
+=======
+                new_node = idx 
+>>>>>>> Stashed changes
             }
             // If the node is a single character.
-            _ => {}
+            _ => {
+                // Converts the read characters into a value and adds the node to the graph.
+                self.graph
+                    .add_node(node_to_val(&chars.into_iter().collect::<String>())?);
+            }
         }
-
-        // Converts the read characters into a value.
-        self.graph
-            .add_node(node_to_val(&chars.into_iter().collect::<String>())?);
 
         // If the EdgeMem is full, we add a new edge to the graph.
         if let EdgeMem {
