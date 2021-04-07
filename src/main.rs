@@ -167,7 +167,7 @@ fn setup(
     let g2 = &gens.gens[0] * &gens.gens[2];
     let g3 = &gens.gens[0] * &gens.gens[3];
     let v = vec![g1, g2, g3].into_iter();
-    let mut tertiary = itertools::iproduct!(v.clone(), v.clone(), v.clone())
+    let mut tertiary = itertools::iproduct!(v.clone(), v.clone(), v)
         .map(|(i, j, k)| i * j * k)
         .collect();
     new_gens.append(&mut tertiary);

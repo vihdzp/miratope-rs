@@ -116,7 +116,9 @@ fn direct_sum(mat1: Matrix<f64>, mat2: Matrix<f64>) -> Matrix<f64> {
     })
 }
 
-/// Computes the power of a matrix.
+/// Computes the power of a matrix. I made a [pull request](https://github.com/dimforge/nalgebra/pull/859)
+/// over at `nalgebra` adding this functionality, so hopefully we'll be able to
+/// use that in the future.
 pub fn pow(mat: &Matrix<f64>, mut n: usize) -> Matrix<f64> {
     let i = Matrix::identity(mat.ncols(), mat.nrows());
 
@@ -149,7 +151,11 @@ dyn_clone::clone_trait_object!(GroupIter);
 /// acting on a space of a certain dimension.
 #[derive(Clone)]
 pub struct Group {
+    /// The dimension of the matrices of the group. Stored separately so that
+    /// the iterator doesn't have to be peekable.
     dim: usize,
+
+    /// The underlying iterator, which actually outputs the matrices.
     iter: Box<dyn GroupIter>,
 }
 
@@ -440,7 +446,7 @@ type MatrixMN<R, C> = nalgebra::Matrix<f64, R, C, VecStorage<f64, R, C>>;
 #[derive(Clone, Debug)]
 #[allow(clippy::upper_case_acronyms)]
 /// A matrix ordered by fuzzy lexicographic ordering. Used to quickly
-/// determine whether an element in a [`GenIter`](super::GenIter) is a
+/// determine whether an element in a [`GenIter`](GenIter) is a
 /// duplicate.
 pub struct OrdMatrixMN<R: Dim, C: Dim>(pub MatrixMN<R, C>)
 where
