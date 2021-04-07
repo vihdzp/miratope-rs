@@ -817,7 +817,7 @@ mod tests {
     }
 
     #[test]
-    fn double_an() {
+    fn pm_an() {
         let mut order = 4;
 
         for n in 2..=6 {
@@ -827,15 +827,15 @@ mod tests {
                 Group::matrix_product(cox!(3; n - 1), Group::central_inv(n)).unwrap(),
                 order,
                 order / 2,
-                &format!("A{}", n),
+                &format!("±A{}", n),
             )
         }
     }
 
-    /// Tests the B*n* symmetries, which correspond to the symmetries of the
+    /// Tests the BC*n* symmetries, which correspond to the symmetries of the
     /// regular hypercube and orthoplex.
     #[test]
-    fn b() {
+    fn bc() {
         let mut order = 2;
 
         for n in 2..=6 {
@@ -850,7 +850,7 @@ mod tests {
                 Group::cox_group(cox).unwrap(),
                 order,
                 order / 2,
-                &format!("B{}", n),
+                &format!("BC{}", n),
             )
         }
     }
@@ -867,16 +867,15 @@ mod tests {
     #[test]
     fn e6() {
         // In the future, we'll have better code for this, I hope.
-        let e6 = Group::cox_group(CoxMatrix(Matrix::from_iterator(
-            6,
-            6,
+        let e6 = Group::cox_group(CoxMatrix(Matrix::from_data(VecStorage::new(
+            Dynamic::new(6),
+            Dynamic::new(6),
             vec![
                 1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 3.0,
                 2.0, 3.0, 2.0, 2.0, 3.0, 1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 2.0, 2.0, 2.0,
                 3.0, 2.0, 2.0, 1.0,
-            ]
-            .into_iter(),
-        )))
+            ],
+        ))))
         .unwrap();
 
         test(e6, 51840, 25920, &"E6");
