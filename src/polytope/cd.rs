@@ -191,7 +191,6 @@ impl<'a> Caret<'a> {
 
                 // Sets the index of the new node to be where the virtual node is refering to.
                 new_node = idx
-                
             }
             // If the node is a single character.
             _ => {}
