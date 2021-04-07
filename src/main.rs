@@ -48,14 +48,19 @@
 //! ## Why is the rendering buggy?
 //! Proper rendering, even in 3D, is a work in progress.
 
-use crate::polytope::group::pow;
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
+use nalgebra::Dynamic;
+use nalgebra::VecStorage;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
-use polytope::group::Group;
+use polytope::{
+    cox::CoxMatrix,
+    geometry::Matrix,
+    group::{GenIter, Group},
+};
 #[allow(unused_imports)]
 use polytope::{off, Concrete, Polytope, Renderable};
 
@@ -147,19 +152,27 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Group::step(cox!(7), |mut mat| {
-        if mat.determinant() > 0.0 {
-            pow(&mat, 3)
-        } else {
-            mat[(0, 1)] *= -1.0;
-            mat[(1, 1)] *= -1.0;
-            mat = pow(&mat, 3);
-            mat[(0, 1)] *= -1.0;
-            mat[(1, 1)] *= -1.0;
-            mat
-        }
-    })
-    .into_polytope(vec![0.53, 0.58, 0.97, 0.93].into());
+    let gens = GenIter::from_cox_mat(CoxMatrix(Matrix::from_data(VecStorage::new(
+        Dynamic::new(4),
+        Dynamic::new(4),
+        vec![
+            1.0, 3.0, 3.0, 3.0, 3.0, 1.0, 2.0, 2.0, 3.0, 2.0, 1.0, 2.0, 3.0, 2.0, 2.0, 1.0,
+        ],
+    ))))
+    .unwrap();
+
+    let mut new_gens = Vec::new();
+    //new_gens.push(gens.gens[0].clone());
+    let g1 = &gens.gens[0] * &gens.gens[1];
+    let g2 = &gens.gens[0] * &gens.gens[2];
+    let g3 = &gens.gens[0] * &gens.gens[3];
+    let v = vec![g1, g2, g3].into_iter();
+    let mut tertiary = itertools::iproduct!(v.clone(), v.clone(), v.clone())
+        .map(|(i, j, k)| i * j * k)
+        .collect();
+    new_gens.append(&mut tertiary);
+
+    let poly = Group::from_gens(4, new_gens).into_polytope(vec![0.5, 0.5, 0.5, 0.5].into());
 
     // Creates OFFBuilder code for a polytope.
     for v in &poly.vertices {

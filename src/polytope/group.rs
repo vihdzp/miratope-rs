@@ -172,6 +172,13 @@ impl Group {
         self.count()
     }
 
+    pub fn from_gens(dim: usize, gens: Vec<Matrix<f64>>) -> Self {
+        Self {
+            dim,
+            iter: Box::new(GenIter::new(dim, gens)),
+        }
+    }
+
     /// Buils the rotation subgroup of a group.
     pub fn rotations(self) -> Self {
         // The determinant might not be exactly 1, so we're extra lenient and
@@ -276,38 +283,9 @@ impl Group {
     /// Generates a Coxeter group from its [`CoxMatrix`], or returns `None` if
     /// the group doesn't fit as a matrix group in spherical space.
     pub fn cox_group(cox: CoxMatrix) -> Option<Self> {
-        const EPS: f64 = 1e-6;
-
-        let dim = cox.nrows();
-        let mut generators = Vec::with_capacity(dim);
-
-        // Builds each generator from the top down as a triangular matrix, so
-        // that the dot products match the values in the Coxeter matrix.
-        for i in 0..dim {
-            let mut gen_i = Vector::from_element(dim, 0.0);
-
-            for (j, gen_j) in generators.iter().enumerate() {
-                let dot = gen_i.dot(gen_j);
-                gen_i[j] = ((PI / cox[(i, j)] as f64).cos() - dot) / gen_j[j];
-            }
-
-            // The vector doesn't fit in spherical space.
-            let norm_sq = gen_i.norm_squared();
-            if norm_sq >= 1.0 - EPS {
-                return None;
-            } else {
-                gen_i[i] = (1.0 - norm_sq).sqrt();
-            }
-
-            generators.push(gen_i);
-        }
-
         Some(Self {
-            dim,
-            iter: Box::new(GenIter::new(
-                dim,
-                generators.into_iter().map(refl_mat).collect(),
-            )),
+            dim: cox.nrows(),
+            iter: Box::new(GenIter::from_cox_mat(cox)?),
         })
     }
 
@@ -556,10 +534,10 @@ type OrdPoint = OrdMatrixMN<Dynamic, U1>;
 #[derive(Clone)]
 pub struct GenIter {
     /// The number of dimensions the group acts on.
-    dim: usize,
+    pub dim: usize,
 
     /// The generators for the group.
-    generators: Vec<Matrix<f64>>,
+    pub gens: Vec<Matrix<f64>>,
 
     /// Stores the elements that have been generated and that can still be
     /// generated again. Is integral for the algorithm to work, as without it,
@@ -624,7 +602,7 @@ pub fn refl_mat(n: Vector<f64>) -> Matrix<f64> {
 
 impl GenIter {
     /// Builds a new group from a set of generators.
-    fn new(dim: usize, generators: Vec<Matrix<f64>>) -> Self {
+    fn new(dim: usize, gens: Vec<Matrix<f64>>) -> Self {
         // Initializes the queue with only the identity matrix.
         let mut queue = VecDeque::new();
         queue.push_back(OrdMatrix::new(Matrix::identity(dim, dim)));
@@ -637,7 +615,7 @@ impl GenIter {
 
         Self {
             dim,
-            generators,
+            gens,
             elements,
             queue,
             gen_idx: 0,
@@ -652,7 +630,7 @@ impl GenIter {
         if let Some(value) = self.elements.insert(el.clone(), 1) {
             // Bumps the value by 1, or removes the element if this is the last
             // time we'll find the element.
-            if value != self.generators.len() - 1 {
+            if value != self.gens.len() - 1 {
                 self.elements.insert(el, value + 1);
             } else {
                 self.elements.remove(&el);
@@ -674,11 +652,11 @@ impl GenIter {
     /// Advances the iterator.
     fn next_el_gen(&mut self) -> Option<[Matrix<f64>; 2]> {
         let el = self.queue.front()?.0.clone();
-        let gen = self.generators[self.gen_idx].clone();
+        let gen = self.gens[self.gen_idx].clone();
 
         // Advances the indices.
         self.gen_idx += 1;
-        if self.gen_idx == self.generators.len() {
+        if self.gen_idx == self.gens.len() {
             self.gen_idx = 0;
             self.queue.pop_front();
         }
@@ -706,6 +684,39 @@ impl GenIter {
         else {
             GroupNext::None
         }
+    }
+
+    pub fn from_cox_mat(cox: CoxMatrix) -> Option<Self> {
+        const EPS: f64 = 1e-6;
+
+        let dim = cox.nrows();
+        let mut generators = Vec::with_capacity(dim);
+
+        // Builds each generator from the top down as a triangular matrix, so
+        // that the dot products match the values in the Coxeter matrix.
+        for i in 0..dim {
+            let mut gen_i = Vector::from_element(dim, 0.0);
+
+            for (j, gen_j) in generators.iter().enumerate() {
+                let dot = gen_i.dot(gen_j);
+                gen_i[j] = ((PI / cox[(i, j)] as f64).cos() - dot) / gen_j[j];
+            }
+
+            // The vector doesn't fit in spherical space.
+            let norm_sq = gen_i.norm_squared();
+            if norm_sq >= 1.0 - EPS {
+                return None;
+            } else {
+                gen_i[i] = (1.0 - norm_sq).sqrt();
+            }
+
+            generators.push(gen_i);
+        }
+
+        Some(Self::new(
+            dim,
+            generators.into_iter().map(refl_mat).collect(),
+        ))
     }
 }
 

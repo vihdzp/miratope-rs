@@ -8,6 +8,7 @@ use std::{
 /// matrix](https://en.wikipedia.org/wiki/Coxeter_group#Coxeter_matrix_and_Schl%C3%A4fli_matrix),
 /// which encodes the angles between the mirrors of the generators of a Coxeter
 /// group.
+/// TODO: add some checks?
 pub struct CoxMatrix(pub Matrix<f64>);
 
 impl Deref for CoxMatrix {
@@ -43,7 +44,7 @@ impl CoxMatrix {
     }
 }
 
-/// Builds a Coxeter matrix for a given linear diagram.
+/// Builds a Coxeter group for a given linear diagram.
 ///
 /// # Examples
 ///
@@ -59,12 +60,26 @@ impl CoxMatrix {
 #[macro_export]
 macro_rules! cox {
     () => (
-        crate::polytope::group::Group::cox_group(crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![])).unwrap()
+        crate::polytope::group::Group::cox_group(crate::cox_mat!()).unwrap()
     );
     ($($x:expr),+) => (
-       crate::polytope::group::Group::cox_group(crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![$($x as f64),+])).unwrap()
+        crate::polytope::group::Group::cox_group(crate::cox_mat!($($x),+)).unwrap()
     );
     ($x:expr; $y:expr) => (
-        crate::polytope::group::Group::cox_group(crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![$x as f64; $y])).unwrap()
+        crate::polytope::group::Group::cox_group(crate::cox_mat!($x; $y)).unwrap()
+    )
+}
+
+/// Builds a Coxeter matrix for a given linear diagram.
+#[macro_export]
+macro_rules! cox_mat {
+    () => (
+        crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![])
+    );
+    ($($x:expr),+) => (
+        crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![$($x as f64),+])
+    );
+    ($x:expr; $y:expr) => (
+        crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![$x as f64; $y])
     )
 }
