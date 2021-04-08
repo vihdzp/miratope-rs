@@ -9,6 +9,7 @@ use super::{
 };
 
 use nalgebra::DMatrix;
+use rand::Rng;
 use scapegoat::SGSet as BTreeSet;
 use std::fmt::Debug;
 
@@ -368,6 +369,17 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
     Concrete::new(vertices, abs)
 }
 
+fn rand_perturbation(dim: usize) -> Point {
+    const PERTURB: f64 = 1e-4;
+    let mut rng = rand::thread_rng();
+
+    (0..dim)
+        .into_iter()
+        .map(|_| rng.gen::<f64>() * PERTURB)
+        .collect::<Vec<_>>()
+        .into()
+}
+
 /// Builds the convex hull of a set of vertices. Uses the gift wrapping algorithm.
 pub fn convex_hull(mut vertices: Vec<Point>) -> Concrete {
     let mut facets = HashSet::new();
@@ -376,9 +388,17 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Concrete {
     // Gets first ridge, reorders elements in the process.
     ridges.insert(get_hull_ridge(&mut vertices));
 
+    let dim = vertices[0].nrows();
+
+    // Perturbs each point randomly.
+    let vertices_pert = vertices
+        .iter()
+        .map(|v| v + rand_perturbation(dim))
+        .collect::<Vec<_>>();
+
     // While there's still a ridge we need to check...
     while let Some(old_ridge) = ridges.pop_first() {
-        let mut new_vertices = leftmost_vertex(&vertices, &old_ridge);
+        let mut new_vertices = leftmost_vertex(&vertices_pert, &old_ridge);
         let new_ridges = get_new_ridges(&old_ridge, &new_vertices);
 
         let mut facet = Element {

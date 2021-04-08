@@ -52,17 +52,10 @@ use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
-use nalgebra::Dynamic;
-use nalgebra::VecStorage;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
-use polytope::{
-    cox::CoxMatrix,
-    geometry::Matrix,
-    group::{GenIter, Group},
-};
 #[allow(unused_imports)]
-use polytope::{off, Concrete, Polytope, Renderable};
+use polytope::{off, Concrete, Polytope, Renderable,group};
 
 mod input;
 mod no_cull_pipeline;
@@ -152,27 +145,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let gens = GenIter::from_cox_mat(CoxMatrix(Matrix::from_data(VecStorage::new(
-        Dynamic::new(4),
-        Dynamic::new(4),
-        vec![
-            1.0, 3.0, 3.0, 3.0, 3.0, 1.0, 2.0, 2.0, 3.0, 2.0, 1.0, 2.0, 3.0, 2.0, 2.0, 1.0,
-        ],
-    ))))
-    .unwrap();
-
-    let mut new_gens = Vec::new();
-    //new_gens.push(gens.gens[0].clone());
-    let g1 = &gens.gens[0] * &gens.gens[1];
-    let g2 = &gens.gens[0] * &gens.gens[2];
-    let g3 = &gens.gens[0] * &gens.gens[3];
-    let v = vec![g1, g2, g3].into_iter();
-    let mut tertiary = itertools::iproduct!(v.clone(), v.clone(), v)
-        .map(|(i, j, k)| i * j * k)
-        .collect();
-    new_gens.append(&mut tertiary);
-
-    let poly = Group::from_gens(4, new_gens).into_polytope(vec![0.5, 0.5, 0.5, 0.5].into());
+    let poly = cox!(2, 2, 2).into_polytope(vec![1., 2., 3., 4.].into());
 
     // Creates OFFBuilder code for a polytope.
     for v in &poly.vertices {
