@@ -55,7 +55,7 @@ use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
 #[allow(unused_imports)]
-use polytope::{group, off, Concrete, Polytope, Renderable};
+use polytope::*;
 
 mod input;
 mod no_cull_pipeline;
@@ -145,7 +145,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = cox!(2, 2, 2).into_polytope(vec![1., 2., 3., 4.].into());
+    let poly = cox!(2, 2, 2).into_polytope(vec![1.0, 2.0, 3.0, 4.0].into());
 
     // Creates OFFBuilder code for a polytope.
     for v in &poly.vertices {

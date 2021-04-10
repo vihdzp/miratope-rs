@@ -1406,7 +1406,7 @@ impl Renderable {
         // Else, we project it down.
         else {
             // Distance from the projection planes.
-            const DIST: f64 = 2.0;
+            const DIST: f64 = 10.0;
 
             vert_iter
                 .map(|point| {

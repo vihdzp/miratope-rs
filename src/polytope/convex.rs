@@ -148,23 +148,23 @@ fn get_hull_ridge(vertices: &mut [Point]) -> VertexSet {
 
 /// Finds the index of the closest leftmost vertex relative to a ridge.
 /// "Leftmost" will depend on the orientation of the ridge.
-fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> Vec<usize> {
+fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> usize {
     debug_assert!(is_sorted(&ridge.vertices));
 
-    let mut leftmost_vertices = Vec::new();
+    let mut leftmost_vertex;
     let mut facet: Vec<_> = ridge.vertices.iter().map(|&idx| &vertices[idx]).collect();
 
     let mut vertex_iter = vertices.iter().enumerate();
 
-    // We find a starting vertex not on the ridge.
+    // We find a starting vertex not on the ridge, and add it to the facet.
     let mut h = Subspace::from_points(facet.iter().cloned().cloned().collect());
     loop {
-        let (i, v0) = vertex_iter.next().unwrap();
+        let (i, v0) = vertex_iter.next().expect("All points coplanar!");
 
         // The ridge should be sorted, so we can optimize this.
         if h.add(v0.clone()).is_some() {
-            leftmost_vertices.push(i);
             facet.push(v0);
+            leftmost_vertex = Some(i);
 
             break;
         }
@@ -179,9 +179,8 @@ fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> Vec<usize> {
 
         // If the new vertex is to the left of the previous leftmost one:
         if sign_hypervolume(&facet, ridge.orientation) == Sign::Positive {
-            // Resets leftmost vertices.
-            leftmost_vertices.clear();
-            leftmost_vertices.push(i);
+            // Resets leftmost vertex.
+            leftmost_vertex = Some(i);
 
             // Adds new leftmost to the facet.
             let len = facet.len();
@@ -191,15 +190,16 @@ fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> Vec<usize> {
         facet.pop();
     }
 
-    debug_assert!(!leftmost_vertices.is_empty());
-    leftmost_vertices
+    let leftmost_vertex = leftmost_vertex.expect("No leftmost vertex!");
+    debug_assert!(
+        !ridge.vertices.contains(&leftmost_vertex),
+        "New vertex in old ridge!"
+    );
+    leftmost_vertex
 }
 
 /// Gets the new ridges that have to be searched, in the correct orientation.
-fn get_new_ridges(old_ridge: &VertexSet, new_vertices: &[usize]) -> Vec<VertexSet> {
-    // THIS CURRENTLY ONLY DEALS WITH SIMPLICIAL FACETS.
-    let new_vertex = new_vertices[0];
-
+fn get_new_ridges(old_ridge: &VertexSet, new_vertex: usize) -> Vec<VertexSet> {
     let len = old_ridge.vertices.len();
     let mut new_ridges = Vec::with_capacity(len);
 
@@ -369,42 +369,45 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
     Concrete::new(vertices, abs)
 }
 
-fn rand_perturbation(dim: usize) -> Point {
+fn perturb(v: &Point) -> Point {
     const PERTURB: f64 = 1e-4;
+
+    let dim = v.nrows();
     let mut rng = rand::thread_rng();
 
-    (0..dim)
+    let pert: Point = (0..dim)
         .into_iter()
         .map(|_| rng.gen::<f64>() * PERTURB)
         .collect::<Vec<_>>()
-        .into()
+        .into();
+
+    v + pert
 }
 
 /// Builds the convex hull of a set of vertices. Uses the gift wrapping algorithm.
 pub fn convex_hull(mut vertices: Vec<Point>) -> Concrete {
+    println!("Start!");
+
     let mut facets = HashSet::new();
     let mut ridges = BTreeSet::new();
 
     // Gets first ridge, reorders elements in the process.
     ridges.insert(get_hull_ridge(&mut vertices));
 
-    let dim = vertices[0].nrows();
-
     // Perturbs each point randomly.
-    let vertices_pert = vertices
-        .iter()
-        .map(|v| v + rand_perturbation(dim))
-        .collect::<Vec<_>>();
+    let vertices_pert = vertices.iter().map(&perturb).collect::<Vec<_>>();
+
+    println!("Perturbed!");
 
     // While there's still a ridge we need to check...
     while let Some(old_ridge) = ridges.pop_first() {
-        let mut new_vertices = leftmost_vertex(&vertices_pert, &old_ridge);
-        let new_ridges = get_new_ridges(&old_ridge, &new_vertices);
+        let new_vertex = leftmost_vertex(&vertices_pert, &old_ridge);
+        let new_ridges = get_new_ridges(&old_ridge, new_vertex);
 
         let mut facet = Element {
             subs: old_ridge.vertices.clone(),
         };
-        facet.subs.append(&mut new_vertices);
+        facet.subs.push(new_vertex);
         facet.subs.sort_unstable();
 
         // We skip the facet if it isn't new.
@@ -428,6 +431,7 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Concrete {
         facets.insert(facet);
     }
 
+    println!("Last step!");
     get_polytope_from_facets(vertices, ElementList(facets.into_iter().collect()))
 }
 
