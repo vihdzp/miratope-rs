@@ -23,6 +23,7 @@ pub mod cox;
 pub mod geometry;
 pub mod group;
 pub mod off;
+pub mod ranked_poset;
 pub mod shapes;
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
