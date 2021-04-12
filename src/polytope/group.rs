@@ -170,39 +170,40 @@ impl Group {
         }
     }
 
-    /// Builds either a left or a right quaternion group from a 3D group.
-    fn quaternions(self, left: bool) -> Option<Self> {
+    /// Builds an iterator over the set of either left or a right quaternions
+    /// from a 3D group. **These won't actually generate a group,** as they
+    /// don't contain central inversion.
+    fn quaternions(self, left: bool) -> Box<dyn GroupIter> {
         if self.dim != 3 {
-            return None;
+            panic!("Quaternions can only be generated from 3D matrices.");
         }
 
-        Some(Self {
-            dim: 4,
-            iter: Box::new(
-                self.rotations()
-                    .map(move |el| {
-                        let q = mat_to_quat(el);
-                        let m = quat_to_mat(q, left);
-                        std::iter::once(m.clone()).chain(std::iter::once(-m))
-                    })
-                    .flatten(),
-            ),
-        })
-    }
-
-    /// Builds a left quaternion group from a 3D group.
-    pub fn left_quaternions(self) -> Option<Self> {
-        self.quaternions(true)
-    }
-
-    /// Builds a right quaternion group from a 3D group.
-    pub fn right_quaternions(self) -> Option<Self> {
-        self.quaternions(false)
+        Box::new(
+            self.rotations()
+                .map(move |el| quat_to_mat(mat_to_quat(el), left)),
+        )
     }
 
     /// Returns the swirl symmetry group of two 3D groups.
-    pub fn swirl(g: Self, h: Self) -> Option<Self> {
-        Self::matrix_product(g.left_quaternions()?, h.right_quaternions()?)
+    pub fn swirl(g: Self, h: Self) -> Self {
+        if g.dim != 3 {
+            panic!("g must be a group of 3D matrices.");
+        }
+        if h.dim != 3 {
+            panic!("h must be a group of 3D matrices.");
+        }
+
+        Self {
+            dim: 4,
+            iter: Box::new(
+                itertools::iproduct!(g.quaternions(true), h.quaternions(false))
+                    .map(|(mat1, mat2)| {
+                        let mat = mat1 * mat2;
+                        std::iter::once(mat.clone()).chain(std::iter::once(-mat))
+                    })
+                    .flatten(),
+            ),
+        }
     }
 
     /// Returns a new group whose elements have all been generated already, so
@@ -766,6 +767,25 @@ mod tests {
         }
     }
 
+    /// Tests the A3⁺ @ (I2(*n*) × I) symmetries, the tetrahedron swirl
+    /// symmetries.
+    #[test]
+    fn a3_p_swirl_i2xi_p() {
+        for n in 2..10 {
+            let order = 24 * n;
+
+            test(
+                Group::swirl(
+                    cox!(3.0, 3.0),
+                    Group::direct_product(cox!(n), Group::trivial(1)),
+                ),
+                order,
+                order,
+                &format!("A3⁺ @ (I2({}) × I)", n),
+            )
+        }
+    }
+
     /// Tests the A*n* symmetries, which correspond to the symmetries of the
     /// regular simplices.
     #[test]
@@ -778,19 +798,8 @@ mod tests {
             test(cox!(3; n - 1), order, order / 2, &format!("A{}", n))
         }
     }
-
-    #[test]
-    fn a_quat() {
-        for &left in &[true, false] {
-            test(
-                cox!(3, 3).quaternions(left).unwrap(),
-                24,
-                24,
-                &"Quaternion A3",
-            );
-        }
-    }
-
+    /// Tests the ±A*n* symmetries, which correspond to the symmetries of the
+    /// compound of two simplices.
     #[test]
     fn pm_an() {
         let mut order = 4;

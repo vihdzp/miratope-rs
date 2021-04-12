@@ -55,7 +55,7 @@ use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
 #[allow(unused_imports)]
-use polytope::*;
+use polytope::{group::Group, *};
 
 mod input;
 mod no_cull_pipeline;
