@@ -402,53 +402,55 @@ fn write_els(off: &mut String, opt: &OffOptions, rank: isize, els: &[Element]) {
 }
 
 /// Converts a polytope into an OFF file.
-pub fn to_src(p: &Concrete, opt: OffOptions) -> String {
-    let rank = p.rank();
-    let vertices = &p.vertices;
-    let abs = &p.abs;
-    let mut off = String::new();
+impl Concrete {
+    pub fn to_src(&self, opt: OffOptions) -> String {
+        let rank = self.rank();
+        let vertices = &self.vertices;
+        let abs = &self.abs;
+        let mut off = String::new();
 
-    // Blatant advertising.
-    if opt.comments {
-        off += &format!(
-            "# Generated using Miratope v{} (https://github.com/OfficialURL/miratope-rs)\n",
-            env!("CARGO_PKG_VERSION")
-        );
+        // Blatant advertising.
+        if opt.comments {
+            off += &format!(
+                "# Generated using Miratope v{} (https://github.com/OfficialURL/miratope-rs)\n",
+                env!("CARGO_PKG_VERSION")
+            );
+        }
+
+        // Writes header.
+        if rank != 3 {
+            off += &rank.to_string();
+        }
+        off += "OFF\n";
+
+        // If we have a nullitope or point on our hands, that is all.
+        if rank < 1 {
+            return off;
+        }
+
+        // Adds the element counts.
+        write_el_counts(&mut off, &opt, self.el_counts());
+
+        // Adds vertex coordinates.
+        write_vertices(&mut off, &opt, vertices);
+
+        // Adds faces.
+        if rank >= 2 {
+            write_faces(&mut off, &opt, rank as usize, &abs[1], &abs[2]);
+        }
+
+        // Adds the rest of the elements.
+        for r in 3..rank {
+            write_els(&mut off, &opt, r, &abs[r]);
+        }
+
+        off
     }
 
-    // Writes header.
-    if rank != 3 {
-        off += &rank.to_string();
+    /// Writes a polytope's OFF file in a specified file path.
+    pub fn to_path(&self, fp: &impl AsRef<Path>, opt: OffOptions) -> Result<()> {
+        std::fs::write(fp, self.to_src(opt))
     }
-    off += "OFF\n";
-
-    // If we have a nullitope or point on our hands, that is all.
-    if rank < 1 {
-        return off;
-    }
-
-    // Adds the element counts.
-    write_el_counts(&mut off, &opt, p.el_counts());
-
-    // Adds vertex coordinates.
-    write_vertices(&mut off, &opt, vertices);
-
-    // Adds faces.
-    if rank >= 2 {
-        write_faces(&mut off, &opt, rank as usize, &abs[1], &abs[2]);
-    }
-
-    // Adds the rest of the elements.
-    for r in 3..rank {
-        write_els(&mut off, &opt, r, &abs[r]);
-    }
-
-    off
-}
-
-/// Writes a polytope's OFF file in a specified file path.
-pub fn to_path(fp: &impl AsRef<Path>, p: &Concrete, opt: OffOptions) -> Result<()> {
-    std::fs::write(fp, to_src(p, opt))
 }
 
 #[cfg(test)]
@@ -462,7 +464,7 @@ mod tests {
 
         // Checks that the polytope can be reloaded correctly.
         assert_eq!(
-            from_src(to_src(&p, Default::default())).el_counts().0,
+            from_src(p.to_src(OffOptions::default())).el_counts().0,
             el_nums
         );
     }

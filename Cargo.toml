@@ -5,19 +5,19 @@ authors = ["Violeta Hernández <vi.hdz.p@gmail.com>", "Grayson Burton <ocornoc@p
 edition = "2018"
 
 [dependencies]
-approx = "0.4.0"
-bevy = "0.4.0"
-bevy_egui = "0.3.0"
-dyn-clone = "1.0.4"
-gcd = "2.0.1"
-itertools = "0.10.0"
-nalgebra = {version = "0.25.4", features = ["serde-serialize"]}
-petgraph = "0.5.1"
-rand = "0.8.3"
-regex = "1.4.5"
-ron = "0.6.4"
-scapegoat = "1.0.0"
-serde = {version = "1.0.123", features = ["derive"]}
+approx = "0.4"
+bevy = "0.4"
+bevy_egui = "0.3"
+dyn-clone = "1.0"
+gcd = "2.0"
+itertools = "0.10"
+nalgebra = {version = "0.26", features = ["serde-serialize"]}
+petgraph = "0.5"
+rand = "0.8"
+regex = "1.4"
+ron = "0.6"
+scapegoat = "1.0"
+serde = {version = "1.0.125", features = ["derive"]}
 
 [profile.release]
 lto = "thin"

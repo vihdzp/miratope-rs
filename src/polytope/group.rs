@@ -116,31 +116,6 @@ fn direct_sum(mat1: Matrix<f64>, mat2: Matrix<f64>) -> Matrix<f64> {
     })
 }
 
-/// Computes the power of a matrix. I made a [pull request](https://github.com/dimforge/nalgebra/pull/859)
-/// over at `nalgebra` adding this functionality, so hopefully we'll be able to
-/// use that in the future.
-pub fn pow(mat: &Matrix<f64>, mut n: usize) -> Matrix<f64> {
-    let i = Matrix::identity(mat.ncols(), mat.nrows());
-
-    if n == 0 {
-        return i;
-    }
-
-    let mut acc = i;
-    let mut multiplier = mat.clone();
-
-    while n > 0 {
-        if n % 2 == 1 {
-            acc *= multiplier.clone();
-        }
-
-        n /= 2;
-        multiplier *= multiplier.clone();
-    }
-
-    acc
-}
-
 /// An iterator such that `dyn` objects using it can be cloned. Used to get
 /// around orphan rules.
 trait GroupIter: Iterator<Item = Matrix<f64>> + dyn_clone::DynClone {}
@@ -901,7 +876,7 @@ mod tests {
         for n in 1..10 {
             for d in 1..n {
                 test(
-                    Group::step(cox!(n).rotations(), move |mat| pow(&mat, d)),
+                    Group::step(cox!(n).rotations(), move |mat| mat.pow(d).unwrap()),
                     n,
                     n,
                     "Step prismatic n-d",
