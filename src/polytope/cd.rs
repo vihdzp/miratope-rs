@@ -1,6 +1,5 @@
 use petgraph::graph::NodeIndex;
 use petgraph::{graph::Graph, Undirected};
-use regex::Regex;
 use std::f64;
 use std::{fmt::Display, str::Chars};
 
@@ -103,6 +102,7 @@ fn cd_parse(input: &str) -> Option<Cd> {
     // Reads through the diagram.
     loop {
         caret.create_node()?;
+        caret.read_edge()?;
 
         if caret.make_edge().is_none() {
             return Some(Cd(caret.graph));
@@ -167,8 +167,7 @@ impl<'a> Caret<'a> {
                     chars.push(c);
                     if c == ')' {
                         // Converts the read characters into a value and adds the node to the graph.
-                        self.graph
-                            .add_node(node_to_val(&chars.into_iter().collect::<String>())?);
+                        self.graph.add_node(node_to_val(&chars)?);
                         break;
                     }
                 }
@@ -199,8 +198,7 @@ impl<'a> Caret<'a> {
             // If the node is a single character.
             _ => {
                 // Converts the read characters into a value and adds the node to the graph.
-                self.graph
-                    .add_node(node_to_val(&chars.into_iter().collect::<String>())?);
+                self.graph.add_node(node_to_val(&chars)?);
             }
         }
 
@@ -238,69 +236,125 @@ impl<'a> Caret<'a> {
     */
 }
 
-///Converts string slices of cd edges to wrapped EdgeVals
-fn edge_to_val(_: &str) -> Option<EdgeVal> {
-    /* use EdgeVal::*;
-    if Regex::new(r#"^\d+/\d+$"#).unwrap().is_match(c) {
-        let bar = c.find("/").unwrap();
-        return Some(Rational(
-            c[..bar].parse::<i64>().unwrap(),
-            c[bar + 1..].parse::<i64>().unwrap(),
-        ));
-    } else if Regex::new(r#"^\d+$"#).unwrap().is_match(c) {
-        return Some(Rational(c.parse::<i64>().unwrap(), 1i64));
-    } else {
-        match c {
-            "∞" => return Some(Inf(false)),
-            "∞'" => return Some(Inf(true)),
-            "Ø" => return Some(Non),
-            _ => None,
+///Converts Vecs of chars to wrapped EdgeVals
+fn edge_to_val(raw: Vec<char>) -> Option<EdgeVal> {
+    use EdgeVal::*;
+    let mut raw_iter = raw.iter();
+    let mut edge = Vec::new();
+    let mut numer: Option<i64> = None;
+    let mut rat = false;
+    let c = *raw_iter.next()?;
+    //Starting character
+    edge.push(c);
+
+    //If the value is Rational or an Integer
+    if c.is_digit(10) {
+        while let Some(&c) = raw_iter.next() {
+            //If the "/" is encountered
+            if c == '/' {
+                //Set the flag for Rationals
+                rat = true;
+
+                //Parse and save the numerator
+                numer = match edge.into_iter().collect::<String>().parse::<i64>() {
+                    Ok(number) => Some(number),
+                    _ => return None,
+                };
+
+                //Reset what's being read
+                edge = Vec::new();
+            };
+
+            //Wasn't a special character, can continue
+            edge.push(c);
+        }
+        //When you're at the end
+        //Parse the end value
+        let val = match edge.into_iter().collect::<String>().parse::<i64>() {
+            Ok(number) => number,
+            _ => return None,
         };
-    };*/
 
-    todo!()
-}
+        //If this was a Rational edge, the end value would be the denominator
+        //If this wasn't a Rational edge, the end value would be the numerator
+        if rat {
+            return Some(Rational(numer?, val));
+        } else {
+            return Some(Rational(val, 1i64));
+        };
+    } else {
+        //For miscellaneous edge symbols,
+        //just read the whole thing as a string
+        let c = edge.into_iter().collect::<String>();
 
-//Converts string slices of cd node values to wrapped NodeVals
-fn node_to_val(c: &str) -> Option<NodeVal> {
-    use NodeVal::*;
-    if (c.len() == 3 || c.len() == 1)
-        & !(Regex::new(r#"([^oxqfvhkuwFe]|\([^oxqfvhkuwFe]\))"#)
-            .unwrap()
-            .is_match(c))
-    {
-        //For established letter-values
-        let c = c.replace("(", "");
-        let c = c.replace(")", "");
         match &c[..] {
-            "o" => Some(Unringed),
-            "v" => Some(Ringed((5f64.sqrt() - 1f64) / 2f64)),
-            "x" => Some(Ringed(1f64)),
-            "q" => Some(Ringed(2f64.sqrt())),
-            "f" => Some(Ringed((5f64.sqrt() + 1f64) / 2f64)),
-            "h" => Some(Ringed(3f64.sqrt())),
-            "k" => Some(Ringed((2f64.sqrt() + 2f64).sqrt())),
-            "u" => Some(Ringed(2f64)),
-            "w" => Some(Ringed(2f64.sqrt() + 1f64)),
-            "F" => Some(Ringed((5f64.sqrt() + 3f64) / 2f64)),
-            "e" => Some(Ringed(3f64.sqrt() + 1f64)),
-            "Q" => Some(Ringed(2f64.sqrt() * 2f64)),
-            "d" => Some(Ringed(3f64)),
-            "V" => Some(Ringed(5f64.sqrt() + 1f64)),
-            "U" => Some(Ringed(2f64.sqrt() + 2f64)),
-            "A" => Some(Ringed((5f64.sqrt() + 5f64) / 4f64)),
-            "X" => Some(Ringed(2f64.sqrt() * 2f64 + 1f64)),
-            "B" => Some(Ringed(5f64.sqrt() + 2f64)),
-            "s" => Some(Snub),
+            "∞" => Some(Inf(false)),
+            "∞'" => Some(Inf(true)),
+            "'∞" => Some(Inf(true)),
+            "Ø" => Some(Non),
             _ => None,
         }
-    } else if Regex::new(r#"^\(\d(\.\d+)?\)$"#).unwrap().is_match(c) {
-        //For custom lengths
-        let c = c.replace("(", "").replace(")", "");
+    }
+}
 
-        Some(Ringed(c.parse::<f64>().unwrap()))
-    } else {
+///Converts Vecs of chars to wrapped NodeVals
+fn node_to_val(raw: &Vec<char>) -> Option<NodeVal> {
+    use NodeVal::*;
+    let mut raw_iter = raw.iter();
+    let mut node = Vec::new();
+    let mut c = *raw_iter.next()?;
+    //Skips to the next character
+    //if the first one an opening parenthesis
+    if c == '(' {
+        c = *raw_iter.next()?
+    }
+    //Starting character
+    node.push(c);
+
+    //If the node has a custom value
+    if c.is_digit(10) {
+        while let Some(&c) = raw_iter.next() {
+            //When you're at the end
+            if c == ')' {
+                //Parse the value
+                let val = match node.into_iter().collect::<String>().parse::<f64>() {
+                    Ok(number) => number,
+                    _ => return None,
+                };
+
+                return Some(Ringed(val));
+            }
+
+            //This character was normal, can continue
+            node.push(c);
+        }
+
+        //Something's wrong, return None
         None
+    } else {
+        //Check shortchord values
+        Some(Ringed(match c {
+            'o' => return Some(Unringed),
+            's' => return Some(Snub),
+            'v' => (5f64.sqrt() - 1f64) / 2f64,
+            'x' => 1f64,
+            'q' => 2f64.sqrt(),
+            'f' => (5f64.sqrt() + 1f64) / 2f64,
+            'h' => 3f64.sqrt(),
+            'k' => (2f64.sqrt() + 2f64).sqrt(),
+            'u' => 2f64,
+            'w' => 2f64.sqrt() + 1f64,
+            'F' => (5f64.sqrt() + 3f64) / 2f64,
+            'e' => 3f64.sqrt() + 1f64,
+            'Q' => 2f64.sqrt() * 2f64,
+            'd' => 3f64,
+            'V' => 5f64.sqrt() + 1f64,
+            'U' => 2f64.sqrt() + 2f64,
+            'A' => (5f64.sqrt() + 5f64) / 4f64,
+            'X' => 2f64.sqrt() * 2f64 + 1f64,
+            'B' => 5f64.sqrt() + 2f64,
+            _ => return None,
+        }))
     }
 }
 
