@@ -1,261 +1,205 @@
-use crate::EPS;
-use petgraph::{
-    graph::NodeReferences,
-    visit::{Dfs, IntoNodeReferences},
-};
+use std::collections::BTreeSet;
+use std::f64::NEG_INFINITY;
 
 use super::{
-    geometry::{Hyperplane, Point, Subspace},
-    Concrete,
+    geometry::{Point, Subspace, Vector},
+    Concrete, RankVec,
 };
-use float_ord::FloatOrd;
-use petgraph::graph::{NodeIndex, NodeWeightsMut, UnGraph};
+use derive_more::{Deref, DerefMut};
+use petgraph::{graph::NodeIndex, Directed, Direction, Graph};
 
-/// Represents a facet in a convex hull. Can be thought of as an oriented
-/// hyperplane, together with a bunch of points that lie on its outer side.
-/// To save space, stores the indices of points instead of the points
-/// themselves.
-struct Facet<'a> {
-    /// The index of a single point that lies on the inner side of the facet.
-    /// Used to test where other points are with respect to this half space.
-    inner: &'a Point,
+/// An entry in the priority queue used in Shell.
+enum QueueEntry<'a> {
+    /// Represents the event where at a certain time, the first facet that
+    /// contains a certain point becomes visible. This facet will have the
+    /// specified vertices and normal vector.
+    Point {
+        time: f64,
+        normal: Vector,
+        point: Point,
+        vertices: Vec<Point>,
+    },
 
-    /// The indices of the points that lie strictly on the facet.
-    contained: Vec<&'a Point>,
-
-    /// The indices of the points that lie on the outer side of the facet, and
-    /// which "are associated" to the facet. Any point must be the outer point
-    /// of at most one facet.
-    outer: Vec<&'a Point>,
+    /// Represents the event where at a certain time, a facet containing a
+    /// horizon peak and the horizon ridges specified by an element's neighbors
+    /// becomes visible. This facet will have the specified normal vector.
+    Peak {
+        time: f64,
+        normal: Vector,
+        element: ShellElement<'a>,
+    },
 }
 
-#[derive(PartialEq)]
-enum Position {
-    Inner,
-    Contained,
-    Outer,
-}
-
-impl<'a> Facet<'a> {
-    fn new(inner: &'a Point, contained: Vec<&'a Point>) -> Self {
-        Self {
-            inner,
-            contained,
-            outer: Vec::new(),
-        }
-    }
-
-    /// Returns the farthest outer point from the facet.
-    fn farthest(&self) -> Option<&'a Point> {
-        let s = Hyperplane::new(
-            Subspace::from_points(self.contained.iter().copied().cloned().collect()),
-            self.inner,
-        );
-
-        self.outer
-            .iter()
-            .copied()
-            .max_by_key(|&p| FloatOrd(s.distance(p)))
-    }
-
-    /// Returns whether a given point is inside, outside, or contained on the
-    /// facet.
-    fn position(&self, p: &'a Point) -> Position {
-        let c = self.contained[0];
-        let i = self.inner;
-        let dot = (c - i).dot(&(p - i));
-
-        if dot > EPS {
-            Position::Inner
-        } else if dot < -EPS {
-            Position::Outer
-        } else {
-            Position::Contained
+impl<'a> QueueEntry<'a> {
+    /// Returns the time associated with an event.
+    pub fn time(&self) -> f64 {
+        match self {
+            QueueEntry::Point {
+                time: t,
+                normal: _,
+                point: _,
+                vertices: _,
+            } => *t,
+            QueueEntry::Peak {
+                time: t,
+                normal: _,
+                element: _,
+            } => *t,
         }
     }
 }
 
-/// Represents a ridge in a convex hull.
-struct Ridge<'a> {
-    /// The indices of the points that lie strictly on the ridge.
-    contained: Vec<&'a Point>,
-}
-
-impl<'a> Ridge<'a> {
-    fn new(contained: Vec<&'a Point>) -> Self {
-        Self { contained }
+impl<'a> PartialEq for QueueEntry<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.time() == other.time()
     }
 }
 
-/// Represents a convex hull. Is made out of facets and ridges, and stores them
-/// as an incidence graph.
-struct Hull<'a> {
-    /// An undirected graph representing adjacencies between facets. Nodes in
-    /// the graph represent facets, while edges represent ridges.
-    ///
-    /// # Todo
-    /// The reason we use a graph structure specifically is that it allows us to
-    /// DFS over the facets. This is very useful when computing the visible
-    /// boundary of a point. Our approach is currently much more naive than
-    /// this.
-    graph: UnGraph<Facet<'a>, Ridge<'a>>,
+impl<'a> Eq for QueueEntry<'a> {}
 
-    /// The vector of facets that we've verified are on the convex hull. Is
-    /// initialized empty, but should have precisely the polytope's facets at
-    /// the end.
-    final_facets: Vec<Facet<'a>>,
+impl<'a> PartialOrd for QueueEntry<'a> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.time().partial_cmp(&other.time())
+    }
 }
 
-impl<'a> Hull<'a> {
-    /// Builds a new `Hull` from the facet-ridge graph.
-    fn new(graph: UnGraph<Facet<'a>, Ridge<'a>>) -> Self {
-        Self {
-            graph,
-            final_facets: Vec::new(),
-        }
+impl<'a> Ord for QueueEntry<'a> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+/// The metadata returned after deleting an element from a [`ShellQueue`]. This
+/// data specifies the minimum time in the queue, the union of all
+/// [`Point`](ShellQueueEntry::Point) and [`Peak`](ShellQueueEntry::Peak)
+/// entries at this time, and their common normal vector.
+struct QueueData<'a> {
+    time: f64,
+    normal: Vector,
+    vertices: Vec<Point>,
+    elements: Vec<ShellElement<'a>>,
+    points: Vec<Point>,
+}
+
+#[derive(Deref, DerefMut)]
+struct Queue<'a>(BTreeSet<QueueEntry<'a>>);
+
+impl<'a> Queue<'a> {
+    pub fn new() -> Self {
+        Self(BTreeSet::new())
     }
 
-    /// Builds a simplicial hull from a set of indices of vertices.
-    fn simplex(indices: &[&'a Point]) -> Self {
-        let n = indices.len();
-        let mut graph = UnGraph::with_capacity(n, n * (n - 1) / 2);
-
-        // Adds facets. Each facet has all vertices but one, and is oriented
-        // away of the remaining one.
-        for i in 0..n {
-            graph.add_node(Facet::new(
-                indices[i],
-                indices[0..i]
-                    .iter()
-                    .chain(indices[(i + 1)..n].iter())
-                    .cloned()
-                    .collect(),
-            ));
-        }
-
-        // Adds ridges. Each ridge has all vertices but two.
-        for j in 1..n {
-            for i in 0..j {
-                graph.add_edge(
-                    NodeIndex::new(i),
-                    NodeIndex::new(j),
-                    Ridge::new(
-                        indices[0..i]
-                            .iter()
-                            .chain(indices[(i + 1)..j].iter())
-                            .chain(indices[(j + 1)..n].iter())
-                            .cloned()
-                            .collect(),
-                    ),
-                );
-            }
-        }
-
-        Self::new(graph)
-    }
-
-    /// Returns a reference to the facet with a given index.
-    fn get_facet(&self, idx: usize) -> Option<&Facet<'a>> {
-        self.graph.node_weight(NodeIndex::new(idx))
-    }
-
-    /// Attempts to remove a facet with a given index, and returns it if
-    /// successful.
-    fn remove_facet(&mut self, idx: usize) -> Option<Facet<'a>> {
-        self.graph.remove_node(NodeIndex::new(idx))
-    }
-
-    /// Returns an iterator over the facets.
-    fn facets(&self) {
-        self.graph.raw_nodes().iter().map(|f| f.weight)
-    }
-
-    /// Returns a mutable iterator over the facets.
-    fn facets_mut(&mut self) -> NodeWeightsMut<Facet<'a>> {
-        self.graph.node_weights_mut()
-    }
-
-    /// Fills the outer vertex sets of all facets.
-    fn fill_outers(&mut self, vertices: &[&'a Point]) {
-        for v in vertices {
-            for f in self.facets_mut() {
-                if f.position(v) == Position::Outer {
-                    f.outer.push(v);
-
-                    // At most one facet can have a given vertex.
-                    break;
-                }
-            }
-        }
-    }
-
-    /// Checks the first facet of the hull. If it has no outer vertices, it adds
-    /// it to `final_facets`. Otherwise, it adds the necessary facets to the
-    /// polytope.
-    fn check_first_facet(&mut self) -> bool {
-        // Takes the first facet in the graph.
-        if let Some(f) = self.get_facet(0) {
-            if let Some(p) = f.farthest() {
-                for facet in self.facets() {}
-
-                todo!()
-            } else {
-                // Deletes facet from graph. (Would it be faster to delete the
-                // last one instead?)
-                let f = self.remove_facet(0).unwrap();
-                self.final_facets.push(f);
-            }
-
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Finds a set of d + 1 points not in the same hyperplane, builds a simplicial
-    /// hull from them. Returs `None` if no such set of points exists.
-    fn initial_hull(vertices: &[&'a Point]) -> Option<Hull<'a>> {
-        let mut vert_iter = vertices.iter();
-        let mut s = Subspace::new((*vert_iter.next()?).clone());
-        let mut hull_vertices = Vec::new();
-
-        for &v in vert_iter {
-            if let Some(_) = s.add(v) {
-                hull_vertices.push(v);
-
-                // If we've already found d + 1 points not in a hyperplane.
-                if s.is_full_rank() {
-                    let mut hull = Hull::simplex(&hull_vertices);
-                    hull.fill_outers(vertices);
-                    return Some(hull);
-                }
-            }
-        }
-
-        None
-    }
-
-    // Converts the finished hull into a concrete polytope.
-    fn into_polytope(&self) -> Concrete {
-        debug_assert_eq!(self.graph.node_count(), 0);
-
+    pub fn delete_min() -> QueueData<'a> {
         todo!()
     }
 }
 
-/// Computes the convex hull of a set of vertices. Returns `None` if the
-/// vertices don't span the ambient space.
-pub fn convex_hull(vertices: Vec<Point>) -> Option<Concrete> {
-    // Turns the vertices into their references.
-    let vertices = vertices.iter().collect::<Vec<_>>();
+/// An element produced by the Shell algorithm. Note that the data it contains
+/// is quite different from that of a [`Element`](super::Element).
+struct ShellElement<'a> {
+    normal: Vector,
+    neighbors: Vec<NodeIndex>,
+    queue: &'a Queue<'a>,
+}
 
-    // Initializes the hull.
-    let mut hull = Hull::initial_hull(&vertices)?;
+struct ShellEdge<'a>(&'a Point);
 
-    // Checks the first facet with a non-empty set of outer vertices, until
-    // there is none.
-    while hull.check_first_facet() {}
+struct Line(Vector, Vector);
 
-    // Builds the polytope from the hull.
-    Some(hull.into_polytope())
+struct ShellPolytope<'a> {
+    dim: usize,
+    graph: Graph<ShellElement<'a>, ShellEdge<'a>, Directed>,
+}
+
+impl<'a> ShellPolytope<'a> {
+    fn new(dim: usize) -> Self {
+        todo!()
+    }
+
+    fn convex_hull(vertices: Vec<Point>) -> Concrete {
+        let s = Subspace::from_points(&vertices);
+
+        // A vector that is contained in s, but is in "general position."
+        let y = 0.57 * &s.basis[0] + 0.43 * &s.basis[1];
+        let a = s.orthogonal_comp();
+        let x: Point = vertices.iter().sum::<Point>() / vertices.len() as f64;
+
+        let vertices = vertices.iter().collect::<Vec<_>>();
+
+        let mut poly = Self::new(vertices[0].nrows());
+
+        poly.shell(
+            Line(y, x),
+            NEG_INFINITY,
+            Vec::new(),
+            Vec::new(),
+            vertices.clone(),
+            vertices,
+            a,
+        );
+
+        poly.into()
+    }
+
+    fn shell(
+        &mut self,
+        line: Line,
+        time: f64,
+        ff: Vec<NodeIndex>,
+        hr: Vec<NodeIndex>,
+        u: Vec<&'a Point>,
+        t: Vec<&'a Point>,
+        n: Vec<Vector>,
+    ) -> ShellElement<'a> {
+        // Step 1
+        let q = self.graph.add_node(ShellElement {
+            normal: vec![].into(),
+            neighbors: Vec::new(),
+            queue: &Queue::new(),
+        });
+
+        for f in ff {
+            self.graph.add_edge(f, q, weight);
+        }
+
+        // Step 2
+        if t.len() == 1 {
+            let p = t[0];
+
+            self.graph.add_edge(
+                q,
+                if let Some(&e) = ff.get(0) {
+                    e
+                } else {
+                    self.graph.add_node(ShellElement {
+                        normal: Vector::zeros(self.dim),
+                        neighbors: Vec::new(),
+                    })
+                },
+                ShellEdge(&p),
+            );
+        }
+
+        // Step 3
+        let mut hp = Vec::new();
+        for f in hr {
+            for g in self.graph.neighbors_directed(f, Direction::Outgoing) {
+                hp.push(g);
+                self.graph[g].neighbors.push(f);
+            }
+        }
+        todo!()
+    }
+}
+
+impl<'a> Into<Concrete> for ShellPolytope<'a> {
+    fn into(self) -> Concrete {
+        todo!()
+    }
+}
+
+impl Concrete {
+    pub fn convex_hull_plus(&self) -> Concrete {
+        convex_hull(self.vertices.clone())
+    }
 }

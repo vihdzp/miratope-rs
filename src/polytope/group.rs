@@ -6,6 +6,7 @@ use crate::{cox, EPS};
 
 use super::{convex, cox::CoxMatrix, geometry::Point, Concrete};
 use approx::{abs_diff_ne, relative_eq};
+use derive_more::Deref;
 use nalgebra::{
     storage::Storage, DMatrix as Matrix, DVector as Vector, Dim, Dynamic, Quaternion, VecStorage,
     U1,
@@ -459,34 +460,14 @@ pub enum GroupNext {
 #[allow(clippy::upper_case_acronyms)]
 type MatrixMN<R, C> = nalgebra::Matrix<f64, R, C, VecStorage<f64, R, C>>;
 
-#[derive(Clone, Debug)]
-#[allow(clippy::upper_case_acronyms)]
 /// A matrix ordered by fuzzy lexicographic ordering. Used to quickly
 /// determine whether an element in a [`GenIter`](super::GenIter) is a
 /// duplicate.
+#[derive(Clone, Debug, Deref)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct OrdMatrixMN<R: Dim, C: Dim>(pub MatrixMN<R, C>)
 where
     VecStorage<f64, R, C>: Storage<f64, R, C>;
-
-impl<R: Dim, C: Dim> std::ops::Deref for OrdMatrixMN<R, C>
-where
-    VecStorage<f64, R, C>: Storage<f64, R, C>,
-{
-    type Target = MatrixMN<R, C>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<R: Dim, C: Dim> std::ops::DerefMut for OrdMatrixMN<R, C>
-where
-    VecStorage<f64, R, C>: Storage<f64, R, C>,
-{
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
 
 impl<R: Dim, C: Dim> PartialEq for OrdMatrixMN<R, C>
 where

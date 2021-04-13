@@ -2,6 +2,7 @@
 //! space.
 
 pub type Point = nalgebra::DVector<f64>;
+pub type Vector = Point;
 pub type Matrix = nalgebra::DMatrix<f64>;
 
 use approx::abs_diff_eq;
@@ -49,7 +50,7 @@ impl Hypersphere {
 /// Represents an (affine) subspace, passing through a given point and generated
 /// by a given basis.
 pub struct Subspace {
-    pub basis: Vec<Point>,
+    pub basis: Vec<Vector>,
     pub rank: usize,
     pub offset: Point,
 }
@@ -99,16 +100,16 @@ impl Subspace {
     }
 
     /// Creates a subspace from a list of points.
-    pub fn from_points(points: Vec<Point>) -> Self {
+    pub fn from_points(points: &[Point]) -> Self {
         let mut points = points.into_iter();
         let mut h = Self::new(
             points
                 .next()
-                .expect("A hyperplane can't be created from an empty point array!"),
+                .expect("A hyperplane can't be created from an empty point array!").clone(),
         );
 
         for p in points {
-            h.add(&p);
+            h.add(p);
         }
 
         h
@@ -133,8 +134,14 @@ impl Subspace {
 
     /// Computes a normal vector to the subspace, so that the specified point is
     /// left out of it. Returns `None` if the point given lies on the subspace.
-    pub fn normal(&self, p: &Point) -> Option<Point> {
+    pub fn normal(&self, p: &Point) -> Option<Vector> {
         (p - self.project(&p)).try_normalize(EPS)
+    }
+
+    /// Computes a set of independent vectors that span the orthogonal
+    /// complement of the subspace.
+    pub fn orthogonal_comp(&self) -> Vec<Vector> {
+        todo!()
     }
 }
 

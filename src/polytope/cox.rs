@@ -1,9 +1,6 @@
 use derive_deref::{Deref, DerefMut};
 use nalgebra::DMatrix as Matrix;
-use std::{
-    mem,
-    ops::{Deref, DerefMut},
-};
+use std::mem;
 
 /// Represents a [Coxeter
 /// matrix](https://en.wikipedia.org/wiki/Coxeter_group#Coxeter_matrix_and_Schl%C3%A4fli_matrix),

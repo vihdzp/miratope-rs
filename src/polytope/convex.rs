@@ -156,7 +156,7 @@ fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> Vec<usize> {
     let mut vertex_iter = vertices.iter().enumerate();
 
     // We find a starting vertex not on the ridge.
-    let mut h = Subspace::from_points(facet.iter().cloned().cloned().collect());
+    let mut h = Subspace::from_points(&facet.iter().cloned().cloned().collect::<Vec<_>>());
     loop {
         let (i, v0) = vertex_iter.next().unwrap();
 
@@ -271,9 +271,9 @@ fn check_subelement(vertices: &[Point], el: &[usize], rank: isize) -> bool {
     if rank >= 4 {
         // The hyperplane of the intersection of the elements.
         let h = Subspace::from_points(
-            el.iter()
+            &el.iter()
                 .map(|&sub| vertices[sub].clone())
-                .collect::<Vec<Point>>(),
+                .collect::<Vec<_>>(),
         );
 
         // If this hyperplane does not have the correct dimension, it
