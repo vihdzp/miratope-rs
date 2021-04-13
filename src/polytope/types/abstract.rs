@@ -39,9 +39,9 @@ impl Abstract {
     }
 
     pub fn push_at(&mut self, rank: isize, el: Elements) {
-        if let Some(lower_rank) = self.get_mut(rank - 1) {
-            let i = lower_rank.len();
+        let i = self[rank].len();
 
+        if let Some(lower_rank) = self.get_mut(rank - 1) {
             // Updates superelements of the lower rank.
             for &sub in &el.subs.0 {
                 lower_rank[sub].sups.push(i);
