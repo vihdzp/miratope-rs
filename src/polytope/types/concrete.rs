@@ -224,7 +224,7 @@ impl Concrete {
 
         // We project the sphere's center onto the polytope's hyperplane to
         // avoid skew weirdness.
-        let h = Subspace::from_points(self.vertices.clone());
+        let h = Subspace::from_points(&self.vertices);
         let o = h.project(&sphere.center);
 
         let mut projections;
@@ -236,7 +236,7 @@ impl Concrete {
 
             for idx in 0..facet_count {
                 projections.push(
-                    Subspace::from_points(self.get_element_vertices(rank - 1, idx).unwrap())
+                    Subspace::from_points(&self.get_element_vertices(rank - 1, idx).unwrap())
                         .project(&o),
                 );
             }

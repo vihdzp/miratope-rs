@@ -6,7 +6,7 @@ use crate::{cox, EPS};
 
 use super::{convex, cox::CoxMatrix, geometry::Point, Concrete};
 use approx::{abs_diff_ne, relative_eq};
-use derive_more::Deref;
+use derive_deref::Deref;
 use nalgebra::{
     storage::Storage, DMatrix as Matrix, DVector as Vector, Dim, Dynamic, Quaternion, VecStorage,
     U1,
