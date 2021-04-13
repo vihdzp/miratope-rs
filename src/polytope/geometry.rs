@@ -105,7 +105,8 @@ impl Subspace {
         let mut h = Self::new(
             points
                 .next()
-                .expect("A hyperplane can't be created from an empty point array!").clone(),
+                .expect("A hyperplane can't be created from an empty point array!")
+                .clone(),
         );
 
         for p in points {

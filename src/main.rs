@@ -57,7 +57,7 @@ use no_cull_pipeline::PbrNoBackfaceBundle;
 
 use polytope::group::Group;
 #[allow(unused_imports)]
-use polytope::{off,Concrete, Polytope, Renderable};
+use polytope::{off, Concrete, Polytope, Renderable};
 
 mod input;
 mod no_cull_pipeline;
