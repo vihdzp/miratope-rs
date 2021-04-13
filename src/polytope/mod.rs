@@ -188,40 +188,105 @@ pub trait Polytope: Sized + Clone {
     }
 }
 
-/// A single element in an [`Abstract`].
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct Element {
-    /// The indices of the subelements of the polytope.
-    pub subs: Vec<usize>,
+/// The indices of the subelements of a polytope.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Deref, DerefMut)]
+pub struct Subelements(pub Vec<usize>);
+
+impl Subelements {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
+    pub fn count(count: usize) -> Self {
+        let mut vec = Vec::new();
+
+        for i in 0..count {
+            vec.push(i);
+        }
+
+        Self(vec)
+    }
 }
 
-impl Element {
+/// The indices of the superelements of a polytope.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Deref, DerefMut)]
+pub struct Superelements(pub Vec<usize>);
+
+impl Superelements {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
+    pub fn count(count: usize) -> Self {
+        let mut vec = Vec::new();
+
+        for i in 0..count {
+            vec.push(i);
+        }
+
+        Self(vec)
+    }
+}
+
+/// The subelements and superlements of a polytope.
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct Elements {
+    pub subs: Subelements,
+    pub sups: Superelements,
+}
+
+impl Elements {
     /// Initializes a new element with no subelements.
-    fn new() -> Self {
-        Self::min()
+    pub fn new() -> Self {
+        Self::min(0)
     }
 
     /// Builds a minimal element for a polytope.
-    fn min() -> Self {
-        Self { subs: vec![] }
+    pub fn min(vertex_count: usize) -> Self {
+        Self {
+            subs: Subelements::new(),
+            sups: Superelements::count(vertex_count),
+        }
     }
 
     /// Builds a maximal element adjacent to a given number of facets.
-    fn max(facet_count: usize) -> Self {
-        let mut subs = Vec::with_capacity(facet_count);
+    pub fn max(facet_count: usize) -> Self {
+        let mut subs = Subelements::with_capacity(facet_count);
 
         for i in 0..facet_count {
             subs.push(i);
         }
 
-        Self { subs }
+        Self {
+            subs,
+            sups: Superelements::new(),
+        }
+    }
+
+    pub fn from_subs(subs: Subelements) -> Self {
+        Self {
+            subs,
+            sups: Superelements(Vec::new()),
+        }
+    }
+
+    pub fn swap_mut(&mut self) {
+        std::mem::swap(&mut self.subs.0, &mut self.sups.0)
     }
 }
 
 /// A list of [`Elements`](Element) of the same
 /// [rank](https://polytope.miraheze.org/wiki/Rank).
 #[derive(Debug, Clone, Deref, DerefMut)]
-pub struct ElementList(pub Vec<Element>);
+pub struct ElementList(pub Vec<Elements>);
 
 impl ElementList {
     /// Initializes an empty element list.
@@ -236,22 +301,23 @@ impl ElementList {
 
     /// Returns the element list for the nullitope in a polytope with a given
     /// vertex count.
-    pub fn min() -> Self {
-        Self(vec![Element::min()])
+    pub fn min(vertex_count: usize) -> Self {
+        Self(vec![Elements::min(vertex_count)])
     }
 
     /// Returns the element list for the maximal element in a polytope with a
     /// given facet count.
     pub fn max(facet_count: usize) -> Self {
-        Self(vec![Element::max(facet_count)])
+        Self(vec![Elements::max(facet_count)])
     }
 
     /// Returns the element list for a set number of vertices in a polytope.
+    /// **Does not include any superelements.**
     pub fn vertices(vertex_count: usize) -> Self {
         let mut els = ElementList::with_capacity(vertex_count);
 
         for _ in 0..vertex_count {
-            els.push(Element { subs: vec![0] });
+            els.push(Elements::from_subs(Subelements(vec![0])));
         }
 
         els
@@ -284,7 +350,7 @@ mod tests {
             Abstract::orthoplex(4),
             Abstract::orthoplex(5),
             Abstract::duoprism(&Abstract::polygon(6), &Abstract::polygon(7)),
-            Abstract::dyad().ditope().ditope().ditope().ditope(),
+            dbg!(Abstract::dyad().ditope()).ditope().ditope().ditope(),
         ]
     }
 

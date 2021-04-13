@@ -101,7 +101,7 @@ impl Subspace {
 
     /// Creates a subspace from a list of points.
     pub fn from_points(points: &[Point]) -> Self {
-        let mut points = points.into_iter();
+        let mut points = points.iter();
         let mut h = Self::new(
             points
                 .next()

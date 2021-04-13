@@ -1,13 +1,13 @@
 use derive_deref::{Deref, DerefMut};
 use std::collections::{HashMap, HashSet};
 
-use crate::polytope::{ranked_poset::RankVec, Element, ElementList, Polytope};
+use crate::polytope::{ranked_poset::RankVec, ElementList, Elements, Polytope, Subelements};
 
 /// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
 /// to an
 /// [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
 #[derive(Debug, Clone, Deref, DerefMut)]
-pub struct Abstract(pub RankVec<ElementList>);
+pub struct Abstract(RankVec<ElementList>);
 
 impl Abstract {
     /// Initializes a polytope with an empty element list.
@@ -17,7 +17,7 @@ impl Abstract {
 
     /// Initializes a new polytope with the capacity needed to store elements up
     /// to a given rank.
-    pub fn with_rank(rank: isize) -> Self {
+    pub fn with_capacity(rank: isize) -> Self {
         Abstract(RankVec::with_rank(rank))
     }
 
@@ -27,17 +27,49 @@ impl Abstract {
     }
 
     /// Returns a reference to the minimal element of the polytope.
-    pub fn min(&self) -> &Element {
+    pub fn min(&self) -> &Elements {
         &self[0][0]
+    }
+
+    /// Pushes a new element list, assuming that the superelements of the
+    /// maximal rank **have** already been set. If they haven't already been
+    /// set, use [`push_subs`] instead.    
+    pub fn push(&mut self, elements: ElementList) {
+        self.0.push(elements);
+    }
+
+    pub fn push_at(&mut self, rank: isize, el: Elements) {
+        if let Some(lower_rank) = self.get_mut(rank - 1) {
+            let i = lower_rank.len();
+
+            // Updates superelements of the lower rank.
+            for &sub in &el.subs.0 {
+                lower_rank[sub].sups.push(i);
+            }
+        }
+
+        self[rank].push(el);
+    }
+
+    /// Pushes a new element list, assuming that the superelements of the
+    /// maximal rank **haven't** already been set. If they have already been
+    /// set, use [`push`] instead.    
+    pub fn push_subs(&mut self, elements: ElementList) {
+        self.0.push(ElementList::with_capacity(elements.len()));
+        let rank = self.rank();
+
+        for el in elements.0.into_iter() {
+            self.push_at(rank, el);
+        }
     }
 
     /// Pushes a minimal element with no superelements into the polytope. To be
     /// used in circumstances where the elements are built up in layers.
     pub fn push_min(&mut self) {
         // If you're using this method, the polytope should be empty.
-        debug_assert!(self.0.is_empty());
+        debug_assert!(self.is_empty());
 
-        self.push(ElementList::min());
+        self.push_subs(ElementList::min(0));
     }
 
     /// Pushes a minimal element with no superelements into the polytope. To be
@@ -47,7 +79,7 @@ impl Abstract {
         // minimal element.
         debug_assert_eq!(self.rank(), -1);
 
-        self.push(ElementList::vertices(vertex_count))
+        self.push_subs(ElementList::vertices(vertex_count))
     }
 
     /// Pushes a maximal element into the polytope, with the facets as
@@ -55,11 +87,7 @@ impl Abstract {
     /// in layers.
     pub fn push_max(&mut self) {
         let facet_count = self.el_count(self.rank());
-        self.push(ElementList::max(facet_count));
-    }
-
-    pub fn insert(&mut self, index: isize, value: ElementList) {
-        self.0.insert((index + 1) as usize, value);
+        self.push_subs(ElementList::max(facet_count));
     }
 
     /// Converts a polytope into its dual.
@@ -71,33 +99,12 @@ impl Abstract {
 
     /// Converts a polytope into its dual in place.
     pub fn dual_mut(&mut self) {
-        let rank = self.rank();
-
-        for r in 0..=rank {
-            // Clears all subelements of the previous rank.
-            for mut el in self[r - 1].iter_mut() {
-                el.subs = Vec::new();
-            }
-
-            // Gets the elements of the previous and current rank mutably.
-            let (part1, part2) = self.split_at_mut(r);
-            let prev_rank = part1.last_mut().unwrap();
-            let cur_rank = &part2[0];
-
-            // Makes the subelements of the previous rank point to the
-            // corresponding superelements of the current rank.
-            for (idx, el) in cur_rank.iter().enumerate() {
-                for &sub in &el.subs {
-                    prev_rank[sub].subs.push(idx);
-                }
+        for elements in self.iter_mut() {
+            for el in elements.iter_mut() {
+                el.swap_mut();
             }
         }
 
-        // Clears subelements of the maximal element.
-        self[rank][0].subs = Vec::new();
-
-        // Now that all of the incidences are backwards, there's only one thing
-        // left to do... flip!
         self.reverse();
     }
 
@@ -115,7 +122,7 @@ impl Abstract {
             let mut hash_subs = HashSet::new();
 
             for idx in indices {
-                for &sub in &self[r][idx].subs {
+                for &sub in &self[r][idx].subs.0 {
                     hash_subs.insert(sub);
                 }
             }
@@ -143,7 +150,7 @@ impl Abstract {
         todo!()
     }
 
-    /// Calls [has_min_max_elements](Abstract::has_min_max_elements),
+    /// Calls [`has_min_max_elements`](Abstract::has_min_max_elements),
     /// [check_incidences](Abstract::check_incidences),
     /// [is_dyadic](Abstract::is_dyadic), and
     /// [is_strongly_connected](Abstract::is_strongly_connected).
@@ -164,7 +171,7 @@ impl Abstract {
     pub fn check_incidences(&self) -> bool {
         for r in -1..self.rank() {
             for element in self[r].iter() {
-                for &sub in &element.subs {
+                for &sub in &element.subs.0 {
                     if self[r - 1].get(sub).is_none() {
                         return false;
                     }
@@ -190,10 +197,10 @@ impl Abstract {
             for el in self[r].iter() {
                 let mut hash_sub_subs = HashMap::new();
 
-                for &sub in &el.subs {
+                for &sub in &el.subs.0 {
                     let sub_el = &self[r - 1][sub];
 
-                    for &sub_sub in &sub_el.subs {
+                    for &sub_sub in &sub_el.subs.0 {
                         match hash_sub_subs.get(&sub_sub) {
                             // Found for the first time.
                             None => hash_sub_subs.insert(sub_sub, Count::Once),
@@ -253,9 +260,9 @@ impl Abstract {
         let rank = p_rank + q_rank + 1 - (!min as isize) - (!max as isize);
 
         // Initializes the product with empty element lists.
-        let mut product = Self::with_rank(rank);
+        let mut product = Self::with_capacity(rank);
         for _ in -1..=rank {
-            product.push(ElementList::new());
+            product.push_subs(ElementList::new());
         }
 
         // We add the elements of a given rank in lexicographic order of the
@@ -317,19 +324,19 @@ impl Abstract {
 
                         // Products of p's subelements with q.
                         if p_els_rank != 0 || min {
-                            for &s in &p_el.subs {
+                            for &s in &p_el.subs.0 {
                                 subs.push(get_element_index(p_els_rank - 1, s, q_els_rank, q_idx))
                             }
                         }
 
                         // Products of q's subelements with p.
                         if q_els_rank != 0 || min {
-                            for &s in &q_el.subs {
+                            for &s in &q_el.subs.0 {
                                 subs.push(get_element_index(p_els_rank, p_idx, q_els_rank - 1, s))
                             }
                         }
 
-                        product[prod_rank].push(Element { subs })
+                        product[prod_rank].push(Elements::from_subs(Subelements(subs)))
                     }
                 }
             }
@@ -337,8 +344,9 @@ impl Abstract {
 
         // If !min, we have to set a minimal element manually.
         if !min {
-            product[-1] = ElementList::min();
-            product[0] = ElementList::vertices(p.el_count(0) * q.el_count(0));
+            let vertex_count = p.el_count(0) * q.el_count(0);
+            product[-1] = ElementList::min(vertex_count);
+            product[0] = ElementList::vertices(vertex_count);
         }
 
         // If !max, we have to set a maximal element manually.
@@ -378,41 +386,46 @@ impl Polytope for Abstract {
 
     /// Returns the unique polytope of rank −1.
     fn nullitope() -> Self {
-        Abstract::from_vec(vec![ElementList::min()])
+        Abstract::from_vec(vec![ElementList::min(0)])
     }
 
     /// Returns the unique polytope of rank 0.
     fn point() -> Self {
-        Abstract::from_vec(vec![ElementList::min(), ElementList::max(1)])
+        Abstract::from_vec(vec![ElementList::min(1), ElementList::max(1)])
     }
 
     /// Returns the unique polytope of rank 1.
     fn dyad() -> Self {
-        Abstract::from_vec(vec![
-            ElementList::min(),
-            ElementList::vertices(2),
-            ElementList::max(2),
-        ])
+        let mut abs = Abstract::with_capacity(1);
+        abs.push(ElementList::min(2));
+        abs.push(ElementList::vertices(2));
+        abs.push_subs(ElementList::max(2));
+        abs
     }
 
     /// Returns the unique polytope of rank 2 with a given amount of vertices.
     fn polygon(n: usize) -> Self {
         assert!(n >= 2);
 
-        let nullitope = ElementList::min();
+        let nullitope = ElementList::min(n);
         let mut vertices = ElementList::with_capacity(n);
         let mut edges = ElementList::with_capacity(n);
         let maximal = ElementList::max(n);
 
-        for i in 1..=n {
-            vertices.push(Element { subs: vec![0] });
+        for i in 0..n {
+            vertices.push(Elements::from_subs(Subelements(vec![0])));
 
-            edges.push(Element {
-                subs: vec![i % n, (i + 1) % n],
-            });
+            edges.push(Elements::from_subs(Subelements(vec![i % n, (i + 1) % n])));
         }
 
-        Abstract::from_vec(vec![nullitope, vertices, edges, maximal])
+        let mut poly = Abstract::with_capacity(2);
+
+        poly.push(nullitope);
+        poly.push(vertices);
+        poly.push_subs(edges);
+        poly.push_subs(maximal);
+
+        poly
     }
 
     fn duopyramid(p: &Self, q: &Self) -> Self {
@@ -441,8 +454,8 @@ impl Polytope for Abstract {
         let rank = self.rank();
         let max = self[rank][0].clone();
 
-        self[rank].push(max);
-        self.push(ElementList::max(2));
+        self.push_at(rank, max);
+        self.push_subs(ElementList::max(2));
     }
 
     fn hosotope(&self) -> Self {

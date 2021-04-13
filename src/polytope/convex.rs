@@ -5,7 +5,7 @@ use std::{
 
 use super::{
     geometry::{Point, Subspace},
-    Abstract, Concrete, Element, ElementList,
+    Abstract, Concrete, ElementList, Elements, Subelements,
 };
 
 use nalgebra::DMatrix;
@@ -292,10 +292,10 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
     let dim = vertices[0].len();
 
     // Initializes the abstract polytope.
-    let mut abs = Abstract::with_rank(dim as isize);
+    let mut abs = Abstract::with_capacity(dim as isize);
     abs.push_min();
     for _ in 0..(dim as isize) {
-        abs.push(ElementList::new());
+        abs.push_subs(ElementList::new());
     }
 
     // Adds everything else.
@@ -310,7 +310,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
         let mut els_subs = ElementList::with_capacity(len);
 
         for _ in 0..len {
-            els_subs.push(Element::new());
+            els_subs.push(Elements::new());
         }
 
         // Checks every pair of d-elements to see if their intersection forms
@@ -348,10 +348,10 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
         }
 
         els_verts = ElementList::new();
-        els_verts.resize(subs_map.len(), Element { subs: vec![] });
+        els_verts.resize(subs_map.len(), Elements::from_subs(Subelements(vec![])));
 
         for (subs, idx) in subs_map {
-            els_verts[idx] = Element { subs };
+            els_verts[idx] = Elements::from_subs(Subelements(subs));
         }
 
         abs[r] = els_subs;
@@ -381,9 +381,7 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Concrete {
         let mut new_vertices = leftmost_vertex(&vertices, &old_ridge);
         let new_ridges = get_new_ridges(&old_ridge, &new_vertices);
 
-        let mut facet = Element {
-            subs: old_ridge.vertices.clone(),
-        };
+        let mut facet = Elements::from_subs(Subelements(old_ridge.vertices.clone()));
         facet.subs.append(&mut new_vertices);
         facet.subs.sort_unstable();
 

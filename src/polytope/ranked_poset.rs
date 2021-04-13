@@ -51,6 +51,12 @@ impl<T> RankVec<T> {
     pub fn swap(&mut self, a: isize, b: isize) {
         self.0.swap((a + 1) as usize, (b + 1) as usize);
     }
+
+    /// Inserts an element at position `index` within the vector, shifting all
+    /// elements after it to the right.
+    pub fn insert(&mut self, index: isize, element: T) {
+        self.0.insert((index + 1) as usize, element)
+    }
 }
 
 impl<T> std::ops::Index<isize> for RankVec<T> {
