@@ -166,7 +166,7 @@ impl<'a> Hull<'a> {
     }
 
     /// Returns an iterator over the facets.
-    fn facets(&self)  {
+    fn facets(&self) {
         self.graph.raw_nodes().iter().map(|f| f.weight)
     }
 

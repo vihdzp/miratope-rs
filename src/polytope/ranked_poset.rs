@@ -1,7 +1,73 @@
+use derive_deref::{Deref, DerefMut};
 use petgraph::graph::{DefaultIx, DiGraph, IndexType, NodeIndex};
 
-use super::RankVec;
+/// A `Vec` indexed by [rank](https://polytope.miraheze.org/wiki/Rank). Wraps
+/// around operations that offset by a constant for our own convenience.
+#[derive(Debug, Clone, Deref, DerefMut)]
+pub struct RankVec<T>(pub Vec<T>);
 
+impl<T> RankVec<T> {
+    /// Constructs a new, empty `RankVec<T>`.
+    pub fn new() -> Self {
+        RankVec(Vec::new())
+    }
+
+    /// Constructs a new, empty `RankVec<T>` with the specified capacity.
+    pub fn with_rank(rank: isize) -> Self {
+        RankVec(Vec::with_capacity((rank + 2) as usize))
+    }
+
+    /// Returns the greatest rank stored in the array.
+    pub fn rank(&self) -> isize {
+        self.len() as isize - 2
+    }
+
+    /// Returns a reference to the element at a given position or `None` if out
+    /// of bounds.
+    pub fn get(&self, index: isize) -> Option<&T> {
+        if index < -1 {
+            None
+        } else {
+            self.0.get((index + 1) as usize)
+        }
+    }
+
+    /// Divides one mutable slice into two at an index.
+    pub fn split_at_mut(&mut self, mid: isize) -> (&mut [T], &mut [T]) {
+        self.0.split_at_mut((mid + 1) as usize)
+    }
+
+    /// Returns a mutable reference to an element or `None` if the index is out
+    /// of bounds.
+    pub fn get_mut(&mut self, index: isize) -> Option<&mut T> {
+        if index < -1 {
+            None
+        } else {
+            self.0.get_mut((index + 1) as usize)
+        }
+    }
+
+    /// Swaps two elements in the vector.
+    pub fn swap(&mut self, a: isize, b: isize) {
+        self.0.swap((a + 1) as usize, (b + 1) as usize);
+    }
+}
+
+impl<T> std::ops::Index<isize> for RankVec<T> {
+    type Output = T;
+
+    fn index(&self, index: isize) -> &Self::Output {
+        &self.0[(index + 1) as usize]
+    }
+}
+
+impl<T> std::ops::IndexMut<isize> for RankVec<T> {
+    fn index_mut(&mut self, index: isize) -> &mut Self::Output {
+        &mut self.0[(index + 1) as usize]
+    }
+}
+
+#[derive(Clone, Copy)]
 struct RankIndex<Ix: IndexType = DefaultIx> {
     rank: isize,
     idx: NodeIndex<Ix>,
@@ -30,7 +96,8 @@ impl<N, E, Ix: IndexType> std::ops::Index<RankIndex<Ix>> for RankedPoset<N, E, I
 
 impl<N, E, Ix: IndexType> std::ops::IndexMut<RankIndex<Ix>> for RankedPoset<N, E, Ix> {
     fn index_mut(&mut self, rank_idx: RankIndex<Ix>) -> &mut Self::Output {
-        &mut self.graph[self.node_idx(rank_idx)]
+        let idx = self.node_idx(rank_idx);
+        &mut self.graph[idx]
     }
 }
 

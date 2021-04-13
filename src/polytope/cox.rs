@@ -1,3 +1,4 @@
+use derive_deref::{Deref, DerefMut};
 use nalgebra::DMatrix as Matrix;
 use std::{
     mem,
@@ -8,21 +9,8 @@ use std::{
 /// matrix](https://en.wikipedia.org/wiki/Coxeter_group#Coxeter_matrix_and_Schl%C3%A4fli_matrix),
 /// which encodes the angles between the mirrors of the generators of a Coxeter
 /// group.
+#[derive(Deref, DerefMut)]
 pub struct CoxMatrix(pub Matrix<f64>);
-
-impl Deref for CoxMatrix {
-    type Target = Matrix<f64>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for CoxMatrix {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
 
 impl CoxMatrix {
     pub fn from_lin_diagram(diagram: Vec<f64>) -> Self {
