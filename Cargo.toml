@@ -8,6 +8,7 @@ edition = "2018"
 approx = "0.4"
 bevy = "0.4"
 bevy_egui = "0.3"
+derive_deref = "1.1"
 dyn-clone = "1.0"
 gcd = "2.0"
 itertools = "0.10"
@@ -17,7 +18,7 @@ rand = "0.8"
 regex = "1.4"
 ron = "0.6"
 scapegoat = "1.0"
-serde = {version = "1.0.125", features = ["derive"]}
+serde = {version = "1.0", features = ["derive"]}
 
 [profile.release]
 lto = "thin"

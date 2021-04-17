@@ -5,7 +5,7 @@ use std::{
 
 use super::{
     geometry::{Point, Subspace},
-    Abstract, Concrete, Element, ElementList,
+    Abstract, Concrete, ElementList, Elements, Subelements,
 };
 
 use nalgebra::DMatrix;
@@ -274,7 +274,7 @@ fn check_subelement(vertices: &[Point], el: &[usize], rank: isize) -> bool {
         let h = Subspace::from_points(
             &el.iter()
                 .map(|&sub| vertices[sub].clone())
-                .collect::<Vec<Point>>(),
+                .collect::<Vec<_>>(),
         );
 
         // If this hyperplane does not have the correct dimension, it
@@ -293,10 +293,10 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
     let dim = vertices[0].len();
 
     // Initializes the abstract polytope.
-    let mut abs = Abstract::with_rank(dim as isize);
+    let mut abs = Abstract::with_capacity(dim as isize);
     abs.push_min();
     for _ in 0..(dim as isize) {
-        abs.push(ElementList::new());
+        abs.push_subs(ElementList::new());
     }
 
     // Adds everything else.
@@ -311,7 +311,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
         let mut els_subs = ElementList::with_capacity(len);
 
         for _ in 0..len {
-            els_subs.push(Element::new());
+            els_subs.push(Elements::new());
         }
 
         // Checks every pair of d-elements to see if their intersection forms
@@ -349,10 +349,10 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
         }
 
         els_verts = ElementList::new();
-        els_verts.resize(subs_map.len(), Element { subs: vec![] });
+        els_verts.resize(subs_map.len(), Elements::from_subs(Subelements(vec![])));
 
         for (subs, idx) in subs_map {
-            els_verts[idx] = Element { subs };
+            els_verts[idx] = Elements::from_subs(Subelements(subs));
         }
 
         abs[r] = els_subs;
@@ -404,9 +404,7 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Concrete {
         let new_vertex = leftmost_vertex(&vertices_pert, &old_ridge);
         let new_ridges = get_new_ridges(&old_ridge, new_vertex);
 
-        let mut facet = Element {
-            subs: old_ridge.vertices.clone(),
-        };
+        let mut facet = Elements::from_subs(Subelements(old_ridge.vertices.clone()));
         facet.subs.push(new_vertex);
         facet.subs.sort_unstable();
 

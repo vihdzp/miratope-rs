@@ -1,7 +1,7 @@
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 use std::{collections::HashMap, io::Result, path::Path, str::FromStr};
 
-use super::{Abstract, Concrete, Element, ElementList, Point, Polytope, RankVec};
+use super::{Abstract, Concrete, ElementList, Elements, Point, Polytope, RankVec, Subelements};
 
 /// Gets the name for an element with a given rank.
 fn element_name(rank: isize) -> String {
@@ -113,7 +113,7 @@ fn parse_edges_and_faces<'a>(
     for _ in 0..num_faces {
         let face_sub_num = next_tok(toks);
 
-        let mut face = Element::new();
+        let mut face = Elements::new();
         let mut face_verts = Vec::with_capacity(face_sub_num);
 
         // Reads all vertices of the face.
@@ -123,9 +123,10 @@ fn parse_edges_and_faces<'a>(
 
         // Gets all edges of the face.
         for i in 0..face_sub_num {
-            let mut edge = Element {
-                subs: vec![face_verts[i], face_verts[(i + 1) % face_sub_num]],
-            };
+            let mut edge = Elements::from_subs(Subelements(vec![
+                face_verts[i],
+                face_verts[(i + 1) % face_sub_num],
+            ]));
             edge.subs.sort_unstable();
 
             if let Some(idx) = hash_edges.get(&edge) {
@@ -170,7 +171,7 @@ fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> Ele
             subs.push(el_sub.parse().expect("Integer parsing failed!"));
         }
 
-        els_subs.push(Element { subs });
+        els_subs.push(Elements::from_subs(Subelements(subs)));
     }
 
     els_subs
@@ -202,7 +203,7 @@ pub fn from_src(src: String) -> Concrete {
 
     let num_elems = get_el_nums(rank, &mut toks);
     let vertices = parse_vertices(num_elems[0], rank as usize, &mut toks);
-    let mut abs = Abstract::with_rank(rank);
+    let mut abs = Abstract::with_capacity(rank);
 
     // Adds nullitope and vertices.
     abs.push_min();
@@ -211,13 +212,13 @@ pub fn from_src(src: String) -> Concrete {
     // Reads edges and faces.
     if rank >= 2 {
         let (edges, faces) = parse_edges_and_faces(rank, num_elems[1], num_elems[2], &mut toks);
-        abs.push(edges);
-        abs.push(faces);
+        abs.push_subs(edges);
+        abs.push_subs(faces);
     }
 
     // Adds all higher elements.
     for &num_el in num_elems.iter().take(rank as usize).skip(3) {
-        abs.push(parse_els(num_el, &mut toks));
+        abs.push_subs(parse_els(num_el, &mut toks));
     }
 
     // Caps the abstract polytope, returns the concrete one.
@@ -333,11 +334,11 @@ fn write_faces(
         let mut graph = Graph::new_undirected();
 
         // Maps the vertex indices to consecutive integers from 0.
-        for &edge_idx in &face.subs {
+        for &edge_idx in &face.subs.0 {
             let edge = &edges[edge_idx];
             let mut hash_edge = Vec::with_capacity(2);
 
-            for &vertex_idx in &edge.subs {
+            for &vertex_idx in &edge.subs.0 {
                 match hash_edges.get(&vertex_idx) {
                     Some(&idx) => hash_edge.push(idx),
                     None => {
@@ -360,7 +361,7 @@ fn write_faces(
         );
 
         // Adds the edges to the graph.
-        for &edge_idx in &face.subs {
+        for &edge_idx in &face.subs.0 {
             let edge = &edges[edge_idx];
             graph.add_edge(
                 NodeIndex::new(*hash_edges.get(&edge.subs[0]).unwrap()),
@@ -380,7 +381,7 @@ fn write_faces(
 }
 
 /// Writes the n-elements of a polytope into an OFF file.
-fn write_els(off: &mut String, opt: &OffOptions, rank: isize, els: &[Element]) {
+fn write_els(off: &mut String, opt: &OffOptions, rank: isize, els: &[Elements]) {
     // # n-elements
     if opt.comments {
         off.push_str("\n# ");
@@ -392,7 +393,7 @@ fn write_els(off: &mut String, opt: &OffOptions, rank: isize, els: &[Element]) {
     for el in els {
         off.push_str(&el.subs.len().to_string());
 
-        for &sub in &el.subs {
+        for &sub in &el.subs.0 {
             off.push(' ');
             off.push_str(&sub.to_string());
         }
