@@ -156,7 +156,7 @@ fn parse_edges_and_faces<'a>(
     (edges, faces)
 }
 
-pub fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> ElementList {
+fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> ElementList {
     let mut els_subs = ElementList::with_capacity(num_el);
 
     // Adds every d-element to the element list.

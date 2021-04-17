@@ -55,7 +55,7 @@ use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
 #[allow(unused_imports)]
-use polytope::{group::Group, *};
+use polytope::{geometry::*, group::*, off::*, *};
 
 mod input;
 mod no_cull_pipeline;
@@ -145,17 +145,11 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = cox!(2, 2, 2).into_polytope(vec![1.0, 2.0, 3.0, 4.0].into());
-
-    // Creates OFFBuilder code for a polytope.
-    for v in &poly.vertices {
-        print!("coordinates.push([");
-        for x in v.iter() {
-            print!("{}, ", x);
-        }
-        println!("]);");
-    }
-
+    let poly = off::from_path(&"E:/Polytopes/Polychora/OFF/1. Platonic hypersolids/Gax.off")
+        .unwrap()
+        .slice(Hyperplane::x(4, 0.31415));
+    poly.to_path(&"E:/Gax slice.off", OffOptions::default())
+        .unwrap();
     let poly = Renderable::new(poly);
 
     pipelines.set_untracked(

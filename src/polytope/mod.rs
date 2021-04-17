@@ -19,6 +19,7 @@ use self::geometry::{Hypersphere, Matrix};
 pub mod cd;
 pub mod convex;
 pub mod cox;
+pub mod cross_section;
 pub mod geometry;
 pub mod group;
 pub mod off;
@@ -204,8 +205,9 @@ impl<T> RankVec<T> {
         RankVec(Vec::new())
     }
 
-    /// Constructs a new, empty `RankVec<T>` with the specified capacity.
-    fn with_rank(rank: isize) -> Self {
+    /// Constructs a new, empty `RankVec<T>` with the capacity to store elements
+    /// up to the specified rank.
+    fn with_capacity(rank: isize) -> Self {
         RankVec(Vec::with_capacity((rank + 2) as usize))
     }
 
@@ -319,8 +321,7 @@ impl ElementList {
         ElementList(Vec::with_capacity(capacity))
     }
 
-    /// Returns the element list for the nullitope in a polytope with a given
-    /// vertex count.
+    /// Returns the element list for the nullitopes in a polytope.
     fn min() -> Self {
         Self(vec![Element::min()])
     }
@@ -372,7 +373,7 @@ impl Abstract {
     /// Initializes a new polytope with the capacity needed to store elements up
     /// to a given rank.
     fn with_rank(rank: isize) -> Self {
-        Abstract(RankVec::with_rank(rank))
+        Abstract(RankVec::with_capacity(rank))
     }
 
     /// Initializes a polytope from a vector of element lists.
@@ -715,7 +716,7 @@ impl Polytope for Abstract {
 
     /// Gets the number of elements of all ranks.
     fn el_counts(&self) -> RankVec<usize> {
-        let mut counts = RankVec::with_rank(self.rank());
+        let mut counts = RankVec::with_capacity(self.rank());
 
         for r in -1..=self.rank() {
             counts.push(self[r].len())
@@ -914,7 +915,7 @@ impl Concrete {
 
         for v in vertices {
             // If the new vertex does not lie on the hyperplane of the others:
-            if let Some(b) = h.add(v.clone()) {
+            if let Some(b) = h.add(&v) {
                 // Calculates the new circumcenter.
                 let k = ((&o - v).norm_squared() - (&o - &v0).norm_squared())
                     / (2.0 * (v - &v0).dot(&b));
@@ -1048,7 +1049,7 @@ impl Concrete {
 
         // We project the sphere's center onto the polytope's hyperplane to
         // avoid skew weirdness.
-        let h = Subspace::from_points(self.vertices.clone());
+        let h = Subspace::from_points(&self.vertices);
         let o = h.project(&sphere.center);
 
         let mut projections;
@@ -1060,7 +1061,7 @@ impl Concrete {
 
             for idx in 0..facet_count {
                 projections.push(
-                    Subspace::from_points(self.get_element_vertices(rank - 1, idx).unwrap())
+                    Subspace::from_points(&self.get_element_vertices(rank - 1, idx).unwrap())
                         .project(&o),
                 );
             }

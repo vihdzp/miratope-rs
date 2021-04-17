@@ -129,12 +129,12 @@ fn get_hull_ridge(vertices: &mut [Point]) -> VertexSet {
 
     // Takes the first `dim - 1` points in lexicographic order, so that no three
     // are collinear, no four are coplanar... these ought to create a ridge.
-    while h.rank != dim - 2 {
+    while h.rank() != dim - 2 {
         let (i, v) = vertices
             .next()
             .expect("Polytope has higher dimension than rank!");
 
-        if h.add(v.clone()).is_some() {
+        if h.add(&v).is_some() {
             ridge.push(i);
         }
     }
@@ -157,12 +157,12 @@ fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> usize {
     let mut vertex_iter = vertices.iter().enumerate();
 
     // We find a starting vertex not on the ridge, and add it to the facet.
-    let mut h = Subspace::from_points(facet.iter().cloned().cloned().collect());
+    let mut h = Subspace::from_points(&facet.iter().cloned().cloned().collect::<Vec<_>>());
     loop {
         let (i, v0) = vertex_iter.next().expect("All points coplanar!");
 
         // The ridge should be sorted, so we can optimize this.
-        if h.add(v0.clone()).is_some() {
+        if h.add(&v0).is_some() {
             facet.push(v0);
             leftmost_vertex = Some(i);
 
@@ -272,14 +272,14 @@ fn check_subelement(vertices: &[Point], el: &[usize], rank: isize) -> bool {
     if rank >= 4 {
         // The hyperplane of the intersection of the elements.
         let h = Subspace::from_points(
-            el.iter()
+            &el.iter()
                 .map(|&sub| vertices[sub].clone())
                 .collect::<Vec<Point>>(),
         );
 
         // If this hyperplane does not have the correct dimension, it
         // can't actually be a subelement.
-        if h.rank != rank - 1 {
+        if h.rank() != rank - 1 {
             return false;
         }
     }
