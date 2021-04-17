@@ -19,11 +19,11 @@ use self::geometry::{Hypersphere, Matrix};
 pub mod cd;
 pub mod convex;
 pub mod cox;
-pub mod slice;
 pub mod geometry;
 pub mod group;
 pub mod off;
 pub mod shapes;
+pub mod slice;
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
 const ELEMENT_NAMES: [&str; 11] = [
