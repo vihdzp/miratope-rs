@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::{
     geometry::{Hyperplane, Segment},
-    Abstract, Concrete, Element, ElementList, Polytope, RankVec,
+    Abstract, Concrete, ElementList, Elements, Polytope, Subelements,
 };
 
 impl Concrete {
@@ -13,8 +13,7 @@ impl Concrete {
     pub fn slice(&self, slice: Hyperplane) -> Self {
         let mut vertices = Vec::new();
 
-        let mut elements = RankVec::new();
-        elements.push(ElementList::min());
+        let mut abs = Abstract::new();
 
         // We map all indices of k-elements in the original polytope to the
         // indices of the new (k-1)-elements resulting from taking their
@@ -35,12 +34,15 @@ impl Concrete {
             }
         }
 
+        let vertex_count = vertices.len();
+
         // The slice does not intersect the polytope.
-        if vertices.is_empty() {
+        if vertex_count == 0 {
             return Self::nullitope();
         }
 
-        elements.push(ElementList::vertices(vertices.len()));
+        abs.push(ElementList::min(vertex_count));
+        abs.push(ElementList::vertices(vertex_count));
 
         // Takes care of building everything else.
         for r in 2..self.rank() {
@@ -49,7 +51,7 @@ impl Concrete {
 
             for (idx, el) in self[r].iter().enumerate() {
                 let mut new_subs = Vec::new();
-                for sub in &el.subs {
+                for sub in el.subs.iter() {
                     if let Some(&v) = hash_element.get(sub) {
                         new_subs.push(v);
                     }
@@ -58,20 +60,17 @@ impl Concrete {
                 // If we got ourselves a new edge:
                 if !new_subs.is_empty() {
                     new_hash_element.insert(idx, new_els.len());
-                    new_els.push(Element { subs: new_subs });
+                    new_els.push(Elements::from_subs(Subelements(new_subs)));
                 }
             }
 
-            elements.push(new_els);
+            abs.push_subs(new_els);
             hash_element = new_hash_element;
         }
 
-        let facet_count = elements.last().unwrap().len();
-        elements.push(ElementList::max(facet_count));
+        let facet_count = abs.last().unwrap().len();
+        abs.push_subs(ElementList::max(facet_count));
 
-        Self {
-            vertices,
-            abs: Abstract(elements),
-        }
+        Self { vertices, abs }
     }
 }
