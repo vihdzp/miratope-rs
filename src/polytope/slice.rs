@@ -1,14 +1,17 @@
 use std::collections::HashMap;
 
 use super::{
-    geometry::{Hyperplane, Point, Segment},
-    Abstract, Concrete, Element, ElementList, RankVec,
+    geometry::{Hyperplane, Segment},
+    Abstract, Concrete, Element, ElementList, Polytope, RankVec,
 };
 
 impl Concrete {
     /// Takes the cross-section of a polytope through a given hyperplane.
+    ///
+    /// # Todo
+    /// We should make this function take a general [`Subspace`] instead.
     pub fn slice(&self, slice: Hyperplane) -> Self {
-        let mut vertices: Vec<Point> = Vec::new();
+        let mut vertices = Vec::new();
 
         let mut elements = RankVec::new();
         elements.push(ElementList::min());
@@ -31,6 +34,12 @@ impl Concrete {
                 vertices.push(slice.flatten(&p));
             }
         }
+
+        // The slice does not intersect the polytope.
+        if vertices.is_empty() {
+            return Self::nullitope();
+        }
+
         elements.push(ElementList::vertices(vertices.len()));
 
         // Takes care of building everything else.

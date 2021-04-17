@@ -241,7 +241,7 @@ fn edge_to_val(raw: Vec<char>) -> Option<EdgeVal> {
     use EdgeVal::*;
     let mut raw_iter = raw.iter();
     let mut edge = Vec::new();
-    let mut numer: Option<i64> = None;
+    let mut number: Option<i64> = None;
     let mut rat = false;
     let c = *raw_iter.next()?;
     //Starting character
@@ -249,14 +249,14 @@ fn edge_to_val(raw: Vec<char>) -> Option<EdgeVal> {
 
     //If the value is Rational or an Integer
     if c.is_digit(10) {
-        while let Some(&c) = raw_iter.next() {
+        for &c in raw_iter {
             //If the "/" is encountered
             if c == '/' {
                 //Set the flag for Rationals
                 rat = true;
 
                 //Parse and save the numerator
-                numer = match edge.into_iter().collect::<String>().parse::<i64>() {
+                number = match edge.into_iter().collect::<String>().parse::<i64>() {
                     Ok(number) => Some(number),
                     _ => return None,
                 };
@@ -278,10 +278,10 @@ fn edge_to_val(raw: Vec<char>) -> Option<EdgeVal> {
         //If this was a Rational edge, the end value would be the denominator
         //If this wasn't a Rational edge, the end value would be the numerator
         if rat {
-            return Some(Rational(numer?, val));
+            Some(Rational(number?, val))
         } else {
-            return Some(Rational(val, 1i64));
-        };
+            Some(Rational(val, 1i64))
+        }
     } else {
         //For miscellaneous edge symbols,
         //just read the whole thing as a string
@@ -298,7 +298,7 @@ fn edge_to_val(raw: Vec<char>) -> Option<EdgeVal> {
 }
 
 ///Converts Vecs of chars to wrapped NodeVals
-fn node_to_val(raw: &Vec<char>) -> Option<NodeVal> {
+fn node_to_val(raw: &[char]) -> Option<NodeVal> {
     use NodeVal::*;
     let mut raw_iter = raw.iter();
     let mut node = Vec::new();
@@ -313,7 +313,7 @@ fn node_to_val(raw: &Vec<char>) -> Option<NodeVal> {
 
     //If the node has a custom value
     if c.is_digit(10) {
-        while let Some(&c) = raw_iter.next() {
+        for &c in raw_iter {
             //When you're at the end
             if c == ')' {
                 //Parse the value

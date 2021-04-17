@@ -153,6 +153,23 @@ impl Subspace {
         Point::from_iterator(self.rank(), self.basis.iter().map(|b| p.dot(b)))
     }
 
+    pub fn x(rank: usize, x: f64) -> Self {
+        // The basis is just all elementary unit vectors save for the
+        // (1, 0, ..., 0) one.
+        let mut basis = Vec::new();
+        for i in 1..rank {
+            let mut p = Point::zeros(rank);
+            p[i] = 1.0;
+            basis.push(p);
+        }
+
+        // The offset is the point (x, 0, ..., 0).
+        let mut offset = Point::zeros(rank);
+        offset[0] = x;
+
+        Self { basis, offset }
+    }
+
     /// Computes a set of independent vectors that span the orthogonal
     /// complement of the subspace.
     pub fn orthogonal_comp(&self) -> Vec<Vector> {
@@ -211,7 +228,7 @@ impl Hyperplane {
         let d1 = self.distance(&l.1);
         let t = d1 / (d1 - d0);
 
-        if t < 0.0 || t > 1.0 {
+        if !(0.0..=1.0).contains(&t) {
             None
         } else {
             Some(l.at(t))
@@ -220,26 +237,14 @@ impl Hyperplane {
 
     // Returns a hyperplane defined by all points with a given x coordinate.
     pub fn x(rank: usize, x: f64) -> Self {
-        // The basis is just all elementary unit vectors save for the
-        // (1, 0, ..., 0) one.
-        let mut basis = Vec::new();
-        for i in 1..rank {
-            let mut p = Point::zeros(rank);
-            p[i] = 1.0;
-            basis.push(p);
-        }
-
-        // The offset is the point (x, 0, ..., 0).
-        let mut offset = Point::zeros(rank);
-        offset[0] = x;
-
         // The normal is the vector (1, 0, ..., 0).
         let mut normal = Vector::zeros(rank);
         normal[0] = 1.0;
 
-        let subspace = Subspace { basis, offset };
-
-        Self { subspace, normal }
+        Self {
+            subspace: Subspace::x(rank, x),
+            normal,
+        }
     }
 }
 

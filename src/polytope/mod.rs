@@ -19,7 +19,7 @@ use self::geometry::{Hypersphere, Matrix};
 pub mod cd;
 pub mod convex;
 pub mod cox;
-pub mod cross_section;
+pub mod slice;
 pub mod geometry;
 pub mod group;
 pub mod off;
