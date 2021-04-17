@@ -239,14 +239,15 @@ impl Superelements {
     }
 }
 
-/// The subelements and superlements of a polytope.
+/// An element in a polytope, which stores the indices of both its subelements
+/// and superlements.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct Elements {
+pub struct Element {
     pub subs: Subelements,
     pub sups: Superelements,
 }
 
-impl Elements {
+impl Element {
     /// Initializes a new element with no subelements.
     pub fn new() -> Self {
         Self::min(0)
@@ -289,7 +290,7 @@ impl Elements {
 /// A list of [`Elements`](Element) of the same
 /// [rank](https://polytope.miraheze.org/wiki/Rank).
 #[derive(Debug, Clone, Deref, DerefMut)]
-pub struct ElementList(pub Vec<Elements>);
+pub struct ElementList(pub Vec<Element>);
 
 impl ElementList {
     /// Initializes an empty element list.
@@ -305,13 +306,13 @@ impl ElementList {
     /// Returns the element list for the nullitope in a polytope with a given
     /// vertex count.
     pub fn min(vertex_count: usize) -> Self {
-        Self(vec![Elements::min(vertex_count)])
+        Self(vec![Element::min(vertex_count)])
     }
 
     /// Returns the element list for the maximal element in a polytope with a
     /// given facet count.
     pub fn max(facet_count: usize) -> Self {
-        Self(vec![Elements::max(facet_count)])
+        Self(vec![Element::max(facet_count)])
     }
 
     /// Returns the element list for a set number of vertices in a polytope.
@@ -320,7 +321,7 @@ impl ElementList {
         let mut els = ElementList::with_capacity(vertex_count);
 
         for _ in 0..vertex_count {
-            els.push(Elements::from_subs(Subelements(vec![0])));
+            els.push(Element::from_subs(Subelements(vec![0])));
         }
 
         els

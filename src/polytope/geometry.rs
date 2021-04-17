@@ -70,11 +70,13 @@ impl Subspace {
     }
 
     /// Returns the number of dimensions of the ambient space. For the number of
-    /// dimensions spanned by the subspace itself, use `.rank`.
+    /// dimensions spanned by the subspace itself, use [`Self::rank`].
     pub fn dim(&self) -> usize {
         self.offset.nrows()
     }
 
+    /// Returns the rank of the subspace, which corresponds to the number of
+    /// vectors in its basis.
     pub fn rank(&self) -> usize {
         self.basis.len()
     }
@@ -105,21 +107,27 @@ impl Subspace {
         }
     }
 
-    /// Creates a subspace from a list of points.
-    pub fn from_points(points: &[Point]) -> Self {
+    /// Creates a subspace from a list of point references.
+    pub fn from_point_refs(points: &[&Point]) -> Self {
         let mut points = points.iter();
         let mut h = Self::new(
             points
                 .next()
                 .expect("A hyperplane can't be created from an empty point array!")
+                .clone()
                 .clone(),
         );
 
-        for p in points {
+        for &p in points {
             h.add(p);
         }
 
         h
+    }
+
+    /// Creates a subspace from a list of points.
+    pub fn from_points(points: &[Point]) -> Self {
+        Self::from_point_refs(&points.iter().collect::<Vec<_>>())
     }
 
     /// Projects a point onto the subspace.
@@ -153,6 +161,7 @@ impl Subspace {
         Point::from_iterator(self.rank(), self.basis.iter().map(|b| p.dot(b)))
     }
 
+    /// Returns a subspace defined by all points with a given x coordinate.
     pub fn x(rank: usize, x: f64) -> Self {
         // The basis is just all elementary unit vectors save for the
         // (1, 0, ..., 0) one.
@@ -256,5 +265,10 @@ impl Segment {
     /// between 0 and 1, the point will be contained on the line segment.
     pub fn at(&self, t: f64) -> Point {
         &self.0 * t + &self.1 * (1.0 - t)
+    }
+
+    /// Returns the midpoint of the segment.
+    pub fn midpoint(&self) -> Point {
+        self.at(0.5)
     }
 }

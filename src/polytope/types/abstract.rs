@@ -1,11 +1,23 @@
 use derive_deref::{Deref, DerefMut};
 use std::collections::{HashMap, HashSet};
 
-use crate::polytope::{ranked_poset::RankVec, ElementList, Elements, Polytope, Subelements};
+use crate::polytope::{ranked_poset::RankVec, Element, ElementList, Polytope, Subelements};
 
 /// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
-/// to an
-/// [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
+/// to an [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
+/// It stores the indices of both the subelements and superelements of each
+/// element.
+///
+/// # How to use?
+/// The fact that we store both subelements and superelements is quite useful
+/// for many algorithms. However, it becomes inconvenient when actually building
+/// a polytope, since most of the time, we can only easily generate subelements.
+///
+/// To get around this, we provide a [`push_subs`] method. Instead of manually
+/// having to set the superelements in the polytope, one can instead provide an
+/// [`ElementList`] whose elements have their superelements set to empty
+/// vectors. This method will automatically set the superelements of the
+/// subelements of the previous rank.
 #[derive(Debug, Clone, Deref, DerefMut)]
 pub struct Abstract(RankVec<ElementList>);
 
@@ -27,7 +39,7 @@ impl Abstract {
     }
 
     /// Returns a reference to the minimal element of the polytope.
-    pub fn min(&self) -> &Elements {
+    pub fn min(&self) -> &Element {
         &self[0][0]
     }
 
@@ -38,7 +50,7 @@ impl Abstract {
         self.0.push(elements);
     }
 
-    pub fn push_at(&mut self, rank: isize, el: Elements) {
+    pub fn push_at(&mut self, rank: isize, el: Element) {
         let i = self[rank].len();
 
         if let Some(lower_rank) = self.get_mut(rank - 1) {
@@ -363,7 +375,7 @@ impl Abstract {
                             }
                         }
 
-                        element_lists[prod_rank].push(Elements::from_subs(Subelements(subs)))
+                        element_lists[prod_rank].push(Element::from_subs(Subelements(subs)))
                     }
                 }
             }
@@ -447,9 +459,9 @@ impl Polytope for Abstract {
         let maximal = ElementList::max(n);
 
         for i in 0..n {
-            vertices.push(Elements::from_subs(Subelements(vec![0])));
+            vertices.push(Element::from_subs(Subelements(vec![0])));
 
-            edges.push(Elements::from_subs(Subelements(vec![i % n, (i + 1) % n])));
+            edges.push(Element::from_subs(Subelements(vec![i % n, (i + 1) % n])));
         }
 
         let mut poly = Abstract::with_capacity(2);

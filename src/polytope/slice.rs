@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::{
     geometry::{Hyperplane, Segment},
-    Abstract, Concrete, ElementList, Elements, Polytope, Subelements,
+    Abstract, Concrete, ElementList, Element, Polytope, Subelements,
 };
 
 impl Concrete {
@@ -60,7 +60,7 @@ impl Concrete {
                 // If we got ourselves a new edge:
                 if !new_subs.is_empty() {
                     new_hash_element.insert(idx, new_els.len());
-                    new_els.push(Elements::from_subs(Subelements(new_subs)));
+                    new_els.push(Element::from_subs(Subelements(new_subs)));
                 }
             }
 

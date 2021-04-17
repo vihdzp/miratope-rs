@@ -5,7 +5,7 @@ use std::{
 
 use super::{
     geometry::{Point, Subspace},
-    Abstract, Concrete, ElementList, Elements, Subelements,
+    Abstract, Concrete, Element, ElementList, Subelements,
 };
 
 use nalgebra::DMatrix;
@@ -157,7 +157,7 @@ fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> usize {
     let mut vertex_iter = vertices.iter().enumerate();
 
     // We find a starting vertex not on the ridge, and add it to the facet.
-    let mut h = Subspace::from_points(&facet.iter().cloned().cloned().collect::<Vec<_>>());
+    let mut h = Subspace::from_point_refs(&facet.iter().cloned().collect::<Vec<_>>());
     loop {
         let (i, v0) = vertex_iter.next().expect("All points coplanar!");
 
@@ -271,11 +271,8 @@ fn check_subelement(vertices: &[Point], el: &[usize], rank: isize) -> bool {
     // only when d >= 4.
     if rank >= 4 {
         // The hyperplane of the intersection of the elements.
-        let h = Subspace::from_points(
-            &el.iter()
-                .map(|&sub| vertices[sub].clone())
-                .collect::<Vec<_>>(),
-        );
+        let h =
+            Subspace::from_point_refs(&el.iter().map(|&sub| &vertices[sub]).collect::<Vec<_>>());
 
         // If this hyperplane does not have the correct dimension, it
         // can't actually be a subelement.
@@ -311,7 +308,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
         let mut els_subs = ElementList::with_capacity(len);
 
         for _ in 0..len {
-            els_subs.push(Elements::new());
+            els_subs.push(Element::new());
         }
 
         // Checks every pair of d-elements to see if their intersection forms
@@ -349,10 +346,10 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
         }
 
         els_verts = ElementList::new();
-        els_verts.resize(subs_map.len(), Elements::from_subs(Subelements(vec![])));
+        els_verts.resize(subs_map.len(), Element::from_subs(Subelements::new()));
 
         for (subs, idx) in subs_map {
-            els_verts[idx] = Elements::from_subs(Subelements(subs));
+            els_verts[idx] = Element::from_subs(Subelements(subs));
         }
 
         abs[r] = els_subs;
@@ -404,7 +401,7 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Concrete {
         let new_vertex = leftmost_vertex(&vertices_pert, &old_ridge);
         let new_ridges = get_new_ridges(&old_ridge, new_vertex);
 
-        let mut facet = Elements::from_subs(Subelements(old_ridge.vertices.clone()));
+        let mut facet = Element::from_subs(Subelements(old_ridge.vertices.clone()));
         facet.subs.push(new_vertex);
         facet.subs.sort_unstable();
 

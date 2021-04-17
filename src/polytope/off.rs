@@ -1,7 +1,7 @@
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 use std::{collections::HashMap, io::Result, path::Path, str::FromStr};
 
-use super::{Abstract, Concrete, ElementList, Elements, Point, Polytope, RankVec, Subelements};
+use super::{Abstract, Concrete, ElementList, Element, Point, Polytope, RankVec, Subelements};
 
 /// Gets the name for an element with a given rank.
 fn element_name(rank: isize) -> String {
@@ -113,7 +113,7 @@ fn parse_edges_and_faces<'a>(
     for _ in 0..num_faces {
         let face_sub_num = next_tok(toks);
 
-        let mut face = Elements::new();
+        let mut face = Element::new();
         let mut face_verts = Vec::with_capacity(face_sub_num);
 
         // Reads all vertices of the face.
@@ -123,7 +123,7 @@ fn parse_edges_and_faces<'a>(
 
         // Gets all edges of the face.
         for i in 0..face_sub_num {
-            let mut edge = Elements::from_subs(Subelements(vec![
+            let mut edge = Element::from_subs(Subelements(vec![
                 face_verts[i],
                 face_verts[(i + 1) % face_sub_num],
             ]));
@@ -171,7 +171,7 @@ fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> Ele
             subs.push(el_sub.parse().expect("Integer parsing failed!"));
         }
 
-        els_subs.push(Elements::from_subs(Subelements(subs)));
+        els_subs.push(Element::from_subs(Subelements(subs)));
     }
 
     els_subs
@@ -381,7 +381,7 @@ fn write_faces(
 }
 
 /// Writes the n-elements of a polytope into an OFF file.
-fn write_els(off: &mut String, opt: &OffOptions, rank: isize, els: &[Elements]) {
+fn write_els(off: &mut String, opt: &OffOptions, rank: isize, els: &[Element]) {
     // # n-elements
     if opt.comments {
         off.push_str("\n# ");
