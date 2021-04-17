@@ -18,7 +18,7 @@ impl Abstract {
     /// Initializes a new polytope with the capacity needed to store elements up
     /// to a given rank.
     pub fn with_capacity(rank: isize) -> Self {
-        Abstract(RankVec::with_rank(rank))
+        Abstract(RankVec::with_capacity(rank))
     }
 
     /// Initializes a polytope from a vector of element lists.
@@ -109,7 +109,7 @@ impl Abstract {
     }
 
     /// Gets the indices of the vertices of a given element in a polytope.
-    pub fn get_element_vertices(&self, rank: isize, idx: usize) -> Option<Vec<usize>> {
+    pub fn element_vertices(&self, rank: isize, idx: usize) -> Option<Vec<usize>> {
         // A nullitope doesn't have vertices.
         if rank == -1 {
             return None;
@@ -134,7 +134,7 @@ impl Abstract {
     }
 
     /// Gets the element with a given rank and index as a polytope.
-    pub fn get_element(&self, _rank: isize, _idx: usize) -> Option<Self> {
+    pub fn element(&self, _rank: isize, _idx: usize) -> Option<Self> {
         todo!()
     }
 
@@ -155,8 +155,33 @@ impl Abstract {
     /// [is_dyadic](Abstract::is_dyadic), and
     /// [is_strongly_connected](Abstract::is_strongly_connected).
     pub fn full_check(&self) -> bool {
-        self.has_min_max_elements() && self.check_incidences() && self.is_dyadic()
+        self.is_consistent()
+            && self.has_min_max_elements()
+            && self.check_incidences()
+            && self.is_dyadic()
         // && self.is_strongly_connected()
+    }
+
+    /// Returns whether the `subs` and `sups` of each element agree with each
+    /// other, that is, if for each element, its superelements contain it as a
+    /// subelement.
+    pub fn is_consistent(&self) -> bool {
+        let rank = self.rank();
+        if !self[rank][0].sups.is_empty() {
+            return false;
+        }
+
+        for r in -1..=rank {
+            for (idx, el) in self[r].iter().enumerate() {
+                for &sub in el.subs.iter() {
+                    if !self[r - 1][sub].sups.contains(&idx) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
     }
 
     /// Determines whether the polytope has a single minimal element and a
@@ -259,10 +284,12 @@ impl Abstract {
 
         let rank = p_rank + q_rank + 1 - (!min as isize) - (!max as isize);
 
-        // Initializes the product with empty element lists.
-        let mut product = Self::with_capacity(rank);
+        // Initializes the element lists. These will only contain the
+        // subelements as they're generated. When they're complete, we'll call
+        // push_subs for each of them into a new Abstract.
+        let mut element_lists = RankVec::with_capacity(rank);
         for _ in -1..=rank {
-            product.push_subs(ElementList::new());
+            element_lists.push(ElementList::new());
         }
 
         // We add the elements of a given rank in lexicographic order of the
@@ -336,7 +363,7 @@ impl Abstract {
                             }
                         }
 
-                        product[prod_rank].push(Elements::from_subs(Subelements(subs)))
+                        element_lists[prod_rank].push(Elements::from_subs(Subelements(subs)))
                     }
                 }
             }
@@ -345,13 +372,20 @@ impl Abstract {
         // If !min, we have to set a minimal element manually.
         if !min {
             let vertex_count = p.el_count(0) * q.el_count(0);
-            product[-1] = ElementList::min(vertex_count);
-            product[0] = ElementList::vertices(vertex_count);
+            element_lists[-1] = ElementList::min(vertex_count);
+            element_lists[0] = ElementList::vertices(vertex_count);
         }
 
         // If !max, we have to set a maximal element manually.
         if !max {
-            product[rank] = ElementList::max(product.el_count(rank - 1));
+            element_lists[rank] = ElementList::max(element_lists[rank - 1].len());
+        }
+
+        // Uses push_subs to add all of the element lists into a new polytope.
+        let mut product = Self::with_capacity(element_lists.rank());
+
+        for elements in element_lists.0.into_iter() {
+            product.push_subs(elements);
         }
 
         product
@@ -375,7 +409,7 @@ impl Polytope for Abstract {
 
     /// Gets the number of elements of all ranks.
     fn el_counts(&self) -> RankVec<usize> {
-        let mut counts = RankVec::with_rank(self.rank());
+        let mut counts = RankVec::with_capacity(self.rank());
 
         for r in -1..=self.rank() {
             counts.push(self[r].len())

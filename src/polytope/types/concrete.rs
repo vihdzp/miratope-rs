@@ -273,7 +273,7 @@ impl Concrete {
     pub fn get_element_vertices(&self, rank: isize, idx: usize) -> Option<Vec<Point>> {
         Some(
             self.abs
-                .get_element_vertices(rank, idx)?
+                .element_vertices(rank, idx)?
                 .iter()
                 .map(|&v| self.vertices[v].clone())
                 .collect(),
@@ -284,7 +284,7 @@ impl Concrete {
     pub fn get_element(&self, rank: isize, idx: usize) -> Option<Self> {
         Some(Concrete {
             vertices: self.get_element_vertices(rank, idx)?,
-            abs: self.abs.get_element(rank, idx)?,
+            abs: self.abs.element(rank, idx)?,
         })
     }
 

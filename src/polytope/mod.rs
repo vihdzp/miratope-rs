@@ -350,7 +350,7 @@ mod tests {
             Abstract::orthoplex(4),
             Abstract::orthoplex(5),
             Abstract::duoprism(&Abstract::polygon(6), &Abstract::polygon(7)),
-            dbg!(Abstract::dyad().ditope()).ditope().ditope().ditope(),
+            Abstract::dyad().ditope().ditope().ditope().ditope(),
         ]
     }
 

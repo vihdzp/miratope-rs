@@ -57,7 +57,7 @@ use no_cull_pipeline::PbrNoBackfaceBundle;
 
 use polytope::group::Group;
 #[allow(unused_imports)]
-use polytope::{off, Concrete, Polytope, Renderable};
+use polytope::*;
 
 mod input;
 mod no_cull_pipeline;
@@ -147,6 +147,8 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
+    dbg!(Abstract::dyad());
+
     let poly = Group::step(cox!(7), |mut mat| {
         if mat.determinant() > 0.0 {
             pow(&mat, 3)
