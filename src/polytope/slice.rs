@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::{
     geometry::{Hyperplane, Segment},
-    Abstract, Concrete, ElementList, Element, Polytope, Subelements,
+    Abstract, Concrete, Element, ElementList, Polytope, Subelements,
 };
 
 impl Concrete {

@@ -1,7 +1,7 @@
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 use std::{collections::HashMap, io::Result, path::Path, str::FromStr};
 
-use super::{Abstract, Concrete, ElementList, Element, Point, Polytope, RankVec, Subelements};
+use super::{Abstract, Concrete, Element, ElementList, Point, Polytope, RankVec, Subelements};
 
 /// Gets the name for an element with a given rank.
 fn element_name(rank: isize) -> String {
