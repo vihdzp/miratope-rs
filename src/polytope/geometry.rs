@@ -111,11 +111,10 @@ impl Subspace {
     pub fn from_point_refs(points: &[&Point]) -> Self {
         let mut points = points.iter();
         let mut h = Self::new(
-            points
+            (*points
                 .next()
-                .expect("A hyperplane can't be created from an empty point array!")
-                .clone()
-                .clone(),
+                .expect("A hyperplane can't be created from an empty point array!"))
+            .clone(),
         );
 
         for &p in points {

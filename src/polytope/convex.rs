@@ -157,7 +157,7 @@ fn leftmost_vertex(vertices: &[Point], ridge: &VertexSet) -> usize {
     let mut vertex_iter = vertices.iter().enumerate();
 
     // We find a starting vertex not on the ridge, and add it to the facet.
-    let mut h = Subspace::from_point_refs(&facet.iter().cloned().collect::<Vec<_>>());
+    let mut h = Subspace::from_point_refs(&facet.to_vec());
     loop {
         let (i, v0) = vertex_iter.next().expect("All points coplanar!");
 
