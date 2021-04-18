@@ -123,12 +123,10 @@ fn update_cross_section_state(
 ) {
     if active.0 {
         state.original_polytope = Some(query.iter_mut().next().unwrap().clone());
+    } else if let Some(t) = state.original_polytope.take() {
+        *query.iter_mut().next().unwrap() = t;
     } else {
-        if let Some(t) = state.original_polytope.take() {
-            *query.iter_mut().next().unwrap() = t;
-        } else {
-            println!("This should only happen on startup.");
-        }
+        println!("This should only happen on startup.");
     }
 }
 
@@ -171,35 +169,35 @@ fn ui(
             });
         });
 
-        // Dual button.
+        // Converts the active polytope into its dual.
         if ui.button("Dual").clicked() {
             for mut p in query.iter_mut() {
                 match p.concrete.dual_mut() {
                     Ok(_) => println!("Dual succeeded"),
                     Err(_) => println!("Dual failed"),
                 }
-                println!("{}", &p.concrete.to_src(off::OffOptions { comments: true }));
+                // Crashes for some reason.
+                // println!("{}", &p.concrete.to_src(off::OffOptions { comments: true }));
             }
         }
-        /*
-                // Verf button.
-                if ui.button("Verf").clicked() {
-                    for mut p in query.iter_mut() {
-                        println!("Verf");
+        // Converts the active polytope into any of its verfs.
+        if ui.button("Verf").clicked() {
+            for mut p in query.iter_mut() {
+                println!("Verf");
 
-                        if let Some(verf) = p.concrete.verf(0) {
-                            *p = Renderable::new(verf);
-                        };
-                    }
-                }
-
-                if ui.button("Export OFF").clicked() {
-                    for _p in query.iter_mut() {
-                        println!("Export OFF");
-                    }
-                }
-        */
-        if ui.button("Section").clicked() {
+                if let Some(verf) = p.concrete.verf(0) {
+                    *p = Renderable::new(verf);
+                };
+            }
+        }
+        // Exports the active polytope as an OFF file (not yet functional!)
+        if ui.button("Export OFF").clicked() {
+            for _p in query.iter_mut() {
+                println!("Export OFF");
+            }
+        }
+        // Toggles cross-section mode.
+        if ui.button("Cross-section").clicked() {
             section_active.0 = !section_active.0;
             println!("{}", section_active.0);
         }
