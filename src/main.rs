@@ -121,12 +121,9 @@ fn update_cross_section_state(
     mut state: ResMut<CrossSectionState>,
     active: ChangedRes<CrossSectionActive>,
 ) {
-    println!("a");
     if active.0 {
-        println!("b");
         state.original_polytope = Some(query.iter_mut().next().unwrap().clone());
     } else {
-        println!("c");
         if let Some(t) = state.original_polytope.take() {
             *query.iter_mut().next().unwrap() = t;
         } else {
@@ -140,15 +137,12 @@ fn update_cross_section(
     state: Res<CrossSectionState>,
     active: Res<CrossSectionActive>,
 ) {
-    println!("d");
-
     if !active.0 {
         return;
     }
 
     for mut p in query.iter_mut() {
         let r = state.original_polytope.clone().unwrap();
-        println!("e");
         let mut hyp_pos = state.hyperplane_pos.into();
         hyp_pos += 0.00001;
         *p = Renderable::new(r.concrete.slice(Hyperplane::x(
