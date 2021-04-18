@@ -54,6 +54,8 @@ use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
+use std::convert::TryInto;
+
 #[allow(unused_imports)]
 use polytope::{geometry::*, group::*, off::*, *};
 
@@ -64,6 +66,13 @@ mod polytope;
 /// Standard constant used for floating point comparisons throughout the code.
 const EPS: f64 = 1e-9;
 
+struct CrossSectionActive(bool);
+
+struct CrossSectionState {
+    original_polytope: Option<Renderable>,
+    hyperplane_pos: f32,
+}
+
 /// Loads all of the necessary systems for the application to run.
 fn main() {
     App::build()
@@ -71,6 +80,11 @@ fn main() {
         .add_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
         // Enables antialiasing.
         .add_resource(Msaa { samples: 4 })
+        .add_resource(CrossSectionActive(false))
+        .add_resource(CrossSectionState {
+            original_polytope: None,
+            hyperplane_pos: 0.0,
+        })
         // Default Bevy plugins.
         .add_plugins(DefaultPlugins)
         // Enables egui to work in the first place.
@@ -81,10 +95,12 @@ fn main() {
         .add_startup_system(setup.system())
         // Scales the interface when the screen is resized.
         .add_system(update_ui_scale_factor.system())
+        .add_system(update_cross_section.system())
         // Loads the User Interface.
         .add_system(ui.system())
         // Updates polytopes when operations are done to them.
         .add_system_to_stage(stage::POST_UPDATE, update_changed_polytopes.system())
+        .add_system_to_stage(stage::POST_UPDATE, update_cross_section_state.system())
         .run();
 }
 
@@ -100,8 +116,55 @@ fn update_ui_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Res<
     }
 }
 
+fn update_cross_section_state(
+    mut query: Query<&mut Renderable>,
+    mut state: ResMut<CrossSectionState>,
+    active: ChangedRes<CrossSectionActive>,
+) {
+    println!("a");
+    if active.0 {
+        println!("b");
+        state.original_polytope = Some(query.iter_mut().next().unwrap().clone());
+    } else {
+        println!("c");
+        if let Some(t) = state.original_polytope.take() {
+            *query.iter_mut().next().unwrap() = t;
+        } else {
+            println!("This should only happen on startup.");
+        }
+    }
+}
+
+fn update_cross_section(
+    mut query: Query<&mut Renderable>,
+    state: Res<CrossSectionState>,
+    active: Res<CrossSectionActive>,
+) {
+    println!("d");
+
+    if !active.0 {
+        return;
+    }
+
+    for mut p in query.iter_mut() {
+        let r = state.original_polytope.clone().unwrap();
+        println!("e");
+        let mut hyp_pos = state.hyperplane_pos.into();
+        hyp_pos += 0.00001;
+        *p = Renderable::new(r.concrete.slice(Hyperplane::x(
+            r.concrete.rank().try_into().unwrap(),
+            hyp_pos,
+        )));
+    }
+}
+
 /// A system for a basic UI.
-fn ui(mut egui_ctx: ResMut<EguiContext>, mut query: Query<&mut Renderable>) {
+fn ui(
+    mut egui_ctx: ResMut<EguiContext>,
+    mut query: Query<&mut Renderable>,
+    mut state: ResMut<CrossSectionState>,
+    mut section_active: ResMut<CrossSectionActive>,
+) {
     let ctx = &mut egui_ctx.ctx;
 
     egui::TopPanel::top("top_panel").show(ctx, |ui| {
@@ -121,19 +184,33 @@ fn ui(mut egui_ctx: ResMut<EguiContext>, mut query: Query<&mut Renderable>) {
                     Ok(_) => println!("Dual succeeded"),
                     Err(_) => println!("Dual failed"),
                 }
+                println!("{}", &p.concrete.to_src(off::OffOptions { comments: true }));
             }
         }
+        /*
+                // Verf button.
+                if ui.button("Verf").clicked() {
+                    for mut p in query.iter_mut() {
+                        println!("Verf");
 
-        // Verf button.
-        if ui.button("Verf").clicked() {
-            for mut p in query.iter_mut() {
-                println!("Verf");
+                        if let Some(verf) = p.concrete.verf(0) {
+                            *p = Renderable::new(verf);
+                        };
+                    }
+                }
 
-                if let Some(verf) = p.concrete.verf(0) {
-                    *p = Renderable::new(verf);
-                };
-            }
+                if ui.button("Export OFF").clicked() {
+                    for _p in query.iter_mut() {
+                        println!("Export OFF");
+                    }
+                }
+        */
+        if ui.button("Section").clicked() {
+            section_active.0 = !section_active.0;
+            println!("{}", section_active.0);
         }
+
+        ui.add(egui::Slider::f32(&mut state.hyperplane_pos, -0.25..=0.25).text("slice"));
     });
 }
 
@@ -227,3 +304,9 @@ fn update_changed_polytopes(
         }
     }
 }
+
+/*
+fn update_text(mut ctx: ResMut<EguiContext>) {
+    todo!()
+}
+*/

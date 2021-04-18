@@ -278,6 +278,28 @@ impl Hyperplane {
             normal,
         }
     }
+
+    // Returns a hyperplane defined by all points with a given last coordinate.
+    pub fn z(rank: usize, z: f64) -> Self {
+        let mut basis = Vec::new();
+        for i in 0..rank-1 {
+            let mut p = Point::zeros(rank);
+            p[i] = 1.0;
+            basis.push(p);
+        }
+
+        // The offset is the point (0, ..., 0, z).
+        let mut offset = Point::zeros(rank);
+        offset[rank-1] = z;
+
+        // The normal is the vector (0, ..., 0, 1).
+        let mut normal = Vector::zeros(rank);
+        normal[rank-1] = 1.0;
+
+        let subspace = Subspace { basis, offset };
+
+        Self { subspace, normal }
+    }
 }
 
 /// Represents a line segment between two points.
