@@ -111,24 +111,6 @@ impl Abstract {
         self.push_subs(ElementList::max(facet_count));
     }
 
-    /// Converts a polytope into its dual.
-    pub fn dual(&self) -> Self {
-        let mut clone = self.clone();
-        clone.dual_mut();
-        clone
-    }
-
-    /// Converts a polytope into its dual in place.
-    pub fn dual_mut(&mut self) {
-        for elements in self.iter_mut() {
-            for el in elements.iter_mut() {
-                el.swap_mut();
-            }
-        }
-
-        self.reverse();
-    }
-
     /// Gets the indices of the vertices of a given element in a polytope.
     pub fn element_vertices(&self, rank: isize, idx: usize) -> Option<Vec<usize>> {
         // A nullitope doesn't have vertices.
@@ -264,24 +246,27 @@ impl Abstract {
         todo!()
     }
 
-    /// Takes the direct product of two polytopes. If the `min` flag is
-    /// turned off, it ignores the minimal elements of both of the factors and
-    /// adds one at the end. The `max` flag works analogously.
+    /// Takes the [direct product](https://en.wikipedia.org/wiki/Direct_product#Direct_product_of_binary_relations)
+    /// of two polytopes. If the `min` flag is turned off, it ignores the
+    /// minimal elements of both of the factors and adds one at the end. The
+    /// `max` flag works analogously.
     ///
     /// The elements of this product are in one to one correspondence to pairs
     /// of elements in the set of polytopes. The elements of a specific rank are
     /// sorted first by lexicographic order of the ranks, then by lexicographic
     /// order of the elements.
     pub fn product(p: &Self, q: &Self, min: bool, max: bool) -> Self {
+        // The ranks of p and q.
         let p_rank = p.rank();
         let q_rank = q.rank();
 
+        // The lowest and highest ranks we'll use to take products in p and q.
         let p_low = -(min as isize);
         let p_hi = p_rank - (!max as isize);
-
         let q_low = -(min as isize);
         let q_hi = q_rank - (!max as isize);
 
+        // The rank of the product.
         let rank = p_rank + q_rank + 1 - (!min as isize) - (!max as isize);
 
         // Initializes the element lists. These will only contain the
@@ -393,12 +378,18 @@ impl Abstract {
 }
 
 impl Polytope for Abstract {
-    /// Returns the rank of the polytope.
+    /// The return type of [`dual`](Self::dual).
+    type Dual = Self;
+
+    /// The return type of [`dual_mut`](Self::dual_mut).
+    type DualMut = ();
+
+    /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
     fn rank(&self) -> isize {
-        self.len() as isize - 2
+        self.0.rank()
     }
 
-    /// Gets the number of elements of a given rank.
+    /// The number of elements of a given rank.
     fn el_count(&self, rank: isize) -> usize {
         if let Some(els) = self.get(rank) {
             els.len()
@@ -407,7 +398,7 @@ impl Polytope for Abstract {
         }
     }
 
-    /// Gets the number of elements of all ranks.
+    /// The element counts of the polytope.
     fn el_counts(&self) -> RankVec<usize> {
         let mut counts = RankVec::with_capacity(self.rank());
 
@@ -418,17 +409,23 @@ impl Polytope for Abstract {
         counts
     }
 
-    /// Returns the unique polytope of rank −1.
+    /// Returns an instance of the
+    /// [nullitope](https://polytope.miraheze.org/wiki/Nullitope), the unique
+    /// polytope of rank &minus;1.
     fn nullitope() -> Self {
         Abstract::from_vec(vec![ElementList::min(0)])
     }
 
-    /// Returns the unique polytope of rank 0.
+    /// Returns an instance of the
+    /// [point](https://polytope.miraheze.org/wiki/Point), the unique polytope
+    /// of rank 0.
     fn point() -> Self {
         Abstract::from_vec(vec![ElementList::min(1), ElementList::max(1)])
     }
 
-    /// Returns the unique polytope of rank 1.
+    /// Returns an instance of the
+    /// [dyad](https://polytope.miraheze.org/wiki/Dyad), the unique polytope of
+    /// rank 1.
     fn dyad() -> Self {
         let mut abs = Abstract::with_capacity(1);
 
@@ -439,7 +436,8 @@ impl Polytope for Abstract {
         abs
     }
 
-    /// Returns the unique polytope of rank 2 with a given amount of vertices.
+    /// Returns an instance of a [polygon](https://polytope.miraheze.org/wiki/Polygon)
+    /// with a given number of sides.
     fn polygon(n: usize) -> Self {
         assert!(n >= 2, "A polygon must have at least 2 sides.");
 
@@ -462,28 +460,58 @@ impl Polytope for Abstract {
         poly
     }
 
+    /// Converts a polytope into its dual.
+    fn dual(&self) -> Self::Dual {
+        let mut clone = self.clone();
+        clone.dual_mut();
+        clone
+    }
+
+    /// Converts a polytope into its dual in place.
+    fn dual_mut(&mut self) -> Self::DualMut {
+        for elements in self.iter_mut() {
+            for el in elements.iter_mut() {
+                el.swap_mut();
+            }
+        }
+
+        self.reverse();
+    }
+
+    /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
+    /// from two polytopes.
     fn duopyramid(p: &Self, q: &Self) -> Self {
         Self::product(p, q, true, true)
     }
 
+    /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
+    /// from two polytopes.
     fn duoprism(p: &Self, q: &Self) -> Self {
         Self::product(p, q, false, true)
     }
 
+    /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
+    /// from two polytopes.
     fn duotegum(p: &Self, q: &Self) -> Self {
         Self::product(p, q, true, false)
     }
 
+    /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
+    /// from two polytopes.
     fn duocomb(p: &Self, q: &Self) -> Self {
         Self::product(p, q, false, false)
     }
 
+    /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
+    /// polytope.
     fn ditope(&self) -> Self {
         let mut clone = self.clone();
         clone.ditope_mut();
         clone
     }
 
+    /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
+    /// polytope in place.
     fn ditope_mut(&mut self) {
         let rank = self.rank();
         let max = self[rank][0].clone();
@@ -492,12 +520,16 @@ impl Polytope for Abstract {
         self.push_subs(ElementList::max(2));
     }
 
+    /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
+    /// given polytope.
     fn hosotope(&self) -> Self {
         let mut clone = self.clone();
         clone.hosotope_mut();
         clone
     }
 
+    /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
+    /// given polytope in place.
     fn hosotope_mut(&mut self) {
         let min = self[-1][0].clone();
 
@@ -505,10 +537,14 @@ impl Polytope for Abstract {
         self.insert(-1, ElementList::max(2));
     }
 
+    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
+    /// based on a given polytope.
     fn antiprism(&self) -> Self {
         todo!()
     }
 
+    /// Determines whether a given polytope is
+    /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
     fn orientable(&self) -> bool {
         todo!()
     }

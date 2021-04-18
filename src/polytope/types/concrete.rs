@@ -1,18 +1,20 @@
 use crate::{
     polytope::{
-        geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace},
+        geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace, Vector},
         rank::RankVec,
         Abstract, Element, ElementList, Polytope, Subelements,
     },
     EPS,
 };
 use approx::{abs_diff_eq, abs_diff_ne};
-use std::{collections::HashMap, f64::consts::SQRT_2};
+use std::{
+    collections::HashMap,
+    f64::consts::{SQRT_2, TAU},
+};
 
 #[derive(Debug, Clone)]
-/// Represents a
-/// [concrete polytope](https://polytope.miraheze.org/wiki/Polytope), which is
-/// an [`Abstract`] together with the corresponding vertices.
+/// Represents a [concrete polytope](https://polytope.miraheze.org/wiki/Polytope),
+/// which is an [`Abstract`] together with its corresponding vertices.
 pub struct Concrete {
     /// The list of vertices as points in Euclidean space.
     pub vertices: Vec<Point>,
@@ -22,10 +24,13 @@ pub struct Concrete {
 }
 
 impl Concrete {
+    /// Initializes a new concrete polytope from a set of vertices and an
+    /// underlying abstract polytope. Does some debug assertions on the input.
     pub fn new(vertices: Vec<Point>, abs: Abstract) -> Self {
         // There must be as many abstract vertices as concrete ones.
         debug_assert_eq!(vertices.len(), abs.el_count(0));
 
+        // All vertices must have the same dimension.
         if let Some(vertex0) = vertices.get(0) {
             for vertex1 in &vertices {
                 debug_assert_eq!(vertex0.len(), vertex1.len());
@@ -56,7 +61,7 @@ impl Concrete {
     }
 
     /// Shifts all vertices by a given vector.
-    pub fn shift(mut self, o: Point) -> Self {
+    pub fn shift(mut self, o: Vector) -> Self {
         for v in &mut self.vertices {
             *v -= &o;
         }
@@ -144,6 +149,8 @@ impl Concrete {
         edge_lengths
     }
 
+    /// Checks whether a polytope is equilateral to a fixed precision, and with
+    /// a specified edge length.
     pub fn is_equilateral_with_len(&self, len: f64) -> bool {
         let edge_lengths = self.edge_lengths().into_iter();
 
@@ -159,17 +166,10 @@ impl Concrete {
 
     /// Checks whether a polytope is equilateral to a fixed precision.
     pub fn is_equilateral(&self) -> bool {
-        if let Some(edges) = self.abs.get(1) {
-            if let Some(edge) = edges.get(0) {
-                let vertices = edge
-                    .subs
-                    .iter()
-                    .map(|&v| &self.vertices[v])
-                    .collect::<Vec<_>>();
-                let (v0, v1) = (vertices[0], vertices[1]);
+        if let Some(vertices) = self.element_vertices_ref(1, 0) {
+            let (v0, v1) = (vertices[0], vertices[1]);
 
-                return self.is_equilateral_with_len((v0 - v1).norm());
-            }
+            return self.is_equilateral_with_len((v0 - v1).norm());
         }
 
         true
@@ -188,25 +188,6 @@ impl Concrete {
         let sub1 = edge.subs[1];
 
         (&vertices[sub0] + &vertices[sub1]).norm() / 2.0
-    }
-
-    /// Returns the dual of a polytope, or `None` if any facets pass through the
-    /// origin.
-    pub fn dual(&self) -> Option<Self> {
-        let mut clone = self.clone();
-
-        if clone.dual_mut().is_ok() {
-            Some(clone)
-        } else {
-            None
-        }
-    }
-
-    /// Builds the dual of a polytope in place, or does nothing in case any
-    /// facets go through the origin. Returns the dual if successful, and `None`
-    /// otherwise.
-    pub fn dual_mut(&mut self) -> Result<(), ()> {
-        self.dual_mut_with_sphere(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
     /// Returns the dual of a polytope with a given reciprocation sphere, or
@@ -302,10 +283,10 @@ impl Concrete {
 
     /// Gets an element of a polytope, as its own polytope.
     pub fn element(&self, rank: isize, idx: usize) -> Option<Self> {
-        Some(Concrete {
-            vertices: self.element_vertices(rank, idx)?,
-            abs: self.abs.element(rank, idx)?,
-        })
+        Some(Self::new(
+            self.element_vertices(rank, idx)?,
+            self.abs.element(rank, idx)?,
+        ))
     }
 
     /// Gets the [vertex figure](https://polytope.miraheze.org/wiki/Vertex_figure)
@@ -457,49 +438,92 @@ impl Concrete {
             hash_element = new_hash_element;
         }
 
+        // Adds a maximal element manually.
         let facet_count = abs.last().unwrap().len();
         abs.push_subs(ElementList::max(facet_count));
 
-        Self { vertices, abs }
+        Self::new(vertices, abs)
     }
 }
 
 impl Polytope for Concrete {
+    type Dual = Option<Self>;
+    type DualMut = Result<(), ()>;
+
+    /// Returns the rank of the polytope.
     fn rank(&self) -> isize {
         self.abs.rank()
     }
 
+    /// Gets the number of elements of a given rank.
     fn el_count(&self, rank: isize) -> usize {
         self.abs.el_count(rank)
     }
 
+    /// Gets the number of elements of all ranks.
     fn el_counts(&self) -> RankVec<usize> {
         self.abs.el_counts()
     }
 
+    /// Builds the unique polytope of rank −1.
     fn nullitope() -> Self {
-        Self {
-            abs: Abstract::nullitope(),
-            vertices: Vec::new(),
-        }
+        Self::new(Vec::new(), Abstract::nullitope())
     }
 
+    /// Builds the unique polytope of rank 0.
     fn point() -> Self {
         Self::new(vec![vec![].into()], Abstract::point())
     }
 
+    /// Builds a dyad with unit edge length.
     fn dyad() -> Self {
         Self::new(vec![vec![-0.5].into(), vec![0.5].into()], Abstract::dyad())
     }
 
+    /// Builds a convex regular polygon with `n` sides and unit edge length.
     fn polygon(n: usize) -> Self {
-        Self::reg_polygon(n, 1)
+        // Scaling factor for unit edge length.
+        let r = (2.0 - 2.0 * (TAU / n as f64).cos()).sqrt();
+
+        Self::new(
+            (0..n)
+                .into_iter()
+                .map(|k| {
+                    let (s, c) = (TAU * k as f64 / n as f64).sin_cos();
+                    vec![s / r, c / r].into()
+                })
+                .collect(),
+            Abstract::polygon(n),
+        )
     }
 
+    /// Returns the dual of a polytope, or `None` if any facets pass through the
+    /// origin.
+    fn dual(&self) -> Self::Dual {
+        let mut clone = self.clone();
+
+        if clone.dual_mut().is_ok() {
+            Some(clone)
+        } else {
+            None
+        }
+    }
+
+    /// Builds the dual of a polytope in place, or does nothing in case any
+    /// facets go through the origin. Returns the dual if successful, and `None`
+    /// otherwise.
+    fn dual_mut(&mut self) -> Self::DualMut {
+        self.dual_mut_with_sphere(&Hypersphere::unit(self.dim().unwrap_or(1)))
+    }
+
+    /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
+    /// from two polytopes.
     fn duopyramid(p: &Self, q: &Self) -> Self {
         Self::duopyramid_with_height(p, q, 1.0)
     }
 
+    /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
+    /// from two polytopes.
     fn duoprism(p: &Self, q: &Self) -> Self {
         Self::new(
             Self::duoprism_vertices(&p.vertices, &q.vertices),
@@ -507,6 +531,8 @@ impl Polytope for Concrete {
         )
     }
 
+    /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
+    /// from two polytopes.
     fn duotegum(p: &Self, q: &Self) -> Self {
         Self::new(
             Self::duopyramid_vertices(&p.vertices, &q.vertices, 0.0, true),
@@ -514,6 +540,8 @@ impl Polytope for Concrete {
         )
     }
 
+    /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
+    /// from two polytopes.
     fn duocomb(p: &Self, q: &Self) -> Self {
         Self::new(
             Self::duoprism_vertices(&p.vertices, &q.vertices),
@@ -521,33 +549,48 @@ impl Polytope for Concrete {
         )
     }
 
+    /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
+    /// polytope.
     fn ditope(&self) -> Self {
-        Self {
-            vertices: self.vertices.clone(),
-            abs: self.abs.ditope(),
-        }
+        Self::new(self.vertices.clone(), self.abs.ditope())
     }
 
+    /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
+    /// polytope in place.
     fn ditope_mut(&mut self) {
         self.abs.ditope_mut();
     }
 
+    /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
+    /// given polytope.
     fn hosotope(&self) -> Self {
-        Self {
-            vertices: vec![vec![-0.5].into(), vec![0.5].into()],
-            abs: self.abs.hosotope(),
-        }
+        Self::new(
+            vec![vec![-0.5].into(), vec![0.5].into()],
+            self.abs.hosotope(),
+        )
     }
 
+    /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
+    /// given polytope in place.
     fn hosotope_mut(&mut self) {
         self.vertices = vec![vec![-0.5].into(), vec![0.5].into()];
         self.abs.hosotope_mut();
     }
 
+    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
+    /// based on a given polytope.
     fn antiprism(&self) -> Self {
         todo!()
     }
 
+    /// Determines whether a given polytope is
+    /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
+    fn orientable(&self) -> bool {
+        self.abs.orientable()
+    }
+
+    /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
+    /// given rank.
     fn simplex(rank: isize) -> Self {
         if rank == -1 {
             Self::nullitope()
@@ -567,16 +610,8 @@ impl Polytope for Concrete {
             let a = (1.0 - ((dim + 1) as f64).sqrt()) * SQRT_2 / (2.0 * dim as f64);
             vertices.push(vec![a; dim].into());
 
-            Concrete {
-                vertices,
-                abs: Abstract::simplex(rank),
-            }
-            .recenter()
+            Concrete::new(vertices, Abstract::simplex(rank)).recenter()
         }
-    }
-
-    fn orientable(&self) -> bool {
-        self.abs.orientable()
     }
 }
 

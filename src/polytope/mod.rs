@@ -29,6 +29,12 @@ const COMPONENTS: &str = "Components";
 
 /// The trait for methods common to all polytopes.
 pub trait Polytope: Sized + Clone {
+    /// The return type of [`dual`](Self::dual).
+    type Dual;
+
+    /// The return type of [`dual_mut`](Self::dual_mut).
+    type DualMut;
+
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
     fn rank(&self) -> isize;
 
@@ -37,10 +43,6 @@ pub trait Polytope: Sized + Clone {
 
     /// The element counts of the polytope.
     fn el_counts(&self) -> RankVec<usize>;
-
-    /// Whether the polytope is
-    /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
-    fn orientable(&self) -> bool;
 
     /// Returns an instance of the
     /// [nullitope](https://polytope.miraheze.org/wiki/Nullitope), the unique
@@ -57,14 +59,18 @@ pub trait Polytope: Sized + Clone {
     /// rank 1.
     fn dyad() -> Self;
 
-    /// Returns an instance of a
-    /// [polygon](https://polytope.miraheze.org/wiki/Polygon) with a given
-    /// amount of sides.
+    /// Returns an instance of a [polygon](https://polytope.miraheze.org/wiki/Polygon)
+    /// with a given number of sides.
     fn polygon(n: usize) -> Self;
 
-    /// Builds a
-    /// [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product) from
-    /// two polytopes.
+    /// Returns the dual of a polytope.
+    fn dual(&self) -> Self::Dual;
+
+    /// Builds the dual of a polytope in place.
+    fn dual_mut(&mut self) -> Self::DualMut;
+
+    /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
+    /// from two polytopes.
     fn duopyramid(p: &Self, q: &Self) -> Self;
 
     /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
@@ -95,6 +101,14 @@ pub trait Polytope: Sized + Clone {
     /// given polytope in place.
     fn hosotope_mut(&mut self);
 
+    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
+    /// based on a given polytope.
+    fn antiprism(&self) -> Self;
+
+    /// Determines whether a given polytope is
+    /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
+    fn orientable(&self) -> bool;
+
     /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
     /// given base.
     fn pyramid(&self) -> Self {
@@ -113,64 +127,66 @@ pub trait Polytope: Sized + Clone {
         Self::duotegum(self, &Self::dyad())
     }
 
-    /// Takes the
-    /// [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product) of
-    /// a set of polytopes.
+    /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)
+    /// of a set of polytopes.
     fn multipyramid(factors: &[&Self]) -> Self {
-        Self::multiproduct(&Self::duopyramid, factors, Self::nullitope())
+        Self::multipyramid_iter(factors.iter().map(|&p| p.clone()))
     }
 
-    /// Takes the
-    /// [prism product](https://polytope.miraheze.org/wiki/Prism_product) of a
-    /// set of polytopes.
+    /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)
+    /// of an iterator over polytopes.
+    fn multipyramid_iter<T: Iterator<Item = Self>>(factors: T) -> Self {
+        factors.fold(Self::nullitope(), |p, q| Self::duopyramid(&p, &q))
+    }
+
+    /// Takes the [prism product](https://polytope.miraheze.org/wiki/Prism_product)
+    /// of a set of polytopes.
     fn multiprism(factors: &[&Self]) -> Self {
-        Self::multiproduct(&Self::duoprism, factors, Self::point())
+        Self::multiprism_iter(factors.iter().map(|&p| p.clone()))
     }
 
-    /// Takes the
-    /// [tegum product](https://polytope.miraheze.org/wiki/Tegum_product) of a
-    /// set of polytopes.
+    /// Takes the [prism product](https://polytope.miraheze.org/wiki/Prism_product)
+    /// of an iterator over polytopes.
+    fn multiprism_iter<T: Iterator<Item = Self>>(factors: T) -> Self {
+        factors.fold(Self::point(), |p, q| Self::duoprism(&p, &q))
+    }
+
+    /// Takes the [tegum product](https://polytope.miraheze.org/wiki/Tegum_product)
+    /// of a set of polytopes.
     fn multitegum(factors: &[&Self]) -> Self {
-        Self::multiproduct(&Self::duotegum, factors, Self::point())
+        Self::multitegum_iter(factors.iter().map(|&p| p.clone()))
     }
 
-    /// Takes the
-    /// [comb product](https://polytope.miraheze.org/wiki/Comb_product) of a set
-    /// of polytopes.
+    /// Takes the [tegum product](https://polytope.miraheze.org/wiki/Tegum_product)
+    /// of an iterator over polytopes.
+    fn multitegum_iter<T: Iterator<Item = Self>>(factors: T) -> Self {
+        factors.fold(Self::point(), |p, q| Self::duotegum(&p, &q))
+    }
+
+    /// Takes the [comb product](https://polytope.miraheze.org/wiki/Comb_product)
+    /// of a set of polytopes.
     fn multicomb(factors: &[&Self]) -> Self {
-        Self::multiproduct(&Self::duocomb, factors, Self::point())
+        Self::multicomb_iter(factors.iter().map(|&p| p.clone()))
     }
 
-    /// Helper method for applying an associative binary function on a list of
-    /// entries.
-    fn multiproduct(
-        product: &dyn Fn(&Self, &Self) -> Self,
-        factors: &[&Self],
-        identity: Self,
-    ) -> Self {
-        match factors.len() {
-            // An empty product just evaluates to the identity element.
-            0 => identity,
+    /// Takes the [comb product](https://polytope.miraheze.org/wiki/Comb_product)
+    /// of an iterator over polytopes.
+    fn multicomb_iter<T: Iterator<Item = Self>>(mut factors: T) -> Self {
+        let init = factors
+            .next()
+            .expect("You can't take an empty comb product.");
 
-            // A product of one entry is just equal to the entry itself.
-            1 => factors[0].clone(),
-
-            // Evaluates larger products recursively.
-            _ => {
-                let (&first, factors) = factors.split_first().unwrap();
-
-                product(first, &Self::multiproduct(&product, factors, identity))
-            }
-        }
+        factors.fold(init, |p, q| Self::duocomb(&p, &q))
     }
 
-    fn antiprism(&self) -> Self;
-
-    // The basic, regular polytopes.
+    /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
+    /// given rank.
     fn simplex(rank: isize) -> Self {
         Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize])
     }
 
+    /// Builds a [hypercube](https://polytope.miraheze.org/wiki/Hypercube) with
+    /// a given rank.
     fn hypercube(rank: isize) -> Self {
         if rank == -1 {
             Self::nullitope()
@@ -179,6 +195,8 @@ pub trait Polytope: Sized + Clone {
         }
     }
 
+    /// Builds an [orthoplex](https://polytope.miraheze.org/wiki/Orthoplex) with
+    /// a given rank.
     fn orthoplex(rank: isize) -> Self {
         if rank == -1 {
             Self::nullitope()

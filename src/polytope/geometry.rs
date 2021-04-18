@@ -18,7 +18,10 @@ use std::fmt;
 #[derive(Debug)]
 /// A hypersphere with a certain center and radius.
 pub struct Hypersphere {
+    /// The center of the hypersphere.
     pub center: Point,
+
+    /// The radius of the hypersphere.
     pub radius: f64,
 }
 

@@ -226,7 +226,7 @@ pub fn from_src(src: String) -> Concrete {
         abs.push_max();
     }
 
-    Concrete { vertices, abs }
+    Concrete::new(vertices, abs)
 }
 
 /// Loads a polytope from a file path.
