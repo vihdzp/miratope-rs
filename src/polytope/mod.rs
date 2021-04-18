@@ -1192,7 +1192,7 @@ impl Concrete {
         vertices
     }
 
-    fn duopyramid_with_height(p: &Self, q: &Self, height: f64) -> Self {
+    pub fn duopyramid_with_height(p: &Self, q: &Self, height: f64) -> Self {
         Self::new(
             Self::duopyramid_vertices(&p.vertices, &q.vertices, height, false),
             Abstract::duopyramid(&p.abs, &q.abs),
