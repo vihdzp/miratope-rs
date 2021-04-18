@@ -1,13 +1,13 @@
 use crate::{
     polytope::{
-        geometry::{Hypersphere, Matrix, Point, Subspace},
+        geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace},
         rank::RankVec,
-        Abstract, ElementList, Polytope,
+        Abstract, Element, ElementList, Polytope, Subelements,
     },
     EPS,
 };
 use approx::{abs_diff_eq, abs_diff_ne};
-use std::f64::consts::SQRT_2;
+use std::{collections::HashMap, f64::consts::SQRT_2};
 
 #[derive(Debug, Clone)]
 /// Represents a

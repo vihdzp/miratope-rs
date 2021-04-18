@@ -247,9 +247,12 @@ pub struct Element {
 }
 
 impl Element {
-    /// Initializes a new element with no subelements.
+    /// Initializes a new element with no subelements and no superelements.
     pub fn new() -> Self {
-        Self::min(0)
+        Self {
+            subs: Subelements::new(),
+            sups: Superelements::new(),
+        }
     }
 
     /// Builds a minimal element for a polytope.
@@ -300,6 +303,12 @@ impl ElementList {
     /// Initializes an empty element list with a given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
         ElementList(Vec::with_capacity(capacity))
+    }
+
+    /// Returns an empty element list. Often used as the element list for the
+    /// nullitopes when a polytope is built in layers.
+    pub fn empty() -> Self {
+        Self(vec![Element::new()])
     }
 
     /// Returns the element list for the nullitope in a polytope with a given

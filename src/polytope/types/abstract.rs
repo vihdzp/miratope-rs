@@ -13,11 +13,11 @@ use crate::polytope::{rank::RankVec, Element, ElementList, Polytope, Subelements
 /// for many algorithms. However, it becomes inconvenient when actually building
 /// a polytope, since most of the time, we can only easily generate subelements.
 ///
-/// To get around this, we provide a [`push_subs`] method. Instead of manually
-/// having to set the superelements in the polytope, one can instead provide an
-/// [`ElementList`] whose elements have their superelements set to empty
-/// vectors. This method will automatically set the superelements of the
-/// subelements of the previous rank.
+/// To get around this, we provide a [`push_subs`](Abstract::push_subs) method.
+/// Instead of manually having to set the superelements in the polytope, one can
+/// instead provide an [`ElementList`] whose elements have their superelements
+/// set to empty vectors. This method will automatically set the superelements
+/// of the subelements of the previous rank.
 #[derive(Debug, Clone, Deref, DerefMut)]
 pub struct Abstract(RankVec<ElementList>);
 
@@ -45,11 +45,12 @@ impl Abstract {
 
     /// Pushes a new element list, assuming that the superelements of the
     /// maximal rank **have** already been set. If they haven't already been
-    /// set, use [`push_subs`] instead.    
+    /// set, use [`push_subs`](Self::push_subs) instead.    
     pub fn push(&mut self, elements: ElementList) {
         self.0.push(elements);
     }
 
+    /// Pushes a given element into the vector of elements of a given rank.
     pub fn push_at(&mut self, rank: isize, el: Element) {
         let i = self[rank].len();
 
@@ -65,8 +66,15 @@ impl Abstract {
 
     /// Pushes a new element list, assuming that the superelements of the
     /// maximal rank **haven't** already been set. If they have already been
-    /// set, use [`push`] instead.    
+    /// set, use [`push`](Self::push) instead.    
     pub fn push_subs(&mut self, elements: ElementList) {
+        // We assume the superelements of the maximal rank haven't been set.
+        if !self.is_empty() {
+            for el in self[self.rank()].iter() {
+                debug_assert!(el.sups.is_empty(), "The method push_subs can only been used when the superelements of the elements of the maximal rank haven't already been set.");
+            }
+        }
+
         self.0.push(ElementList::with_capacity(elements.len()));
         let rank = self.rank();
 
@@ -162,22 +170,24 @@ impl Abstract {
         todo!()
     }
 
-    /// Calls [`has_min_max_elements`](Abstract::has_min_max_elements),
-    /// [check_incidences](Abstract::check_incidences),
-    /// [is_dyadic](Abstract::is_dyadic), and
-    /// [is_strongly_connected](Abstract::is_strongly_connected).
+    /// Checks whether the polytope is bounded
     pub fn full_check(&self) -> bool {
-        self.is_consistent()
-            && self.has_min_max_elements()
-            && self.check_incidences()
-            && self.is_dyadic()
+        self.is_bounded() && self.check_incidences() && self.is_dyadic()
         // && self.is_strongly_connected()
     }
 
-    /// Returns whether the `subs` and `sups` of each element agree with each
-    /// other, that is, if for each element, its superelements contain it as a
-    /// subelement.
-    pub fn is_consistent(&self) -> bool {
+    /// Determines whether the polytope is bounded, i.e. whether it has a single
+    /// minimal element and a single maximal element. A valid polytope should
+    /// always return `true`.
+    pub fn is_bounded(&self) -> bool {
+        self.el_count(-1) == 1 && self.el_count(self.rank()) == 1
+    }
+
+    /// Checks whether subelements and superelements match up, and whether they
+    /// all refer to valid elements in the polytope. If this returns `false`,
+    /// then either the polytope hasn't fully built up, or there's something
+    /// seriously wrong.
+    pub fn check_incidences(&self) -> bool {
         let rank = self.rank();
         if !self[rank][0].sups.is_empty() {
             return false;
@@ -187,29 +197,6 @@ impl Abstract {
             for (idx, el) in self[r].iter().enumerate() {
                 for &sub in el.subs.iter() {
                     if !self[r - 1][sub].sups.contains(&idx) {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        true
-    }
-
-    /// Determines whether the polytope has a single minimal element and a
-    /// single maximal element. A valid polytope should always return `true`.
-    pub fn has_min_max_elements(&self) -> bool {
-        self.el_count(-1) == 1 && self.el_count(self.rank()) == 1
-    }
-
-    /// Checks whether all of the subelements refer to valid elements in the
-    /// polytope. If this returns `false`, then either the polytope hasn't been
-    /// fully built up, or there's something seriously wrong.
-    pub fn check_incidences(&self) -> bool {
-        for r in -1..self.rank() {
-            for element in self[r].iter() {
-                for &sub in &element.subs.0 {
-                    if self[r - 1].get(sub).is_none() {
                         return false;
                     }
                 }
@@ -384,7 +371,7 @@ impl Abstract {
         // If !min, we have to set a minimal element manually.
         if !min {
             let vertex_count = p.el_count(0) * q.el_count(0);
-            element_lists[-1] = ElementList::min(vertex_count);
+            element_lists[-1] = ElementList::empty();
             element_lists[0] = ElementList::vertices(vertex_count);
         }
 
