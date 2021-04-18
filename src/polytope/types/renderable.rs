@@ -27,7 +27,7 @@ impl Renderable {
         let mut triangles = Vec::new();
 
         for face in faces.iter() {
-            let edge_i = *face.subs.first().expect("no indices in face");
+            let edge_i = *face.subs.first().expect("No indices in face.");
             let vert_i = edges
                 .get(edge_i)
                 .expect("Index out of bounds: you probably screwed up the polytope's indices.")
@@ -35,7 +35,7 @@ impl Renderable {
 
             for verts in face.subs[1..].iter().map(|&i| {
                 let edge = &edges[i];
-                assert_eq!(edge.subs.len(), 2, "edges has more than two subelements");
+                assert_eq!(edge.subs.len(), 2, "Edge has more than two subelements.");
                 [edge.subs[0], edge.subs[1]]
             }) {
                 let [vert_j, vert_k]: [usize; 2] = verts;

@@ -98,6 +98,7 @@ impl CameraInputEvent {
     }
 }
 
+/// Processes camera events coming from the keyboard.
 fn cam_events_from_kb(
     time: Res<Time>,
     keyboard: Res<Input<KeyCode>>,
@@ -133,6 +134,7 @@ fn cam_events_from_kb(
     (real_scale, scale)
 }
 
+/// Processes camera events coming from the mouse buttons.
 fn cam_events_from_mouse(
     mouse_button: Res<Input<MouseButton>>,
     mouse_move: Res<Events<MouseMotion>>,
@@ -150,6 +152,7 @@ fn cam_events_from_mouse(
     }
 }
 
+/// Processes camera events coming from the mouse wheel.
 fn cam_events_from_wheel(
     mouse_wheel: Res<Events<MouseWheel>>,
     scale: f32,

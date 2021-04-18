@@ -82,6 +82,8 @@ impl<T> IntoIterator for RankVec<T> {
     }
 }
 
+/// A wrapper around a usual iterator over vectors, which implements a
+/// [`rank_enumerate`](IntoIter::rank_enumerate) convenience method.
 pub struct IntoIter<T>(std::vec::IntoIter<T>);
 
 impl<T> Iterator for IntoIter<T> {
