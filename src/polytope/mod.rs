@@ -6,7 +6,7 @@ use std::hash::Hash;
 
 use derive_deref::{Deref, DerefMut};
 
-use self::{geometry::Point, ranked_poset::RankVec};
+use self::{geometry::Point, rank::RankVec};
 pub use types::{concrete::*, r#abstract::*, renderable::*};
 
 pub mod cd;
@@ -15,9 +15,8 @@ pub mod cox;
 pub mod geometry;
 pub mod group;
 pub mod off;
-pub mod ranked_poset;
+pub mod rank;
 pub mod shapes;
-pub mod slice;
 pub mod types;
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.

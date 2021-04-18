@@ -7,6 +7,7 @@ use super::{
     geometry::{Point, Subspace},
     Abstract, Concrete, Element, ElementList, Subelements,
 };
+use crate::EPS;
 
 use nalgebra::DMatrix;
 use rand::Rng;
@@ -78,8 +79,6 @@ impl VertexSet {
 
 /// Returns the sign of a number, up to some imprecision.
 fn sign(x: f64) -> Sign {
-    const EPS: f64 = 1e-9;
-
     if x > EPS {
         Sign::Positive
     } else if x < -EPS {

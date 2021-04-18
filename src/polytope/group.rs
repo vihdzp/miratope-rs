@@ -533,8 +533,6 @@ impl Iterator for GenIter {
 
 /// Determines whether two matrices are "approximately equal" elementwise.
 fn matrix_approx(mat1: &Matrix<f64>, mat2: &Matrix<f64>) -> bool {
-    const EPS: f64 = 1e-4;
-
     let mat1 = mat1.iter();
     let mut mat2 = mat2.iter();
 
@@ -650,8 +648,6 @@ impl GenIter {
     }
 
     pub fn from_cox_mat(cox: CoxMatrix) -> Option<Self> {
-        const EPS: f64 = 1e-6;
-
         let dim = cox.nrows();
         let mut generators = Vec::with_capacity(dim);
 

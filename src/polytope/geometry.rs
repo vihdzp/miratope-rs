@@ -1,8 +1,13 @@
 //! Contains a few structs and methods to faciliate geometry in n-dimensional
 //! space.
 
+/// A point in *n*-dimensional space.
 pub type Point = nalgebra::DVector<f64>;
+
+/// A vector in *n*-dimensional space.
 pub type Vector = Point;
+
+/// An *n* by *n* matrix.
 pub type Matrix = nalgebra::DMatrix<f64>;
 
 use approx::abs_diff_eq;
@@ -38,11 +43,26 @@ impl Hypersphere {
         Hypersphere::with_radius(dim, 1.0)
     }
 
+    /// Reciprocates a point
+    pub fn reciprocate(&self, p: &mut Point) -> Result<(), ()> {
+        *p -= &self.center;
+        let s = p.norm_squared();
+
+        // If any face passes through the dual center, the dual does
+        // not exist, and we return early.
+        if s < EPS {
+            return Err(());
+        }
+
+        *p /= s;
+        *p += &self.center;
+
+        Ok(())
+    }
+
     /// Returns whether two hyperspheres are "approximately" equal.
     /// Used for testing.
     pub fn approx(&self, sphere: &Hypersphere) -> bool {
-        const EPS: f64 = 1e-9;
-
         (&self.center - &sphere.center).norm() < EPS && self.radius - sphere.radius < EPS
     }
 }
@@ -96,8 +116,6 @@ impl Subspace {
     /// Adds a point to the subspace. If the rank increases, returns a new
     /// basis vector for the subspace.
     pub fn add(&mut self, p: &Point) -> Option<Point> {
-        const EPS: f64 = 1e-9;
-
         let mut v = p - self.project(p);
         if v.normalize_mut() > EPS {
             self.basis.push(v.clone());
@@ -187,8 +205,11 @@ impl Subspace {
 
 /// Represents an (oriented) hyperplane together with a normal vector.
 pub struct Hyperplane {
+    /// The underlying subspace associated to the hyperplane.
     pub subspace: Subspace,
-    normal: Point,
+
+    /// The normal vector of the hyperplane.
+    normal: Vector,
 }
 
 impl Hyperplane {

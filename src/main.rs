@@ -118,8 +118,8 @@ fn ui(mut egui_ctx: ResMut<EguiContext>, mut query: Query<&mut Renderable>) {
         if ui.button("Dual").clicked() {
             for mut p in query.iter_mut() {
                 match p.concrete.dual_mut() {
-                    Some(_) => println!("Dual succeeded"),
-                    None => println!("Dual failed"),
+                    Ok(_) => println!("Dual succeeded"),
+                    Err(_) => println!("Dual failed"),
                 }
             }
         }

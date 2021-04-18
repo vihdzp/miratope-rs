@@ -1,7 +1,7 @@
 use derive_deref::{Deref, DerefMut};
 use std::collections::{HashMap, HashSet};
 
-use crate::polytope::{ranked_poset::RankVec, Element, ElementList, Polytope, Subelements};
+use crate::polytope::{rank::RankVec, Element, ElementList, Polytope, Subelements};
 
 /// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
 /// to an [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
