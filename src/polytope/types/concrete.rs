@@ -516,6 +516,15 @@ impl Polytope for Concrete {
         self.dual_mut_with_sphere(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
+    fn append(&mut self, mut p: Self) -> Result<(), ()> {
+        if self.abs.append(p.abs).is_err() {
+            return Err(());
+        }
+
+        self.vertices.append(&mut p.vertices);
+        Ok(())
+    }
+
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.
     fn duopyramid(p: &Self, q: &Self) -> Self {
@@ -534,10 +543,17 @@ impl Polytope for Concrete {
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
     /// from two polytopes.
     fn duotegum(p: &Self, q: &Self) -> Self {
-        Self::new(
-            Self::duopyramid_vertices(&p.vertices, &q.vertices, 0.0, true),
-            Abstract::duotegum(&p.abs, &q.abs),
-        )
+        // Point-polytope duotegums are special cases.
+        if p.rank() == 0 {
+            q.clone()
+        } else if q.rank() == 0 {
+            p.clone()
+        } else {
+            Self::new(
+                Self::duopyramid_vertices(&p.vertices, &q.vertices, 0.0, true),
+                Abstract::duotegum(&p.abs, &q.abs),
+            )
+        }
     }
 
     /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)

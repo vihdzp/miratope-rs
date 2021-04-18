@@ -145,8 +145,10 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::orthoplex(4).slice(Hyperplane::x(4, 0.31415));
-    let poly = Renderable::new(poly);
+    let mut p = Concrete::hypercube(3);
+    let q = Concrete::orthoplex(3);
+    p.append(q).unwrap();
+    let poly = Renderable::new(p);
 
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,

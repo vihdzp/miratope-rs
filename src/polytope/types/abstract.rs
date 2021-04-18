@@ -478,6 +478,46 @@ impl Polytope for Abstract {
         self.reverse();
     }
 
+    /// "Appends" a polytope into another, creating a compound polytope. Fails
+    /// if the polytopes have different ranks.
+    fn append(&mut self, p: Self) -> Result<(), ()> {
+        let rank = self.rank();
+
+        // The polytopes must have the same ranks.
+        if rank != p.rank() {
+            return Err(());
+        }
+
+        let el_counts = self.el_counts();
+
+        for (r, elements) in p.into_iter().rank_enumerate() {
+            if r == -1 || r == rank {
+                continue;
+            }
+
+            let sub_offset = el_counts[r - 1];
+            let sup_offset = el_counts[r + 1];
+
+            for mut el in elements.into_iter() {
+                if r != 0 {
+                    for sub in el.subs.iter_mut() {
+                        *sub += sub_offset;
+                    }
+                }
+
+                if r != rank - 1 {
+                    for sup in el.sups.iter_mut() {
+                        *sup += sup_offset;
+                    }
+                }
+
+                self.push_at(r, el);
+            }
+        }
+
+        Ok(())
+    }
+
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.
     fn duopyramid(p: &Self, q: &Self) -> Self {
@@ -561,5 +601,15 @@ impl std::ops::Index<isize> for Abstract {
 impl std::ops::IndexMut<isize> for Abstract {
     fn index_mut(&mut self, index: isize) -> &mut Self::Output {
         &mut self.0[index]
+    }
+}
+
+impl IntoIterator for Abstract {
+    type Item = ElementList;
+
+    type IntoIter = crate::polytope::rank::IntoIter<ElementList>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }

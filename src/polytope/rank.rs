@@ -75,9 +75,32 @@ impl<T> std::ops::IndexMut<isize> for RankVec<T> {
 impl<T> IntoIterator for RankVec<T> {
     type Item = T;
 
-    type IntoIter = std::vec::IntoIter<T>;
+    type IntoIter = IntoIter<T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        IntoIter(self.0.into_iter())
+    }
+}
+
+pub struct IntoIter<T>(std::vec::IntoIter<T>);
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
+impl<T> IntoIter<T> {
+    /// Wraps around the usual `enumerate` method, offsetting the first entry by
+    /// 1.
+    pub fn rank_enumerate(
+        self,
+    ) -> std::iter::Map<
+        std::iter::Enumerate<std::vec::IntoIter<T>>,
+        impl FnMut((usize, T)) -> (isize, T),
+    > {
+        self.0.enumerate().map(|(idx, t)| (idx as isize - 1, t))
     }
 }

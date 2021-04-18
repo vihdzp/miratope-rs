@@ -69,6 +69,32 @@ pub trait Polytope: Sized + Clone {
     /// Builds the dual of a polytope in place.
     fn dual_mut(&mut self) -> Self::DualMut;
 
+    /// "Appends" a polytope into another, creating a compound polytope. Fails
+    /// if the polytopes have different ranks.
+    fn append(&mut self, p: Self) -> Result<(), ()>;
+
+    /// Builds a compound polytope from a set of components.
+    fn compound(components: Vec<Self>) -> Option<Self> {
+        Self::compound_iter(components.into_iter())
+    }
+
+    /// Builds a compound polytope from an iterator over components.
+    fn compound_iter<T: Iterator<Item = Self>>(mut components: T) -> Option<Self> {
+        Some(if let Some(p) = components.next() {
+            let mut p = p.clone();
+
+            for q in components {
+                if p.append(q).is_err() {
+                    return None;
+                }
+            }
+
+            p
+        } else {
+            Self::nullitope()
+        })
+    }
+
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.
     fn duopyramid(p: &Self, q: &Self) -> Self;
@@ -130,53 +156,66 @@ pub trait Polytope: Sized + Clone {
     /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// of a set of polytopes.
     fn multipyramid(factors: &[&Self]) -> Self {
-        Self::multipyramid_iter(factors.iter().map(|&p| p.clone()))
+        Self::multipyramid_iter(factors.iter().copied())
     }
 
     /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// of an iterator over polytopes.
-    fn multipyramid_iter<T: Iterator<Item = Self>>(factors: T) -> Self {
-        factors.fold(Self::nullitope(), |p, q| Self::duopyramid(&p, &q))
+    fn multipyramid_iter<'a, T: Iterator<Item = &'a Self>>(factors: T) -> Self
+    where
+        Self: 'a,
+    {
+        factors.fold(Self::nullitope(), |p, q| Self::duopyramid(&p, q))
     }
 
     /// Takes the [prism product](https://polytope.miraheze.org/wiki/Prism_product)
     /// of a set of polytopes.
     fn multiprism(factors: &[&Self]) -> Self {
-        Self::multiprism_iter(factors.iter().map(|&p| p.clone()))
+        Self::multiprism_iter(factors.iter().copied())
     }
 
     /// Takes the [prism product](https://polytope.miraheze.org/wiki/Prism_product)
     /// of an iterator over polytopes.
-    fn multiprism_iter<T: Iterator<Item = Self>>(factors: T) -> Self {
-        factors.fold(Self::point(), |p, q| Self::duoprism(&p, &q))
+    fn multiprism_iter<'a, T: Iterator<Item = &'a Self>>(factors: T) -> Self
+    where
+        Self: 'a,
+    {
+        factors.fold(Self::point(), |p, q| Self::duoprism(&p, q))
     }
 
     /// Takes the [tegum product](https://polytope.miraheze.org/wiki/Tegum_product)
     /// of a set of polytopes.
     fn multitegum(factors: &[&Self]) -> Self {
-        Self::multitegum_iter(factors.iter().map(|&p| p.clone()))
+        Self::multitegum_iter(factors.iter().copied())
     }
 
     /// Takes the [tegum product](https://polytope.miraheze.org/wiki/Tegum_product)
     /// of an iterator over polytopes.
-    fn multitegum_iter<T: Iterator<Item = Self>>(factors: T) -> Self {
-        factors.fold(Self::point(), |p, q| Self::duotegum(&p, &q))
+    fn multitegum_iter<'a, T: Iterator<Item = &'a Self>>(factors: T) -> Self
+    where
+        Self: 'a,
+    {
+        factors.fold(Self::point(), |p, q| Self::duotegum(&p, q))
     }
 
     /// Takes the [comb product](https://polytope.miraheze.org/wiki/Comb_product)
     /// of a set of polytopes.
     fn multicomb(factors: &[&Self]) -> Self {
-        Self::multicomb_iter(factors.iter().map(|&p| p.clone()))
+        Self::multicomb_iter(factors.iter().copied())
     }
 
     /// Takes the [comb product](https://polytope.miraheze.org/wiki/Comb_product)
     /// of an iterator over polytopes.
-    fn multicomb_iter<T: Iterator<Item = Self>>(mut factors: T) -> Self {
+    fn multicomb_iter<'a, T: Iterator<Item = &'a Self>>(mut factors: T) -> Self
+    where
+        Self: 'a,
+    {
         let init = factors
             .next()
-            .expect("You can't take an empty comb product.");
+            .expect("You can't take an empty comb product.")
+            .clone();
 
-        factors.fold(init, |p, q| Self::duocomb(&p, &q))
+        factors.fold(init, |p, q| Self::duocomb(&p, q))
     }
 
     /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
