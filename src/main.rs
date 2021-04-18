@@ -145,7 +145,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::star_polygon(5, 2);
+    let p = Concrete::star_polygon(15, 6);
     let poly = Renderable::new(p);
 
     pipelines.set_untracked(

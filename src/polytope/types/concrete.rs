@@ -52,38 +52,43 @@ impl Concrete {
         Some(self.vertices.get(0)?.len())
     }
 
+    /// Builds the Grünbaumian star polygon `{n / d}`, rotated by an angle.
     fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: f64) -> Self {
         assert!(n >= 2);
         assert!(d >= 1);
 
         // Scaling factor for unit edge length.
-        let r = (2.0 - 2.0 * (TAU / n as f64).cos()).sqrt();
-        let a = TAU * d as f64 / n as f64;
+        let angle = TAU * d as f64 / n as f64;
+        let radius = (2.0 - 2.0 * angle.cos()).sqrt();
 
         Self::new(
             (0..n)
                 .into_iter()
                 .map(|k| {
-                    let (s, c) = (k as f64 * a + rot).sin_cos();
-                    vec![s / r, c / r].into()
+                    let (sin, cos) = (k as f64 * angle + rot).sin_cos();
+                    vec![sin / radius, cos / radius].into()
                 })
                 .collect(),
             Abstract::polygon(n),
         )
     }
 
+    /// Builds the Grünbaumian star polygon `{n / d}`. If `n` and `d` have a
+    /// common factor, the result is a multiply-wound polygon.
     pub fn grunbaum_star_polygon(n: usize, d: usize) -> Self {
         Self::grunbaum_star_polygon_with_rot(n, d, 0.0)
     }
 
+    /// Builds the star polygon `{n / d}`. If `n` and `d` have a common factor,
+    /// the result is a compound.
     pub fn star_polygon(n: usize, d: usize) -> Self {
-        let g = n.gcd(d);
-        let a = TAU / n as f64;
+        let gcd = n.gcd(d);
+        let angle = TAU / n as f64;
 
         Self::compound_iter(
-            (0..g)
+            (0..gcd)
                 .into_iter()
-                .map(|k| Self::grunbaum_star_polygon_with_rot(n / g, d / g, k as f64 * a)),
+                .map(|k| Self::grunbaum_star_polygon_with_rot(n / gcd, d / gcd, k as f64 * angle)),
         )
         .unwrap()
     }
