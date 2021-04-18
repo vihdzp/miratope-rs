@@ -7,6 +7,7 @@ use crate::{
     EPS,
 };
 use approx::{abs_diff_eq, abs_diff_ne};
+use gcd::Gcd;
 use std::{
     collections::HashMap,
     f64::consts::{SQRT_2, TAU},
@@ -49,6 +50,42 @@ impl Concrete {
     /// or `None` in the case of the nullitope.
     pub fn dim(&self) -> Option<usize> {
         Some(self.vertices.get(0)?.len())
+    }
+
+    fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: f64) -> Self {
+        assert!(n >= 2);
+        assert!(d >= 1);
+
+        // Scaling factor for unit edge length.
+        let r = (2.0 - 2.0 * (TAU / n as f64).cos()).sqrt();
+        let a = TAU * d as f64 / n as f64;
+
+        Self::new(
+            (0..n)
+                .into_iter()
+                .map(|k| {
+                    let (s, c) = (k as f64 * a + rot).sin_cos();
+                    vec![s / r, c / r].into()
+                })
+                .collect(),
+            Abstract::polygon(n),
+        )
+    }
+
+    pub fn grunbaum_star_polygon(n: usize, d: usize) -> Self {
+        Self::grunbaum_star_polygon_with_rot(n, d, 0.0)
+    }
+
+    pub fn star_polygon(n: usize, d: usize) -> Self {
+        let g = n.gcd(d);
+        let a = TAU / n as f64;
+
+        Self::compound_iter(
+            (0..g)
+                .into_iter()
+                .map(|k| Self::grunbaum_star_polygon_with_rot(n / g, d / g, k as f64 * a)),
+        )
+        .unwrap()
     }
 
     /// Scales a polytope by a given factor.
@@ -482,19 +519,7 @@ impl Polytope for Concrete {
 
     /// Builds a convex regular polygon with `n` sides and unit edge length.
     fn polygon(n: usize) -> Self {
-        // Scaling factor for unit edge length.
-        let r = (2.0 - 2.0 * (TAU / n as f64).cos()).sqrt();
-
-        Self::new(
-            (0..n)
-                .into_iter()
-                .map(|k| {
-                    let (s, c) = (TAU * k as f64 / n as f64).sin_cos();
-                    vec![s / r, c / r].into()
-                })
-                .collect(),
-            Abstract::polygon(n),
-        )
+        Self::grunbaum_star_polygon(n, 1)
     }
 
     /// Returns the dual of a polytope, or `None` if any facets pass through the
@@ -516,6 +541,8 @@ impl Polytope for Concrete {
         self.dual_mut_with_sphere(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
+    /// "Appends" a polytope into another, creating a compound polytope. Fails
+    /// if the polytopes have different ranks.
     fn append(&mut self, mut p: Self) -> Result<(), ()> {
         if self.abs.append(p.abs).is_err() {
             return Err(());

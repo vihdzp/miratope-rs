@@ -145,9 +145,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let mut p = Concrete::hypercube(3);
-    let q = Concrete::orthoplex(3);
-    p.append(q).unwrap();
+    let p = Concrete::star_polygon(5, 2);
     let poly = Renderable::new(p);
 
     pipelines.set_untracked(

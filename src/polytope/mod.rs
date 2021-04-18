@@ -16,7 +16,6 @@ pub mod geometry;
 pub mod group;
 pub mod off;
 pub mod rank;
-pub mod shapes;
 pub mod types;
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
@@ -80,9 +79,7 @@ pub trait Polytope: Sized + Clone {
 
     /// Builds a compound polytope from an iterator over components.
     fn compound_iter<T: Iterator<Item = Self>>(mut components: T) -> Option<Self> {
-        Some(if let Some(p) = components.next() {
-            let mut p = p.clone();
-
+        Some(if let Some(mut p) = components.next() {
             for q in components {
                 if p.append(q).is_err() {
                     return None;
