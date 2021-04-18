@@ -231,9 +231,17 @@ fn setup(
     );
     */
 
+
+
+
+/*
     let poly = off::from_path(&"OFF FILE PATH GOES HERE").unwrap();
 
     println!("{}", &poly.to_src(off::OffOptions{comments: true,}));
+*/
+
+
+
 
     // Creates OFFBuilder code for a polytope.
     /*
