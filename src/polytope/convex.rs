@@ -229,7 +229,7 @@ fn is_sorted(el: &[usize]) -> bool {
 /// Finds the common elements of two arrays.
 /// # Assumptions:
 /// * Both arrays must be sorted in increasing order.
-fn common(el0: &[usize], el1: &[usize]) -> Vec<usize> {
+fn common(el0: &[usize], el1: &[usize]) -> Subelements {
     // Nightly Rust has el.is_sorted().
     debug_assert!(is_sorted(el0));
     debug_assert!(is_sorted(el1));
@@ -253,7 +253,7 @@ fn common(el0: &[usize], el1: &[usize]) -> Vec<usize> {
         }
     }
 
-    common
+    Subelements(common)
 }
 
 /// Checks whether a given vertex set actually generates a valid d-polytope.
@@ -290,7 +290,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
 
     // Initializes the abstract polytope.
     let mut abs = Abstract::with_capacity(dim as isize);
-    abs.push_min();
+    abs.push_single();
     for _ in 0..(dim as isize) {
         abs.push_subs(ElementList::new());
     }
@@ -345,10 +345,10 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
         }
 
         els_verts = ElementList::new();
-        els_verts.resize(subs_map.len(), Element::from_subs(Subelements::new()));
+        els_verts.resize(subs_map.len(), Element::new());
 
         for (subs, idx) in subs_map {
-            els_verts[idx] = Element::from_subs(Subelements(subs));
+            els_verts[idx] = Element::from_subs(subs);
         }
 
         abs[r] = els_subs;
@@ -382,8 +382,6 @@ fn perturb(v: &Point) -> Point {
 
 /// Builds the convex hull of a set of vertices. Uses the gift wrapping algorithm.
 pub fn convex_hull(mut vertices: Vec<Point>) -> Concrete {
-    println!("Start!");
-
     let mut facets = HashSet::new();
     let mut ridges = BTreeSet::new();
 
@@ -392,8 +390,6 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Concrete {
 
     // Perturbs each point randomly.
     let vertices_pert = vertices.iter().map(&perturb).collect::<Vec<_>>();
-
-    println!("Perturbed!");
 
     // While there's still a ridge we need to check...
     while let Some(old_ridge) = ridges.pop_first() {
@@ -425,7 +421,6 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Concrete {
         facets.insert(facet);
     }
 
-    println!("Last step!");
     get_polytope_from_facets(vertices, ElementList(facets.into_iter().collect()))
 }
 

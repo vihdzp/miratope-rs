@@ -193,16 +193,19 @@ pub trait Polytope: Sized + Clone {
 pub struct Subelements(pub Vec<usize>);
 
 impl Subelements {
+    /// Constructs a new, empty subelement list.
     pub fn new() -> Self {
         Self(Vec::new())
     }
 
-    /// Constructs a new, empty `RankVec<T>` with the capacity to store elements
-    /// up to the specified rank.
+    /// Constructs a new, empty subelement list with the capacity to store
+    /// elements up to the specified rank.
     fn with_capacity(rank: usize) -> Self {
         Self(Vec::with_capacity(rank))
     }
 
+    /// Constructs a subelement list consisting of the indices from `0` to
+    /// `count`.
     pub fn count(count: usize) -> Self {
         let mut vec = Vec::new();
 
@@ -219,14 +222,19 @@ impl Subelements {
 pub struct Superelements(pub Vec<usize>);
 
 impl Superelements {
+    /// Constructs a new, empty subelement list.
     pub fn new() -> Self {
         Self(Vec::new())
     }
 
+    /// Constructs a new, empty superelement list with the capacity to store
+    /// elements up to the specified rank.
     pub fn with_capacity(capacity: usize) -> Self {
         Self(Vec::with_capacity(capacity))
     }
 
+    /// Constructs a superelement list consisting of the indices from `0` to
+    /// `count`.
     pub fn count(count: usize) -> Self {
         let mut vec = Vec::new();
 
@@ -255,7 +263,7 @@ impl Element {
         }
     }
 
-    /// Builds a minimal element for a polytope.
+    /// Builds a minimal element adjacent to a given amount of vertices.
     pub fn min(vertex_count: usize) -> Self {
         Self {
             subs: Subelements::new(),
@@ -265,25 +273,22 @@ impl Element {
 
     /// Builds a maximal element adjacent to a given number of facets.
     pub fn max(facet_count: usize) -> Self {
-        let mut subs = Subelements::with_capacity(facet_count);
-
-        for i in 0..facet_count {
-            subs.push(i);
+        Self {
+            subs: Subelements::count(facet_count),
+            sups: Superelements::new(),
         }
+    }
 
+    /// Builds an element from a given set of subelements and an empty
+    /// superelement list.
+    pub fn from_subs(subs: Subelements) -> Self {
         Self {
             subs,
             sups: Superelements::new(),
         }
     }
 
-    pub fn from_subs(subs: Subelements) -> Self {
-        Self {
-            subs,
-            sups: Superelements(Vec::new()),
-        }
-    }
-
+    /// Swaps the subelements and superelements of the element.
     pub fn swap_mut(&mut self) {
         std::mem::swap(&mut self.subs.0, &mut self.sups.0)
     }
@@ -305,9 +310,9 @@ impl ElementList {
         ElementList(Vec::with_capacity(capacity))
     }
 
-    /// Returns an empty element list. Often used as the element list for the
-    /// nullitopes when a polytope is built in layers.
-    pub fn empty() -> Self {
+    /// Returns an element list with a single, empty element. Often used as the
+    /// element list for the nullitopes when a polytope is built in layers.
+    pub fn single() -> Self {
         Self(vec![Element::new()])
     }
 
@@ -336,6 +341,17 @@ impl ElementList {
     }
 }
 
+impl IntoIterator for ElementList {
+    type Item = Element;
+
+    type IntoIter = std::vec::IntoIter<Element>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+// Maybe move these tests to the individual files?
 #[cfg(test)]
 mod tests {
     use super::*;

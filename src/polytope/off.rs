@@ -163,7 +163,7 @@ fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> Ele
     // Adds every d-element to the element list.
     for _ in 0..num_el {
         let el_sub_num = next_tok(toks);
-        let mut subs = Vec::with_capacity(el_sub_num);
+        let mut subs = Subelements::with_capacity(el_sub_num);
 
         // Reads all sub-elements of the d-element.
         for _ in 0..el_sub_num {
@@ -171,7 +171,7 @@ fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> Ele
             subs.push(el_sub.parse().expect("Integer parsing failed!"));
         }
 
-        els_subs.push(Element::from_subs(Subelements(subs)));
+        els_subs.push(Element::from_subs(subs));
     }
 
     els_subs
@@ -206,7 +206,7 @@ pub fn from_src(src: String) -> Concrete {
     let mut abs = Abstract::with_capacity(rank);
 
     // Adds nullitope and vertices.
-    abs.push_min();
+    abs.push_single();
     abs.push_vertices(vertices.len());
 
     // Reads edges and faces.

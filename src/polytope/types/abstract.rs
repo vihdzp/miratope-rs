@@ -17,7 +17,7 @@ use crate::polytope::{rank::RankVec, Element, ElementList, Polytope, Subelements
 /// Instead of manually having to set the superelements in the polytope, one can
 /// instead provide an [`ElementList`] whose elements have their superelements
 /// set to empty vectors. This method will automatically set the superelements
-/// of the subelements of the previous rank.
+/// of the elements of the previous rank.
 #[derive(Debug, Clone, Deref, DerefMut)]
 pub struct Abstract(RankVec<ElementList>);
 
@@ -56,7 +56,7 @@ impl Abstract {
 
         if let Some(lower_rank) = self.get_mut(rank - 1) {
             // Updates superelements of the lower rank.
-            for &sub in &el.subs.0 {
+            for &sub in el.subs.iter() {
                 lower_rank[sub].sups.push(i);
             }
         }
@@ -75,21 +75,22 @@ impl Abstract {
             }
         }
 
-        self.0.push(ElementList::with_capacity(elements.len()));
+        self.push(ElementList::with_capacity(elements.len()));
         let rank = self.rank();
 
-        for el in elements.0.into_iter() {
+        for el in elements.into_iter() {
             self.push_at(rank, el);
         }
     }
 
-    /// Pushes a minimal element with no superelements into the polytope. To be
-    /// used in circumstances where the elements are built up in layers.
-    pub fn push_min(&mut self) {
+    /// Pushes an element list with a single empty element into the polytope. To
+    /// be used in circumstances where the elements are built up in layers, as
+    /// the base element.
+    pub fn push_single(&mut self) {
         // If you're using this method, the polytope should be empty.
         debug_assert!(self.is_empty());
 
-        self.push_subs(ElementList::min(0));
+        self.push_subs(ElementList::single());
     }
 
     /// Pushes a minimal element with no superelements into the polytope. To be
@@ -142,7 +143,7 @@ impl Abstract {
             let mut hash_subs = HashSet::new();
 
             for idx in indices {
-                for &sub in &self[r][idx].subs.0 {
+                for &sub in self[r][idx].subs.iter() {
                     hash_subs.insert(sub);
                 }
             }
@@ -221,10 +222,10 @@ impl Abstract {
             for el in self[r].iter() {
                 let mut hash_sub_subs = HashMap::new();
 
-                for &sub in &el.subs.0 {
+                for &sub in el.subs.iter() {
                     let sub_el = &self[r - 1][sub];
 
-                    for &sub_sub in &sub_el.subs.0 {
+                    for &sub_sub in sub_el.subs.iter() {
                         match hash_sub_subs.get(&sub_sub) {
                             // Found for the first time.
                             None => hash_sub_subs.insert(sub_sub, Count::Once),
@@ -346,23 +347,23 @@ impl Abstract {
                 // with every element in q with rank q_els_rank.
                 for (p_idx, p_el) in p[p_els_rank].iter().enumerate() {
                     for (q_idx, q_el) in q[q_els_rank].iter().enumerate() {
-                        let mut subs = Vec::new();
+                        let mut subs = Subelements::new();
 
                         // Products of p's subelements with q.
                         if p_els_rank != 0 || min {
-                            for &s in &p_el.subs.0 {
+                            for &s in p_el.subs.iter() {
                                 subs.push(get_element_index(p_els_rank - 1, s, q_els_rank, q_idx))
                             }
                         }
 
                         // Products of q's subelements with p.
                         if q_els_rank != 0 || min {
-                            for &s in &q_el.subs.0 {
+                            for &s in q_el.subs.iter() {
                                 subs.push(get_element_index(p_els_rank, p_idx, q_els_rank - 1, s))
                             }
                         }
 
-                        element_lists[prod_rank].push(Element::from_subs(Subelements(subs)))
+                        element_lists[prod_rank].push(Element::from_subs(subs))
                     }
                 }
             }
@@ -371,7 +372,7 @@ impl Abstract {
         // If !min, we have to set a minimal element manually.
         if !min {
             let vertex_count = p.el_count(0) * q.el_count(0);
-            element_lists[-1] = ElementList::empty();
+            element_lists[-1] = ElementList::single();
             element_lists[0] = ElementList::vertices(vertex_count);
         }
 
@@ -383,7 +384,7 @@ impl Abstract {
         // Uses push_subs to add all of the element lists into a new polytope.
         let mut product = Self::with_capacity(element_lists.rank());
 
-        for elements in element_lists.0.into_iter() {
+        for elements in element_lists.into_iter() {
             product.push_subs(elements);
         }
 
@@ -400,7 +401,7 @@ impl Polytope for Abstract {
     /// Gets the number of elements of a given rank.
     fn el_count(&self, rank: isize) -> usize {
         if let Some(els) = self.get(rank) {
-            els.0.len()
+            els.len()
         } else {
             0
         }
@@ -430,24 +431,24 @@ impl Polytope for Abstract {
     /// Returns the unique polytope of rank 1.
     fn dyad() -> Self {
         let mut abs = Abstract::with_capacity(1);
+
         abs.push(ElementList::min(2));
         abs.push(ElementList::vertices(2));
         abs.push_subs(ElementList::max(2));
+
         abs
     }
 
     /// Returns the unique polytope of rank 2 with a given amount of vertices.
     fn polygon(n: usize) -> Self {
-        assert!(n >= 2);
+        assert!(n >= 2, "A polygon must have at least 2 sides.");
 
         let nullitope = ElementList::min(n);
-        let mut vertices = ElementList::with_capacity(n);
+        let vertices = ElementList::vertices(n);
         let mut edges = ElementList::with_capacity(n);
         let maximal = ElementList::max(n);
 
         for i in 0..n {
-            vertices.push(Element::from_subs(Subelements(vec![0])));
-
             edges.push(Element::from_subs(Subelements(vec![i % n, (i + 1) % n])));
         }
 

@@ -439,7 +439,7 @@ impl Concrete {
             let mut new_els = ElementList::new();
 
             for (idx, el) in self[r].iter().enumerate() {
-                let mut new_subs = Vec::new();
+                let mut new_subs = Subelements::new();
                 for sub in el.subs.iter() {
                     if let Some(&v) = hash_element.get(sub) {
                         new_subs.push(v);
@@ -449,7 +449,7 @@ impl Concrete {
                 // If we got ourselves a new edge:
                 if !new_subs.is_empty() {
                     new_hash_element.insert(idx, new_els.len());
-                    new_els.push(Element::from_subs(Subelements(new_subs)));
+                    new_els.push(Element::from_subs(new_subs));
                 }
             }
 
