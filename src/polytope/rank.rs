@@ -11,7 +11,7 @@ impl<T> RankVec<T> {
         RankVec(Vec::new())
     }
 
-    /// Constructs a new, empty `RankVec<T>` with the specified capacity.
+    /// Constructs a new, empty `RankVec<T>` with the capacity.
     pub fn with_capacity(rank: isize) -> Self {
         RankVec(Vec::with_capacity((rank + 2) as usize))
     }

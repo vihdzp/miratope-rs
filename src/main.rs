@@ -180,13 +180,13 @@ fn ui(
                 // println!("{}", &p.concrete.to_src(off::OffOptions { comments: true }));
             }
         }
-        // Converts the active polytope into any of its verfs.
-        if ui.button("Verf").clicked() {
+        // Converts the active polytope into any of its facets.
+        if ui.button("Facet").clicked() {
             for mut p in query.iter_mut() {
-                println!("Verf");
+                println!("Facet");
 
-                if let Some(verf) = p.concrete.verf(0) {
-                    *p = Renderable::new(verf);
+                if let Some(facet) = p.concrete.facet(0) {
+                    *p = Renderable::new(facet);
                 };
             }
         }
@@ -214,9 +214,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let mut p = Concrete::hypercube(3);
-    let q = Concrete::orthoplex(3);
-    p.append(q).unwrap();
+    let p = Concrete::hypercube(4).element(3, 0).unwrap();
     let poly = Renderable::new(p);
 
     pipelines.set_untracked(

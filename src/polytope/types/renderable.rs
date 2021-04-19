@@ -1,7 +1,7 @@
 use bevy::prelude::Mesh;
 use bevy::render::{mesh::Indices, pipeline::PrimitiveTopology};
 
-use crate::polytope::{geometry::Point, Concrete};
+use crate::polytope::{geometry::Point, Concrete, ElementList};
 
 /// A [`Concrete`], together with a triangulation used to render it.
 #[derive(Debug, Clone)]
@@ -20,8 +20,9 @@ impl Renderable {
     /// Generates the triangulation of a `Concrete`.
     pub fn new(concrete: Concrete) -> Self {
         // let vertices = &concrete.vertices;
-        let edges = concrete.abs.get(1).unwrap();
-        let faces = concrete.abs.get(2).unwrap();
+        let empty_els = ElementList::new();
+        let edges = concrete.abs.get(1).unwrap_or(&empty_els);
+        let faces = concrete.abs.get(2).unwrap_or(&empty_els);
 
         let extra_vertices = Vec::new();
         let mut triangles = Vec::new();
@@ -119,7 +120,8 @@ impl Renderable {
 
     /// Generates the wireframe for a polytope.
     pub fn get_wireframe(&self) -> Mesh {
-        let edges = self.concrete.abs.get(1).unwrap();
+        let empty_els = ElementList::new();
+        let edges = self.concrete.abs.get(1).unwrap_or(&empty_els);
         let vertices = self.get_vertex_coords();
         let mut indices = Vec::with_capacity(edges.len() * 2);
         for edge in edges.iter() {

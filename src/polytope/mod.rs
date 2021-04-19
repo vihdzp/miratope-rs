@@ -72,6 +72,26 @@ pub trait Polytope: Sized + Clone {
     /// if the polytopes have different ranks.
     fn append(&mut self, p: Self) -> Result<(), ()>;
 
+    /// Gets the element with a given rank and index as a polytope.
+    fn element(&self, rank: isize, idx: usize) -> Option<Self>;
+
+    /// Gets the element figure with a given rank and index as a polytope.
+    fn element_fig(&self, rank: isize, idx: usize) -> Option<Self>;
+
+    /// Gets the section defined by two elements with given ranks and indices as
+    /// a polytope, or returns `None` in case no section is defined by these
+    /// elements.
+    fn section(&self, rank_lo: isize, idx_lo: usize, rank_hi: isize, idx_hi: usize)
+        -> Option<Self>;
+
+    fn facet(&self, idx: usize) -> Option<Self> {
+        self.element(self.rank() - 1, idx)
+    }
+
+    fn verf(&self, idx: usize) -> Option<Self> {
+        self.element_fig(0, idx)
+    }
+
     /// Builds a compound polytope from a set of components.
     fn compound(components: Vec<Self>) -> Option<Self> {
         Self::compound_iter(components.into_iter())
@@ -242,31 +262,39 @@ pub trait Polytope: Sized + Clone {
     }
 }
 
-/// The indices of the subelements of a polytope.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Deref, DerefMut)]
-pub struct Subelements(pub Vec<usize>);
+trait Subsupelements: Sized {
+    fn from_vec(vec: Vec<usize>) -> Self;
 
-impl Subelements {
-    /// Constructs a new, empty subelement list.
-    pub fn new() -> Self {
-        Self(Vec::new())
+    /// Constructs a new, empty subelement or superelement list.
+    fn new() -> Self {
+        Self::from_vec(Vec::new())
     }
 
     /// Constructs a new, empty subelement list with the capacity to store
     /// elements up to the specified rank.
     fn with_capacity(rank: usize) -> Self {
-        Self(Vec::with_capacity(rank))
+        Self::from_vec(Vec::with_capacity(rank))
     }
 
     /// Constructs a subelement list consisting of the indices from `0` to
     /// `count`.
-    pub fn count(count: usize) -> Self {
+    fn count(count: usize) -> Self {
         let mut vec = Vec::new();
 
         for i in 0..count {
             vec.push(i);
         }
 
+        Self::from_vec(vec)
+    }
+}
+
+/// The indices of the subelements of a polytope.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Deref, DerefMut)]
+pub struct Subelements(pub Vec<usize>);
+
+impl Subsupelements for Subelements {
+    fn from_vec(vec: Vec<usize>) -> Self {
         Self(vec)
     }
 }
@@ -275,27 +303,8 @@ impl Subelements {
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Deref, DerefMut)]
 pub struct Superelements(pub Vec<usize>);
 
-impl Superelements {
-    /// Constructs a new, empty subelement list.
-    pub fn new() -> Self {
-        Self(Vec::new())
-    }
-
-    /// Constructs a new, empty superelement list with the capacity to store
-    /// elements up to the specified rank.
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self(Vec::with_capacity(capacity))
-    }
-
-    /// Constructs a superelement list consisting of the indices from `0` to
-    /// `count`.
-    pub fn count(count: usize) -> Self {
-        let mut vec = Vec::new();
-
-        for i in 0..count {
-            vec.push(i);
-        }
-
+impl Subsupelements for Superelements {
+    fn from_vec(vec: Vec<usize>) -> Self {
         Self(vec)
     }
 }

@@ -2,7 +2,7 @@ use crate::{
     polytope::{
         geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace, Vector},
         rank::RankVec,
-        Abstract, Element, ElementList, Polytope, Subelements,
+        Abstract, Element, ElementList, Polytope, Subelements, Subsupelements,
     },
     EPS,
 };
@@ -323,20 +323,6 @@ impl Concrete {
         )
     }
 
-    /// Gets an element of a polytope, as its own polytope.
-    pub fn element(&self, rank: isize, idx: usize) -> Option<Self> {
-        Some(Self::new(
-            self.element_vertices(rank, idx)?,
-            self.abs.element(rank, idx)?,
-        ))
-    }
-
-    /// Gets the [vertex figure](https://polytope.miraheze.org/wiki/Vertex_figure)
-    /// of a polytope corresponding to a given vertex.
-    pub fn verf(&self, idx: usize) -> Option<Self> {
-        self.dual()?.element(self.rank() - 1, idx)?.dual()
-    }
-
     /// Generates the vertices for either a tegum or a pyramid product with two
     /// given vertex sets and a given height.
     fn duopyramid_vertices(p: &[Point], q: &[Point], height: f64, tegum: bool) -> Vec<Point> {
@@ -555,6 +541,32 @@ impl Polytope for Concrete {
 
         self.vertices.append(&mut p.vertices);
         Ok(())
+    }
+
+    fn element(&self, rank: isize, idx: usize) -> Option<Self> {
+        let (vertices, abs) = self.abs.element_and_vertices(rank, idx)?;
+
+        Some(Self::new(
+            vertices
+                .into_iter()
+                .map(|idx| self.vertices[idx].clone())
+                .collect(),
+            abs,
+        ))
+    }
+
+    fn element_fig(&self, _rank: isize, _idx: usize) -> Option<Self> {
+        todo!()
+    }
+
+    fn section(
+        &self,
+        rank_lo: isize,
+        idx_lo: usize,
+        rank_hi: isize,
+        idx_hi: usize,
+    ) -> Option<Self> {
+        self.element(rank_hi, idx_hi)?.element_fig(rank_lo, idx_lo)
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)

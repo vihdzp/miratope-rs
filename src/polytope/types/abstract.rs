@@ -1,7 +1,9 @@
 use derive_deref::{Deref, DerefMut};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
-use crate::polytope::{rank::RankVec, Element, ElementList, Polytope, Subelements};
+use crate::polytope::{rank::RankVec, Element, ElementList, Polytope, Subelements, Subsupelements};
+
+type ElementHash = RankVec<HashMap<usize, usize>>;
 
 /// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
 /// to an [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
@@ -111,46 +113,120 @@ impl Abstract {
         self.push_subs(ElementList::max(facet_count));
     }
 
-    /// Gets the indices of the vertices of a given element in a polytope.
-    pub fn element_vertices(&self, rank: isize, idx: usize) -> Option<Vec<usize>> {
-        // A nullitope doesn't have vertices.
-        if rank == -1 {
-            return None;
-        }
+    fn get_element(&self, rank: isize, idx: usize) -> Option<&Element> {
+        self.0.get(rank)?.get(idx)
+    }
 
-        let mut indices = vec![idx];
+    /// Returns an [`ElementHash`], used as an auxiliary data structure for
+    /// operations involving elements.
+    ///
+    /// As a byproduct of calculating either the vertices or the entire polytope
+    /// corresponding to a given element, we generate a map from ranks and
+    /// indices in the original polytope to ranks and indices in the element.
+    /// This function returns such a map, encoded as a vector of hash maps.
+    ///
+    /// If the element doesn't exist, we return `None`.
+    fn element_hash(&self, rank: isize, idx: usize) -> Option<ElementHash> {
+        self.get_element(rank, idx)?;
+
+        // A vector of HashMaps. The k-th entry is a map from k-elements of the
+        // original polytope into k-elements in a new polytope.
+        let mut hashes = RankVec::with_capacity(rank);
+        for _ in -1..=rank {
+            hashes.push(HashMap::new());
+        }
+        hashes[rank].insert(idx, 0);
 
         // Gets subindices of subindices, until reaching the vertices.
-        for r in (1..=rank).rev() {
-            let mut hash_subs = HashSet::new();
+        for r in (0..=rank).rev() {
+            let (left_slice, right_slice) = hashes.split_at_mut(r);
+            let prev_hash = left_slice.last_mut().unwrap();
+            let hash = right_slice.first().unwrap();
 
-            for idx in indices {
-                for &sub in self[r][idx].subs.iter() {
-                    hash_subs.insert(sub);
+            for (&idx, _) in hash.iter() {
+                for &sub in self[r as isize][idx].subs.iter() {
+                    let len = prev_hash.len();
+                    if !prev_hash.contains_key(&sub) {
+                        prev_hash.insert(sub, len);
+                    }
                 }
             }
-
-            indices = hash_subs.into_iter().collect();
         }
 
-        Some(indices)
+        Some(hashes)
     }
 
-    /// Gets the element with a given rank and index as a polytope.
-    pub fn element(&self, _rank: isize, _idx: usize) -> Option<Self> {
-        todo!()
+    /// Gets the indices of the vertices of a given element in a polytope.
+    fn vertices_from_element_hash(element_hash: &ElementHash) -> Vec<usize> {
+        if let Some(hash_vertices) = element_hash.get(0) {
+            let mut vertices = Vec::new();
+            vertices.resize(hash_vertices.len(), 0);
+
+            for (&sub, &idx) in hash_vertices {
+                vertices[idx] = sub;
+            }
+
+            vertices
+        } else {
+            Vec::new()
+        }
     }
 
-    pub fn section(
-        &self,
-        _rank_low: isize,
-        _idx_low: usize,
-        _rank_hi: isize,
-        _idx_hi: usize,
-    ) -> Self {
-        // assert incidence.
+    /// Gets the indices of the vertices of a given element in a polytope.
+    fn polytope_from_element_hash(&self, element_hash: &ElementHash) -> Self {
+        let rank = element_hash.rank();
+        let mut abs = Self::with_capacity(rank);
 
-        todo!()
+        for r in -1..=rank {
+            let mut elements = ElementList::new();
+            let hash = &element_hash[r];
+
+            for _ in 0..hash.len() {
+                elements.push(Element::new());
+            }
+
+            for (&idx, &new_idx) in hash {
+                let el = self.get_element(r, idx).unwrap();
+                let mut new_el = Element::new();
+
+                if let Some(prev_hash) = element_hash.get(r - 1) {
+                    for sub in el.subs.iter() {
+                        if let Some(&new_sub) = prev_hash.get(sub) {
+                            new_el.subs.push(new_sub);
+                        }
+                    }
+                }
+
+                if let Some(next_hash) = element_hash.get(r + 1) {
+                    for sup in el.sups.iter() {
+                        if let Some(&new_sup) = next_hash.get(sup) {
+                            new_el.sups.push(new_sup);
+                        }
+                    }
+                }
+
+                elements[new_idx] = new_el;
+            }
+
+            abs.push(elements);
+        }
+
+        abs
+    }
+
+    pub fn element_vertices(&self, rank: isize, idx: usize) -> Option<Vec<usize>> {
+        Some(Self::vertices_from_element_hash(
+            &self.element_hash(rank, idx)?,
+        ))
+    }
+
+    pub fn element_and_vertices(&self, rank: isize, idx: usize) -> Option<(Vec<usize>, Self)> {
+        let element_hash = self.element_hash(rank, idx)?;
+
+        Some((
+            Self::vertices_from_element_hash(&element_hash),
+            self.polytope_from_element_hash(&element_hash),
+        ))
     }
 
     /// Checks whether the polytope is bounded
@@ -516,6 +592,24 @@ impl Polytope for Abstract {
         }
 
         Ok(())
+    }
+
+    fn element(&self, rank: isize, idx: usize) -> Option<Self> {
+        Some(self.polytope_from_element_hash(&self.element_hash(rank, idx)?))
+    }
+
+    fn element_fig(&self, _rank: isize, _idx: usize) -> Option<Self> {
+        todo!()
+    }
+
+    fn section(
+        &self,
+        _rank_lo: isize,
+        _idx_lo: usize,
+        _rank_hi: isize,
+        _idx_hi: usize,
+    ) -> Option<Self> {
+        todo!()
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
