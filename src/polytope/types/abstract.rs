@@ -146,9 +146,7 @@ impl Abstract {
             for (&idx, _) in hash.iter() {
                 for &sub in self[r as isize][idx].subs.iter() {
                     let len = prev_hash.len();
-                    if !prev_hash.contains_key(&sub) {
-                        prev_hash.insert(sub, len);
-                    }
+                    prev_hash.entry(sub).or_insert(len);
                 }
             }
         }

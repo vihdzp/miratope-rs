@@ -103,20 +103,16 @@ impl Concrete {
     }
 
     /// Shifts all vertices by a given vector.
-    pub fn shift(mut self, o: Vector) -> Self {
+    pub fn shift(&mut self, o: Vector) {
         for v in &mut self.vertices {
             *v -= &o;
         }
-
-        self
     }
 
     /// Recenters a polytope so that the gravicenter is at the origin.
-    pub fn recenter(self) -> Self {
+    pub fn recenter(&mut self) {
         if let Some(gravicenter) = self.gravicenter() {
-            self.shift(gravicenter)
-        } else {
-            self
+            self.shift(gravicenter);
         }
     }
 
@@ -404,6 +400,18 @@ impl Concrete {
         )
     }
 
+    /// Projects the vertices of the polytope into the lowest dimension possible.
+    /// If the polytope's subspace is already of full rank, this is a no-op.
+    pub fn flatten(&mut self) {
+        let subspace = Subspace::from_points(&self.vertices);
+
+        if !subspace.is_full_rank() {
+            for v in self.vertices.iter_mut() {
+                *v = subspace.flatten(v);
+            }
+        }
+    }
+
     /// Takes the cross-section of a polytope through a given hyperplane.
     ///
     /// # Todo
@@ -670,7 +678,9 @@ impl Polytope for Concrete {
             let a = (1.0 - ((dim + 1) as f64).sqrt()) * SQRT_2 / (2.0 * dim as f64);
             vertices.push(vec![a; dim].into());
 
-            Concrete::new(vertices, Abstract::simplex(rank)).recenter()
+            let mut simplex = Concrete::new(vertices, Abstract::simplex(rank));
+            simplex.recenter();
+            simplex
         }
     }
 }

@@ -142,7 +142,8 @@ fn update_cross_section(
     for mut p in query.iter_mut() {
         let r = state.original_polytope.clone().unwrap();
         let mut hyp_pos = state.hyperplane_pos.into();
-        hyp_pos += 0.00001;
+        hyp_pos += 0.00001; // Botch fix for degeneracies.
+
         *p = Renderable::new(r.concrete.slice(Hyperplane::x(
             r.concrete.rank().try_into().unwrap(),
             hyp_pos,
@@ -180,26 +181,30 @@ fn ui(
                 // println!("{}", &p.concrete.to_src(off::OffOptions { comments: true }));
             }
         }
+
         // Converts the active polytope into any of its facets.
         if ui.button("Facet").clicked() {
             for mut p in query.iter_mut() {
                 println!("Facet");
 
-                if let Some(facet) = p.concrete.facet(0) {
+                if let Some(mut facet) = p.concrete.facet(0) {
+                    facet.flatten();
+                    facet.recenter();
                     *p = Renderable::new(facet);
                 };
             }
         }
+
         // Exports the active polytope as an OFF file (not yet functional!)
         if ui.button("Export OFF").clicked() {
             for _p in query.iter_mut() {
                 println!("Export OFF");
             }
         }
+
         // Toggles cross-section mode.
         if ui.button("Cross-section").clicked() {
             section_active.0 = !section_active.0;
-            println!("{}", section_active.0);
         }
 
         ui.add(egui::Slider::f32(&mut state.hyperplane_pos, -0.25..=0.25).text("slice"));
@@ -214,7 +219,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::hypercube(4).element(3, 0).unwrap();
+    let p = Concrete::hypercube(4);
     let poly = Renderable::new(p);
 
     pipelines.set_untracked(
