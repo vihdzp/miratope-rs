@@ -10,6 +10,7 @@ bevy = "0.4"
 bevy_egui = "0.3"
 derive_deref = "1.1"
 dyn-clone = "1.0"
+factorial = "0.2"
 gcd = "2.0"
 itertools = "0.10"
 nalgebra = {version = "0.26", features = ["serde-serialize"]}

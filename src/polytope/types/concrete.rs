@@ -1,5 +1,4 @@
 use crate::{
-    hypervolume,
     polytope::{
         flag::FlagIter,
         geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace, Vector},
@@ -8,7 +7,9 @@ use crate::{
     },
     EPS,
 };
+
 use approx::{abs_diff_eq, abs_diff_ne};
+use factorial::Factorial;
 use gcd::Gcd;
 use std::{
     collections::HashMap,
@@ -429,23 +430,25 @@ impl Concrete {
             vertices.push(vertex_list);
         }
 
+        let dim = self.dim().unwrap();
         let mut volume = 0.0;
-        let origin = Point::zeros(self.dim().unwrap());
 
         for flag in self.flags() {
             volume += flag.orientation.sign()
-                * hypervolume(
-                    &flag
-                        .elements
-                        .iter()
+                * Matrix::from_iterator(
+                    dim,
+                    dim,
+                    flag.elements
+                        .into_iter()
                         .enumerate()
-                        .map(|(rank, &idx)| &self.vertices[vertices[rank][idx]])
-                        .chain(std::iter::once(&origin))
-                        .collect::<Vec<_>>(),
-                );
+                        .map(|(rank, idx)| &self.vertices[vertices[rank][idx]])
+                        .flatten()
+                        .copied(),
+                )
+                .determinant();
         }
 
-        volume.abs()
+        volume.abs() / (dim.factorial() as f64)
     }
 
     /// Projects the vertices of the polytope into the lowest dimension possible.
