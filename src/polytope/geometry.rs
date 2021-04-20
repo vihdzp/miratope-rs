@@ -15,6 +15,27 @@ use approx::abs_diff_eq;
 use crate::EPS;
 use std::fmt;
 
+/// A very lazy factorial implementation.
+fn factorial(n: usize) -> f64 {
+    [
+        1.0, 1.0, 2.0, 6.0, 24.0, 120.0, 720.0, 5040.0, 40320.0, 362880.0, 3628800.0,
+    ][n]
+}
+
+/// Returns the sign of the hypervolume of a simplex specified by a set of
+/// n-dimensional points.
+pub fn hypervolume(simplex: &[&Point]) -> f64 {
+    let dim = simplex.len() - 1;
+
+    Matrix::from_fn(
+        dim + 1,
+        dim + 1,
+        |i, j| if j < dim { simplex[i][j] } else { 1.0 },
+    )
+    .determinant()
+        / factorial(dim)
+}
+
 #[derive(Debug)]
 /// A hypersphere with a certain center and radius.
 pub struct Hypersphere {

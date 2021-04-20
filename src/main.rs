@@ -55,7 +55,7 @@ use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
 #[allow(unused_imports)]
-use polytope::{geometry::*, group::*, off::*, *};
+use polytope::{geometry::*, group::*, off::*, Polytope, *};
 
 mod input;
 mod no_cull_pipeline;
@@ -121,8 +121,8 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let mut p = off::from_path(&"E:/Polytopes/Polychora/OFF/3. Archimedean hypersolids/Omnitruncated hecatonicosachoron.off").unwrap();
-    p.scale(0.1);
+    let p = Concrete::duoprism(&Concrete::hypercube(3), &Concrete::polygon(6));
+    dbg!(p.volume());
     let poly = Renderable::new(p);
 
     pipelines.set_untracked(

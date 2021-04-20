@@ -1,5 +1,7 @@
 use crate::{
+    hypervolume,
     polytope::{
+        flag::FlagIter,
         geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace, Vector},
         rank::RankVec,
         Abstract, Element, ElementList, Polytope, Subelements, Subsupelements,
@@ -226,6 +228,10 @@ impl Concrete {
         (&vertices[sub0] + &vertices[sub1]).norm() / 2.0
     }
 
+    pub fn dual(&self) -> Option<Self> {
+        self._dual()
+    }
+
     /// Returns the dual of a polytope with a given reciprocation sphere, or
     /// `None` if any facets pass through the reciprocation center.
     pub fn dual_with_sphere(&self, sphere: &Hypersphere) -> Option<Self> {
@@ -236,6 +242,10 @@ impl Concrete {
         } else {
             None
         }
+    }
+
+    pub fn dual_mut(&mut self) -> Result<(), ()> {
+        self._dual_mut()
     }
 
     /// Builds the dual of a polytope with a given reciprocation sphere in
@@ -398,6 +408,46 @@ impl Concrete {
         )
     }
 
+    pub fn volume(&self) -> f64 {
+        let mut vertices = Vec::new();
+
+        // Vertices map to themselves.
+        let mut vertex_list = Vec::new();
+        for v in 0..self[0].len() {
+            vertex_list.push(v);
+        }
+        vertices.push(vertex_list);
+
+        // Every other element maps to the vertex of any subelement.
+        for r in 1..=self.rank() {
+            let mut vertex_list = Vec::new();
+
+            for el in self[r].iter() {
+                vertex_list.push(vertices[r as usize - 1][el.subs[0]]);
+            }
+
+            vertices.push(vertex_list);
+        }
+
+        let mut volume = 0.0;
+        let origin = Point::zeros(self.dim().unwrap());
+
+        for flag in self.flags() {
+            volume += flag.orientation.sign()
+                * hypervolume(
+                    &flag
+                        .elements
+                        .iter()
+                        .enumerate()
+                        .map(|(rank, &idx)| &self.vertices[vertices[rank][idx]])
+                        .chain(std::iter::once(&origin))
+                        .collect::<Vec<_>>(),
+                );
+        }
+
+        volume.abs()
+    }
+
     /// Projects the vertices of the polytope into the lowest dimension possible.
     /// If the polytope's subspace is already of full rank, this is a no-op.
     pub fn flatten(&mut self) {
@@ -481,9 +531,6 @@ impl Concrete {
 }
 
 impl Polytope for Concrete {
-    type Dual = Option<Self>;
-    type DualMut = Result<(), ()>;
-
     /// Returns the rank of the polytope.
     fn rank(&self) -> isize {
         self.abs.rank()
@@ -521,7 +568,7 @@ impl Polytope for Concrete {
 
     /// Returns the dual of a polytope, or `None` if any facets pass through the
     /// origin.
-    fn dual(&self) -> Self::Dual {
+    fn _dual(&self) -> Option<Self> {
         let mut clone = self.clone();
 
         if clone.dual_mut().is_ok() {
@@ -534,7 +581,7 @@ impl Polytope for Concrete {
     /// Builds the dual of a polytope in place, or does nothing in case any
     /// facets go through the origin. Returns the dual if successful, and `None`
     /// otherwise.
-    fn dual_mut(&mut self) -> Self::DualMut {
+    fn _dual_mut(&mut self) -> Result<(), ()> {
         self.dual_mut_with_sphere(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
@@ -561,18 +608,8 @@ impl Polytope for Concrete {
         ))
     }
 
-    fn element_fig(&self, _rank: isize, _idx: usize) -> Option<Self> {
-        todo!()
-    }
-
-    fn section(
-        &self,
-        rank_lo: isize,
-        idx_lo: usize,
-        rank_hi: isize,
-        idx_hi: usize,
-    ) -> Option<Self> {
-        self.element(rank_hi, idx_hi)?.element_fig(rank_lo, idx_lo)
+    fn flags(&self) -> FlagIter {
+        self.abs.flags()
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)

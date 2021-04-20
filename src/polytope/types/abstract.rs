@@ -1,28 +1,11 @@
 use derive_deref::{Deref, DerefMut};
 use std::collections::HashMap;
 
-use crate::polytope::{rank::RankVec, Element, ElementList, Polytope, Subelements, Subsupelements};
+use crate::polytope::{
+    flag::FlagIter, rank::RankVec, Element, ElementList, Polytope, Subelements, Subsupelements,
+};
 
-#[derive(Deref, DerefMut)]
-struct ElementHash(RankVec<HashMap<usize, usize>>);
-
-impl ElementHash {
-    /// Gets the indices of the elements of a given rank in a polytope.
-    fn elements(&self, rank: isize) -> Vec<usize> {
-        if let Some(elements) = self.get(rank) {
-            let mut new_elements = Vec::new();
-            new_elements.resize(elements.len(), 0);
-
-            for (&sub, &idx) in elements {
-                new_elements[idx] = sub;
-            }
-
-            new_elements
-        } else {
-            Vec::new()
-        }
-    }
-}
+use super::ElementHash;
 
 /// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
 /// to an [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
@@ -138,112 +121,32 @@ impl Abstract {
         self.0.get(rank)?.get(idx)
     }
 
-    /// Returns an [`ElementHash`], used as an auxiliary data structure for
-    /// operations involving elements.
-    ///
-    /// As a byproduct of calculating either the vertices or the entire polytope
-    /// corresponding to a given element, we generate a map from ranks and
-    /// indices in the original polytope to ranks and indices in the element.
-    /// This function returns such a map, encoded as a vector of hash maps.
-    ///
-    /// If the element doesn't exist, we return `None`.
-    fn element_hash(&self, rank: isize, idx: usize) -> Option<ElementHash> {
-        self.get_element(rank, idx)?;
-
-        // A vector of HashMaps. The k-th entry is a map from k-elements of the
-        // original polytope into k-elements in a new polytope.
-        let mut hashes = RankVec::with_capacity(rank);
-        for _ in -1..=rank {
-            hashes.push(HashMap::new());
-        }
-        hashes[rank].insert(idx, 0);
-
-        // Gets subindices of subindices, until reaching the vertices.
-        for r in (0..=rank).rev() {
-            let (left_slice, right_slice) = hashes.split_at_mut(r);
-            let prev_hash = left_slice.last_mut().unwrap();
-            let hash = right_slice.first().unwrap();
-
-            for (&idx, _) in hash.iter() {
-                for &sub in self[r as isize][idx].subs.iter() {
-                    let len = prev_hash.len();
-                    prev_hash.entry(sub).or_insert(len);
-                }
-            }
-        }
-
-        Some(hashes)
-    }
-
-    /// Gets the indices of the vertices of a given element in a polytope.
-    fn polytope_from_element_hash(&self, element_hash: &ElementHash) -> Self {
-        let rank = element_hash.rank();
-        let mut abs = Self::with_capacity(rank);
-
-        for r in -1..=rank {
-            let mut elements = ElementList::new();
-            let hash = &element_hash[r];
-
-            for _ in 0..hash.len() {
-                elements.push(Element::new());
-            }
-
-            // For every element of rank r in the hash element list.
-            for (&idx, &new_idx) in hash {
-                // We take the corresponding element in the original polytope
-                // and use the hash map to get its sub and superelements in the
-                // new polytope.
-                let el = self.get_element(r, idx).unwrap();
-                let mut new_el = Element::new();
-
-                // Gets the subelements.
-                if let Some(prev_hash) = element_hash.get(r - 1) {
-                    for sub in el.subs.iter() {
-                        if let Some(&new_sub) = prev_hash.get(sub) {
-                            new_el.subs.push(new_sub);
-                        }
-                    }
-                }
-
-                // Gets the superelements.
-                if let Some(next_hash) = element_hash.get(r + 1) {
-                    for sup in el.sups.iter() {
-                        if let Some(&new_sup) = next_hash.get(sup) {
-                            new_el.sups.push(new_sup);
-                        }
-                    }
-                }
-
-                elements[new_idx] = new_el;
-            }
-
-            abs.push(elements);
-        }
-
-        abs
-    }
-
     /// Gets the indices of the vertices of an element in the polytope, if it
     /// exists.
     pub fn element_vertices(&self, rank: isize, idx: usize) -> Option<Vec<usize>> {
-        Some(self.element_hash(rank, idx)?.elements(0))
+        Some(ElementHash::from_element(self, rank, idx)?.to_elements(0))
     }
 
     /// Gets both element with a given rank and index as a polytope and the
     /// indices of its vertices on the original polytope, if it exists.
     pub fn element_and_vertices(&self, rank: isize, idx: usize) -> Option<(Vec<usize>, Self)> {
-        let element_hash = self.element_hash(rank, idx)?;
+        let element_hash = ElementHash::from_element(self, rank, idx)?;
 
-        Some((
-            Self::vertices_from_element_hash(&element_hash),
-            self.polytope_from_element_hash(&element_hash),
-        ))
+        Some((element_hash.to_elements(0), element_hash.to_polytope(self)))
     }
 
     /// Checks whether the polytope is bounded
     pub fn full_check(&self) -> bool {
         self.is_bounded() && self.check_incidences() && self.is_dyadic()
         // && self.is_strongly_connected()
+    }
+
+    pub fn dual(&self) -> Self {
+        self._dual().unwrap()
+    }
+
+    pub fn dual_mut(&mut self) {
+        self._dual_mut().unwrap();
     }
 
     /// Determines whether the polytope is bounded, i.e. whether it has a single
@@ -465,12 +368,6 @@ impl Abstract {
 }
 
 impl Polytope for Abstract {
-    /// The return type of [`dual`](Self::dual).
-    type Dual = Self;
-
-    /// The return type of [`dual_mut`](Self::dual_mut).
-    type DualMut = ();
-
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
     fn rank(&self) -> isize {
         self.0.rank()
@@ -548,14 +445,14 @@ impl Polytope for Abstract {
     }
 
     /// Converts a polytope into its dual.
-    fn dual(&self) -> Self::Dual {
+    fn _dual(&self) -> Option<Self> {
         let mut clone = self.clone();
         clone.dual_mut();
-        clone
+        Some(clone)
     }
 
     /// Converts a polytope into its dual in place.
-    fn dual_mut(&mut self) -> Self::DualMut {
+    fn _dual_mut(&mut self) -> Result<(), ()> {
         for elements in self.iter_mut() {
             for el in elements.iter_mut() {
                 el.swap_mut();
@@ -563,6 +460,7 @@ impl Polytope for Abstract {
         }
 
         self.reverse();
+        Ok(())
     }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
@@ -607,21 +505,11 @@ impl Polytope for Abstract {
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
     fn element(&self, rank: isize, idx: usize) -> Option<Self> {
-        Some(self.polytope_from_element_hash(&self.element_hash(rank, idx)?))
+        Some(ElementHash::from_element(self, rank, idx)?.to_polytope(self))
     }
 
-    fn element_fig(&self, _rank: isize, _idx: usize) -> Option<Self> {
-        todo!()
-    }
-
-    fn section(
-        &self,
-        _rank_lo: isize,
-        _idx_lo: usize,
-        _rank_hi: isize,
-        _idx_hi: usize,
-    ) -> Option<Self> {
-        todo!()
+    fn flags(&self) -> FlagIter {
+        FlagIter::new(&self)
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)

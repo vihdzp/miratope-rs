@@ -2,6 +2,7 @@
 //! [polytopes](https://polytope.miraheze.org/wiki/Polytope), as well as some
 //! basic methods to operate on them.
 
+use crate::polytope::flag::FlagIter;
 use std::hash::Hash;
 
 use derive_deref::{Deref, DerefMut};
@@ -12,6 +13,7 @@ pub use types::{concrete::*, r#abstract::*, renderable::*};
 pub mod cd;
 pub mod convex;
 pub mod cox;
+mod flag;
 pub mod geometry;
 pub mod group;
 pub mod off;
@@ -28,12 +30,6 @@ const COMPONENTS: &str = "Components";
 
 /// The trait for methods common to all polytopes.
 pub trait Polytope: Sized + Clone {
-    /// The return type of [`dual`](Self::dual).
-    type Dual;
-
-    /// The return type of [`dual_mut`](Self::dual_mut).
-    type DualMut;
-
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
     fn rank(&self) -> isize;
 
@@ -63,10 +59,10 @@ pub trait Polytope: Sized + Clone {
     fn polygon(n: usize) -> Self;
 
     /// Returns the dual of a polytope.
-    fn dual(&self) -> Self::Dual;
+    fn _dual(&self) -> Option<Self>;
 
     /// Builds the dual of a polytope in place.
-    fn dual_mut(&mut self) -> Self::DualMut;
+    fn _dual_mut(&mut self) -> Result<(), ()>;
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks.
@@ -76,13 +72,28 @@ pub trait Polytope: Sized + Clone {
     fn element(&self, rank: isize, idx: usize) -> Option<Self>;
 
     /// Gets the element figure with a given rank and index as a polytope.
-    fn element_fig(&self, rank: isize, idx: usize) -> Option<Self>;
+    fn element_fig(&self, rank: isize, idx: usize) -> Option<Self> {
+        let mut element_fig = self._dual()?.element(self.rank() - rank - 1, idx)?;
+
+        if element_fig._dual_mut().is_ok() {
+            Some(element_fig)
+        } else {
+            None
+        }
+    }
 
     /// Gets the section defined by two elements with given ranks and indices as
     /// a polytope, or returns `None` in case no section is defined by these
     /// elements.
-    fn section(&self, rank_lo: isize, idx_lo: usize, rank_hi: isize, idx_hi: usize)
-        -> Option<Self>;
+    fn section(
+        &self,
+        rank_lo: isize,
+        idx_lo: usize,
+        rank_hi: isize,
+        idx_hi: usize,
+    ) -> Option<Self> {
+        self.element(rank_hi, idx_hi)?.element_fig(rank_lo, idx_lo)
+    }
 
     fn facet(&self, idx: usize) -> Option<Self> {
         self.element(self.rank() - 1, idx)
@@ -111,6 +122,8 @@ pub trait Polytope: Sized + Clone {
             Self::nullitope()
         })
     }
+
+    fn flags(&self) -> FlagIter;
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.
