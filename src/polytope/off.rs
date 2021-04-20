@@ -179,61 +179,65 @@ fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> Ele
     els_subs
 }
 
-/// Builds a [`Polytope`] from the string representation of an OFF file.
-pub fn from_src(src: String) -> Concrete {
-    let mut toks = data_tokens(&src);
-    let rank = {
-        let first = toks.next().expect("OFF file empty");
-        let rank = first.strip_suffix("OFF").expect("no \"OFF\" detected");
+impl Concrete {
+    /// Builds a polytope from the string representation of an OFF file.
+    pub fn from_off(src: String) -> Self {
+        let mut toks = data_tokens(&src);
+        let rank = {
+            let first = toks.next().expect("OFF file empty");
+            let rank = first.strip_suffix("OFF").expect("no \"OFF\" detected");
 
-        if rank.is_empty() {
-            3
-        } else {
-            rank.parse()
-                .expect("could not parse dimension as an integer")
+            if rank.is_empty() {
+                3
+            } else {
+                rank.parse()
+                    .expect("could not parse dimension as an integer")
+            }
+        };
+
+        // Deals with dumb degenerate cases.
+        if rank == -1 {
+            return Concrete::nullitope();
+        } else if rank == 0 {
+            return Concrete::point();
+        } else if rank == 1 {
+            return Concrete::dyad();
         }
-    };
 
-    // Deals with dumb degenerate cases.
-    if rank == -1 {
-        return Concrete::nullitope();
-    } else if rank == 0 {
-        return Concrete::point();
-    } else if rank == 1 {
-        return Concrete::dyad();
+        let num_elems = get_el_nums(rank, &mut toks);
+        let vertices = parse_vertices(num_elems[0], rank as usize, &mut toks);
+        let mut abs = Abstract::with_capacity(rank);
+
+        // Adds nullitope and vertices.
+        abs.push_single();
+        abs.push_vertices(vertices.len());
+
+        // Reads edges and faces.
+        if rank >= 2 {
+            let (edges, faces) = parse_edges_and_faces(rank, num_elems[1], num_elems[2], &mut toks);
+            abs.push_subs(edges);
+            abs.push_subs(faces);
+        }
+
+        // Adds all higher elements.
+        for &num_el in num_elems.iter().take(rank as usize).skip(3) {
+            abs.push_subs(parse_els(num_el, &mut toks));
+        }
+
+        // Caps the abstract polytope, returns the concrete one.
+        if rank != 2 {
+            abs.push_max();
+        }
+
+        Self::new(vertices, abs)
     }
 
-    let num_elems = get_el_nums(rank, &mut toks);
-    let vertices = parse_vertices(num_elems[0], rank as usize, &mut toks);
-    let mut abs = Abstract::with_capacity(rank);
-
-    // Adds nullitope and vertices.
-    abs.push_single();
-    abs.push_vertices(vertices.len());
-
-    // Reads edges and faces.
-    if rank >= 2 {
-        let (edges, faces) = parse_edges_and_faces(rank, num_elems[1], num_elems[2], &mut toks);
-        abs.push_subs(edges);
-        abs.push_subs(faces);
+    /// Loads a polytope from a file path.
+    pub fn from_path(fp: &impl AsRef<Path>) -> Result<Self> {
+        Ok(Self::from_off(
+            String::from_utf8(std::fs::read(fp)?).unwrap(),
+        ))
     }
-
-    // Adds all higher elements.
-    for &num_el in num_elems.iter().take(rank as usize).skip(3) {
-        abs.push_subs(parse_els(num_el, &mut toks));
-    }
-
-    // Caps the abstract polytope, returns the concrete one.
-    if rank != 2 {
-        abs.push_max();
-    }
-
-    Concrete::new(vertices, abs)
-}
-
-/// Loads a polytope from a file path.
-pub fn from_path(fp: &impl AsRef<Path>) -> Result<Concrete> {
-    Ok(from_src(String::from_utf8(std::fs::read(fp)?).unwrap()))
 }
 
 /// A set of options to be used when saving the OFF file.
@@ -249,6 +253,7 @@ impl Default for OffOptions {
     }
 }
 
+/// Writes the polytope's element counts into an OFF file.
 fn write_el_counts(off: &mut String, opt: &OffOptions, mut el_counts: RankVec<usize>) {
     let rank = el_counts.rank();
 
@@ -404,8 +409,8 @@ fn write_els(off: &mut String, opt: &OffOptions, rank: isize, els: &[Element]) {
     }
 }
 
-/// Converts a polytope into an OFF file.
 impl Concrete {
+    /// Converts a polytope into an OFF file.
     pub fn to_src(&self, opt: OffOptions) -> String {
         let rank = self.rank();
         let vertices = &self.vertices;
@@ -467,7 +472,9 @@ mod tests {
 
         // Checks that the polytope can be reloaded correctly.
         assert_eq!(
-            from_src(p.to_src(OffOptions::default())).el_counts().0,
+            Concrete::from_off(p.to_src(OffOptions::default()))
+                .el_counts()
+                .0,
             el_nums
         );
     }
@@ -475,7 +482,7 @@ mod tests {
     #[test]
     /// Checks that a point has the correct amount of elements.
     fn point_nums() {
-        let point = from_src("0OFF".to_string());
+        let point = Concrete::from_off("0OFF".to_string());
 
         test_shape(point, vec![1, 1])
     }
@@ -483,7 +490,7 @@ mod tests {
     #[test]
     /// Checks that a dyad has the correct amount of elements.
     fn dyad_nums() {
-        let dyad = from_src("1OFF 2 -1 1 0 1".to_string());
+        let dyad = Concrete::from_off("1OFF 2 -1 1 0 1".to_string());
 
         test_shape(dyad, vec![1, 2, 1])
     }
@@ -513,7 +520,7 @@ mod tests {
     #[test]
     /// Checks that a tetrahedron has the correct amount of elements.
     fn tet_nums() {
-        let tet = from_src(
+        let tet = Concrete::from_off(
             "OFF 4 4 6 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2".to_string(),
         );
 
@@ -523,7 +530,7 @@ mod tests {
     #[test]
     /// Checks that a 2-tetrahedron compund has the correct amount of elements.
     fn so_nums() {
-        let so = from_src(
+        let so =    Concrete::  from_off(
             "OFF 8 8 12 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 -1 -1 -1 -1 1 1 1 -1 1 1 1 -1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2 3 4 5 6 3 7 4 6 3 4 5 7 3 7 5 6 ".to_string(),
         );
 
@@ -533,7 +540,7 @@ mod tests {
     #[test]
     /// Checks that a pentachoron has the correct amount of elements.
     fn pen_nums() {
-        let pen = from_src(
+        let pen =   Concrete::   from_off(
             "4OFF 5 10 10 5 0.158113883008419 0.204124145231932 0.288675134594813 0.5 0.158113883008419 0.204124145231932 0.288675134594813 -0.5 0.158113883008419 0.204124145231932 -0.577350269189626 0 0.158113883008419 -0.612372435695794 0 0 -0.632455532033676 0 0 0 3 0 3 4 3 0 2 4 3 2 3 4 3 0 2 3 3 0 1 4 3 1 3 4 3 0 1 3 3 1 2 4 3 0 1 2 3 1 2 3 4 0 1 2 3 4 0 4 5 6 4 1 4 7 8 4 2 5 7 9 4 3 6 8 9"
                 .to_string(),
         );
@@ -544,7 +551,7 @@ mod tests {
     #[test]
     /// Checks that comments are correctly parsed.
     fn comments() {
-        let tet = from_src(
+        let tet = Concrete::from_off(
             "# So
             OFF # this
             4 4 6 # is
@@ -566,12 +573,12 @@ mod tests {
     #[test]
     #[should_panic(expected = "OFF file empty")]
     fn empty() {
-        Concrete::from(from_src("".to_string()));
+        Concrete::from_off("".to_string());
     }
 
     #[test]
     #[should_panic(expected = "no \"OFF\" detected")]
     fn magic_num() {
-        Concrete::from(from_src("foo bar".to_string()));
+        Concrete::from_off("foo bar".to_string());
     }
 }

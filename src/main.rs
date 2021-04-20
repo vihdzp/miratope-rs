@@ -121,7 +121,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::duoprism(&Concrete::hypercube(3), &Concrete::polygon(6));
+    let p = Concrete::from_path(&"./Gap.off").unwrap();
     dbg!(p.volume());
     let poly = Renderable::new(p);
 

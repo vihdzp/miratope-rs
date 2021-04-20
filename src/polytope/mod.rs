@@ -276,6 +276,7 @@ pub trait Polytope: Sized + Clone {
 }
 
 trait Subsupelements: Sized {
+    /// Builds a list of either subelements or superelements from a vector.
     fn from_vec(vec: Vec<usize>) -> Self;
 
     /// Constructs a new, empty subelement or superelement list.
@@ -307,6 +308,7 @@ trait Subsupelements: Sized {
 pub struct Subelements(pub Vec<usize>);
 
 impl Subsupelements for Subelements {
+    /// Builds a list of subelements from a vector.
     fn from_vec(vec: Vec<usize>) -> Self {
         Self(vec)
     }
@@ -317,6 +319,7 @@ impl Subsupelements for Subelements {
 pub struct Superelements(pub Vec<usize>);
 
 impl Subsupelements for Superelements {
+    /// Builds a list of superelements from a vector.
     fn from_vec(vec: Vec<usize>) -> Self {
         Self(vec)
     }
@@ -326,7 +329,10 @@ impl Subsupelements for Superelements {
 /// and superlements.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Element {
+    /// The indices of the subelements of the element.
     pub subs: Subelements,
+
+    /// The indices of the superelements of the element.
     pub sups: Superelements,
 }
 

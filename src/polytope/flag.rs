@@ -166,7 +166,7 @@ impl FlagIter {
         let mut idx = 0;
         flag.elements.push(0);
         for r in 1..rank {
-            idx = polytope.get_element(r, idx).unwrap().sups[0];
+            idx = polytope.get_element(r - 1, idx).unwrap().sups[0];
             flag.elements.push(idx);
         }
 
