@@ -72,7 +72,7 @@ pub trait Polytope: Sized + Clone {
     /// if the polytopes have different ranks.
     fn append(&mut self, p: Self) -> Result<(), ()>;
 
-    /// Gets the element with a given rank and index as a polytope.
+    /// Gets the element with a given rank and index as a polytope, if it exists.
     fn element(&self, rank: isize, idx: usize) -> Option<Self>;
 
     /// Gets the element figure with a given rank and index as a polytope.

@@ -54,8 +54,6 @@ use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
-use std::convert::TryInto;
-
 #[allow(unused_imports)]
 use polytope::{geometry::*, group::*, off::*, *};
 
@@ -66,11 +64,20 @@ mod polytope;
 /// Standard constant used for floating point comparisons throughout the code.
 const EPS: f64 = 1e-9;
 
+/// Stores whether the cross-section view is active.
 struct CrossSectionActive(bool);
 
+impl CrossSectionActive {
+    /// Flips the state.
+    pub fn flip(&mut self) {
+        self.0 = !self.0;
+    }
+}
+
+/// Stores the state of the cross-section view.
 struct CrossSectionState {
     original_polytope: Option<Renderable>,
-    hyperplane_pos: f32,
+    hyperplane_pos: f64,
 }
 
 /// Loads all of the necessary systems for the application to run.
@@ -95,120 +102,15 @@ fn main() {
         .add_startup_system(setup.system())
         // Scales the interface when the screen is resized.
         .add_system(update_ui_scale_factor.system())
-        .add_system(update_cross_section.system())
         // Loads the User Interface.
-        .add_system(ui.system())
+        .add_system_to_stage(stage::PRE_UPDATE, ui.system())
+        // Updates the visibility of the cross-section view.
+        .add_system_to_stage(stage::UPDATE, update_cross_section_state.system())
+        // Updates the cross-section.
+        .add_system_to_stage(stage::POST_UPDATE, update_cross_section.system())
         // Updates polytopes when operations are done to them.
         .add_system_to_stage(stage::POST_UPDATE, update_changed_polytopes.system())
-        .add_system_to_stage(stage::POST_UPDATE, update_cross_section_state.system())
         .run();
-}
-
-const WIREFRAME_SELECTED_MATERIAL: HandleUntyped =
-    HandleUntyped::weak_from_u64(StandardMaterial::TYPE_UUID, 0x82A3A5DD3A34CC21);
-const WIREFRAME_UNSELECTED_MATERIAL: HandleUntyped =
-    HandleUntyped::weak_from_u64(StandardMaterial::TYPE_UUID, 0x82A3A5DD3A34CC22);
-
-/// Resizes the UI when the screen is resized.
-fn update_ui_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Res<Windows>) {
-    if let Some(window) = windows.get_primary() {
-        egui_settings.scale_factor = 1.0 / window.scale_factor();
-    }
-}
-
-fn update_cross_section_state(
-    mut query: Query<&mut Renderable>,
-    mut state: ResMut<CrossSectionState>,
-    active: ChangedRes<CrossSectionActive>,
-) {
-    if active.0 {
-        state.original_polytope = Some(query.iter_mut().next().unwrap().clone());
-    } else if let Some(t) = state.original_polytope.take() {
-        *query.iter_mut().next().unwrap() = t;
-    } else {
-        println!("This should only happen on startup.");
-    }
-}
-
-fn update_cross_section(
-    mut query: Query<&mut Renderable>,
-    state: Res<CrossSectionState>,
-    active: Res<CrossSectionActive>,
-) {
-    if !active.0 {
-        return;
-    }
-
-    for mut p in query.iter_mut() {
-        let r = state.original_polytope.clone().unwrap();
-        let mut hyp_pos = state.hyperplane_pos.into();
-        hyp_pos += 0.00001; // Botch fix for degeneracies.
-
-        *p = Renderable::new(r.concrete.slice(Hyperplane::x(
-            r.concrete.rank().try_into().unwrap(),
-            hyp_pos,
-        )));
-    }
-}
-
-/// A system for a basic UI.
-fn ui(
-    mut egui_ctx: ResMut<EguiContext>,
-    mut query: Query<&mut Renderable>,
-    mut state: ResMut<CrossSectionState>,
-    mut section_active: ResMut<CrossSectionActive>,
-) {
-    let ctx = &mut egui_ctx.ctx;
-
-    egui::TopPanel::top("top_panel").show(ctx, |ui| {
-        // The top panel is often a good place for a menu bar:
-        egui::menu::bar(ui, |ui| {
-            egui::menu::menu(ui, "File", |ui| {
-                if ui.button("Quit").clicked() {
-                    std::process::exit(0);
-                }
-            });
-        });
-
-        // Converts the active polytope into its dual.
-        if ui.button("Dual").clicked() {
-            for mut p in query.iter_mut() {
-                match p.concrete.dual_mut() {
-                    Ok(_) => println!("Dual succeeded"),
-                    Err(_) => println!("Dual failed"),
-                }
-                // Crashes for some reason.
-                // println!("{}", &p.concrete.to_src(off::OffOptions { comments: true }));
-            }
-        }
-
-        // Converts the active polytope into any of its facets.
-        if ui.button("Facet").clicked() {
-            for mut p in query.iter_mut() {
-                println!("Facet");
-
-                if let Some(mut facet) = p.concrete.facet(0) {
-                    facet.flatten();
-                    facet.recenter();
-                    *p = Renderable::new(facet);
-                };
-            }
-        }
-
-        // Exports the active polytope as an OFF file (not yet functional!)
-        if ui.button("Export OFF").clicked() {
-            for _p in query.iter_mut() {
-                println!("Export OFF");
-            }
-        }
-
-        // Toggles cross-section mode.
-        if ui.button("Cross-section").clicked() {
-            section_active.0 = !section_active.0;
-        }
-
-        ui.add(egui::Slider::f32(&mut state.hyperplane_pos, -0.25..=0.25).text("slice"));
-    });
 }
 
 /// Initializes the scene.
@@ -219,7 +121,8 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::hypercube(4);
+    let mut p = off::from_path(&"E:/Polytopes/Polychora/OFF/3. Archimedean hypersolids/Omnitruncated hecatonicosachoron.off").unwrap();
+    p.scale(0.1);
     let poly = Renderable::new(p);
 
     pipelines.set_untracked(
@@ -279,6 +182,95 @@ fn setup(
         });
 }
 
+const WIREFRAME_SELECTED_MATERIAL: HandleUntyped =
+    HandleUntyped::weak_from_u64(StandardMaterial::TYPE_UUID, 0x82A3A5DD3A34CC21);
+const WIREFRAME_UNSELECTED_MATERIAL: HandleUntyped =
+    HandleUntyped::weak_from_u64(StandardMaterial::TYPE_UUID, 0x82A3A5DD3A34CC22);
+
+/// The system in charge of the UI.
+fn ui(
+    mut egui_ctx: ResMut<EguiContext>,
+    mut query: Query<&mut Renderable>,
+    mut section_state: ResMut<CrossSectionState>,
+    mut section_active: ResMut<CrossSectionActive>,
+) {
+    let ctx = &mut egui_ctx.ctx;
+
+    egui::TopPanel::top("top_panel").show(ctx, |ui| {
+        // The top panel is often a good place for a menu bar:
+        egui::menu::bar(ui, |ui| {
+            egui::menu::menu(ui, "File", |ui| {
+                if ui.button("Quit").clicked() {
+                    std::process::exit(0);
+                }
+            });
+        });
+
+        // Converts the active polytope into its dual.
+        if ui.button("Dual").clicked() {
+            for mut p in query.iter_mut() {
+                match p.concrete.dual_mut() {
+                    Ok(_) => println!("Dual succeeded"),
+                    Err(_) => println!("Dual failed"),
+                }
+
+                // If we're currently viewing a cross-section, it gets "fixed"
+                // as the active polytope.
+                section_state.original_polytope = None;
+                section_active.0 = false;
+
+                // Crashes for some reason.
+                // println!("{}", &p.concrete.to_src(off::OffOptions { comments: true }));
+            }
+        }
+
+        // Converts the active polytope into any of its facets.
+        if ui.button("Facet").clicked() {
+            for mut p in query.iter_mut() {
+                println!("Facet");
+
+                if let Some(mut facet) = p.concrete.facet(0) {
+                    facet.flatten();
+                    facet.recenter();
+                    *p = Renderable::new(facet);
+                };
+
+                // If we're currently viewing a cross-section, it gets "fixed"
+                // as the active polytope.
+                section_state.original_polytope = None;
+                section_active.0 = false;
+            }
+        }
+
+        // Exports the active polytope as an OFF file (not yet functional!)
+        if ui.button("Export OFF").clicked() {
+            for _p in query.iter_mut() {
+                println!("Export OFF");
+            }
+        }
+
+        // Toggles cross-section mode.
+        if ui.button("Cross-section").clicked() {
+            section_active.flip();
+        }
+
+        // Updates the slicing depth for the polytope, but only when needed.
+        let mut new_hyperplane_pos = section_state.hyperplane_pos;
+        ui.add(egui::Slider::f64(&mut new_hyperplane_pos, -1.0..=1.0).text("Slice depth"));
+
+        if section_active.0 && section_state.hyperplane_pos != new_hyperplane_pos {
+            section_state.hyperplane_pos = new_hyperplane_pos;
+        }
+    });
+}
+
+/// Resizes the UI when the screen is resized.
+fn update_ui_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Res<Windows>) {
+    if let Some(window) = windows.get_primary() {
+        egui_settings.scale_factor = 1.0 / window.scale_factor();
+    }
+}
+
 /// Updates polytopes after an operation.
 fn update_changed_polytopes(
     mut meshes: ResMut<Assets<Mesh>>,
@@ -300,8 +292,36 @@ fn update_changed_polytopes(
     }
 }
 
-/*
-fn update_text(mut ctx: ResMut<EguiContext>) {
-    todo!()
+/// Shows or hides the cross-section view.
+fn update_cross_section_state(
+    mut query: Query<&mut Renderable>,
+    mut state: ResMut<CrossSectionState>,
+    active: ChangedRes<CrossSectionActive>,
+) {
+    if dbg!(active.0) {
+        state.original_polytope = Some(query.iter_mut().next().unwrap().clone());
+    } else if let Some(p) = state.original_polytope.take() {
+        *query.iter_mut().next().unwrap() = p;
+    } else {
+        println!("This should only happen on startup.");
+    }
 }
-*/
+
+/// Updates the cross-section shown.
+fn update_cross_section(
+    mut query: Query<&mut Renderable>,
+    state: ChangedRes<CrossSectionState>,
+    active: Res<CrossSectionActive>,
+) {
+    if active.0 {
+        for mut p in query.iter_mut() {
+            let r = state.original_polytope.clone().unwrap();
+            let hyp_pos = state.hyperplane_pos + 0.00001; // Botch fix for degeneracies.
+
+            *p = Renderable::new(
+                r.concrete
+                    .slice(Hyperplane::x(r.concrete.dim().unwrap(), hyp_pos)),
+            );
+        }
+    }
+}

@@ -3,7 +3,26 @@ use std::collections::HashMap;
 
 use crate::polytope::{rank::RankVec, Element, ElementList, Polytope, Subelements, Subsupelements};
 
-type ElementHash = RankVec<HashMap<usize, usize>>;
+#[derive(Deref, DerefMut)]
+struct ElementHash(RankVec<HashMap<usize, usize>>);
+
+impl ElementHash {
+    /// Gets the indices of the elements of a given rank in a polytope.
+    fn elements(&self, rank: isize) -> Vec<usize> {
+        if let Some(elements) = self.get(rank) {
+            let mut new_elements = Vec::new();
+            new_elements.resize(elements.len(), 0);
+
+            for (&sub, &idx) in elements {
+                new_elements[idx] = sub;
+            }
+
+            new_elements
+        } else {
+            Vec::new()
+        }
+    }
+}
 
 /// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
 /// to an [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
@@ -113,7 +132,9 @@ impl Abstract {
         self.push_subs(ElementList::max(facet_count));
     }
 
-    fn get_element(&self, rank: isize, idx: usize) -> Option<&Element> {
+    /// Returns a reference to an element of the polytope. To actually get the
+    /// entire polytope it defines, use [`element`](Self::element).
+    pub fn get_element(&self, rank: isize, idx: usize) -> Option<&Element> {
         self.0.get(rank)?.get(idx)
     }
 
@@ -155,22 +176,6 @@ impl Abstract {
     }
 
     /// Gets the indices of the vertices of a given element in a polytope.
-    fn vertices_from_element_hash(element_hash: &ElementHash) -> Vec<usize> {
-        if let Some(hash_vertices) = element_hash.get(0) {
-            let mut vertices = Vec::new();
-            vertices.resize(hash_vertices.len(), 0);
-
-            for (&sub, &idx) in hash_vertices {
-                vertices[idx] = sub;
-            }
-
-            vertices
-        } else {
-            Vec::new()
-        }
-    }
-
-    /// Gets the indices of the vertices of a given element in a polytope.
     fn polytope_from_element_hash(&self, element_hash: &ElementHash) -> Self {
         let rank = element_hash.rank();
         let mut abs = Self::with_capacity(rank);
@@ -183,10 +188,15 @@ impl Abstract {
                 elements.push(Element::new());
             }
 
+            // For every element of rank r in the hash element list.
             for (&idx, &new_idx) in hash {
+                // We take the corresponding element in the original polytope
+                // and use the hash map to get its sub and superelements in the
+                // new polytope.
                 let el = self.get_element(r, idx).unwrap();
                 let mut new_el = Element::new();
 
+                // Gets the subelements.
                 if let Some(prev_hash) = element_hash.get(r - 1) {
                     for sub in el.subs.iter() {
                         if let Some(&new_sub) = prev_hash.get(sub) {
@@ -195,6 +205,7 @@ impl Abstract {
                     }
                 }
 
+                // Gets the superelements.
                 if let Some(next_hash) = element_hash.get(r + 1) {
                     for sup in el.sups.iter() {
                         if let Some(&new_sup) = next_hash.get(sup) {
@@ -212,12 +223,14 @@ impl Abstract {
         abs
     }
 
+    /// Gets the indices of the vertices of an element in the polytope, if it
+    /// exists.
     pub fn element_vertices(&self, rank: isize, idx: usize) -> Option<Vec<usize>> {
-        Some(Self::vertices_from_element_hash(
-            &self.element_hash(rank, idx)?,
-        ))
+        Some(self.element_hash(rank, idx)?.elements(0))
     }
 
+    /// Gets both element with a given rank and index as a polytope and the
+    /// indices of its vertices on the original polytope, if it exists.
     pub fn element_and_vertices(&self, rank: isize, idx: usize) -> Option<(Vec<usize>, Self)> {
         let element_hash = self.element_hash(rank, idx)?;
 
@@ -592,6 +605,7 @@ impl Polytope for Abstract {
         Ok(())
     }
 
+    /// Gets the element with a given rank and index as a polytope, if it exists.
     fn element(&self, rank: isize, idx: usize) -> Option<Self> {
         Some(self.polytope_from_element_hash(&self.element_hash(rank, idx)?))
     }

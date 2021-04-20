@@ -94,12 +94,10 @@ impl Concrete {
     }
 
     /// Scales a polytope by a given factor.
-    pub fn scale(mut self, k: f64) -> Self {
+    pub fn scale(&mut self, k: f64) {
         for v in &mut self.vertices {
             *v *= k;
         }
-
-        self
     }
 
     /// Shifts all vertices by a given vector.
