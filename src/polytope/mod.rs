@@ -7,7 +7,11 @@ use std::hash::Hash;
 
 use derive_deref::{Deref, DerefMut};
 
-use self::{geometry::Point, rank::RankVec};
+use self::{
+    flag::{Flag, FlagEvent},
+    geometry::Point,
+    rank::RankVec,
+};
 pub use types::{concrete::*, r#abstract::*, renderable::*};
 
 pub mod cd;
@@ -123,7 +127,21 @@ pub trait Polytope: Sized + Clone {
         })
     }
 
-    fn flags(&self) -> FlagIter;
+    fn flag_events(&self) -> FlagIter;
+
+    fn flags(&self) -> Box<dyn Iterator<Item = Flag>> {
+        Box::new(
+            self.flag_events()
+                .filter(|event| event.is_flag())
+                .map(|event| {
+                    if let FlagEvent::Flag(flag) = event {
+                        flag
+                    } else {
+                        panic!("Non-flag somehow slipped through!")
+                    }
+                }),
+        )
+    }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.
@@ -374,6 +392,12 @@ impl Element {
     pub fn swap_mut(&mut self) {
         std::mem::swap(&mut self.subs.0, &mut self.sups.0)
     }
+
+    /// Sorts the subelements and superelements by index.
+    pub fn sort(&mut self) {
+        self.subs.sort_unstable();
+        self.sups.sort_unstable();
+    }
 }
 
 /// A list of [`Elements`](Element) of the same
@@ -548,7 +572,7 @@ mod tests {
                 );
                 assert!(
                     duopyramid.full_check(),
-                    "{}-{} duopyramid are invalid.",
+                    "{}-{} duopyramid is invalid.",
                     m,
                     n
                 );

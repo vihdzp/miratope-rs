@@ -1,13 +1,18 @@
-use std::collections::{hash_map::Entry, VecDeque};
+use std::{
+    collections::{hash_map::Entry, VecDeque},
+    hash::{Hash, Hasher},
+};
 
 use std::{cmp::Ordering, collections::HashMap};
 
 use super::Abstract;
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq)]
 pub enum Orientation {
+    /// A flag of even orientation.
     Even,
+
+    /// A flag of odd orientation.
     Odd,
-    Either,
 }
 
 impl Orientation {
@@ -15,7 +20,6 @@ impl Orientation {
         match self {
             Orientation::Even => *self = Orientation::Odd,
             Orientation::Odd => *self = Orientation::Even,
-            Orientation::Either => {}
         }
     }
 
@@ -23,7 +27,6 @@ impl Orientation {
         match self {
             Orientation::Even => 1.0,
             Orientation::Odd => -1.0,
-            Orientation::Either => 0.0,
         }
     }
 }
@@ -34,11 +37,33 @@ impl Default for Orientation {
     }
 }
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Flag {
+    /// The indices of the elements the flag contains, excluding the null and
+    /// maximal elements.
     pub elements: Vec<usize>,
+
+    /// The orientation of the flag.
     pub orientation: Orientation,
 }
+
+impl Hash for Flag {
+    /// Returns the hash of the flag. **Does not take orientation into
+    /// account.**
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.elements.hash(state);
+    }
+}
+
+impl PartialEq for Flag {
+    /// Determines whether two flags are equal. **Does not take orientation into
+    /// account.**
+    fn eq(&self, other: &Self) -> bool {
+        self.elements.eq(&other.elements)
+    }
+}
+
+impl Eq for Flag {}
 
 /// Gets the common elements of two **sorted** lists.
 fn common(vec0: &[usize], vec1: &[usize]) -> Vec<usize> {
@@ -65,6 +90,7 @@ fn common(vec0: &[usize], vec1: &[usize]) -> Vec<usize> {
 }
 
 impl Flag {
+    /// Constructs a new, empty `Flag` with the specified capacity.
     pub fn with_capacity(rank: isize) -> Self {
         Self {
             elements: Vec::with_capacity(rank as usize),
@@ -72,6 +98,8 @@ impl Flag {
         }
     }
 
+    /// Gets the index of the element stored at a given rank, whilst pretending
+    /// that the flag contains a minimal and maximal element.
     pub fn get(&self, rank: isize) -> Option<&usize> {
         if rank == -1 || rank == self.elements.len() as isize {
             Some(&0)
@@ -80,6 +108,7 @@ impl Flag {
         }
     }
 
+    /// Applies a specified flag change to the flag in place.
     pub fn change_mut(&mut self, polytope: &Abstract, idx: usize) {
         assert!(polytope.rank() >= 1);
 
@@ -99,6 +128,7 @@ impl Flag {
         self.orientation.flip_mut();
     }
 
+    /// Applies a specified flag change to the flag.
     pub fn change(&self, polytope: &Abstract, idx: usize) -> Self {
         let mut clone = self.clone();
         clone.change_mut(polytope, idx);
@@ -120,8 +150,12 @@ impl std::ops::IndexMut<isize> for Flag {
     }
 }
 
+/// An iterator over all of the "flag events" of a polytope. A flag event is
+/// simply either a flag, or an event that determines that a polytope is
+/// non-orientable.
 pub struct FlagIter {
-    /// The polytope whose flags are iterated.
+    /// The polytope whose flags are iterated. We must sort all of its elements
+    /// before using it for the algorithm to work.
     polytope: Abstract,
 
     /// The flags whose adjacencies are being searched.
@@ -133,16 +167,31 @@ pub struct FlagIter {
     /// The flags that have already been found, but whose neighbors haven't all
     /// been found yet.
     found: HashMap<Flag, usize>,
+
+    /// Whether all of the flags the iterator has checked so far have a parity.
+    orientable: bool,
 }
 
+/// The result of trying to get the next flag.
+#[derive(Debug)]
 pub enum IterResult {
+    /// We found a new flag.
     New(Flag),
+
+    /// We found a flag we had already found before.
     Repeat,
+
+    /// We just realized the polytope is non-orientable.
+    NonOrientable,
+
+    /// There are no flags left to find.
     None,
 }
 
 impl FlagIter {
     pub fn new(polytope: &Abstract) -> Self {
+        assert!(polytope.is_bounded());
+
         assert_ne!(
             polytope.rank(),
             -1,
@@ -156,8 +205,7 @@ impl FlagIter {
         let mut polytope = polytope.clone();
         for elements in polytope.iter_mut() {
             for el in elements.iter_mut() {
-                el.subs.sort_unstable();
-                el.sups.sort_unstable();
+                el.sort();
             }
         }
 
@@ -174,31 +222,30 @@ impl FlagIter {
         let mut found = HashMap::new();
         found.insert(flag.clone(), 0);
 
+        // Initializes queue.
         let mut queue = VecDeque::new();
-        queue.push_front(flag);
+        queue.push_back(flag);
 
         Self {
             polytope,
             queue,
             flag_idx: 0,
             found,
+            orientable: true,
         }
     }
 
-    pub fn rank(&self) -> usize {
-        self.polytope.rank() as usize
-    }
-
+    /// Attempts to get the next flag.
     pub fn try_next(&mut self) -> IterResult {
-        let rank = self.rank();
+        let rank = self.polytope.rank() as usize;
         let new_flag;
 
-        if let Some(current) = self.queue.back() {
+        if let Some(current) = self.queue.front() {
             new_flag = current.change(&self.polytope, self.flag_idx);
 
             // Increments flag_idx.
             self.flag_idx = if self.flag_idx + 1 == rank {
-                self.queue.pop_back();
+                self.queue.pop_front();
                 0
             } else {
                 self.flag_idx + 1
@@ -207,26 +254,46 @@ impl FlagIter {
             return IterResult::None;
         }
 
-        // Adds the new flag if not yet found, updates it if found, and removes
-        // it if it's been found all of the times it will ever be found.
-        match self.found.entry(new_flag.clone()) {
+        let new_orientation = new_flag.orientation;
+        match self.found.entry(new_flag) {
+            // If the flag is already in the found dictionary:
             Entry::Occupied(mut occupied_entry) => {
                 *occupied_entry.get_mut() += 1;
                 let val = *occupied_entry.get();
 
-                if val == rank {
-                    occupied_entry.remove();
+                if self.orientable && new_orientation != occupied_entry.key().orientation {
+                    self.orientable = false;
+                    return IterResult::NonOrientable;
                 }
 
+                // In the special case we just found the initial flag again, we
+                // return it.
                 if val == 1 {
+                    let new_flag = occupied_entry.key().clone();
+
+                    // If we've found it all of the times we'll ever find it, no use
+                    // in keeping it in the dictionary.
+                    if val == rank {
+                        occupied_entry.remove();
+                    }
+
                     IterResult::New(new_flag)
                 } else {
+                    // If we've found it all of the times we'll ever find it, no use
+                    // in keeping it in the dictionary.
+                    if val == rank {
+                        occupied_entry.remove();
+                    }
+
+                    // Otherwise, this will always be a repeat.
                     IterResult::Repeat
                 }
             }
+            // If this flag is new, we just add it and return it.
             Entry::Vacant(vacant_entry) => {
+                let new_flag = vacant_entry.key().clone();
+                self.queue.push_back(new_flag.clone());
                 vacant_entry.insert(1);
-                self.queue.push_front(new_flag.clone());
 
                 IterResult::New(new_flag)
             }
@@ -234,15 +301,38 @@ impl FlagIter {
     }
 }
 
+#[derive(PartialEq)]
+/// Represents either a new found flag, or the event in which the iterator
+/// realizes that the polytope is non-orientable.
+pub enum FlagEvent {
+    Flag(Flag),
+    NonOrientable,
+}
+
+impl FlagEvent {
+    pub fn is_flag(&self) -> bool {
+        if let FlagEvent::Flag(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+}
+
 impl Iterator for FlagIter {
-    type Item = Flag;
+    type Item = FlagEvent;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match self.try_next() {
-                IterResult::New(f) => return Some(f),
-                IterResult::Repeat => {}
+                IterResult::New(f) => {
+                    return Some(FlagEvent::Flag(f));
+                }
+                IterResult::NonOrientable => {
+                    return Some(FlagEvent::NonOrientable);
+                }
                 IterResult::None => return None,
+                IterResult::Repeat => {}
             }
         }
     }

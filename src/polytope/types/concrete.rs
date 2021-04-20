@@ -1,6 +1,6 @@
 use crate::{
     polytope::{
-        flag::FlagIter,
+        flag::{FlagEvent, FlagIter},
         geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace, Vector},
         rank::RankVec,
         Abstract, Element, ElementList, Polytope, Subelements, Subsupelements,
@@ -409,7 +409,7 @@ impl Concrete {
         )
     }
 
-    pub fn volume(&self) -> f64 {
+    pub fn volume(&self) -> Option<f64> {
         let mut vertices = Vec::new();
 
         // Vertices map to themselves.
@@ -433,22 +433,29 @@ impl Concrete {
         let dim = self.dim().unwrap();
         let mut volume = 0.0;
 
-        for flag in self.flags() {
-            volume += flag.orientation.sign()
-                * Matrix::from_iterator(
-                    dim,
-                    dim,
-                    flag.elements
-                        .into_iter()
-                        .enumerate()
-                        .map(|(rank, idx)| &self.vertices[vertices[rank][idx]])
-                        .flatten()
-                        .copied(),
-                )
-                .determinant();
+        // For each flag, there's a simplex defined by any vertices in its
+        // elements and the origin. We add up the volumes of all of these
+        // simplices times the sign of the flag that generated them.
+        for flag_event in self.flag_events() {
+            if let FlagEvent::Flag(flag) = flag_event {
+                volume += flag.orientation.sign()
+                    * Matrix::from_iterator(
+                        dim,
+                        dim,
+                        flag.elements
+                            .into_iter()
+                            .enumerate()
+                            .map(|(rank, idx)| &self.vertices[vertices[rank][idx]])
+                            .flatten()
+                            .copied(),
+                    )
+                    .determinant();
+            } else {
+                return None;
+            }
         }
 
-        volume.abs() / (dim.factorial() as f64)
+        Some(volume.abs() / (dim.factorial() as f64))
     }
 
     /// Projects the vertices of the polytope into the lowest dimension possible.
@@ -611,8 +618,8 @@ impl Polytope for Concrete {
         ))
     }
 
-    fn flags(&self) -> FlagIter {
-        self.abs.flags()
+    fn flag_events(&self) -> FlagIter {
+        self.abs.flag_events()
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)

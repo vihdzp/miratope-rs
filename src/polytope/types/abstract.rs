@@ -2,7 +2,9 @@ use derive_deref::{Deref, DerefMut};
 use std::collections::HashMap;
 
 use crate::polytope::{
-    flag::FlagIter, rank::RankVec, Element, ElementList, Polytope, Subelements, Subsupelements,
+    flag::{FlagEvent, FlagIter},
+    rank::RankVec,
+    Element, ElementList, Polytope, Subelements, Subsupelements,
 };
 
 use super::ElementHash;
@@ -508,7 +510,7 @@ impl Polytope for Abstract {
         Some(ElementHash::from_element(self, rank, idx)?.to_polytope(self))
     }
 
-    fn flags(&self) -> FlagIter {
+    fn flag_events(&self) -> FlagIter {
         FlagIter::new(&self)
     }
 
@@ -580,7 +582,15 @@ impl Polytope for Abstract {
     /// Determines whether a given polytope is
     /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
     fn orientable(&self) -> bool {
-        todo!()
+        let flag_iter = self.flag_events();
+
+        for flag in flag_iter {
+            if flag == FlagEvent::NonOrientable {
+                return false;
+            }
+        }
+
+        true
     }
 }
 

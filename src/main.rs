@@ -121,7 +121,8 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::from_path(&"./Gap.off").unwrap();
+    let p = Concrete::from_path(&"./Thah.off").unwrap().prism();
+    dbg!(p.flags().count());
     dbg!(p.volume());
     let poly = Renderable::new(p);
 
