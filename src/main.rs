@@ -258,6 +258,7 @@ fn ui(
         let mut new_hyperplane_pos = section_state.hyperplane_pos;
         ui.add(egui::Slider::f64(&mut new_hyperplane_pos, -1.0..=1.0).text("Slice depth"));
 
+        #[allow(clippy::float_cmp)]
         if section_active.0 && section_state.hyperplane_pos != new_hyperplane_pos {
             section_state.hyperplane_pos = new_hyperplane_pos;
         }
