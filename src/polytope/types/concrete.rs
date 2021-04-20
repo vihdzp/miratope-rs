@@ -14,6 +14,8 @@ use gcd::Gcd;
 use std::{
     collections::HashMap,
     f64::consts::{SQRT_2, TAU},
+    fs, io,
+    path::Path,
 };
 
 #[derive(Debug, Clone)]
@@ -446,7 +448,6 @@ impl Concrete {
             vertex_map.push(element_list);
         }
 
-        let dim = self.dim().unwrap();
         let mut volume = 0.0;
 
         // For each flag, there's a simplex defined by any vertices in its
@@ -471,7 +472,7 @@ impl Concrete {
             }
         }
 
-        Some(volume.abs() / (dim.factorial() as f64))
+        Some(volume.abs() / ((rank as usize).factorial() as f64))
     }
 
     pub fn flat_vertices(&self) -> Option<Vec<Point>> {
@@ -491,11 +492,13 @@ impl Concrete {
     /// Projects the vertices of the polytope into the lowest dimension possible.
     /// If the polytope's subspace is already of full rank, this is a no-op.
     pub fn flatten(&mut self) {
-        let subspace = Subspace::from_points(&self.vertices);
+        if !self.vertices.is_empty() {
+            let subspace = Subspace::from_points(&self.vertices);
 
-        if !subspace.is_full_rank() {
-            for v in self.vertices.iter_mut() {
-                *v = subspace.flatten(v);
+            if !subspace.is_full_rank() {
+                for v in self.vertices.iter_mut() {
+                    *v = subspace.flatten(v);
+                }
             }
         }
     }
@@ -524,7 +527,7 @@ impl Concrete {
             // If we got ourselves a new vertex:
             if let Some(p) = slice.intersect(segment) {
                 hash_element.insert(idx, vertices.len());
-                vertices.push(slice.flatten(&p));
+                vertices.push(p);
             }
         }
 
@@ -567,6 +570,26 @@ impl Concrete {
         abs.push_subs(ElementList::max(facet_count));
 
         Self::new(vertices, abs)
+    }
+
+    /// Loads a polytope from a file path.
+    pub fn from_path(fp: &impl AsRef<Path>) -> std::io::Result<Self> {
+        let off = std::ffi::OsStr::new("off");
+        let ggb = std::ffi::OsStr::new("ggb");
+        let ext = fp.as_ref().extension();
+
+        if ext == Some(off) {
+            Ok(Self::from_off(String::from_utf8(fs::read(fp)?).unwrap())?)
+        } else if ext == Some(ggb) {
+            Ok(Self::from_ggb(zip::read::ZipArchive::new(
+                &mut fs::File::open(fp)?,
+            )?)?)
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "File extension not recognized.",
+            ))
+        }
     }
 }
 

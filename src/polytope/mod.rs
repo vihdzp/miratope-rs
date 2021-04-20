@@ -19,6 +19,7 @@ pub mod convex;
 pub mod cox;
 mod flag;
 pub mod geometry;
+mod ggb;
 pub mod group;
 pub mod off;
 pub mod rank;

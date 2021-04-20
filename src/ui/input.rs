@@ -19,6 +19,11 @@ impl Plugin for InputPlugin {
     }
 }
 
+pub enum CameraType {
+    Projection,
+    Orthogonal,
+}
+
 /// An input event for the camera.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CameraInputEvent {
@@ -39,16 +44,20 @@ pub enum CameraInputEvent {
     ///
     /// The zoom tapers with distance: closer in zooms slow, etc.
     Zoom(f32),
+
+    Reset,
 }
 
 impl std::ops::Mul<f32> for CameraInputEvent {
     type Output = CameraInputEvent;
 
+    /// Composes two camera events together.
     fn mul(mut self, rhs: f32) -> CameraInputEvent {
         match &mut self {
             CameraInputEvent::RotateAnchor(r) => *r *= rhs,
             CameraInputEvent::Translate(p) => *p *= rhs,
             CameraInputEvent::Roll(r) | CameraInputEvent::Zoom(r) => *r *= rhs,
+            _ => {}
         }
 
         self
@@ -58,6 +67,7 @@ impl std::ops::Mul<f32> for CameraInputEvent {
 impl std::ops::Mul<CameraInputEvent> for f32 {
     type Output = CameraInputEvent;
 
+    /// Composes two camera events together.
     fn mul(self, rhs: CameraInputEvent) -> CameraInputEvent {
         rhs * self
     }
@@ -76,9 +86,16 @@ impl CameraInputEvent {
         anchor_tf.rotate(Quat::from_rotation_ypr(0.0, 0.0, roll));
     }
 
+    /// Zooms into the camera.
     fn zoom(zoom: f32, cam_tf: &mut Transform) {
         cam_tf.translation.z += zoom * cam_tf.translation.length();
         cam_tf.translation.z = cam_tf.translation.z.max(0.2);
+    }
+
+    /// Resets the camera to the default position.
+    fn reset(anchor_tf: &mut Transform, cam_tf: &mut Transform) {
+        *anchor_tf = Transform::default();
+        *cam_tf = Transform::default();
     }
 
     fn update_camera_and_anchor(
@@ -94,6 +111,7 @@ impl CameraInputEvent {
             }
             CameraInputEvent::Roll(roll) => CameraInputEvent::roll(roll, anchor_tf),
             CameraInputEvent::Zoom(zoom) => CameraInputEvent::zoom(zoom, cam_tf),
+            CameraInputEvent::Reset => CameraInputEvent::reset(anchor_tf, cam_tf),
         }
     }
 }
@@ -127,6 +145,7 @@ fn cam_events_from_kb(
             KeyCode::LShift | KeyCode::RShift => -scale * ud,
             KeyCode::Q | KeyCode::Numpad7 => real_scale * ROLL,
             KeyCode::E | KeyCode::Numpad9 => -real_scale * ROLL,
+            KeyCode::R => CameraInputEvent::Reset,
             _ => continue,
         })
     }
@@ -187,6 +206,7 @@ fn add_cam_input_events(
 
     let cam_inputs = &mut cam_inputs;
     let (real_scale, scale) = cam_events_from_kb(time, keyboard, cam_inputs);
+
     cam_events_from_mouse(
         mouse_button,
         mouse_move,

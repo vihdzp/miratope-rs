@@ -1,5 +1,5 @@
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
-use std::{collections::HashMap, io::Result, path::Path, str::FromStr};
+use std::{collections::HashMap, io, path::Path, str::FromStr};
 
 use super::{
     Abstract, Concrete, Element, ElementList, Point, Polytope, RankVec, Subelements, Subsupelements,
@@ -181,7 +181,7 @@ fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> Ele
 
 impl Concrete {
     /// Builds a polytope from the string representation of an OFF file.
-    pub fn from_off(src: String) -> Self {
+    pub fn from_off(src: String) -> io::Result<Self> {
         let mut toks = data_tokens(&src);
         let rank = {
             let first = toks.next().expect("OFF file empty");
@@ -197,11 +197,11 @@ impl Concrete {
 
         // Deals with dumb degenerate cases.
         if rank == -1 {
-            return Concrete::nullitope();
+            return Ok(Concrete::nullitope());
         } else if rank == 0 {
-            return Concrete::point();
+            return Ok(Concrete::point());
         } else if rank == 1 {
-            return Concrete::dyad();
+            return Ok(Concrete::dyad());
         }
 
         let num_elems = get_el_nums(rank, &mut toks);
@@ -229,14 +229,7 @@ impl Concrete {
             abs.push_max();
         }
 
-        Self::new(vertices, abs)
-    }
-
-    /// Loads a polytope from a file path.
-    pub fn from_path(fp: &impl AsRef<Path>) -> Result<Self> {
-        Ok(Self::from_off(
-            String::from_utf8(std::fs::read(fp)?).unwrap(),
-        ))
+        Ok(Self::new(vertices, abs))
     }
 }
 
@@ -411,7 +404,7 @@ fn write_els(off: &mut String, opt: &OffOptions, rank: isize, els: &[Element]) {
 
 impl Concrete {
     /// Converts a polytope into an OFF file.
-    pub fn to_src(&self, opt: OffOptions) -> String {
+    pub fn to_off(&self, opt: OffOptions) -> String {
         let rank = self.rank();
         let vertices = &self.vertices;
         let abs = &self.abs;
@@ -456,8 +449,8 @@ impl Concrete {
     }
 
     /// Writes a polytope's OFF file in a specified file path.
-    pub fn to_path(&self, fp: &impl AsRef<Path>, opt: OffOptions) -> Result<()> {
-        std::fs::write(fp, self.to_src(opt))
+    pub fn to_path(&self, fp: &impl AsRef<Path>, opt: OffOptions) -> io::Result<()> {
+        std::fs::write(fp, self.to_off(opt))
     }
 }
 
@@ -472,7 +465,8 @@ mod tests {
 
         // Checks that the polytope can be reloaded correctly.
         assert_eq!(
-            Concrete::from_off(p.to_src(OffOptions::default()))
+            Concrete::from_off(p.to_off(OffOptions::default()))
+                .unwrap()
                 .el_counts()
                 .0,
             el_nums
@@ -482,7 +476,7 @@ mod tests {
     #[test]
     /// Checks that a point has the correct amount of elements.
     fn point_nums() {
-        let point = Concrete::from_off("0OFF".to_string());
+        let point = Concrete::from_off("0OFF".to_string()).unwrap();
 
         test_shape(point, vec![1, 1])
     }
@@ -490,7 +484,7 @@ mod tests {
     #[test]
     /// Checks that a dyad has the correct amount of elements.
     fn dyad_nums() {
-        let dyad = Concrete::from_off("1OFF 2 -1 1 0 1".to_string());
+        let dyad = Concrete::from_off("1OFF 2 -1 1 0 1".to_string()).unwrap();
 
         test_shape(dyad, vec![1, 2, 1])
     }
@@ -522,7 +516,8 @@ mod tests {
     fn tet_nums() {
         let tet = Concrete::from_off(
             "OFF 4 4 6 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2".to_string(),
-        );
+        )
+        .unwrap();
 
         test_shape(tet, vec![1, 4, 6, 4, 1])
     }
@@ -530,9 +525,9 @@ mod tests {
     #[test]
     /// Checks that a 2-tetrahedron compund has the correct amount of elements.
     fn so_nums() {
-        let so =    Concrete::  from_off(
+        let so = Concrete::from_off(
             "OFF 8 8 12 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 -1 -1 -1 -1 1 1 1 -1 1 1 1 -1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2 3 4 5 6 3 7 4 6 3 4 5 7 3 7 5 6 ".to_string(),
-        );
+        ).unwrap();
 
         test_shape(so, vec![1, 8, 12, 8, 1])
     }
@@ -543,7 +538,7 @@ mod tests {
         let pen =   Concrete::   from_off(
             "4OFF 5 10 10 5 0.158113883008419 0.204124145231932 0.288675134594813 0.5 0.158113883008419 0.204124145231932 0.288675134594813 -0.5 0.158113883008419 0.204124145231932 -0.577350269189626 0 0.158113883008419 -0.612372435695794 0 0 -0.632455532033676 0 0 0 3 0 3 4 3 0 2 4 3 2 3 4 3 0 2 3 3 0 1 4 3 1 3 4 3 0 1 3 3 1 2 4 3 0 1 2 3 1 2 3 4 0 1 2 3 4 0 4 5 6 4 1 4 7 8 4 2 5 7 9 4 3 6 8 9"
                 .to_string(),
-        );
+        ).unwrap();
 
         test_shape(pen, vec![1, 5, 10, 10, 5, 1])
     }
@@ -565,7 +560,8 @@ mod tests {
             3 0 1 3#it
             3 3 1 2#works!#"
                 .to_string(),
-        );
+        )
+        .unwrap();
 
         test_shape(tet, vec![1, 4, 6, 4, 1])
     }
@@ -573,12 +569,12 @@ mod tests {
     #[test]
     #[should_panic(expected = "OFF file empty")]
     fn empty() {
-        Concrete::from_off("".to_string());
+        Concrete::from_off("".to_string()).unwrap();
     }
 
     #[test]
     #[should_panic(expected = "no \"OFF\" detected")]
     fn magic_num() {
-        Concrete::from_off("foo bar".to_string());
+        Concrete::from_off("foo bar".to_string()).unwrap();
     }
 }
