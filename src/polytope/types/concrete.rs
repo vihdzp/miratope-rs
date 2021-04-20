@@ -410,24 +410,40 @@ impl Concrete {
     }
 
     pub fn volume(&self) -> Option<f64> {
-        let mut vertices = Vec::new();
+        let rank = self.rank();
+
+        // We leave the nullitope's volume undefined.
+        if rank == -1 {
+            return None;
+        }
+
+        // The vertices, flattened if necessary.
+        let flat_vertices = self.flat_vertices();
+        let flat_vertices = flat_vertices.as_ref().unwrap_or(&self.vertices);
+
+        if flat_vertices.get(0)?.len() != rank as usize {
+            return None;
+        }
+
+        // Maps every element of the polytope to one of its vertices.
+        let mut vertex_map = Vec::new();
 
         // Vertices map to themselves.
         let mut vertex_list = Vec::new();
         for v in 0..self[0].len() {
             vertex_list.push(v);
         }
-        vertices.push(vertex_list);
+        vertex_map.push(vertex_list);
 
         // Every other element maps to the vertex of any subelement.
         for r in 1..=self.rank() {
-            let mut vertex_list = Vec::new();
+            let mut element_list = Vec::new();
 
             for el in self[r].iter() {
-                vertex_list.push(vertices[r as usize - 1][el.subs[0]]);
+                element_list.push(vertex_map[r as usize - 1][el.subs[0]]);
             }
 
-            vertices.push(vertex_list);
+            vertex_map.push(element_list);
         }
 
         let dim = self.dim().unwrap();
@@ -440,12 +456,12 @@ impl Concrete {
             if let FlagEvent::Flag(flag) = flag_event {
                 volume += flag.orientation.sign()
                     * Matrix::from_iterator(
-                        dim,
-                        dim,
+                        rank as usize,
+                        rank as usize,
                         flag.elements
                             .into_iter()
                             .enumerate()
-                            .map(|(rank, idx)| &self.vertices[vertices[rank][idx]])
+                            .map(|(rank, idx)| &flat_vertices[vertex_map[rank][idx]])
                             .flatten()
                             .copied(),
                     )
@@ -456,6 +472,20 @@ impl Concrete {
         }
 
         Some(volume.abs() / (dim.factorial() as f64))
+    }
+
+    pub fn flat_vertices(&self) -> Option<Vec<Point>> {
+        let subspace = Subspace::from_points(&self.vertices);
+
+        if subspace.is_full_rank() {
+            None
+        } else {
+            let mut flat_vertices = Vec::new();
+            for v in self.vertices.iter() {
+                flat_vertices.push(subspace.flatten(v));
+            }
+            Some(flat_vertices)
+        }
     }
 
     /// Projects the vertices of the polytope into the lowest dimension possible.

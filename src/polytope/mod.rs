@@ -127,8 +127,11 @@ pub trait Polytope: Sized + Clone {
         })
     }
 
+    /// Returns an iterator over all "flag events" of a polytope. For more info,
+    /// see [`FlagIter`].
     fn flag_events(&self) -> FlagIter;
 
+    /// Returns an iterator over all flags of a polytope.
     fn flags(&self) -> Box<dyn Iterator<Item = Flag>> {
         Box::new(
             self.flag_events()

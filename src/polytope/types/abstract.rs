@@ -582,10 +582,8 @@ impl Polytope for Abstract {
     /// Determines whether a given polytope is
     /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
     fn orientable(&self) -> bool {
-        let flag_iter = self.flag_events();
-
-        for flag in flag_iter {
-            if flag == FlagEvent::NonOrientable {
+        for flag_event in self.flag_events() {
+            if flag_event == FlagEvent::NonOrientable {
                 return false;
             }
         }

@@ -139,7 +139,13 @@ impl Subspace {
         );
 
         for &p in points {
-            h.add(p);
+            if h.add(p).is_some() {
+                // If the subspace is of full rank, we don't need to check any
+                // more points.
+                if h.is_full_rank() {
+                    return h;
+                }
+            }
         }
 
         h

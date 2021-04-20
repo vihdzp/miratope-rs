@@ -43,7 +43,8 @@ pub struct Flag {
     /// maximal elements.
     pub elements: Vec<usize>,
 
-    /// The orientation of the flag.
+    /// The orientation of the flag. If the polytope is non-orientable, this
+    /// will contain garbage.
     pub orientation: Orientation,
 }
 
@@ -91,9 +92,9 @@ fn common(vec0: &[usize], vec1: &[usize]) -> Vec<usize> {
 
 impl Flag {
     /// Constructs a new, empty `Flag` with the specified capacity.
-    pub fn with_capacity(rank: isize) -> Self {
+    pub fn with_capacity(rank: usize) -> Self {
         Self {
-            elements: Vec::with_capacity(rank as usize),
+            elements: Vec::with_capacity(rank),
             orientation: Orientation::default(),
         }
     }
@@ -110,15 +111,26 @@ impl Flag {
 
     /// Applies a specified flag change to the flag in place.
     pub fn change_mut(&mut self, polytope: &Abstract, idx: usize) {
-        assert!(polytope.rank() >= 1);
+        let rank = polytope.rank();
+        assert_ne!(rank, -1, "Can't iterate over flags of the nullitope.");
+
+        // A flag change is a no-op in a point.
+        if rank == 0 {
+            return;
+        }
 
         let idx = idx as isize;
+
+        // Determines the common elements between the subelements of the element
+        // above and the superelements of the element below.
         let below = polytope.get_element(idx - 1, self[idx - 1]).unwrap();
         let above = polytope.get_element(idx + 1, self[idx + 1]).unwrap();
         let common = common(&below.sups, &above.subs);
 
-        assert_eq!(common.len(), 2);
+        assert_eq!(common.len(), 2, "Diamond property fails.");
 
+        // Changes the element at idx to the other element in the section
+        // determined by the elements above and below.
         if self[idx] == common[0] {
             self[idx] = common[1];
         } else {
@@ -151,8 +163,13 @@ impl std::ops::IndexMut<isize> for Flag {
 }
 
 /// An iterator over all of the "flag events" of a polytope. A flag event is
-/// simply either a flag, or an event that determines that a polytope is
+/// simply either a [`Flag`], or an event that determines that a polytope is
 /// non-orientable.
+///
+/// The reason we don't iterate over flags directly is that sometimes, we
+/// realize a polytope is non-orientable only after checking every single one of
+/// its flags. Hence, we can't bundle the information that the polytope is
+/// non-orientable with the flags.
 pub struct FlagIter {
     /// The polytope whose flags are iterated. We must sort all of its elements
     /// before using it for the algorithm to work.
@@ -189,15 +206,9 @@ pub enum IterResult {
 }
 
 impl FlagIter {
+    /// Initializes a new iterator over the flag events of a polytope.
     pub fn new(polytope: &Abstract) -> Self {
-        assert!(polytope.is_bounded());
-
-        assert_ne!(
-            polytope.rank(),
-            -1,
-            "Can't iterate over the flags of the nullitope!"
-        );
-
+        assert!(polytope.is_bounded(), "Polytope is not bounded.");
         let rank = polytope.rank();
 
         // The polytope's elements must be sorted! We thus clone the polytope
@@ -209,22 +220,25 @@ impl FlagIter {
             }
         }
 
-        // Initializes with any flag from the polytope.
-        let mut flag = Flag::with_capacity(rank);
-        let mut idx = 0;
-        flag.elements.push(0);
-        for r in 1..rank {
-            idx = polytope.get_element(r - 1, idx).unwrap().sups[0];
-            flag.elements.push(idx);
-        }
-
         // Initializes found flags.
         let mut found = HashMap::new();
-        found.insert(flag.clone(), 0);
-
-        // Initializes queue.
         let mut queue = VecDeque::new();
-        queue.push_back(flag);
+
+        if polytope.rank() != -1 {
+            // Initializes with any flag from the polytope.
+            let mut flag = Flag::with_capacity(rank as usize);
+            let mut idx = 0;
+            flag.elements.push(0);
+            for r in 1..rank {
+                idx = polytope.get_element(r - 1, idx).unwrap().sups[0];
+                flag.elements.push(idx);
+            }
+
+            found.insert(flag.clone(), 0);
+
+            // Initializes queue.
+            queue.push_back(flag);
+        }
 
         Self {
             polytope,
@@ -305,17 +319,16 @@ impl FlagIter {
 /// Represents either a new found flag, or the event in which the iterator
 /// realizes that the polytope is non-orientable.
 pub enum FlagEvent {
+    /// We found a new flag.
     Flag(Flag),
+
+    /// We just realized the polytope is non-orientable.
     NonOrientable,
 }
 
 impl FlagEvent {
     pub fn is_flag(&self) -> bool {
-        if let FlagEvent::Flag(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, FlagEvent::Flag(_))
     }
 }
 
@@ -323,16 +336,31 @@ impl Iterator for FlagIter {
     type Item = FlagEvent;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match self.try_next() {
-                IterResult::New(f) => {
-                    return Some(FlagEvent::Flag(f));
+        let rank = self.polytope.rank();
+
+        // A nullitope has no flags.
+        if rank == -1 {
+            None
+        }
+        // A point has a single flag.
+        else if rank == 0 {
+            if let Some(f) = self.queue.pop_front() {
+                Some(FlagEvent::Flag(f))
+            } else {
+                None
+            }
+        } else {
+            loop {
+                match self.try_next() {
+                    IterResult::New(f) => {
+                        return Some(FlagEvent::Flag(f));
+                    }
+                    IterResult::NonOrientable => {
+                        return Some(FlagEvent::NonOrientable);
+                    }
+                    IterResult::None => return None,
+                    IterResult::Repeat => {}
                 }
-                IterResult::NonOrientable => {
-                    return Some(FlagEvent::NonOrientable);
-                }
-                IterResult::None => return None,
-                IterResult::Repeat => {}
             }
         }
     }

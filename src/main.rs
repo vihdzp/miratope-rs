@@ -121,9 +121,8 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::from_path(&"./Thah.off").unwrap().prism();
-    dbg!(p.flags().count());
-    dbg!(p.volume());
+    let p = Concrete::from_path(&"./Gap.off").unwrap();
+    dbg!(p.verf(0).unwrap().volume());
     let poly = Renderable::new(p);
 
     pipelines.set_untracked(
@@ -207,60 +206,91 @@ fn ui(
             });
         });
 
-        // Converts the active polytope into its dual.
-        if ui.button("Dual").clicked() {
-            for mut p in query.iter_mut() {
-                match p.concrete.dual_mut() {
-                    Ok(_) => println!("Dual succeeded"),
-                    Err(_) => println!("Dual failed"),
+        ui.columns(2, |columns| {
+            // Converts the active polytope into its dual.
+            if columns[0].button("Dual").clicked() {
+                for mut p in query.iter_mut() {
+                    match p.concrete.dual_mut() {
+                        Ok(_) => println!("Dual succeeded"),
+                        Err(_) => println!("Dual failed"),
+                    }
+
+                    // If we're currently viewing a cross-section, it gets "fixed"
+                    // as the active polytope.
+                    section_state.original_polytope = None;
+                    section_active.0 = false;
+
+                    // Crashes for some reason.
+                    // println!("{}", &p.concrete.to_src(off::OffOptions { comments: true }));
                 }
-
-                // If we're currently viewing a cross-section, it gets "fixed"
-                // as the active polytope.
-                section_state.original_polytope = None;
-                section_active.0 = false;
-
-                // Crashes for some reason.
-                // println!("{}", &p.concrete.to_src(off::OffOptions { comments: true }));
             }
-        }
 
-        // Converts the active polytope into any of its facets.
-        if ui.button("Facet").clicked() {
-            for mut p in query.iter_mut() {
-                println!("Facet");
+            // Converts the active polytope into any of its facets.
+            if columns[0].button("Facet").clicked() {
+                for mut p in query.iter_mut() {
+                    println!("Facet");
 
-                if let Some(mut facet) = p.concrete.facet(0) {
-                    facet.flatten();
-                    facet.recenter();
-                    *p = Renderable::new(facet);
-                };
+                    if let Some(mut facet) = p.concrete.facet(0) {
+                        facet.flatten();
+                        facet.recenter();
+                        *p = Renderable::new(facet);
+                    };
 
-                // If we're currently viewing a cross-section, it gets "fixed"
-                // as the active polytope.
-                section_state.original_polytope = None;
-                section_active.0 = false;
+                    // If we're currently viewing a cross-section, it gets "fixed"
+                    // as the active polytope.
+                    section_state.original_polytope = None;
+                    section_active.0 = false;
+                }
             }
-        }
 
-        // Exports the active polytope as an OFF file (not yet functional!)
-        if ui.button("Export OFF").clicked() {
-            for _p in query.iter_mut() {
-                println!("Export OFF");
+            // Converts the active polytope into any of its verfs.
+            if columns[0].button("Verf").clicked() {
+                for mut p in query.iter_mut() {
+                    println!("Verf");
+
+                    if let Some(mut facet) = p.concrete.verf(0) {
+                        facet.flatten();
+                        facet.recenter();
+                        *p = Renderable::new(facet);
+                    };
+
+                    // If we're currently viewing a cross-section, it gets "fixed"
+                    // as the active polytope.
+                    section_state.original_polytope = None;
+                    section_active.0 = false;
+                }
             }
-        }
 
-        // Toggles cross-section mode.
-        if ui.button("Cross-section").clicked() {
-            section_active.flip();
-        }
+            // Exports the active polytope as an OFF file (not yet functional!)
+            if columns[1].button("Export OFF").clicked() {
+                for _p in query.iter_mut() {
+                    println!("Export OFF");
+                }
+            }
+
+            // Gets the volume of the polytope.
+            if columns[1].button("Volume").clicked() {
+                for p in query.iter_mut() {
+                    if let Some(vol) = p.concrete.volume() {
+                        println!("The volume is {}.", vol);
+                    } else {
+                        println!("The polytope has no volume.");
+                    }
+                }
+            }
+
+            // Toggles cross-section mode.
+            if columns[1].button("Cross-section").clicked() {
+                section_active.flip();
+            }
+        });
 
         // Updates the slicing depth for the polytope, but only when needed.
         let mut new_hyperplane_pos = section_state.hyperplane_pos;
         ui.add(egui::Slider::f64(&mut new_hyperplane_pos, -1.0..=1.0).text("Slice depth"));
 
         #[allow(clippy::float_cmp)]
-        if section_active.0 && section_state.hyperplane_pos != new_hyperplane_pos {
+        if section_state.hyperplane_pos != new_hyperplane_pos {
             section_state.hyperplane_pos = new_hyperplane_pos;
         }
     });
@@ -320,10 +350,9 @@ fn update_cross_section(
             let r = state.original_polytope.clone().unwrap();
             let hyp_pos = state.hyperplane_pos + 0.00001; // Botch fix for degeneracies.
 
-            *p = Renderable::new(
-                r.concrete
-                    .slice(Hyperplane::x(r.concrete.dim().unwrap(), hyp_pos)),
-            );
+            if let Some(dim) = r.concrete.dim() {
+                *p = Renderable::new(r.concrete.slice(Hyperplane::x(dim, hyp_pos)));
+            }
         }
     }
 }
