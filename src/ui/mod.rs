@@ -139,18 +139,18 @@ pub fn ui(
 
         // Sets the slider range to the range of x coordinates in the polytope.
         let mut new_hyperplane_pos = section_state.hyperplane_pos;
-        let min_x;
-        let max_x;
+        let x_min;
+        let x_max;
 
         if let Some(original) = &section_state.original_polytope {
-            min_x = original.concrete.x_min().unwrap();
-            max_x = original.concrete.x_max().unwrap();
+            x_min = original.concrete.x_min().unwrap();
+            x_max = original.concrete.x_max().unwrap();
         } else {
-            min_x = -1.0;
-            max_x = 1.0;
+            x_min = -1.0;
+            x_max = 1.0;
         }
         ui.add(
-            egui::Slider::f64(&mut new_hyperplane_pos, min_x..=max_x - 0.000001)
+            egui::Slider::f64(&mut new_hyperplane_pos, x_min..=x_max - 0.000001)
                 .max_decimals(5)
                 .text("Slice depth"),
         );
@@ -205,12 +205,10 @@ pub fn update_cross_section_state(
     mut state: ResMut<CrossSectionState>,
     active: ChangedRes<CrossSectionActive>,
 ) {
-    if dbg!(active.0) {
+    if active.0 {
         state.original_polytope = Some(query.iter_mut().next().unwrap().clone());
     } else if let Some(p) = state.original_polytope.take() {
         *query.iter_mut().next().unwrap() = p;
-    } else {
-        println!("This should only happen on startup.");
     }
 }
 
