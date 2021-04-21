@@ -140,7 +140,17 @@ pub fn ui(
 
         // Updates the slicing depth for the polytope, but only when needed.
         let mut new_hyperplane_pos = section_state.hyperplane_pos;
-        ui.add(egui::Slider::f64(&mut new_hyperplane_pos, -2.0..=2.0).text("Slice depth"));
+        let originalref = section_state.original_polytope.as_ref();
+        let minx: f64;
+        let maxx: f64;
+        if originalref.is_none() {
+            minx = -1.0;
+            maxx = 1.0;
+        } else {
+            minx = originalref.unwrap().concrete.min_x().unwrap();
+            maxx = originalref.unwrap().concrete.max_x().unwrap();
+        }
+        ui.add(egui::Slider::f64(&mut new_hyperplane_pos, minx..=maxx-0.0001).text("Slice depth"));
 
         #[allow(clippy::float_cmp)]
         if section_state.hyperplane_pos != new_hyperplane_pos {

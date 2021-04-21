@@ -12,6 +12,7 @@ use crate::{
 use approx::{abs_diff_eq, abs_diff_ne};
 use factorial::Factorial;
 use gcd::Gcd;
+use core::f64;
 use std::{
     collections::HashMap,
     f64::consts::{SQRT_2, TAU},
@@ -174,6 +175,44 @@ impl Concrete {
         }
 
         Some(g / (self.vertices.len() as f64))
+    }
+
+    /// Gets the highest x coordinate of a vertex of the polytope.
+    pub fn max_x(&self) -> Option<f64> {
+        if self.rank() < 0 {
+            return None
+        }
+
+        let mut m: f64 = f64::NEG_INFINITY;
+        let mut cx: f64;
+
+        for v in &self.vertices {
+            cx = v[0];
+            if cx > m {
+                m = cx;
+            }
+        }
+
+        Some(m)
+    }
+
+    /// Gets the highest x coordinate of a vertex of the polytope.
+    pub fn min_x(&self) -> Option<f64> {
+        if self.rank() < 0 {
+            return None
+        }
+
+        let mut m: f64 = f64::INFINITY;
+        let mut cx: f64;
+
+        for v in &self.vertices {
+            cx = v[0];
+            if cx < m {
+                m = cx;
+            }
+        }
+
+        Some(m)
     }
 
     /// Gets the edge lengths of all edges in the polytope, in order.
