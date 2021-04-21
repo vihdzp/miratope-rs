@@ -12,6 +12,7 @@ use crate::{
 use approx::{abs_diff_eq, abs_diff_ne};
 use core::f64;
 use factorial::Factorial;
+use float_ord::FloatOrd;
 use gcd::Gcd;
 use std::{
     collections::HashMap,
@@ -177,42 +178,22 @@ impl Concrete {
         Some(g / (self.vertices.len() as f64))
     }
 
-    /// Gets the highest x coordinate of a vertex of the polytope.
-    pub fn max_x(&self) -> Option<f64> {
-        if self.rank() < 0 {
-            return None;
-        }
-
-        let mut m: f64 = f64::NEG_INFINITY;
-        let mut cx: f64;
-
-        for v in &self.vertices {
-            cx = v[0];
-            if cx > m {
-                m = cx;
-            }
-        }
-
-        Some(m)
+    /// Gets the least `x` coordinate of a vertex of the polytope.
+    pub fn x_min(&self) -> Option<f64> {
+        self.vertices
+            .iter()
+            .map(|v| FloatOrd(v[0]))
+            .min()
+            .map(|x| x.0)
     }
 
-    /// Gets the highest x coordinate of a vertex of the polytope.
-    pub fn min_x(&self) -> Option<f64> {
-        if self.rank() < 0 {
-            return None;
-        }
-
-        let mut m: f64 = f64::INFINITY;
-        let mut cx: f64;
-
-        for v in &self.vertices {
-            cx = v[0];
-            if cx < m {
-                m = cx;
-            }
-        }
-
-        Some(m)
+    /// Gets the greatest `x` coordinate of a vertex of the polytope.
+    pub fn x_max(&self) -> Option<f64> {
+        self.vertices
+            .iter()
+            .map(|v| FloatOrd(v[0]))
+            .max()
+            .map(|x| x.0)
     }
 
     /// Gets the edge lengths of all edges in the polytope, in order.

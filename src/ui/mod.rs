@@ -143,8 +143,8 @@ pub fn ui(
         let max_x;
 
         if let Some(original) = &section_state.original_polytope {
-            min_x = original.concrete.min_x().unwrap();
-            max_x = original.concrete.max_x().unwrap();
+            min_x = original.concrete.x_min().unwrap();
+            max_x = original.concrete.x_max().unwrap();
         } else {
             min_x = -1.0;
             max_x = 1.0;

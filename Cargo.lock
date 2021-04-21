@@ -1439,6 +1439,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "float-ord"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64860170d0b2dd3f1c5af6d96aafa47b5928ac0163116c1ab27313480d82b547"
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2351,6 +2357,7 @@ dependencies = [
  "derive_deref",
  "dyn-clone",
  "factorial",
+ "float-ord",
  "gcd",
  "itertools",
  "nalgebra",
