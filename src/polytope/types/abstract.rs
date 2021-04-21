@@ -27,7 +27,7 @@ use super::ElementHash;
 #[derive(Debug, Clone)]
 pub struct Abstract {
     pub ranks: RankVec<ElementList>,
-     name: Name,
+    name: Name,
 }
 
 impl Abstract {
