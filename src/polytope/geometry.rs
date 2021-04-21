@@ -1,4 +1,4 @@
-//! Contains a few structs and methods to faciliate geometry in n-dimensional
+//! Contains a few structs and methods to faciliate geometry in *n*-dimensional
 //! space.
 
 /// A point in *n*-dimensional space.
@@ -46,10 +46,11 @@ impl Hypersphere {
         Hypersphere::with_radius(dim, 1.0)
     }
 
-    /// Reciprocates a point
-    pub fn reciprocate(&self, p: &mut Point) -> Result<(), ()> {
-        *p -= &self.center;
-        let s = p.norm_squared();
+    /// Reciprocates a point in place. If it's too close to the sphere's center,
+    /// it returns `Err(())` and leaves it unmoved.
+    pub fn reciprocate_mut(&self, p: &mut Point) -> Result<(), ()> {
+        let mut q = &*p - &self.center;
+        let s = q.norm_squared();
 
         // If any face passes through the dual center, the dual does
         // not exist, and we return early.
@@ -57,10 +58,21 @@ impl Hypersphere {
             return Err(());
         }
 
-        *p /= s;
-        *p += &self.center;
+        q /= s;
+        q += &self.center;
+        *p = q;
 
         Ok(())
+    }
+
+    /// Reciprocates a point.
+    pub fn reciprocate(&self, p: &Point) -> Option<Point> {
+        let mut clone = p.clone();
+        if self.reciprocate_mut(&mut clone).is_ok() {
+            Some(clone)
+        } else {
+            None
+        }
     }
 
     /// Returns whether two hyperspheres are "approximately" equal.

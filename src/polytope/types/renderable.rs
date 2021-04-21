@@ -5,8 +5,8 @@ use crate::polytope::{geometry::Point, Concrete, ElementList};
 
 /// A [`Concrete`], together with a triangulation used to render it.
 ///
-/// This struct doesn't actually implement [`Polytope`], though it still acts as
-/// a type of polytope by virtue of storing one directly.
+/// This struct doesn't actually implement [`Polytope`](crate::Polytope), though
+/// it still acts as a type of polytope by virtue of storing one directly.
 #[derive(Debug, Clone)]
 pub struct Renderable {
     /// The underlying concrete polytope.

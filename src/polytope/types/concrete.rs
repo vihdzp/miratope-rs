@@ -10,9 +10,9 @@ use crate::{
 };
 
 use approx::{abs_diff_eq, abs_diff_ne};
+use core::f64;
 use factorial::Factorial;
 use gcd::Gcd;
-use core::f64;
 use std::{
     collections::HashMap,
     f64::consts::{SQRT_2, TAU},
@@ -180,7 +180,7 @@ impl Concrete {
     /// Gets the highest x coordinate of a vertex of the polytope.
     pub fn max_x(&self) -> Option<f64> {
         if self.rank() < 0 {
-            return None
+            return None;
         }
 
         let mut m: f64 = f64::NEG_INFINITY;
@@ -199,7 +199,7 @@ impl Concrete {
     /// Gets the highest x coordinate of a vertex of the polytope.
     pub fn min_x(&self) -> Option<f64> {
         if self.rank() < 0 {
-            return None
+            return None;
         }
 
         let mut m: f64 = f64::INFINITY;
@@ -307,7 +307,7 @@ impl Concrete {
         // In the case of points, we reciprocate them.
         else if rank == 0 {
             for v in self.vertices.iter_mut() {
-                if sphere.reciprocate(v).is_err() {
+                if sphere.reciprocate_mut(v).is_err() {
                     return Err(());
                 }
             }
@@ -339,7 +339,7 @@ impl Concrete {
 
         // Reciprocates the projected points.
         for v in projections.iter_mut() {
-            if sphere.reciprocate(v).is_err() {
+            if sphere.reciprocate_mut(v).is_err() {
                 return Err(());
             }
         }

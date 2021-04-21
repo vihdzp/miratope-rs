@@ -12,7 +12,7 @@ as well as the following:
 
 * Various families of polytopes to build and render
   * All [regular polytopes](https://polytope.miraheze.org/wiki/Regular_polytope)
-  * All 3D and 4D known [uniform polytopes](https://polytope.miraheze.org/wiki/Uniform_polytope)
+  * All known 3D and 4D [uniform polytopes](https://polytope.miraheze.org/wiki/Uniform_polytope)
   * Many of the known [CRFs](https://polytope.miraheze.org/wiki/Convex_regular-faced_polytope)
 * Many operations to apply to these polytopes
   * [Duals](https://polytope.miraheze.org/wiki/Dual)

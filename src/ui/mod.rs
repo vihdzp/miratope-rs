@@ -48,7 +48,6 @@ pub fn ui(
     let ctx = &mut egui_ctx.ctx;
 
     egui::TopPanel::top("top_panel").show(ctx, |ui| {
-
         egui::menu::bar(ui, |ui| {
             egui::menu::menu(ui, "File", |ui| {
                 if ui.button("Quit").clicked() {
@@ -56,7 +55,7 @@ pub fn ui(
                 }
             });
         });
-        
+
         ui.columns(6, |columns| {
             // Converts the active polytope into its dual.
             if columns[0].button("Dual").clicked() {
@@ -135,24 +134,27 @@ pub fn ui(
                 section_active.flip();
             }
         });
-        
+
         ui.spacing_mut().slider_width = 800.0;
 
-        // Updates the slicing depth for the polytope, but only when needed.
+        // Sets the slider range to the range of x coordinates in the polytope.
         let mut new_hyperplane_pos = section_state.hyperplane_pos;
-        let originalref = section_state.original_polytope.as_ref();
-        let minx: f64;
-        let maxx: f64;
-        if originalref.is_none() {
-            minx = -1.0;
-            maxx = 1.0;
+        let min_x;
+        let max_x;
+
+        if let Some(original) = &section_state.original_polytope {
+            min_x = original.concrete.min_x().unwrap();
+            max_x = original.concrete.max_x().unwrap();
         } else {
-            minx = originalref.unwrap().concrete.min_x().unwrap();
-            maxx = originalref.unwrap().concrete.max_x().unwrap();
+            min_x = -1.0;
+            max_x = 1.0;
         }
-        ui.add(egui::Slider::f64(&mut new_hyperplane_pos, minx..=maxx-0.000001).max_decimals(5).text("Slice depth"));
+        ui.add(
+            egui::Slider::f64(&mut new_hyperplane_pos, min_x..=max_x - 0.0001).text("Slice depth"),
+        );
 
         #[allow(clippy::float_cmp)]
+        // Updates the slicing depth for the polytope, but only when needed.
         if section_state.hyperplane_pos != new_hyperplane_pos {
             section_state.hyperplane_pos = new_hyperplane_pos;
         }
@@ -224,14 +226,14 @@ pub fn update_cross_section(
             if let Some(dim) = r.concrete.dim() {
                 let hyperplane = Hyperplane::x(dim, hyp_pos);
                 let mut slice = r.concrete.slice(&hyperplane);
-            
+
                 if state.flatten {
                     slice.flatten_into(&hyperplane.subspace);
                     slice.recenter_with(
                         &hyperplane.flatten(&hyperplane.project(&Point::zeros(dim))),
                     );
                 }
-            
+
                 *p = Renderable::new(slice);
             }
         }
