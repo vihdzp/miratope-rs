@@ -1,4 +1,4 @@
-use crate::polytope::geometry::Hyperplane;
+use crate::polytope::geometry::{Hyperplane, Point};
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
 
@@ -210,10 +210,14 @@ pub fn update_cross_section(
             let hyp_pos = state.hyperplane_pos + 0.00001; // Botch fix for degeneracies.
 
             if let Some(dim) = r.concrete.dim() {
-                let mut slice = r.concrete.slice(Hyperplane::x(dim, hyp_pos));
+                let hyperplane = Hyperplane::x(dim, hyp_pos);
+                let mut slice = r.concrete.slice(&hyperplane);
+
                 if state.flatten {
-                    slice.flatten();
-                    slice.recenter();
+                    slice.flatten_into(&hyperplane.subspace);
+                    slice.recenter_with(
+                        &hyperplane.flatten(&hyperplane.project(&Point::zeros(dim))),
+                    );
                 }
 
                 *p = Renderable::new(slice);

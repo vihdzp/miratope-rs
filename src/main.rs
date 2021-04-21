@@ -92,7 +92,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::polygon(3).prism();
+    let p = Concrete::polygon(7).prism();
     dbg!(language::Es::parse(p.get_name(), Default::default()));
     let poly = Renderable::new(p);
 

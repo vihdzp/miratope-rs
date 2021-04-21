@@ -107,17 +107,21 @@ impl Concrete {
     }
 
     /// Shifts all vertices by a given vector.
-    pub fn shift(&mut self, o: Vector) {
+    pub fn shift(&mut self, o: &Vector) {
         for v in &mut self.vertices {
-            *v -= &o;
+            *v -= o;
         }
     }
 
     /// Recenters a polytope so that the gravicenter is at the origin.
     pub fn recenter(&mut self) {
         if let Some(gravicenter) = self.gravicenter() {
-            self.shift(gravicenter);
+            self.recenter_with(&gravicenter);
         }
+    }
+
+    pub fn recenter_with(&mut self, p: &Point) {
+        self.shift(&-p)
     }
 
     /// Applies a matrix to all vertices of a polytope.
@@ -494,12 +498,14 @@ impl Concrete {
     /// If the polytope's subspace is already of full rank, this is a no-op.
     pub fn flatten(&mut self) {
         if !self.vertices.is_empty() {
-            let subspace = Subspace::from_points(&self.vertices);
+            self.flatten_into(&Subspace::from_points(&self.vertices));
+        }
+    }
 
-            if !subspace.is_full_rank() {
-                for v in self.vertices.iter_mut() {
-                    *v = subspace.flatten(v);
-                }
+    pub fn flatten_into(&mut self, subspace: &Subspace) {
+        if !subspace.is_full_rank() {
+            for v in self.vertices.iter_mut() {
+                *v = subspace.flatten(v);
             }
         }
     }
@@ -508,7 +514,7 @@ impl Concrete {
     ///
     /// # Todo
     /// We should make this function take a general [`Subspace`] instead.
-    pub fn slice(&self, slice: Hyperplane) -> Self {
+    pub fn slice(&self, slice: &Hyperplane) -> Self {
         let mut vertices = Vec::new();
 
         let mut abs = Abstract::new();

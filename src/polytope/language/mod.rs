@@ -333,7 +333,9 @@ pub trait Language: GreekPrefix {
         format!("{}{}", Self::prefix(n, options), Self::suffix(d, options))
     }
 
-    fn polygon(n:usize,options: Options) -> String {}
+    fn polygon(n: usize, options: Options) -> String {
+        Self::simple(n, 2, options)
+    }
 
     /// The name for a pyramid with a given base.
     fn pyramid(base: &Name, options: Options) -> String {
