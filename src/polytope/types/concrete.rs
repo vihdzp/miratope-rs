@@ -2,6 +2,7 @@ use crate::{
     polytope::{
         flag::{FlagEvent, FlagIter},
         geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace, Vector},
+        language::Name,
         rank::RankVec,
         Abstract, Element, ElementList, Polytope, Subelements, Subsupelements,
     },
@@ -176,7 +177,7 @@ impl Concrete {
         let mut edge_lengths = Vec::new();
 
         // If there are no edges, we just return the empty vector.
-        if let Some(edges) = self.abs.get(1) {
+        if let Some(edges) = self.abs.ranks.get(1) {
             edge_lengths.reserve_exact(edges.len());
 
             for edge in edges.iter() {
@@ -566,7 +567,7 @@ impl Concrete {
         }
 
         // Adds a maximal element manually.
-        let facet_count = abs.last().unwrap().len();
+        let facet_count = abs.ranks.last().unwrap().len();
         abs.push_subs(ElementList::max(facet_count));
 
         Self::new(vertices, abs)
@@ -597,6 +598,14 @@ impl Polytope for Concrete {
     /// Returns the rank of the polytope.
     fn rank(&self) -> isize {
         self.abs.rank()
+    }
+
+    fn set_name(&mut self, name: Name) {
+        self.abs.set_name(name);
+    }
+
+    fn get_name(&self) -> &Name {
+        self.abs.get_name()
     }
 
     /// Gets the number of elements of a given rank.

@@ -1,8 +1,8 @@
-use derive_deref::{Deref, DerefMut};
 use std::collections::HashMap;
 
 use crate::polytope::{
     flag::{FlagEvent, FlagIter},
+    language::Name,
     rank::RankVec,
     Element, ElementList, Polytope, Subelements, Subsupelements,
 };
@@ -24,24 +24,35 @@ use super::ElementHash;
 /// instead provide an [`ElementList`] whose elements have their superelements
 /// set to empty vectors. This method will automatically set the superelements
 /// of the elements of the previous rank.
-#[derive(Debug, Clone, Deref, DerefMut)]
-pub struct Abstract(RankVec<ElementList>);
+#[derive(Debug, Clone)]
+pub struct Abstract {
+    pub ranks: RankVec<ElementList>,
+     name: Name,
+}
 
 impl Abstract {
     /// Initializes a polytope with an empty element list.
     pub fn new() -> Self {
-        Abstract(RankVec::new())
+        Self::from_vec(RankVec::new())
     }
 
     /// Initializes a new polytope with the capacity needed to store elements up
     /// to a given rank.
     pub fn with_capacity(rank: isize) -> Self {
-        Abstract(RankVec::with_capacity(rank))
+        Self::from_vec(RankVec::with_capacity(rank))
     }
 
     /// Initializes a polytope from a vector of element lists.
-    pub fn from_vec(vec: Vec<ElementList>) -> Self {
-        Abstract(RankVec(vec))
+    pub fn from_vec(ranks: RankVec<ElementList>) -> Self {
+        Self {
+            ranks,
+            name: Name::Unknown,
+        }
+    }
+
+    /// Returns the rank of the polytope.
+    pub fn rank(&self) -> isize {
+        self.ranks.rank()
     }
 
     /// Returns a reference to the minimal element of the polytope.
@@ -53,14 +64,14 @@ impl Abstract {
     /// maximal rank **have** already been set. If they haven't already been
     /// set, use [`push_subs`](Self::push_subs) instead.    
     pub fn push(&mut self, elements: ElementList) {
-        self.0.push(elements);
+        self.ranks.push(elements);
     }
 
     /// Pushes a given element into the vector of elements of a given rank.
     pub fn push_at(&mut self, rank: isize, el: Element) {
         let i = self[rank].len();
 
-        if let Some(lower_rank) = self.get_mut(rank - 1) {
+        if let Some(lower_rank) = self.ranks.get_mut(rank - 1) {
             // Updates superelements of the lower rank.
             for &sub in el.subs.iter() {
                 lower_rank[sub].sups.push(i);
@@ -75,7 +86,7 @@ impl Abstract {
     /// set, use [`push`](Self::push) instead.    
     pub fn push_subs(&mut self, elements: ElementList) {
         // We assume the superelements of the maximal rank haven't been set.
-        if !self.is_empty() {
+        if !self.ranks.is_empty() {
             for el in self[self.rank()].iter() {
                 debug_assert!(el.sups.is_empty(), "The method push_subs can only been used when the superelements of the elements of the maximal rank haven't already been set.");
             }
@@ -94,7 +105,7 @@ impl Abstract {
     /// the base element.
     pub fn push_single(&mut self) {
         // If you're using this method, the polytope should be empty.
-        debug_assert!(self.is_empty());
+        debug_assert!(self.ranks.is_empty());
 
         self.push_subs(ElementList::single());
     }
@@ -120,7 +131,7 @@ impl Abstract {
     /// Returns a reference to an element of the polytope. To actually get the
     /// entire polytope it defines, use [`element`](Self::element).
     pub fn get_element(&self, rank: isize, idx: usize) -> Option<&Element> {
-        self.0.get(rank)?.get(idx)
+        self.ranks.get(rank)?.get(idx)
     }
 
     /// Gets the indices of the vertices of an element in the polytope, if it
@@ -372,13 +383,21 @@ impl Abstract {
 impl Polytope for Abstract {
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
     fn rank(&self) -> isize {
-        self.0.rank()
+        self.ranks.rank()
+    }
+
+    fn set_name(&mut self, name: Name) {
+        self.name = name;
+    }
+
+    fn get_name(&self) -> &Name {
+        &self.name
     }
 
     /// The number of elements of a given rank.
     fn el_count(&self, rank: isize) -> usize {
-        if let Some(els) = self.get(rank) {
-            els.len()
+        if let Some(elements) = self.ranks.get(rank) {
+            elements.len()
         } else {
             0
         }
@@ -399,14 +418,20 @@ impl Polytope for Abstract {
     /// [nullitope](https://polytope.miraheze.org/wiki/Nullitope), the unique
     /// polytope of rank &minus;1.
     fn nullitope() -> Self {
-        Abstract::from_vec(vec![ElementList::min(0)])
+        Self {
+            ranks: RankVec(vec![ElementList::min(0)]),
+            name: Name::Simplex(-1),
+        }
     }
 
     /// Returns an instance of the
     /// [point](https://polytope.miraheze.org/wiki/Point), the unique polytope
     /// of rank 0.
     fn point() -> Self {
-        Abstract::from_vec(vec![ElementList::min(1), ElementList::max(1)])
+        Self {
+            ranks: RankVec(vec![ElementList::min(1), ElementList::max(1)]),
+            name: Name::Simplex(0),
+        }
     }
 
     /// Returns an instance of the
@@ -418,6 +443,7 @@ impl Polytope for Abstract {
         abs.push(ElementList::min(2));
         abs.push(ElementList::vertices(2));
         abs.push_subs(ElementList::max(2));
+        abs.name = Name::Simplex(1);
 
         abs
     }
@@ -442,6 +468,7 @@ impl Polytope for Abstract {
         poly.push(vertices);
         poly.push_subs(edges);
         poly.push_subs(maximal);
+        poly.name = Name::Polygon(n);
 
         poly
     }
@@ -455,13 +482,13 @@ impl Polytope for Abstract {
 
     /// Converts a polytope into its dual in place.
     fn _dual_mut(&mut self) -> Result<(), ()> {
-        for elements in self.iter_mut() {
+        for elements in self.ranks.iter_mut() {
             for el in elements.iter_mut() {
                 el.swap_mut();
             }
         }
 
-        self.reverse();
+        self.ranks.reverse();
         Ok(())
     }
 
@@ -570,7 +597,7 @@ impl Polytope for Abstract {
         let min = self[-1][0].clone();
 
         self[-1].push(min);
-        self.insert(-1, ElementList::max(2));
+        self.ranks.insert(-1, ElementList::max(2));
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
@@ -596,13 +623,13 @@ impl std::ops::Index<isize> for Abstract {
     type Output = ElementList;
 
     fn index(&self, index: isize) -> &Self::Output {
-        &self.0[index]
+        &self.ranks[index]
     }
 }
 
 impl std::ops::IndexMut<isize> for Abstract {
     fn index_mut(&mut self, index: isize) -> &mut Self::Output {
-        &mut self.0[index]
+        &mut self.ranks[index]
     }
 }
 
@@ -612,6 +639,6 @@ impl IntoIterator for Abstract {
     type IntoIter = crate::polytope::rank::IntoIter<ElementList>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        self.ranks.into_iter()
     }
 }

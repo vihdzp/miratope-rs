@@ -10,6 +10,7 @@ use derive_deref::{Deref, DerefMut};
 use self::{
     flag::{Flag, FlagEvent},
     geometry::Point,
+    language::Name,
     rank::RankVec,
 };
 pub use types::{concrete::*, r#abstract::*, renderable::*};
@@ -17,10 +18,11 @@ pub use types::{concrete::*, r#abstract::*, renderable::*};
 pub mod cd;
 pub mod convex;
 pub mod cox;
-mod flag;
+pub mod flag;
 pub mod geometry;
-mod ggb;
+pub mod ggb;
 pub mod group;
+pub mod language;
 pub mod off;
 pub mod rank;
 pub mod types;
@@ -37,6 +39,10 @@ const COMPONENTS: &str = "Components";
 pub trait Polytope: Sized + Clone {
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
     fn rank(&self) -> isize;
+
+    fn set_name(&mut self, name: Name);
+
+    fn get_name(&self) -> &Name;
 
     /// The number of elements of a given rank.
     fn el_count(&self, rank: isize) -> usize;
@@ -190,19 +196,25 @@ pub trait Polytope: Sized + Clone {
     /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
     /// given base.
     fn pyramid(&self) -> Self {
-        Self::duopyramid(self, &Self::point())
+        let mut pyramid = Self::duopyramid(self, &Self::point());
+        pyramid.set_name(self.get_name().pyramid());
+        pyramid
     }
 
     /// Builds a [prism](https://polytope.miraheze.org/wiki/Prism) from a
     /// given base.
     fn prism(&self) -> Self {
-        Self::duoprism(self, &Self::dyad())
+        let mut prism = Self::duoprism(self, &Self::dyad());
+        prism.set_name(self.get_name().prism());
+        prism
     }
 
     /// Builds a [tegum](https://polytope.miraheze.org/wiki/Bipyramid) from a
     /// given base.
     fn tegum(&self) -> Self {
-        Self::duotegum(self, &Self::dyad())
+        let mut tegum = Self::duotegum(self, &Self::dyad());
+        tegum.set_name(self.get_name().tegum());
+        tegum
     }
 
     /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)
@@ -273,7 +285,9 @@ pub trait Polytope: Sized + Clone {
     /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
     /// given rank.
     fn simplex(rank: isize) -> Self {
-        Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize])
+        let mut simplex = Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize]);
+        simplex.set_name(Name::Simplex(rank));
+        simplex
     }
 
     /// Builds a [hypercube](https://polytope.miraheze.org/wiki/Hypercube) with
@@ -282,7 +296,9 @@ pub trait Polytope: Sized + Clone {
         if rank == -1 {
             Self::nullitope()
         } else {
-            Self::multiprism(&vec![&Self::dyad(); rank as usize])
+            let mut hypercube = Self::multiprism(&vec![&Self::dyad(); rank as usize]);
+            hypercube.set_name(Name::Hypercube(rank));
+            hypercube
         }
     }
 
@@ -292,7 +308,9 @@ pub trait Polytope: Sized + Clone {
         if rank == -1 {
             Self::nullitope()
         } else {
-            Self::multitegum(&vec![&Self::dyad(); rank as usize])
+            let mut orthoplex = Self::multitegum(&vec![&Self::dyad(); rank as usize]);
+            orthoplex.set_name(Name::Orthoplex(rank));
+            orthoplex
         }
     }
 }

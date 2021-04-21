@@ -24,8 +24,8 @@ impl Renderable {
     pub fn new(concrete: Concrete) -> Self {
         // let vertices = &concrete.vertices;
         let empty_els = ElementList::new();
-        let edges = concrete.abs.get(1).unwrap_or(&empty_els);
-        let faces = concrete.abs.get(2).unwrap_or(&empty_els);
+        let edges = concrete.abs.ranks.get(1).unwrap_or(&empty_els);
+        let faces = concrete.abs.ranks.get(2).unwrap_or(&empty_els);
 
         let extra_vertices = Vec::new();
         let mut triangles = Vec::new();
@@ -124,9 +124,10 @@ impl Renderable {
     /// Generates the wireframe for a polytope.
     pub fn get_wireframe(&self) -> Mesh {
         let empty_els = ElementList::new();
-        let edges = self.concrete.abs.get(1).unwrap_or(&empty_els);
+        let edges = self.concrete.abs.ranks.get(1).unwrap_or(&empty_els);
         let vertices = self.get_vertex_coords();
         let mut indices = Vec::with_capacity(edges.len() * 2);
+
         for edge in edges.iter() {
             indices.push(edge.subs[0] as u16);
             indices.push(edge.subs[1] as u16);

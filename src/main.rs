@@ -55,7 +55,7 @@ use bevy_egui::EguiPlugin;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
 #[allow(unused_imports)]
-use polytope::{geometry::*, group::*, off::*, Polytope, *};
+use polytope::{geometry::*, group::*, language::*, off::*, Polytope, *};
 use ui::{input::CameraInputEvent, CrossSectionActive, CrossSectionState};
 
 mod no_cull_pipeline;
@@ -92,7 +92,8 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::hypercube(3);
+    let p = Concrete::polygon(3).prism();
+    dbg!(language::Es::parse(p.get_name(), Default::default()));
     let poly = Renderable::new(p);
 
     pipelines.set_untracked(

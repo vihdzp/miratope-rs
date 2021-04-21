@@ -214,7 +214,7 @@ impl FlagIter {
         // The polytope's elements must be sorted! We thus clone the polytope
         // and sort its elements.
         let mut polytope = polytope.clone();
-        for elements in polytope.iter_mut() {
+        for elements in polytope.ranks.iter_mut() {
             for el in elements.iter_mut() {
                 el.sort();
             }
