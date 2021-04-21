@@ -10,7 +10,7 @@ use derive_deref::{Deref, DerefMut};
 use self::{
     flag::{Flag, FlagEvent},
     geometry::Point,
-    language::Name,
+    lang::Name,
     rank::RankVec,
 };
 pub use types::{concrete::*, r#abstract::*, renderable::*};
@@ -22,7 +22,7 @@ pub mod flag;
 pub mod geometry;
 pub mod ggb;
 pub mod group;
-pub mod language;
+pub mod lang;
 pub mod off;
 pub mod rank;
 pub mod types;
@@ -197,7 +197,7 @@ pub trait Polytope: Sized + Clone {
     /// given base.
     fn pyramid(&self) -> Self {
         let mut pyramid = Self::duopyramid(self, &Self::point());
-        pyramid.set_name(self.get_name().pyramid());
+        pyramid.set_name(self.get_name().clone().pyramid());
         pyramid
     }
 
@@ -205,7 +205,7 @@ pub trait Polytope: Sized + Clone {
     /// given base.
     fn prism(&self) -> Self {
         let mut prism = Self::duoprism(self, &Self::dyad());
-        prism.set_name(self.get_name().prism());
+        prism.set_name(self.get_name().clone().prism());
         prism
     }
 
@@ -213,7 +213,7 @@ pub trait Polytope: Sized + Clone {
     /// given base.
     fn tegum(&self) -> Self {
         let mut tegum = Self::duotegum(self, &Self::dyad());
-        tegum.set_name(self.get_name().tegum());
+        tegum.set_name(self.get_name().clone().tegum());
         tegum
     }
 

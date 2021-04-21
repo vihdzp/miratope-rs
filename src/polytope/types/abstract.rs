@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::polytope::{
     flag::{FlagEvent, FlagIter},
-    language::Name,
+    lang::Name,
     rank::RankVec,
     Element, ElementList, Polytope, Subelements, Subsupelements,
 };

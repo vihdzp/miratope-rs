@@ -46,8 +46,11 @@
 //! that calls specific functions to parse every specific polytope type. These
 //! are the functions that need to be coded in the target language.
 
+mod dbg;
 mod en;
 mod es;
+
+pub use dbg::Dbg;
 pub use en::En;
 pub use es::Es;
 
@@ -57,6 +60,12 @@ const NULLITOPE: &str = "nullitope";
 /// tree-like structure structure.
 #[derive(Debug, Clone)]
 pub enum Name {
+    Nullitope,
+    Point,
+    Dyad,
+    Triangle,
+    Square,
+
     /// A pyramid based on some polytope.
     Pyramid(Box<Name>),
 
@@ -66,10 +75,17 @@ pub enum Name {
     /// A tegum based on some polytope.
     Tegum(Box<Name>),
 
-    Multipyramid(Box<[Name]>),
-    Multiprism(Box<[Name]>),
-    Multitegum(Box<[Name]>),
-    Multicomb(Box<[Name]>),
+    /// A multipyramid based on a list of polytopes.
+    Multipyramid(Vec<Name>),
+
+    /// A multiprism based on a list of polytopes.
+    Multiprism(Vec<Name>),
+
+    /// A multitegum based on a list of polytopes.
+    Multitegum(Vec<Name>),
+
+    /// A multicomb based on a list of polytopes.
+    Multicomb(Vec<Name>),
 
     /// The dual of a specified polytope.
     Dual(Box<Name>),
@@ -98,11 +114,23 @@ pub enum Product {
 }
 
 impl Name {
-    /// Simplifies a name by taking advantage of equivalences between
-    /// constructions. Assumes that only the top layer requires simplifying, and
+    /// Simplifies a [`Name`] by taking advantage of equivalences between
+    /// constructions. In general, if two things have equivalent names, they'll
+    /// get converted into a common name.
+    ///
+    /// The conversions this method performs are as follows:
+    /// * Duals of duals get converted into the original polytope.
+    /// * 3-gons and 4-gons get converted into triangles and squares.
+    /// * The simplest simplices, hypercubes and orthoplices get turned into
+    /// nullitopes, points, dyads, triangles, or squares.
+    /// * Multiproducts of multiproducts get turned into a single multiproduct.
+    ///
+    /// # Assumptions
+    /// * This method assumes that only the top layer requires simplifying, and
     /// that any other `Name` that is contained is already simplified.
     pub fn simplify(self) -> Self {
         match self {
+            // The dual of a dual is the original polytope.
             Self::Dual(base) => {
                 if let Self::Dual(original) = *base {
                     *original
@@ -110,51 +138,74 @@ impl Name {
                     Self::Dual(base)
                 }
             }
+            // The simplest polygons have their own names.
+            Self::Polygon(n) => match n {
+                3 => Self::Triangle,
+                4 => Self::Square,
+                _ => self,
+            },
+            // The simplest simplices have their own names.
+            Self::Simplex(n) => match n {
+                -1 => Self::Nullitope,
+                0 => Self::Point,
+                1 => Self::Dyad,
+                2 => Self::Triangle,
+                _ => self,
+            },
+            // The simplest hypercubes and orthoplices have their own names.
+            Self::Hypercube(n) | Self::Orthoplex(n) => match n {
+                -1 => Self::Nullitope,
+                0 => Self::Point,
+                1 => Self::Dyad,
+                2 => Self::Square,
+                _ => self,
+            },
+            // Any multipyramid inside of the multipyramid is taken out of the
+            // product.
+            Self::Multipyramid(bases) => {
+                if bases.is_empty() {
+                    return Self::Nullitope;
+                }
+
+                let mut new_bases = Vec::new();
+                let mut pyramid_count = 0;
+
+                // Figures out which bases of the multipyramid are multipyramids
+                // themselves, and accounts for them accordingly.
+                for base in bases.into_iter() {
+                    match base {
+                        Self::Nullitope => {}
+                        Self::Point => pyramid_count += 1,
+                        Self::Dyad => pyramid_count += 2,
+                        Self::Simplex(n) => pyramid_count += n + 1,
+                        Self::Multipyramid(mut extra_bases) => new_bases.append(&mut extra_bases),
+                        _ => new_bases.push(base),
+                    }
+                }
+
+                let mut multipyramid = Self::Multipyramid(new_bases);
+                for _ in 0..pyramid_count {
+                    multipyramid = multipyramid.pyramid();
+                }
+                multipyramid
+            }
             _ => self,
-        }
-    }
-    /// Determines whether a name determines a nullitope.
-    pub fn is_nullitope(&self) -> bool {
-        match self {
-            Self::Dual(p) => p.is_nullitope(),
-            Self::Simplex(n) | Self::Hypercube(n) | Self::Orthoplex(n) => *n == -1,
-            Self::Multipyramid(bases) => bases.is_empty(),
-            _ => false,
-        }
-    }
-
-    /// Determines whether a name determines a point.
-    pub fn is_point(&self) -> bool {
-        match self {
-            Self::Dual(p) => p.is_point(),
-            Self::Simplex(n) | Self::Hypercube(n) | Self::Orthoplex(n) => *n == 0,
-            Self::Multiprism(bases) | Self::Multitegum(bases) => bases.is_empty(),
-            _ => false,
-        }
-    }
-
-    /// Determines whether a name determines a dyad.
-    pub fn is_dyad(&self) -> bool {
-        match self {
-            Self::Dual(p) => p.is_dyad(),
-            Self::Simplex(n) | Self::Hypercube(n) | Self::Orthoplex(n) => *n == 1,
-            _ => false,
         }
     }
 
     /// Builds a pyramid name from a given name.
-    pub fn pyramid(&self) -> Self {
-        Self::Pyramid(Box::new(self.clone()))
+    pub fn pyramid(self) -> Self {
+        Self::Pyramid(Box::new(self))
     }
 
     /// Builds a prism name from a given name.
-    pub fn prism(&self) -> Self {
-        Self::Prism(Box::new(self.clone()))
+    pub fn prism(self) -> Self {
+        Self::Prism(Box::new(self))
     }
 
     /// Builds a tegum name from a given name.
-    pub fn tegum(&self) -> Self {
-        Self::Tegum(Box::new(self.clone()))
+    pub fn tegum(self) -> Self {
+        Self::Tegum(Box::new(self))
     }
 
     /// Returns the name for a regular polygon of `n` sides.
@@ -259,13 +310,22 @@ fn adj_or_plural<'a>(options: Options, adj: &'a str, plural: &'a str, none: &'a 
     }
 }
 
+/// Trait that allows one to build a prefix from any natural number. Every
+/// [`Language`] must implement this trait. If the language implements a
+/// Greek-like system for prefixes (e.g. "penta", "hexa"), you should implement
+/// this trait via [`GreekPrefix`] instead.
+///
+/// Defaults to just using `n-` as prefixes.
 pub trait Prefix {
     fn prefix(n: usize) -> String {
         format!("{}-", n)
     }
 }
 
-/// Trait shared by languages that allow for greek prefixes or their equivalent.
+/// Trait shared by languages that allow for greek prefixes or anything similar.
+/// Every `struct` implementing this trait automatically implements [`Prefix`]
+/// as well.
+///
 /// Defaults to the English ["Wikipedian system."](https://polytope.miraheze.org/wiki/Nomenclature#Wikipedian_system)
 pub trait GreekPrefix {
     /// The prefix for a single digit number.
@@ -324,6 +384,7 @@ pub trait GreekPrefix {
     /// The prefix for 30000.
     const TRISMYRIA: &'static str = "trismyria";
 
+    /// Converts a number into its Greek prefix equivalent.
     fn greek_prefix(n: usize) -> String {
         match n {
             2..=9 => Self::UNITS[n].to_string(),
