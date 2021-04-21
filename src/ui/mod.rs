@@ -48,7 +48,7 @@ pub fn ui(
     let ctx = &mut egui_ctx.ctx;
 
     egui::TopPanel::top("top_panel").show(ctx, |ui| {
-        // The top panel is often a good place for a menu bar:
+
         egui::menu::bar(ui, |ui| {
             egui::menu::menu(ui, "File", |ui| {
                 if ui.button("Quit").clicked() {
@@ -56,7 +56,7 @@ pub fn ui(
                 }
             });
         });
-
+        
         ui.columns(6, |columns| {
             // Converts the active polytope into its dual.
             if columns[0].button("Dual").clicked() {
@@ -135,10 +135,12 @@ pub fn ui(
                 section_active.flip();
             }
         });
+        
+        ui.spacing_mut().slider_width = 800.0;
 
         // Updates the slicing depth for the polytope, but only when needed.
         let mut new_hyperplane_pos = section_state.hyperplane_pos;
-        ui.add(egui::Slider::f64(&mut new_hyperplane_pos, -0.3..=0.3).text("Slice depth"));
+        ui.add(egui::Slider::f64(&mut new_hyperplane_pos, -2.0..=2.0).text("Slice depth"));
 
         #[allow(clippy::float_cmp)]
         if section_state.hyperplane_pos != new_hyperplane_pos {
