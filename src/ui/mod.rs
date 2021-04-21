@@ -150,7 +150,9 @@ pub fn ui(
             max_x = 1.0;
         }
         ui.add(
-            egui::Slider::f64(&mut new_hyperplane_pos, min_x..=max_x - 0.000001).max_decimals(5).text("Slice depth"),
+            egui::Slider::f64(&mut new_hyperplane_pos, min_x..=max_x - 0.000001)
+                .max_decimals(5)
+                .text("Slice depth"),
         );
 
         #[allow(clippy::float_cmp)]
