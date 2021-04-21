@@ -93,9 +93,11 @@ impl CameraInputEvent {
     }
 
     /// Resets the camera to the default position.
-    fn reset(anchor_tf: &mut Transform, cam_tf: &mut Transform) {
-        *anchor_tf = Transform::default();
-        *cam_tf = Transform::default();
+    pub fn reset(anchor_tf: &mut Transform, cam_tf: &mut Transform) {
+        *cam_tf = Transform::from_translation(Vec3::new(0.0, 0.0, 5.0));
+        *anchor_tf = Transform::from_translation(Vec3::new(0.02, -0.025, -0.05))
+            * Transform::from_translation(Vec3::new(-0.02, 0.025, 0.05))
+                .looking_at(Vec3::default(), Vec3::unit_y());
     }
 
     fn update_camera_and_anchor(

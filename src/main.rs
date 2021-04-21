@@ -56,7 +56,7 @@ use no_cull_pipeline::PbrNoBackfaceBundle;
 
 #[allow(unused_imports)]
 use polytope::{geometry::*, group::*, off::*, Polytope, *};
-use ui::{CrossSectionActive, CrossSectionState};
+use ui::{input::CameraInputEvent, CrossSectionActive, CrossSectionState};
 
 mod no_cull_pipeline;
 mod polytope;
@@ -92,7 +92,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::from_path(&"./Gap.off").unwrap();
+    let p = Concrete::hypercube(3);
     let poly = Renderable::new(p);
 
     pipelines.set_untracked(
@@ -109,6 +109,10 @@ fn setup(
         WIREFRAME_UNSELECTED_MATERIAL,
         Color::rgb_u8(56, 68, 236).into(),
     );
+
+    let mut cam_anchor = Transform::default();
+    let mut cam = Transform::default();
+    CameraInputEvent::reset(&mut cam_anchor, &mut cam);
 
     commands
         .spawn(PbrNoBackfaceBundle {
@@ -133,16 +137,11 @@ fn setup(
             ..Default::default()
         })
         // camera anchor
-        .spawn((
-            GlobalTransform::default(),
-            Transform::from_translation(Vec3::new(0.02, -0.025, -0.05))
-                * Transform::from_translation(Vec3::new(-0.02, 0.025, 0.05))
-                    .looking_at(Vec3::default(), Vec3::unit_y()),
-        ))
+        .spawn((GlobalTransform::default(), cam_anchor))
         .with_children(|cb| {
             // camera
             cb.spawn(Camera3dBundle {
-                transform: Transform::from_translation(Vec3::new(0.0, 0.0, 5.0)),
+                transform: cam,
                 perspective_projection: PerspectiveProjection {
                     near: 0.0001,
                     ..Default::default()
