@@ -150,7 +150,7 @@ pub fn ui(
             minx = originalref.unwrap().concrete.min_x().unwrap();
             maxx = originalref.unwrap().concrete.max_x().unwrap();
         }
-        ui.add(egui::Slider::f64(&mut new_hyperplane_pos, minx..=maxx-0.0001).text("Slice depth"));
+        ui.add(egui::Slider::f64(&mut new_hyperplane_pos, minx..=maxx-0.000001).max_decimals(5).text("Slice depth"));
 
         #[allow(clippy::float_cmp)]
         if section_state.hyperplane_pos != new_hyperplane_pos {
@@ -219,7 +219,7 @@ pub fn update_cross_section(
     if active.0 {
         for mut p in query.iter_mut() {
             let r = state.original_polytope.clone().unwrap();
-            let hyp_pos = state.hyperplane_pos + 0.00001; // Botch fix for degeneracies.
+            let hyp_pos = state.hyperplane_pos + 0.0000001; // Botch fix for degeneracies.
 
             if let Some(dim) = r.concrete.dim() {
                 let hyperplane = Hyperplane::x(dim, hyp_pos);

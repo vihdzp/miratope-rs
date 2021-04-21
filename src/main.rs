@@ -102,12 +102,12 @@ fn setup(
 
     materials.set_untracked(
         WIREFRAME_SELECTED_MATERIAL,
-        Color::rgb_u8(126, 192, 236).into(),
+        Color::rgb_u8(126, 192, 255).into(),
     );
 
     let wf_unselected = materials.set(
         WIREFRAME_UNSELECTED_MATERIAL,
-        Color::rgb_u8(56, 68, 236).into(),
+        Color::rgb_u8(56, 68, 255).into(),
     );
 
     let mut cam_anchor = Transform::default();
