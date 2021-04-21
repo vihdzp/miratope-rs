@@ -57,7 +57,7 @@ pub fn ui(
             });
         });
 
-        ui.columns(2, |columns| {
+        ui.columns(6, |columns| {
             // Converts the active polytope into its dual.
             if columns[0].button("Dual").clicked() {
                 for mut p in query.iter_mut() {
@@ -77,7 +77,7 @@ pub fn ui(
             }
 
             // Converts the active polytope into any of its facets.
-            if columns[0].button("Facet").clicked() {
+            if columns[1].button("Facet").clicked() {
                 for mut p in query.iter_mut() {
                     println!("Facet");
 
@@ -95,7 +95,7 @@ pub fn ui(
             }
 
             // Converts the active polytope into any of its verfs.
-            if columns[0].button("Verf").clicked() {
+            if columns[2].button("Verf").clicked() {
                 for mut p in query.iter_mut() {
                     println!("Verf");
 
@@ -113,14 +113,14 @@ pub fn ui(
             }
 
             // Exports the active polytope as an OFF file (not yet functional!)
-            if columns[1].button("Export OFF").clicked() {
+            if columns[3].button("Export OFF").clicked() {
                 for _p in query.iter_mut() {
                     println!("Export OFF");
                 }
             }
 
             // Gets the volume of the polytope.
-            if columns[1].button("Volume").clicked() {
+            if columns[4].button("Volume").clicked() {
                 for p in query.iter_mut() {
                     if let Some(vol) = p.concrete.volume() {
                         println!("The volume is {}.", vol);
@@ -131,14 +131,14 @@ pub fn ui(
             }
 
             // Toggles cross-section mode.
-            if columns[1].button("Cross-section").clicked() {
+            if columns[5].button("Cross-section").clicked() {
                 section_active.flip();
             }
         });
 
         // Updates the slicing depth for the polytope, but only when needed.
         let mut new_hyperplane_pos = section_state.hyperplane_pos;
-        ui.add(egui::Slider::f64(&mut new_hyperplane_pos, -1.0..=1.0).text("Slice depth"));
+        ui.add(egui::Slider::f64(&mut new_hyperplane_pos, -0.3..=0.3).text("Slice depth"));
 
         #[allow(clippy::float_cmp)]
         if section_state.hyperplane_pos != new_hyperplane_pos {
@@ -212,14 +212,14 @@ pub fn update_cross_section(
             if let Some(dim) = r.concrete.dim() {
                 let hyperplane = Hyperplane::x(dim, hyp_pos);
                 let mut slice = r.concrete.slice(&hyperplane);
-
+            
                 if state.flatten {
                     slice.flatten_into(&hyperplane.subspace);
                     slice.recenter_with(
                         &hyperplane.flatten(&hyperplane.project(&Point::zeros(dim))),
                     );
                 }
-
+            
                 *p = Renderable::new(slice);
             }
         }

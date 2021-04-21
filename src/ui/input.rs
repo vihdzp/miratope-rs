@@ -168,7 +168,7 @@ fn cam_events_from_mouse(
         for &MouseMotion { mut delta } in mouse_move.get_reader().iter(&mouse_move) {
             delta.x /= width;
             delta.y /= height;
-            cam_inputs.send(CameraInputEvent::RotateAnchor(-100.0 * real_scale * delta))
+            cam_inputs.send(CameraInputEvent::RotateAnchor(-300.0 * real_scale * delta))
         }
     }
 }
