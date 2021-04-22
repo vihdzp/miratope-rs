@@ -56,6 +56,7 @@ use no_cull_pipeline::PbrNoBackfaceBundle;
 
 #[allow(unused_imports)]
 use polytope::{geometry::*, group::*, off::*, Polytope, *};
+#[allow(unused_imports)]
 use translation::{lang, Language, Options};
 use ui::{input::CameraInputEvent, CrossSectionActive, CrossSectionState};
 
@@ -94,8 +95,9 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::hypercube(5).pyramid();
-    dbg!(lang::En::parse(p.name(), Options::default()));
+    let mut p = Concrete::polygon(5).prism();
+    p.dual_mut_with_sphere(&Hypersphere::random(3)).unwrap();
+    p.dual_mut_with_sphere(&Hypersphere::random(3)).unwrap();
     let poly = Renderable::new(p);
 
     pipelines.set_untracked(
@@ -110,7 +112,7 @@ fn setup(
 
     let wf_unselected = materials.set(
         WIREFRAME_UNSELECTED_MATERIAL,
-        Color::rgb_u8(56, 68, 255).into(),
+        Color::rgb_u8(238, 130, 238).into(),
     );
 
     let mut cam_anchor = Transform::default();

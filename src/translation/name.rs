@@ -282,6 +282,7 @@ impl Name {
                     Self::Unknown
                 }
             }
+            Self::Multipyramid(_)=>self,
             _ => self,
         }
     }

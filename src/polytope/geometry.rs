@@ -75,6 +75,21 @@ impl Hypersphere {
         }
     }
 
+    pub fn random(dim: usize) -> Self {
+        use rand::Rng;
+
+        let mut rand = rand::thread_rng();
+        let mut center = Point::zeros(dim);
+        for coord in center.iter_mut() {
+            *coord = rand.gen_range(0.0..=1.0);
+        }
+
+        Hypersphere {
+            radius: rand.gen_range(0.0..=1.0),
+            center,
+        }
+    }
+
     /// Returns whether two hyperspheres are "approximately" equal.
     /// Used for testing.
     pub fn approx(&self, sphere: &Hypersphere) -> bool {
