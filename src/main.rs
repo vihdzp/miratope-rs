@@ -55,11 +55,13 @@ use bevy_egui::EguiPlugin;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
 #[allow(unused_imports)]
-use polytope::{geometry::*, group::*, lang::*, off::*, Polytope, *};
+use polytope::{geometry::*, group::*, off::*, Polytope, *};
+use translation::{lang, Language, Options};
 use ui::{input::CameraInputEvent, CrossSectionActive, CrossSectionState};
 
 mod no_cull_pipeline;
 mod polytope;
+mod translation;
 mod ui;
 
 /// Standard constant used for floating point comparisons throughout the code.

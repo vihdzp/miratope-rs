@@ -1,6 +1,6 @@
 //! A language we can use for debugging.
 
-use super::{Language, Options, Prefix};
+use super::super::{Language, Name, Options, Prefix};
 
 pub struct Dbg;
 
@@ -11,15 +11,15 @@ impl Language for Dbg {
         format!("({}-elements)", d - 1)
     }
 
-    fn pyramid(base: &super::Name, _options: Options) -> String {
+    fn pyramid(base: &Name, _options: Options) -> String {
         format!("({}) pyramid", Self::parse(base, Options::default()))
     }
 
-    fn prism(base: &super::Name, _options: Options) -> String {
+    fn prism(base: &Name, _options: Options) -> String {
         format!("({}) prism", Self::parse(base, Options::default()))
     }
 
-    fn tegum(base: &super::Name, _options: Options) -> String {
+    fn tegum(base: &Name, _options: Options) -> String {
         format!("({}) tegum", Self::parse(base, Options::default()))
     }
 

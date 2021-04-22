@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
-use crate::polytope::{
-    flag::{FlagEvent, FlagIter},
-    lang::Name,
-    rank::RankVec,
-    Element, ElementList, Polytope, Subelements, Subsupelements,
+use crate::{
+    polytope::{
+        flag::{FlagEvent, FlagIter},
+        rank::RankVec,
+        Element, ElementList, Polytope, Subelements, Subsupelements,
+    },
+    translation::Name,
 };
 
 use super::ElementHash;

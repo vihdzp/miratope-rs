@@ -1,6 +1,6 @@
 pub struct Es;
 
-use super::{GreekPrefix, Language, Options, Prefix};
+use super::super::{GreekPrefix, Language, Options, Prefix};
 
 impl GreekPrefix for Es {}
 

@@ -2,10 +2,10 @@ use crate::{
     polytope::{
         flag::{FlagEvent, FlagIter},
         geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace, Vector},
-        lang::Name,
         rank::RankVec,
         Abstract, Element, ElementList, Polytope, Subelements, Subsupelements,
     },
+    translation::Name,
     EPS,
 };
 

@@ -2,7 +2,7 @@
 //! [polytopes](https://polytope.miraheze.org/wiki/Polytope), as well as some
 //! basic methods to operate on them.
 
-use crate::polytope::flag::FlagIter;
+use crate::{polytope::flag::FlagIter, translation::Name};
 use std::hash::Hash;
 
 use derive_deref::{Deref, DerefMut};
@@ -10,7 +10,6 @@ use derive_deref::{Deref, DerefMut};
 use self::{
     flag::{Flag, FlagEvent},
     geometry::Point,
-    lang::Name,
     rank::RankVec,
 };
 pub use types::{concrete::*, r#abstract::*, renderable::*};
@@ -22,7 +21,6 @@ pub mod flag;
 pub mod geometry;
 pub mod ggb;
 pub mod group;
-pub mod lang;
 pub mod off;
 pub mod rank;
 pub mod types;

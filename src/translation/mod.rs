@@ -46,13 +46,7 @@
 //! that calls specific functions to parse every specific polytope type. These
 //! are the functions that need to be coded in the target language.
 
-mod dbg;
-mod en;
-mod es;
-
-pub use dbg::Dbg;
-pub use en::En;
-pub use es::Es;
+pub mod lang;
 
 const NULLITOPE: &str = "nullitope";
 
@@ -104,13 +98,6 @@ pub enum Name {
 
     /// The name of the polytope is unknown.
     Unknown,
-}
-
-pub enum Product {
-    Pyramid,
-    Prism,
-    Tegum,
-    Comb,
 }
 
 impl Name {
@@ -217,21 +204,12 @@ impl Name {
         }
     }
 
-    pub fn as_product(&self) -> Option<Product> {
-        match self {
-            Self::Multipyramid(_) => Some(Product::Pyramid),
-            Self::Multiprism(_) => Some(Product::Prism),
-            Self::Multitegum(_) => Some(Product::Tegum),
-            Self::Multicomb(_) => Some(Product::Comb),
-            _ => None,
-        }
-    }
-
-    fn rank_product(bases: &[Name], product: Product) -> Option<isize> {
-        let offset = match product {
-            Product::Pyramid => -1,
-            Product::Prism | Product::Tegum => 0,
-            Product::Comb => 1,
+    fn rank_product(&self) -> Option<isize> {
+        let (bases, offset) = match self {
+            Self::Multipyramid(bases) => (bases, -1),
+            Self::Multiprism(bases) | Self::Multitegum(bases) => (bases, 0),
+            Self::Multicomb(bases) => (bases, 1),
+            _ => return None,
         };
 
         let mut rank = offset;
@@ -249,10 +227,10 @@ impl Name {
             Name::Simplex(rank) | Name::Hypercube(rank) | Name::Orthoplex(rank) => Some(*rank),
             Name::Dual(base) => base.rank(),
             Name::Polygon(_) => Some(2),
-            Name::Multipyramid(bases)
-            | Name::Multiprism(bases)
-            | Name::Multitegum(bases)
-            | Name::Multicomb(bases) => Self::rank_product(bases, self.as_product().unwrap()),
+            Name::Multipyramid(_)
+            | Name::Multiprism(_)
+            | Name::Multitegum(_)
+            | Name::Multicomb(_) => self.rank_product(),
             _ => None,
         }
     }
@@ -269,13 +247,13 @@ pub enum Gender {
 /// Represents the different modifiers that can be applied to a term.
 #[derive(Clone, Copy)]
 pub struct Options {
-    /// Does the polytope act as an adjective?
+    /// Determines whether the polytope acts as an adjective.
     adjective: bool,
 
-    /// How many of the polytope are there?
+    /// The number of the polytope there are.
     count: usize,
 
-    /// What (if applicable) is the grammatical gender of the polytope?
+    /// The grammatical gender of the polytope.
     gender: Gender,
 }
 
@@ -295,7 +273,7 @@ impl Default for Options {
 /// In English, there's only three different ways a word can be modified:
 ///
 /// * It can be made into an adjective.
-/// * It can be made into a plural.
+/// * It can be made into a plural noun.
 /// * It can remain as a singular noun.
 ///
 /// This method reads the options and returns whichever string applies in the
@@ -328,7 +306,7 @@ pub trait Prefix {
 ///
 /// Defaults to the English ["Wikipedian system."](https://polytope.miraheze.org/wiki/Nomenclature#Wikipedian_system)
 pub trait GreekPrefix {
-    /// The prefix for a single digit number.
+    /// The prefixes for a single digit number.
     const UNITS: [&'static str; 10] = [
         "", "hena", "di", "tri", "tetra", "penta", "hexa", "hepta", "octa", "ennea",
     ];
@@ -443,6 +421,11 @@ pub trait Language: Prefix {
     /// Parses the [`Name`] in the specified language, with the given [`Options`].
     fn parse(name: &Name, options: Options) -> String {
         match name {
+            Name::Nullitope => Self::nullitope(options),
+            Name::Point => Self::point(options),
+            Name::Dyad => Self::dyad(options),
+            Name::Triangle => Self::triangle(options),
+            Name::Square => Self::square(options),
             Name::Pyramid(base) => Self::pyramid(base, options),
             Name::Prism(base) => Self::prism(base, options),
             Name::Tegum(base) => Self::tegum(base, options),
@@ -474,6 +457,31 @@ pub trait Language: Prefix {
                 adj_or_plural(options, "ic", "a", "on")
             }
         )
+    }
+
+    /// The name of a nullitope.
+    fn nullitope(options: Options) -> String {
+        format!("nullitop{}", adj_or_plural(options, "ic", "es", "e"))
+    }
+
+    /// The name of a point.
+    fn point(options: Options) -> String {
+        format!("point{}", adj_or_plural(options, "", "s", ""))
+    }
+
+    /// The name of a dyad.
+    fn dyad(options: Options) -> String {
+        format!("dyad{}", adj_or_plural(options, "ic", "s", ""))
+    }
+
+    /// The name of a triangle.
+    fn triangle(options: Options) -> String {
+        format!("triang{}", adj_or_plural(options, "ular", "les", "le"))
+    }
+
+    /// The name of a square.
+    fn square(options: Options) -> String {
+        format!("square{}", adj_or_plural(options, "", "s", ""))
     }
 
     /// The name for a polytope with `n` facets in `d` dimensions.
@@ -533,7 +541,7 @@ pub trait Language: Prefix {
         )
     }
 
-    fn multiproduct(_bases: &[Name], _kind: Product) -> String {
+    fn multiproduct(&self) -> String {
         todo!()
     }
 
