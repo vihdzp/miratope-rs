@@ -37,7 +37,7 @@ fn last_vowel_tilde(prefix: String) -> String {
 }
 
 impl Language for Es {
-    fn basic(n: usize, d: usize, options: Options) -> String {
+    fn generic(n: usize, d: usize, options: Options) -> String {
         let mut prefix = Self::prefix(n);
 
         if d == 2 && !options.adjective {

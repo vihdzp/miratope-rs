@@ -272,19 +272,21 @@ pub trait Polytope: Sized + Clone {
     where
         Self: 'a,
     {
-        let init = factors
-            .next()
-            .expect("You can't take an empty comb product.")
-            .clone();
-
-        factors.fold(init, |p, q| Self::duocomb(&p, q))
+        if let Some(init) = factors.next().cloned() {
+            factors.fold(init, |p, q| Self::duocomb(&p, q))
+        }
+        // There's no sensible way to take an empty comb product, so we just
+        // make it a nullitope for simplicity.
+        else {
+            Self::nullitope()
+        }
     }
 
     /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
     /// given rank.
     fn simplex(rank: isize) -> Self {
         let mut simplex = Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize]);
-        simplex.set_name(Name::Simplex(rank));
+        simplex.set_name(Name::simplex(rank));
         simplex
     }
 
@@ -295,7 +297,7 @@ pub trait Polytope: Sized + Clone {
             Self::nullitope()
         } else {
             let mut hypercube = Self::multiprism(&vec![&Self::dyad(); rank as usize]);
-            hypercube.set_name(Name::Hypercube(rank));
+            hypercube.set_name(Name::hypercube(rank));
             hypercube
         }
     }
@@ -307,7 +309,7 @@ pub trait Polytope: Sized + Clone {
             Self::nullitope()
         } else {
             let mut orthoplex = Self::multitegum(&vec![&Self::dyad(); rank as usize]);
-            orthoplex.set_name(Name::Orthoplex(rank));
+            orthoplex.set_name(Name::orthoplex(rank));
             orthoplex
         }
     }

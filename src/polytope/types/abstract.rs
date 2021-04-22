@@ -373,9 +373,20 @@ impl Abstract {
 
         // Uses push_subs to add all of the element lists into a new polytope.
         let mut product = Self::with_capacity(element_lists.rank());
-
         for elements in element_lists.into_iter() {
             product.push_subs(elements);
+        }
+
+        // Sets the name of the polytope.
+        let bases = vec![p.get_name().clone(), q.get_name().clone()];
+        if min && max {
+            product.set_name(Name::multipyramid(bases));
+        } else if !min && max {
+            product.set_name(Name::multiprism(bases));
+        } else if min && !max {
+            product.set_name(Name::multitegum(bases));
+        } else {
+            product.set_name(Name::multicomb(bases));
         }
 
         product
@@ -422,7 +433,7 @@ impl Polytope for Abstract {
     fn nullitope() -> Self {
         Self {
             ranks: RankVec(vec![ElementList::min(0)]),
-            name: Name::Simplex(-1),
+            name: Name::Nullitope,
         }
     }
 
@@ -432,7 +443,7 @@ impl Polytope for Abstract {
     fn point() -> Self {
         Self {
             ranks: RankVec(vec![ElementList::min(1), ElementList::max(1)]),
-            name: Name::Simplex(0),
+            name: Name::Point,
         }
     }
 
@@ -445,7 +456,7 @@ impl Polytope for Abstract {
         abs.push(ElementList::min(2));
         abs.push(ElementList::vertices(2));
         abs.push_subs(ElementList::max(2));
-        abs.name = Name::Simplex(1);
+        abs.name = Name::Dyad;
 
         abs
     }
@@ -470,7 +481,7 @@ impl Polytope for Abstract {
         poly.push(vertices);
         poly.push_subs(edges);
         poly.push_subs(maximal);
-        poly.name = Name::Polygon(n);
+        poly.name = Name::polygon(n);
 
         poly
     }

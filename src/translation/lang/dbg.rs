@@ -23,15 +23,36 @@ impl Language for Dbg {
         format!("({}) tegum", Self::parse(base, Options::default()))
     }
 
-    fn simplex(rank: isize, _options: Options) -> String {
+    fn simplex(rank: usize, _options: Options) -> String {
         format!("{}-simplex", rank)
     }
 
-    fn hypercube(rank: isize, _options: Options) -> String {
+    fn hypercube(rank: usize, _options: Options) -> String {
         format!("{}-hypercube", rank)
     }
 
-    fn orthoplex(rank: isize, _options: Options) -> String {
+    fn orthoplex(rank: usize, _options: Options) -> String {
         format!("{}-orthoplex", rank)
+    }
+
+    fn multiproduct(name: &Name, _options: Options) -> String {
+        let (bases, kind) = match name {
+            Name::Multipyramid(bases) => (bases, "multipyramid"),
+            Name::Multiprism(bases) => (bases, "multiprism"),
+            Name::Multitegum(bases) => (bases, "multitegum"),
+            Name::Multicomb(bases) => (bases, "multicomb"),
+            _ => panic!("Not a product!"),
+        };
+
+        let mut str_bases = String::new();
+
+        let (last, bases) = bases.split_last().unwrap();
+        for base in bases {
+            str_bases.push_str(&format!("({})", Self::parse(base, _options)));
+            str_bases.push_str(", ");
+        }
+        str_bases.push_str(&format!("({})", Self::parse(last, _options)));
+
+        format!("({}) {}", str_bases, kind)
     }
 }
