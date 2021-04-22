@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
 
 use crate::polytope::{Polytope, Renderable};
+use crate::OffOptions;
 
 pub mod input;
 
@@ -112,9 +113,9 @@ pub fn ui(
             }
 
             // Exports the active polytope as an OFF file (not yet functional!)
-            if columns[3].button("Export OFF").clicked() {
+            if columns[3].button("Print OFF").clicked() {
                 for _p in query.iter_mut() {
-                    println!("Export OFF");
+                    println!("{}", _p.concrete.to_off(OffOptions::default()));
                 }
             }
 
