@@ -499,7 +499,7 @@ impl Polytope for Abstract {
         }
 
         self.ranks.reverse();
-        self.name = self.name.clone().dual();
+        self.name = self.name.clone().dual(true);
 
         Ok(())
     }

@@ -9,10 +9,7 @@ pub use es::Es;
 use super::{Name, Options, Prefix};
 
 pub fn is_vowel(c: char) -> bool {
-    match c {
-        'a' | 'e' | 'i' | 'o' | 'u' => true,
-        _ => false,
-    }
+    matches!(c, 'a' | 'e' | 'i' | 'o' | 'u')
 }
 
 /// A convenience method for declensing nouns in English.

@@ -258,12 +258,23 @@ impl Name {
         }
     }
 
-    /// Builds a dual name from a given name. Assumes that the polytope is
-    /// geometric, and hence that relations like the dual being an involution
-    /// don't generally hold. If you want these relations to be taken into
-    /// account, use [`abstract_dual`].
-    pub fn dual(self) -> Self {
+    /// Builds a dual name from a given name.
+    pub fn dual(self, abs: bool) -> Self {
         match self {
+            Self::Dual(base) => {
+                // Abstractly, duals of duals give back the original polytope.
+                if abs {
+                    if let Self::Dual(original) = *base {
+                        *original
+                    } else {
+                        Self::Dual(base)
+                    }
+                }
+                // Geometrically, we have no guarantees.
+                else {
+                    Self::Dual(base)
+                }
+            }
             Self::Generic(_, d) => {
                 if d <= 2 {
                     self

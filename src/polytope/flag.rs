@@ -127,18 +127,19 @@ impl Flag {
         let above = polytope.get_element(r + 1, self[r + 1]).unwrap();
         let common = common(&below.sups, &above.subs);
 
-        let idx = self[r];
         assert_eq!(
             common.len(),
             2,
-            "Diamond property fails at rank {}, index {}.",
-            r,
-            idx
+            "Diamond property fails between rank {}, index {}, and rank {}, index {}.",
+            r - 1,
+            self[r - 1],
+            r + 1,
+            self[r + 1]
         );
 
         // Changes the element at idx to the other element in the section
         // determined by the elements above and below.
-        if idx == common[0] {
+        if self[r] == common[0] {
             self[r] = common[1];
         } else {
             self[r] = common[0];
