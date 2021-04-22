@@ -38,9 +38,14 @@ pub trait Polytope: Sized + Clone {
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
     fn rank(&self) -> isize;
 
-    fn set_name(&mut self, name: Name);
+    fn name(&self) -> &Name;
 
-    fn get_name(&self) -> &Name;
+    fn name_mut(&mut self) -> &mut Name;
+
+    fn with_name(mut self, name: Name) -> Self {
+        *self.name_mut() = name;
+        self
+    }
 
     /// The number of elements of a given rank.
     fn el_count(&self, rank: isize) -> usize;
@@ -195,7 +200,7 @@ pub trait Polytope: Sized + Clone {
     /// given base.
     fn pyramid(&self) -> Self {
         let mut pyramid = Self::duopyramid(self, &Self::point());
-        pyramid.set_name(self.get_name().clone().pyramid());
+        *pyramid.name_mut() = self.name().clone().pyramid();
         pyramid
     }
 
@@ -203,7 +208,7 @@ pub trait Polytope: Sized + Clone {
     /// given base.
     fn prism(&self) -> Self {
         let mut prism = Self::duoprism(self, &Self::dyad());
-        prism.set_name(self.get_name().clone().prism());
+        *prism.name_mut() = self.name().clone().prism();
         prism
     }
 
@@ -211,7 +216,7 @@ pub trait Polytope: Sized + Clone {
     /// given base.
     fn tegum(&self) -> Self {
         let mut tegum = Self::duotegum(self, &Self::dyad());
-        tegum.set_name(self.get_name().clone().tegum());
+        *tegum.name_mut() = self.name().clone().tegum();
         tegum
     }
 
@@ -286,7 +291,7 @@ pub trait Polytope: Sized + Clone {
     /// given rank.
     fn simplex(rank: isize) -> Self {
         let mut simplex = Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize]);
-        simplex.set_name(Name::simplex(true, rank));
+        *simplex.name_mut() = Name::simplex(true, rank);
         simplex
     }
 
@@ -297,7 +302,7 @@ pub trait Polytope: Sized + Clone {
             Self::nullitope()
         } else {
             let mut hypercube = Self::multiprism(&vec![&Self::dyad(); rank as usize]);
-            hypercube.set_name(Name::hypercube(rank));
+            *hypercube.name_mut() = Name::hypercube(true, rank);
             hypercube
         }
     }
@@ -309,12 +314,13 @@ pub trait Polytope: Sized + Clone {
             Self::nullitope()
         } else {
             let mut orthoplex = Self::multitegum(&vec![&Self::dyad(); rank as usize]);
-            orthoplex.set_name(Name::orthoplex(rank));
+            *orthoplex.name_mut() = Name::orthoplex(true, rank);
             orthoplex
         }
     }
 }
 
+/// Common boilerplate code for subelements and superelements.
 trait Subsupelements: Sized {
     /// Builds a list of either subelements or superelements from a vector.
     fn from_vec(vec: Vec<usize>) -> Self;

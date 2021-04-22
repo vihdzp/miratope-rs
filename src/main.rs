@@ -94,13 +94,8 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::multiprism(&[
-        &Concrete::polygon(5),
-        &Concrete::polygon(3),
-        &Concrete::dyad(),
-    ])
-    .prism();
-    dbg!(lang::En::parse(p.get_name(), Options::default()));
+    let p = Concrete::hypercube(5).pyramid();
+    dbg!(lang::En::parse(p.name(), Options::default()));
     let poly = Renderable::new(p);
 
     pipelines.set_untracked(

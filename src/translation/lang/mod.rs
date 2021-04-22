@@ -8,6 +8,13 @@ pub use es::Es;
 
 use super::{Name, Options, Prefix};
 
+pub fn is_vowel(c: char) -> bool {
+    match c {
+        'a' | 'e' | 'i' | 'o' | 'u' => true,
+        _ => false,
+    }
+}
+
 /// A convenience method for declensing nouns in English.
 ///
 /// In English, there's only three different ways a word can be modified:
@@ -52,7 +59,8 @@ pub trait Language: Prefix {
             Name::Simplex(regular, rank) => Self::simplex(*regular, *rank, options),
             Name::Hypercube(regular, rank) => Self::hypercube(*regular, *rank, options),
             Name::Orthoplex(regular, rank) => Self::orthoplex(*regular, *rank, options),
-            _ => Self::unknown(),
+            Name::Dual(base) => Self::dual(base, options),
+            Name::Unknown => Self::unknown(),
         }
     }
 
@@ -214,20 +222,47 @@ pub trait Language: Prefix {
 
     /// The name for a simplex with a given rank.
     fn simplex(_regular: bool, rank: usize, options: Options) -> String {
-        let n = rank as usize;
-        Self::generic(n + 1, n, options)
+        Self::generic(rank + 1, rank, options)
     }
 
     /// The name for a hypercube with a given rank.
     fn hypercube(_regular: bool, rank: usize, options: Options) -> String {
-        let n = rank as usize;
-        Self::generic(2 * n, n, options)
+        match rank {
+            3 => format!("cub{}", adj_or_plural(options, "ic", "s", "e")),
+            4 => format!("tesseract{}", adj_or_plural(options, "ic", "s", "")),
+            _ => {
+                let mut prefix = Self::prefix(rank).chars().collect::<Vec<_>>();
+                let len = prefix.len();
+
+                // Penta -> Pente, or Deca -> Deke
+                if let Some(c) = prefix.last_mut() {
+                    if is_vowel(*c) {
+                        *c = 'e';
+                    }
+                }
+                if let Some(c) = prefix.get_mut(len - 2) {
+                    if *c == 'c' {
+                        *c = 'k';
+                    }
+                }
+
+                format!(
+                    "{}ract{}",
+                    prefix.into_iter().collect::<String>(),
+                    adj_or_plural(options, "ic", "s", "")
+                )
+            }
+        }
     }
 
     /// The name for an orthoplex with a given rank.
     fn orthoplex(_regular: bool, rank: usize, options: Options) -> String {
-        let n = rank as usize;
-        Self::generic(2u32.pow(n as u32) as usize, n, options)
+        Self::generic(2u32.pow(rank as u32) as usize, rank, options)
+    }
+
+    /// The name for the dual of another polytope.
+    fn dual(base: &Name, options: Options) -> String {
+        format!("dual {}", Self::parse(base, options))
     }
 
     /// A placeholder name for a polytope whose name is not known.

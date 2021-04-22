@@ -110,7 +110,7 @@ impl Flag {
     }
 
     /// Applies a specified flag change to the flag in place.
-    pub fn change_mut(&mut self, polytope: &Abstract, idx: usize) {
+    pub fn change_mut(&mut self, polytope: &Abstract, r: usize) {
         let rank = polytope.rank();
         assert_ne!(rank, -1, "Can't iterate over flags of the nullitope.");
 
@@ -119,22 +119,29 @@ impl Flag {
             return;
         }
 
-        let idx = idx as isize;
+        let r = r as isize;
 
         // Determines the common elements between the subelements of the element
         // above and the superelements of the element below.
-        let below = polytope.get_element(idx - 1, self[idx - 1]).unwrap();
-        let above = polytope.get_element(idx + 1, self[idx + 1]).unwrap();
+        let below = polytope.get_element(r - 1, self[r - 1]).unwrap();
+        let above = polytope.get_element(r + 1, self[r + 1]).unwrap();
         let common = common(&below.sups, &above.subs);
 
-        assert_eq!(common.len(), 2, "Diamond property fails.");
+        let idx = self[r];
+        assert_eq!(
+            common.len(),
+            2,
+            "Diamond property fails at rank {}, index {}.",
+            r,
+            idx
+        );
 
         // Changes the element at idx to the other element in the section
         // determined by the elements above and below.
-        if self[idx] == common[0] {
-            self[idx] = common[1];
+        if idx == common[0] {
+            self[r] = common[1];
         } else {
-            self[idx] = common[0];
+            self[r] = common[0];
         }
 
         self.orientation.flip_mut();

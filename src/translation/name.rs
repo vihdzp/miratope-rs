@@ -37,12 +37,14 @@ pub enum Name {
     /// A tegum based on some polytope.
     Tegum(Box<Name>),
 
-    /// A multipyramid based on a list of polytopes. The list must contain at
-    /// least two elements, be "sorted", and contain nothing that can be
-    /// interpreted as a multipyramid.
+    /// A multipyramid based on a list of polytopes. The list must contain **at
+    /// least 2** elements, and contain nothing that can be interpreted as a
+    /// multipyramid.
     Multipyramid(Vec<Name>),
 
-    /// A multiprism based on a list of polytopes.
+    /// A multiprism based on a list of polytopes. The list must contain at
+    /// least two elements, be "sorted", and contain nothing that can be
+    /// interpreted as a multiprism.
     Multiprism(Vec<Name>),
 
     /// A multitegum based on a list of polytopes.
@@ -55,24 +57,19 @@ pub enum Name {
     Dual(Box<Name>),
 
     /// A simplex of a given dimension, **at least 3.** The boolean stores
-    /// whether it's regular, the integer stores its rank. Use [`Nullitope`](Name::Nullitope),
-    /// [`Point`](Name::Point), [`Dyad`](Name::Dyad), or [`Triangle`](Name::Triangle)
-    /// for the simplices of lower rank.
+    /// whether it's regular, the integer stores its rank.
     Simplex(bool, usize),
 
     /// A regular hypercube of a given dimension, **at least 3.** The boolean stores
-    /// whether it's regular, the integer stores its rank. Use [`Nullitope`](Name::Nullitope),
-    /// [`Point`](Name::Point), [`Dyad`](Name::Dyad), or [`Square`](Name::Square)
-    /// for the hypercubes of lower rank.
+    /// whether it's regular, the integer stores its rank.
     Hypercube(bool, usize),
 
-    /// A regular orthoplex of a given dimension, **at least 3.** The boolean stores
-    /// whether it's regular, the integer stores its rank. Use [`Nullitope`](Name::Nullitope),
-    /// [`Point`](Name::Point), [`Dyad`](Name::Dyad), or [`Square`](Name::Square)
-    /// for the orthoplices of lower rank.
+    /// A regular orthoplex of a given dimension, **at least 2.** The boolean stores
+    /// whether it's regular, the integer stores its rank.
     Orthoplex(bool, usize),
 
-    /// A polytope with a given facet count and rank, in that order.
+    /// A polytope with a given facet count and rank, in that order. The facet
+    /// count must be **at least 2,** and the dimension must be **at most 20.**
     Generic(usize, usize),
 
     /// The name of the polytope is unknown.
@@ -161,8 +158,14 @@ impl Name {
             | Self::Multitegum(bases)
             | Self::Multicomb(bases) => {
                 // Any multiproduct must have at least two bases.
-                if bases.len() < 2 {
-                    return false;
+                match bases.len() {
+                    0..=1 => return false,
+                    2 => {
+                        if self != &Self::Multitegum(vec![]) {
+                            return false;
+                        }
+                    }
+                    _ => {}
                 }
 
                 // No base should have the same variant as self.
@@ -224,13 +227,35 @@ impl Name {
                 }
             }
             Self::Prism(base) => Self::multiprism(vec![*base, Self::Rectangle]),
+            Self::Multiprism(mut bases) => {
+                bases.push(Self::Dyad);
+                Self::multipyramid(bases)
+            }
             _ => Self::Prism(Box::new(self)),
         }
     }
 
     /// Builds a tegum name from a given name.
     pub fn tegum(self) -> Self {
-        Self::Tegum(Box::new(self))
+        match self {
+            Self::Nullitope => Self::Nullitope,
+            Self::Point => Self::Dyad,
+            Self::Dyad => Self::Square,
+            Self::Square => Self::Orthoplex(false, 3),
+            Self::Orthoplex(regular, n) => {
+                if regular {
+                    Self::Tegum(Box::new(self))
+                } else {
+                    Self::Orthoplex(false, n + 1)
+                }
+            }
+            Self::Tegum(base) => Self::multitegum(vec![*base, Self::Orthoplex(false, 2)]),
+            Self::Multitegum(mut bases) => {
+                bases.push(Self::Dyad);
+                Self::multitegum(bases)
+            }
+            _ => Self::Tegum(Box::new(self)),
+        }
     }
 
     /// Builds a dual name from a given name. Assumes that the polytope is
@@ -239,7 +264,13 @@ impl Name {
     /// account, use [`abstract_dual`].
     pub fn dual(self) -> Self {
         match self {
-            Self::Generic(_, _) => Self::Unknown,
+            Self::Generic(_, d) => {
+                if d <= 2 {
+                    self
+                } else {
+                    Self::Unknown
+                }
+            }
             _ => self,
         }
     }
@@ -255,25 +286,31 @@ impl Name {
         }
     }
 
-    /// The name for a regular *n*-hypercube.
-    pub fn hypercube(n: isize) -> Self {
+    /// The name for an *n*-hypercube.
+    pub fn hypercube(regular: bool, n: isize) -> Self {
         match n {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
-            2 => Self::Square,
-            _ => Self::Hypercube(true, n as usize),
+            2 => {
+                if regular {
+                    Self::Square
+                } else {
+                    Self::Rectangle
+                }
+            }
+            _ => Self::Hypercube(regular, n as usize),
         }
     }
 
-    /// The name for a regular *n*-orthoplex.
-    pub fn orthoplex(n: isize) -> Self {
+    /// The name for an *n*-orthoplex.
+    pub fn orthoplex(regular: bool, n: isize) -> Self {
         match n {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
             2 => Self::Square,
-            _ => Self::Orthoplex(true, n as usize),
+            _ => Self::Orthoplex(regular, n as usize),
         }
     }
 
@@ -295,6 +332,8 @@ impl Name {
         }
     }
 
+    /// Sorts the bases of a multiproduct according to their rank, and then
+    /// their facet count.
     fn sort_bases(bases: &mut Vec<Name>) {
         use std::cmp::Ordering;
 
@@ -381,7 +420,7 @@ impl Name {
                 }
                 Self::Point => {}
                 Self::Dyad => prism_count += 1,
-                Self::Square => prism_count += 2,
+                Self::Square | Self::Rectangle => prism_count += 2,
                 Self::Hypercube(_, n) => prism_count += n,
                 Self::Multiprism(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
@@ -391,7 +430,7 @@ impl Name {
         // If we're taking more than one prism, we combine all of them into a
         // single hypercube.
         if prism_count >= 2 {
-            new_bases.push(Name::hypercube(prism_count as isize));
+            new_bases.push(Name::hypercube(false, prism_count as isize));
         }
 
         // Sorts the bases by convention.
@@ -436,7 +475,7 @@ impl Name {
         // If we're taking more than one tegum, we combine all of them into a
         // single orthoplex.
         if tegum_count >= 2 {
-            new_bases.push(Name::orthoplex(tegum_count as isize));
+            new_bases.push(Name::orthoplex(false, tegum_count as isize));
         }
 
         // Sorts the bases by convention.

@@ -378,18 +378,17 @@ impl Abstract {
         }
 
         // Sets the name of the polytope.
-        let bases = vec![p.get_name().clone(), q.get_name().clone()];
-        if min && max {
-            product.set_name(Name::multipyramid(bases));
-        } else if !min && max {
-            product.set_name(Name::multiprism(bases));
-        } else if min && !max {
-            product.set_name(Name::multitegum(bases));
-        } else {
-            product.set_name(Name::multicomb(bases));
-        }
+        let bases = vec![p.name().clone(), q.name().clone()];
 
-        product
+        product.with_name(if min && max {
+            Name::multipyramid(bases)
+        } else if !min && max {
+            Name::multiprism(bases)
+        } else if min && !max {
+            Name::multitegum(bases)
+        } else {
+            Name::multicomb(bases)
+        })
     }
 }
 
@@ -399,12 +398,12 @@ impl Polytope for Abstract {
         self.ranks.rank()
     }
 
-    fn set_name(&mut self, name: Name) {
-        self.name = name;
+    fn name(&self) -> &Name {
+        &self.name
     }
 
-    fn get_name(&self) -> &Name {
-        &self.name
+    fn name_mut(&mut self) -> &mut Name {
+        &mut self.name
     }
 
     /// The number of elements of a given rank.
@@ -456,9 +455,8 @@ impl Polytope for Abstract {
         abs.push(ElementList::min(2));
         abs.push(ElementList::vertices(2));
         abs.push_subs(ElementList::max(2));
-        abs.name = Name::Dyad;
 
-        abs
+        abs.with_name(Name::Dyad)
     }
 
     /// Returns an instance of a [polygon](https://polytope.miraheze.org/wiki/Polygon)
@@ -481,9 +479,8 @@ impl Polytope for Abstract {
         poly.push(vertices);
         poly.push_subs(edges);
         poly.push_subs(maximal);
-        poly.name = Name::polygon(n);
 
-        poly
+        poly.with_name(Name::polygon(n))
     }
 
     /// Converts a polytope into its dual.
@@ -502,6 +499,8 @@ impl Polytope for Abstract {
         }
 
         self.ranks.reverse();
+        self.name = self.name.clone().dual();
+
         Ok(())
     }
 

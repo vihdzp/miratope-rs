@@ -1,7 +1,7 @@
 use crate::{
     polytope::{
         flag::{FlagEvent, FlagIter},
-        geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace, Vector},
+        geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace},
         rank::RankVec,
         Abstract, Element, ElementList, Polytope, Subelements, Subsupelements,
     },
@@ -11,14 +11,9 @@ use crate::{
 
 use approx::{abs_diff_eq, abs_diff_ne};
 use core::f64;
-use factorial::Factorial;
-use float_ord::FloatOrd;
-use gcd::Gcd;
 use std::{
     collections::HashMap,
     f64::consts::{SQRT_2, TAU},
-    fs, io,
-    path::Path,
 };
 
 #[derive(Debug, Clone)]
@@ -90,6 +85,8 @@ impl Concrete {
     /// Builds the star polygon `{n / d}`. If `n` and `d` have a common factor,
     /// the result is a compound.
     pub fn star_polygon(n: usize, d: usize) -> Self {
+        use gcd::Gcd;
+
         let gcd = n.gcd(d);
         let angle = TAU / n as f64;
 
@@ -108,13 +105,6 @@ impl Concrete {
         }
     }
 
-    /// Shifts all vertices by a given vector.
-    pub fn shift(&mut self, o: &Vector) {
-        for v in &mut self.vertices {
-            *v -= o;
-        }
-    }
-
     /// Recenters a polytope so that the gravicenter is at the origin.
     pub fn recenter(&mut self) {
         if let Some(gravicenter) = self.gravicenter() {
@@ -123,7 +113,9 @@ impl Concrete {
     }
 
     pub fn recenter_with(&mut self, p: &Point) {
-        self.shift(&-p)
+        for v in &mut self.vertices {
+            *v -= p;
+        }
     }
 
     /// Applies a matrix to all vertices of a polytope.
@@ -182,7 +174,7 @@ impl Concrete {
     pub fn x_min(&self) -> Option<f64> {
         self.vertices
             .iter()
-            .map(|v| FloatOrd(v[0]))
+            .map(|v| float_ord::FloatOrd(v[0]))
             .min()
             .map(|x| x.0)
     }
@@ -191,7 +183,7 @@ impl Concrete {
     pub fn x_max(&self) -> Option<f64> {
         self.vertices
             .iter()
-            .map(|v| FloatOrd(v[0]))
+            .map(|v| float_ord::FloatOrd(v[0]))
             .max()
             .map(|x| x.0)
     }
@@ -437,6 +429,8 @@ impl Concrete {
     }
 
     pub fn volume(&self) -> Option<f64> {
+        use factorial::Factorial;
+
         let rank = self.rank();
 
         // We leave the nullitope's volume undefined.
@@ -497,7 +491,7 @@ impl Concrete {
             }
         }
 
-        Some(volume.abs() / ((rank as usize).factorial() as f64))
+        Some(volume.abs() / (rank as usize).factorial() as f64)
     }
 
     pub fn flat_vertices(&self) -> Option<Vec<Point>> {
@@ -600,9 +594,11 @@ impl Concrete {
     }
 
     /// Loads a polytope from a file path.
-    pub fn from_path(fp: &impl AsRef<Path>) -> std::io::Result<Self> {
-        let off = std::ffi::OsStr::new("off");
-        let ggb = std::ffi::OsStr::new("ggb");
+    pub fn from_path(fp: &impl AsRef<std::path::Path>) -> std::io::Result<Self> {
+        use std::{ffi::OsStr, fs, io};
+
+        let off = OsStr::new("off");
+        let ggb = OsStr::new("ggb");
         let ext = fp.as_ref().extension();
 
         if ext == Some(off) {
@@ -626,12 +622,12 @@ impl Polytope for Concrete {
         self.abs.rank()
     }
 
-    fn set_name(&mut self, name: Name) {
-        self.abs.set_name(name);
+    fn name(&self) -> &Name {
+        self.abs.name()
     }
 
-    fn get_name(&self) -> &Name {
-        self.abs.get_name()
+    fn name_mut(&mut self) -> &mut Name {
+        self.abs.name_mut()
     }
 
     /// Gets the number of elements of a given rank.
@@ -661,7 +657,7 @@ impl Polytope for Concrete {
 
     /// Builds a convex regular polygon with `n` sides and unit edge length.
     fn polygon(n: usize) -> Self {
-        Self::grunbaum_star_polygon(n, 1)
+        Self::grunbaum_star_polygon(n, 1).with_name(Name::reg_polygon(n))
     }
 
     /// Returns the dual of a polytope, or `None` if any facets pass through the
