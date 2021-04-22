@@ -5,7 +5,10 @@ use crate::{
         rank::RankVec,
         Abstract, Element, ElementList, Polytope, Subelements, Subsupelements,
     },
-    translation::{name::Con, Name},
+    translation::{
+        name::{Con, NameType},
+        Name,
+    },
     EPS,
 };
 
@@ -648,22 +651,22 @@ impl Polytope<Con> for Concrete {
 
     /// Builds the unique polytope of rank −1.
     fn nullitope() -> Self {
-        Self::new(Vec::new(), Abstract::nullitope())
+        Self::new(Vec::new(), Abstract::nullitope()).with_name(Name::Nullitope)
     }
 
     /// Builds the unique polytope of rank 0.
     fn point() -> Self {
-        Self::new(vec![vec![].into()], Abstract::point())
+        Self::new(vec![vec![].into()], Abstract::point()).with_name(Name::Point)
     }
 
     /// Builds a dyad with unit edge length.
     fn dyad() -> Self {
-        Self::new(vec![vec![-0.5].into(), vec![0.5].into()], Abstract::dyad())
+        Self::new(vec![vec![-0.5].into(), vec![0.5].into()], Abstract::dyad()).with_name(Name::Dyad)
     }
 
     /// Builds a convex regular polygon with `n` sides and unit edge length.
     fn polygon(n: usize) -> Self {
-        Self::grunbaum_star_polygon(n, 1).with_name(Name::reg_polygon(n))
+        Self::grunbaum_star_polygon(n, 1).with_name(Name::polygon(Con::regular(true), n))
     }
 
     /// Returns the dual of a polytope, or `None` if any facets pass through the

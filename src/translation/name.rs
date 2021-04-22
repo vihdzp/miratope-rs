@@ -70,15 +70,16 @@ pub enum Name<T: NameType> {
     /// A square.
     Square,
 
-    /// A rectangle.
+    /// An irregular rectangle.
     Rectangle,
 
-    /// A pyramid based on some polytope. Don't instanciate this directly, use
-    /// [`Name::pyramid`] instead.
+    /// An orthodiagonal quadrilateral.
+    Orthodiagonal,
+
+    /// A pyramid based on some polytope.
     Pyramid(Box<Name<T>>),
 
-    /// A prism based on some polytope. Don't instanciate this directly, use
-    /// [`Name::prism`] instead.
+    /// A prism based on some polytope.
     Prism(Box<Name<T>>),
 
     /// A tegum based on some polytope.
@@ -107,12 +108,12 @@ pub enum Name<T: NameType> {
     /// whether it's regular, the integer stores its rank.
     Simplex(T, usize),
 
-    /// A regular hypercube of a given dimension, **at least 3.** The boolean stores
-    /// whether it's regular, the integer stores its rank.
+    /// A regular hypercube of a given dimension, **at least 3.** The boolean
+    /// stores whether it's regular, the integer stores its rank.
     Hypercube(T, usize),
 
-    /// A regular orthoplex of a given dimension, **at least 2.** The boolean stores
-    /// whether it's regular, the integer stores its rank.
+    /// A regular orthoplex of a given dimension, **at least 2.** The boolean
+    /// stores whether it's regular, the integer stores its rank.
     Orthoplex(T, usize),
 
     /// A polytope with a given facet count and rank, in that order. The facet
@@ -155,7 +156,7 @@ impl<T: NameType> Name<T> {
             Name::Nullitope => Some(-1),
             Name::Point => Some(0),
             Name::Dyad => Some(1),
-            Name::Triangle(_) | Name::Square | Name::Rectangle => Some(2),
+            Name::Triangle(_) | Name::Square | Name::Rectangle | Name::Orthodiagonal => Some(2),
             Name::Simplex(_, rank) | Name::Hypercube(_, rank) | Name::Orthoplex(_, rank) => {
                 Some(*rank as isize)
             }
@@ -178,7 +179,7 @@ impl<T: NameType> Name<T> {
             Name::Point => 1,
             Name::Dyad => 2,
             Name::Triangle(_) => 3,
-            Name::Square | Name::Rectangle => 4,
+            Name::Square | Name::Rectangle | Name::Orthodiagonal => 4,
             Name::Generic(n, _) => *n,
             Name::Simplex(_, n) => *n + 1,
             Name::Hypercube(_, n) => *n * 2,
@@ -236,6 +237,22 @@ impl<T: NameType> Name<T> {
         }
     }
 
+    pub fn rectangle(regular: T) -> Self {
+        if regular.is_regular() {
+            Self::Square
+        } else {
+            Self::Rectangle
+        }
+    }
+
+    pub fn orthodiagonal(regular: T) -> Self {
+        if regular.is_regular() {
+            Self::Square
+        } else {
+            Self::Orthodiagonal
+        }
+    }
+
     /// Builds a pyramid name from a given name.
     pub fn pyramid(self) -> Self {
         match self {
@@ -270,8 +287,8 @@ impl<T: NameType> Name<T> {
         match self {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
-            Self::Dyad => Self::Square,
-            Self::Square => Self::Hypercube(T::regular(false), 3),
+            Self::Dyad => Self::rectangle(T::regular(false)),
+            Self::Rectangle => Self::Hypercube(T::regular(false), 3),
             Self::Hypercube(regular, n) => {
                 if regular.is_regular() {
                     Self::Prism(Box::new(self))
@@ -279,10 +296,10 @@ impl<T: NameType> Name<T> {
                     Self::Hypercube(T::regular(false), n + 1)
                 }
             }
-            Self::Prism(base) => Self::multiprism(vec![*base, Self::Rectangle]),
+            Self::Prism(base) => Self::multiprism(vec![*base, Self::rectangle(T::regular(false))]),
             Self::Multiprism(mut bases) => {
                 bases.push(Self::Dyad);
-                Self::multipyramid(bases)
+                Self::multiprism(bases)
             }
             _ => Self::Prism(Box::new(self)),
         }
@@ -293,8 +310,8 @@ impl<T: NameType> Name<T> {
         match self {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
-            Self::Dyad => Self::Square,
-            Self::Square => Self::Orthoplex(T::regular(false), 3),
+            Self::Dyad => Self::orthoplex(T::regular(false), 2),
+            Self::Orthodiagonal => Self::Orthoplex(T::regular(false), 3),
             Self::Orthoplex(regular, n) => {
                 if regular.is_regular() {
                     Self::Tegum(Box::new(self))
@@ -387,21 +404,18 @@ impl<T: NameType> Name<T> {
         }
     }
 
-    /// Returns the name for a regular polygon of `n` sides.
-    pub fn reg_polygon(n: usize) -> Self {
-        match n {
-            3 => Self::Triangle(T::regular(true)),
-            4 => Self::Square,
-            _ => Self::Generic(n, 2),
-        }
-    }
-
     /// Returns the name for a polygon (not necessarily regular) of `n` sides.
-    pub fn polygon(n: usize) -> Self {
-        if n == 3 {
-            Self::Triangle(T::regular(false))
-        } else {
-            Self::Generic(n, 2)
+    pub fn polygon(regular: T, n: usize) -> Self {
+        match n {
+            3 => Self::Triangle(regular),
+            4 => {
+                if regular.is_regular() {
+                    Self::Square
+                } else {
+                    Self::Generic(4, 2)
+                }
+            }
+            _ => Self::Generic(n, 2),
         }
     }
 

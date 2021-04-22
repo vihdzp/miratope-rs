@@ -45,6 +45,7 @@ pub trait Language: Prefix {
             Name::Triangle(regular) => Self::triangle(*regular, options),
             Name::Square => Self::square(options),
             Name::Rectangle => Self::rectangle(options),
+            Name::Orthodiagonal => Self::orthodiagonal(options),
             Name::Generic(n, d) => Self::generic(*n, *d, options),
             Name::Pyramid(base) => Self::pyramid(base, options),
             Name::Prism(base) => Self::prism(base, options),
@@ -111,6 +112,12 @@ pub trait Language: Prefix {
     /// The name of a rectangle.
     fn rectangle(options: Options) -> String {
         format!("rectang{}", adj_or_plural(options, "ular", "les", "le"))
+    }
+
+    /// The name of an orthodiagonal quadrilateral. You should probably just
+    /// default this one to "tetragon," as it only exists for tracking purposes.
+    fn orthodiagonal(options: Options) -> String {
+        Self::generic(4, 2, options)
     }
 
     /// The generic name for a polytope with `n` facets in `d` dimensions.
@@ -223,9 +230,15 @@ pub trait Language: Prefix {
     }
 
     /// The name for a hypercube with a given rank.
-    fn hypercube<T: NameType>(_regular: T, rank: usize, options: Options) -> String {
+    fn hypercube<T: NameType>(regular: T, rank: usize, options: Options) -> String {
         match rank {
-            3 => format!("cub{}", adj_or_plural(options, "ic", "s", "e")),
+            3 => {
+                if regular.is_regular() {
+                    format!("cub{}", adj_or_plural(options, "ic", "s", "e"))
+                } else {
+                    format!("cuboid{}", adj_or_plural(options, "al", "s", ""))
+                }
+            }
             4 => format!("tesseract{}", adj_or_plural(options, "ic", "s", "")),
             _ => {
                 let mut prefix = Self::prefix(rank).chars().collect::<Vec<_>>();

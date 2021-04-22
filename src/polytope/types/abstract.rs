@@ -6,7 +6,10 @@ use crate::{
         rank::RankVec,
         Element, ElementList, Polytope, Subelements, Subsupelements,
     },
-    translation::{name::Abs, Name},
+    translation::{
+        name::{Abs, NameType},
+        Name,
+    },
 };
 
 use super::ElementHash;
@@ -480,7 +483,7 @@ impl Polytope<Abs> for Abstract {
         poly.push_subs(edges);
         poly.push_subs(maximal);
 
-        poly.with_name(Name::polygon(n))
+        poly.with_name(Name::polygon(Abs::regular(true), n))
     }
 
     /// Converts a polytope into its dual.

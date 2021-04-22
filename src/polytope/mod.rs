@@ -202,25 +202,19 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
     /// given base.
     fn pyramid(&self) -> Self {
-        let mut pyramid = Self::duopyramid(self, &Self::point());
-        *pyramid.name_mut() = self.name().clone().pyramid();
-        pyramid
+        Self::duopyramid(self, &Self::point()).with_name(self.name().clone().pyramid())
     }
 
     /// Builds a [prism](https://polytope.miraheze.org/wiki/Prism) from a
     /// given base.
     fn prism(&self) -> Self {
-        let mut prism = Self::duoprism(self, &Self::dyad());
-        *prism.name_mut() = self.name().clone().prism();
-        prism
+        Self::duoprism(self, &Self::dyad()).with_name(self.name().clone().prism())
     }
 
     /// Builds a [tegum](https://polytope.miraheze.org/wiki/Bipyramid) from a
     /// given base.
     fn tegum(&self) -> Self {
-        let mut tegum = Self::duotegum(self, &Self::dyad());
-        *tegum.name_mut() = self.name().clone().tegum();
-        tegum
+        Self::duotegum(self, &Self::dyad()).with_name(self.name().clone().tegum())
     }
 
     /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)
