@@ -3,6 +3,7 @@
 
 use super::super::{GreekPrefix, Language};
 
+/// The English language.
 pub struct En;
 
 impl GreekPrefix for En {}

@@ -1,6 +1,12 @@
 /// A language-independent representation of a polytope name, in a syntax
 /// tree-like structure structure.
-#[derive(Debug, Clone, PartialEq, PartialOrd, Ord, Eq)]
+///
+/// Many of the variants are subject to complicated invariants which help keep
+/// the translation code more modular by separation of concerns. If you
+/// instanciate a `Name` directly, **you ought to guarantee that these
+/// invariants hold.** Convenience methods are provided, which will guarantee these
+/// invariants for you.
+#[derive(Debug, Clone, PartialEq)]
 pub enum Name {
     /// A nullitope.
     Nullitope,
@@ -11,11 +17,14 @@ pub enum Name {
     /// A dyad.
     Dyad,
 
-    /// A triangle.
-    Triangle,
+    /// A triangle, which stores whether it's regular.
+    Triangle(bool),
 
     /// A square.
     Square,
+
+    /// A rectangle.
+    Rectangle,
 
     /// A pyramid based on some polytope. Don't instanciate this directly, use
     /// [`Name::pyramid`] instead.
@@ -28,7 +37,9 @@ pub enum Name {
     /// A tegum based on some polytope.
     Tegum(Box<Name>),
 
-    /// A multipyramid based on a list of polytopes.
+    /// A multipyramid based on a list of polytopes. The list must contain at
+    /// least two elements, be "sorted", and contain nothing that can be
+    /// interpreted as a multipyramid.
     Multipyramid(Vec<Name>),
 
     /// A multiprism based on a list of polytopes.
@@ -43,20 +54,23 @@ pub enum Name {
     /// The dual of a specified polytope.
     Dual(Box<Name>),
 
-    /// A simplex of a given dimension, **at least 3.** Use [`Nullitope`](Name::Nullitope),
+    /// A simplex of a given dimension, **at least 3.** The boolean stores
+    /// whether it's regular, the integer stores its rank. Use [`Nullitope`](Name::Nullitope),
     /// [`Point`](Name::Point), [`Dyad`](Name::Dyad), or [`Triangle`](Name::Triangle)
     /// for the simplices of lower rank.
-    Simplex(usize),
+    Simplex(bool, usize),
 
-    /// A hypercube of a given dimension, **at least 3.** Use [`Nullitope`](Name::Nullitope),
+    /// A regular hypercube of a given dimension, **at least 3.** The boolean stores
+    /// whether it's regular, the integer stores its rank. Use [`Nullitope`](Name::Nullitope),
     /// [`Point`](Name::Point), [`Dyad`](Name::Dyad), or [`Square`](Name::Square)
-    /// for the simplices of lower rank.
-    Hypercube(usize),
+    /// for the hypercubes of lower rank.
+    Hypercube(bool, usize),
 
-    /// An orthoplex of a given dimension, **at least 3.** Use [`Nullitope`](Name::Nullitope),
+    /// A regular orthoplex of a given dimension, **at least 3.** The boolean stores
+    /// whether it's regular, the integer stores its rank. Use [`Nullitope`](Name::Nullitope),
     /// [`Point`](Name::Point), [`Dyad`](Name::Dyad), or [`Square`](Name::Square)
     /// for the orthoplices of lower rank.
-    Orthoplex(usize),
+    Orthoplex(bool, usize),
 
     /// A polytope with a given facet count and rank, in that order.
     Generic(usize, usize),
@@ -91,9 +105,8 @@ impl Name {
             Name::Nullitope => Some(-1),
             Name::Point => Some(0),
             Name::Dyad => Some(1),
-            Name::Triangle => Some(2),
-            Name::Square => Some(2),
-            Name::Simplex(rank) | Name::Hypercube(rank) | Name::Orthoplex(rank) => {
+            Name::Triangle(_) | Name::Square | Name::Rectangle => Some(2),
+            Name::Simplex(_, rank) | Name::Hypercube(_, rank) | Name::Orthoplex(_, rank) => {
                 Some(*rank as isize)
             }
             Name::Dual(base) => base.rank(),
@@ -114,32 +127,105 @@ impl Name {
             Name::Nullitope => 0,
             Name::Point => 1,
             Name::Dyad => 2,
-            Name::Triangle => 3,
-            Name::Square => 4,
-            Name::Simplex(n) => *n + 1,
-            Name::Hypercube(n) => *n * 2,
-            Name::Orthoplex(n) => 2u32.pow(*n as u32) as usize,
+            Name::Triangle(_) => 3,
+            Name::Square | Name::Rectangle => 4,
             Name::Generic(n, _) => *n,
+            Name::Simplex(_, n) => *n + 1,
+            Name::Hypercube(_, n) => *n * 2,
+            Name::Orthoplex(_, n) => 2u32.pow(*n as u32) as usize,
+            Name::Multipyramid(bases) | Name::Multitegum(bases) => {
+                let mut facet_count = 1;
+                for base in bases {
+                    facet_count *= base.facet_count()?;
+                }
+                facet_count
+            }
+            Name::Multiprism(bases) | Name::Multicomb(bases) => {
+                let mut facet_count = 0;
+                for base in bases {
+                    facet_count += base.facet_count()?;
+                }
+                facet_count
+            }
             _ => return None,
         })
     }
 
+    /// Determines whether a `Name` is valid, that is, all of the conditions
+    /// specified on its variants hold. Used for debugging.
     pub fn is_valid(&self) -> bool {
         match self {
-            Self::Simplex(n) | Self::Hypercube(n) | Self::Orthoplex(n) => *n >= 3,
-            Self::Multicomb(bases) => !bases.is_empty(),
+            Self::Simplex(_, n) | Self::Hypercube(_, n) | Self::Orthoplex(_, n) => *n >= 3,
+            Self::Multipyramid(bases)
+            | Self::Multiprism(bases)
+            | Self::Multitegum(bases)
+            | Self::Multicomb(bases) => {
+                // Any multiproduct must have at least two bases.
+                if bases.len() < 2 {
+                    return false;
+                }
+
+                // No base should have the same variant as self.
+                for base in bases {
+                    if base == self {
+                        return false;
+                    }
+                }
+
+                // We should check that the bases are sorted somehow.
+
+                true
+            }
             _ => true,
         }
     }
 
     /// Builds a pyramid name from a given name.
     pub fn pyramid(self) -> Self {
-        Self::Pyramid(Box::new(self))
+        match self {
+            Self::Nullitope => Self::Nullitope,
+            Self::Point => Self::Dyad,
+            Self::Dyad => Self::Generic(3, 2),
+            Self::Triangle(regular) => {
+                if regular {
+                    Self::Pyramid(Box::new(self))
+                } else {
+                    Self::Simplex(false, 3)
+                }
+            }
+            Self::Simplex(regular, n) => {
+                if regular {
+                    Self::Pyramid(Box::new(self))
+                } else {
+                    Self::Simplex(false, n + 1)
+                }
+            }
+            Self::Pyramid(base) => Self::multipyramid(vec![*base, Self::Dyad]),
+            Self::Multipyramid(mut bases) => {
+                bases.push(Self::Point);
+                Self::multipyramid(bases)
+            }
+            _ => Self::Pyramid(Box::new(self)),
+        }
     }
 
     /// Builds a prism name from a given name.
     pub fn prism(self) -> Self {
-        Self::Prism(Box::new(self))
+        match self {
+            Self::Nullitope => Self::Nullitope,
+            Self::Point => Self::Dyad,
+            Self::Dyad => Self::Square,
+            Self::Square => Self::Hypercube(false, 3),
+            Self::Hypercube(regular, n) => {
+                if regular {
+                    Self::Prism(Box::new(self))
+                } else {
+                    Self::Hypercube(false, n + 1)
+                }
+            }
+            Self::Prism(base) => Self::multiprism(vec![*base, Self::Rectangle]),
+            _ => Self::Prism(Box::new(self)),
+        }
     }
 
     /// Builds a tegum name from a given name.
@@ -159,42 +245,42 @@ impl Name {
     }
 
     /// The name for an *n*-simplex.
-    pub fn simplex(n: isize) -> Self {
+    pub fn simplex(regular: bool, n: isize) -> Self {
         match n {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
-            2 => Self::Triangle,
-            _ => Self::Simplex(n as usize),
+            2 => Self::Triangle(regular),
+            _ => Self::Simplex(regular, n as usize),
         }
     }
 
-    /// The name for an *n*-hypercube.
+    /// The name for a regular *n*-hypercube.
     pub fn hypercube(n: isize) -> Self {
         match n {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
             2 => Self::Square,
-            _ => Self::Hypercube(n as usize),
+            _ => Self::Hypercube(true, n as usize),
         }
     }
 
-    /// The name for an *n*-orthoplex.
+    /// The name for a regular *n*-orthoplex.
     pub fn orthoplex(n: isize) -> Self {
         match n {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
             2 => Self::Square,
-            _ => Self::Orthoplex(n as usize),
+            _ => Self::Orthoplex(true, n as usize),
         }
     }
 
     /// Returns the name for a regular polygon of `n` sides.
     pub fn reg_polygon(n: usize) -> Self {
         match n {
-            3 => Self::Triangle,
+            3 => Self::Triangle(true),
             4 => Self::Square,
             _ => Self::Generic(n, 2),
         }
@@ -203,7 +289,7 @@ impl Name {
     /// Returns the name for a polygon (not necessarily regular) of `n` sides.
     pub fn polygon(n: usize) -> Self {
         if n == 3 {
-            Self::Triangle
+            Self::Triangle(false)
         } else {
             Self::Generic(n, 2)
         }
@@ -227,10 +313,6 @@ impl Name {
             // Names are firstly compared by rank.
             return_if_ne!(base0.rank().unwrap_or(-2).cmp(&base1.rank().unwrap_or(-2)));
 
-            // Names are then compared by their variant names in an arbitrary
-            // manner, so that polytopes of the same type are grouped together.
-            return_if_ne!(base0.cmp(&base1));
-
             // If we know the facet count of the names, a name with less facets
             // compares as less to one with more facets.
             return_if_ne!(base0
@@ -243,13 +325,7 @@ impl Name {
         });
     }
 
-    pub fn multipyramid(mut bases: Vec<Name>) -> Self {
-        if bases.is_empty() {
-            return Self::Nullitope;
-        } else if bases.len() == 1 {
-            return bases.swap_remove(0);
-        }
-
+    pub fn multipyramid(bases: Vec<Name>) -> Self {
         let mut new_bases = Vec::new();
         let mut pyramid_count = 0;
 
@@ -260,8 +336,8 @@ impl Name {
                 Self::Nullitope => {}
                 Self::Point => pyramid_count += 1,
                 Self::Dyad => pyramid_count += 2,
-                Self::Triangle => pyramid_count += 2,
-                Self::Simplex(n) => pyramid_count += n + 1,
+                Self::Triangle(_) => pyramid_count += 2,
+                Self::Simplex(_, n) => pyramid_count += n + 1,
                 Self::Multipyramid(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
             }
@@ -270,27 +346,29 @@ impl Name {
         // If we're taking more than one pyramid, we combine all of them into a
         // single simplex.
         if pyramid_count >= 2 {
-            new_bases.push(Name::simplex(pyramid_count as isize - 1));
+            new_bases.push(Name::simplex(false, pyramid_count as isize - 1));
         }
 
         // Sorts the bases by convention.
         Self::sort_bases(&mut new_bases);
 
-        let multipyramid = Self::Multipyramid(new_bases);
+        let multipyramid = match new_bases.len() {
+            0 => Self::Nullitope,
+            1 => new_bases.swap_remove(0),
+            _ => Self::Multipyramid(new_bases),
+        };
+
+        // If we take exactly one pyramid, we apply it at the end.
         if pyramid_count == 1 {
             multipyramid.pyramid()
-        } else {
+        }
+        // Otherwise, we already combined them.
+        else {
             multipyramid
         }
     }
 
-    pub fn multiprism(mut bases: Vec<Name>) -> Self {
-        if bases.is_empty() {
-            return Self::Point;
-        } else if bases.len() == 1 {
-            return bases.swap_remove(0);
-        }
-
+    pub fn multiprism(bases: Vec<Name>) -> Self {
         let mut new_bases = Vec::new();
         let mut prism_count = 0;
 
@@ -304,14 +382,14 @@ impl Name {
                 Self::Point => {}
                 Self::Dyad => prism_count += 1,
                 Self::Square => prism_count += 2,
-                Self::Hypercube(n) => prism_count += n,
-                Self::Multipyramid(mut extra_bases) => new_bases.append(&mut extra_bases),
+                Self::Hypercube(_, n) => prism_count += n,
+                Self::Multiprism(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
             }
         }
 
-        // If we're taking more than one pyramid, we combine all of them into a
-        // single simplex.
+        // If we're taking more than one prism, we combine all of them into a
+        // single hypercube.
         if prism_count >= 2 {
             new_bases.push(Name::hypercube(prism_count as isize));
         }
@@ -319,21 +397,23 @@ impl Name {
         // Sorts the bases by convention.
         Self::sort_bases(&mut new_bases);
 
-        let multiprism = Self::Multiprism(new_bases);
+        let multiprism = match new_bases.len() {
+            0 => Self::Point,
+            1 => new_bases.swap_remove(0),
+            _ => Self::Multiprism(new_bases),
+        };
+
+        // If we take exactly one prism, we apply it at the end.
         if prism_count == 1 {
             multiprism.prism()
-        } else {
+        }
+        // Otherwise, we already combined them.
+        else {
             multiprism
         }
     }
 
-    pub fn multitegum(mut bases: Vec<Name>) -> Self {
-        if bases.is_empty() {
-            return Self::Point;
-        } else if bases.len() == 1 {
-            return bases.swap_remove(0);
-        }
-
+    pub fn multitegum(bases: Vec<Name>) -> Self {
         let mut new_bases = Vec::new();
         let mut tegum_count = 0;
 
@@ -347,14 +427,14 @@ impl Name {
                 Self::Point => {}
                 Self::Dyad => tegum_count += 1,
                 Self::Square => tegum_count += 2,
-                Self::Hypercube(n) => tegum_count += n,
-                Self::Multipyramid(mut extra_bases) => new_bases.append(&mut extra_bases),
+                Self::Orthoplex(_, n) => tegum_count += n,
+                Self::Multitegum(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
             }
         }
 
-        // If we're taking more than one pyramid, we combine all of them into a
-        // single simplex.
+        // If we're taking more than one tegum, we combine all of them into a
+        // single orthoplex.
         if tegum_count >= 2 {
             new_bases.push(Name::orthoplex(tegum_count as isize));
         }
@@ -362,24 +442,42 @@ impl Name {
         // Sorts the bases by convention.
         Self::sort_bases(&mut new_bases);
 
-        let multitegum = Self::Multitegum(new_bases);
+        let multitegum = match new_bases.len() {
+            0 => Self::Point,
+            1 => new_bases.swap_remove(0),
+            _ => Self::Multitegum(new_bases),
+        };
+
+        // If we take exactly one tegum, we apply it at the end.
         if tegum_count == 1 {
             multitegum.tegum()
-        } else {
+        }
+        // Otherwise, we already combined them.
+        else {
             multitegum
         }
     }
 
-    pub fn multicomb(mut bases: Vec<Name>) -> Self {
-        if bases.is_empty() {
-            return Self::Nullitope;
-        } else if bases.len() == 1 {
-            return bases.swap_remove(0);
+    pub fn multicomb(bases: Vec<Name>) -> Self {
+        let mut new_bases = Vec::new();
+
+        // Figures out which bases of the multipyramid are multipyramids
+        // themselves, and accounts for them accordingly.
+        for base in bases.into_iter() {
+            if let Self::Multicomb(mut extra_bases) = base {
+                new_bases.append(&mut extra_bases);
+            } else {
+                new_bases.push(base);
+            }
         }
 
         // Sorts the bases by convention.
-        Self::sort_bases(&mut bases);
+        Self::sort_bases(&mut new_bases);
 
-        Self::Multicomb(bases)
+        match new_bases.len() {
+            0 => Self::Point,
+            1 => new_bases.swap_remove(0),
+            _ => Self::Multicomb(new_bases),
+        }
     }
 }

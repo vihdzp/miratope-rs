@@ -32,14 +32,15 @@ fn adj_or_plural<'a>(options: Options, adj: &'a str, plural: &'a str, none: &'a 
 pub trait Language: Prefix {
     /// Parses the [`Name`] in the specified language, with the given [`Options`].
     fn parse(name: &Name, options: Options) -> String {
-        debug_assert!(name.is_valid());
+        debug_assert!(name.is_valid(), "Invalid name {:?}.", name);
 
         match name {
             Name::Nullitope => Self::nullitope(options),
             Name::Point => Self::point(options),
             Name::Dyad => Self::dyad(options),
-            Name::Triangle => Self::triangle(options),
+            Name::Triangle(regular) => Self::triangle(*regular, options),
             Name::Square => Self::square(options),
+            Name::Rectangle => Self::rectangle(options),
             Name::Generic(n, d) => Self::generic(*n, *d, options),
             Name::Pyramid(base) => Self::pyramid(base, options),
             Name::Prism(base) => Self::prism(base, options),
@@ -48,9 +49,9 @@ pub trait Language: Prefix {
             | Name::Multiprism(_)
             | Name::Multitegum(_)
             | Name::Multicomb(_) => Self::multiproduct(name, options),
-            Name::Simplex(rank) => Self::simplex(*rank, options),
-            Name::Hypercube(rank) => Self::hypercube(*rank, options),
-            Name::Orthoplex(rank) => Self::orthoplex(*rank, options),
+            Name::Simplex(regular, rank) => Self::simplex(*regular, *rank, options),
+            Name::Hypercube(regular, rank) => Self::hypercube(*regular, *rank, options),
+            Name::Orthoplex(regular, rank) => Self::orthoplex(*regular, *rank, options),
             _ => Self::unknown(),
         }
     }
@@ -93,13 +94,18 @@ pub trait Language: Prefix {
     }
 
     /// The name of a triangle.
-    fn triangle(options: Options) -> String {
+    fn triangle(_regular: bool, options: Options) -> String {
         format!("triang{}", adj_or_plural(options, "ular", "les", "le"))
     }
 
     /// The name of a square.
     fn square(options: Options) -> String {
         format!("square{}", adj_or_plural(options, "", "s", ""))
+    }
+
+    /// The name of a rectangle.
+    fn rectangle(options: Options) -> String {
+        format!("rectang{}", adj_or_plural(options, "ular", "les", "le"))
     }
 
     /// The generic name for a polytope with `n` facets in `d` dimensions.
@@ -187,22 +193,19 @@ pub trait Language: Prefix {
 
         let mut str_bases = String::new();
         let parse_base = |base| {
-            format!(
-                "{}",
-                Self::parse(
-                    base,
-                    Options {
-                        adjective: true,
-                        ..Default::default()
-                    }
-                )
+            Self::parse(
+                base,
+                Options {
+                    adjective: true,
+                    ..Default::default()
+                },
             )
         };
 
         let (last, bases) = bases.split_last().unwrap();
         for base in bases {
             str_bases.push_str(&parse_base(base));
-            str_bases.push_str("-");
+            str_bases.push('-');
         }
         str_bases.push_str(&parse_base(last));
 
@@ -210,19 +213,19 @@ pub trait Language: Prefix {
     }
 
     /// The name for a simplex with a given rank.
-    fn simplex(rank: usize, options: Options) -> String {
+    fn simplex(_regular: bool, rank: usize, options: Options) -> String {
         let n = rank as usize;
         Self::generic(n + 1, n, options)
     }
 
     /// The name for a hypercube with a given rank.
-    fn hypercube(rank: usize, options: Options) -> String {
+    fn hypercube(_regular: bool, rank: usize, options: Options) -> String {
         let n = rank as usize;
         Self::generic(2 * n, n, options)
     }
 
     /// The name for an orthoplex with a given rank.
-    fn orthoplex(rank: usize, options: Options) -> String {
+    fn orthoplex(_regular: bool, rank: usize, options: Options) -> String {
         let n = rank as usize;
         Self::generic(2u32.pow(n as u32) as usize, n, options)
     }

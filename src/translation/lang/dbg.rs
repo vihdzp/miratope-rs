@@ -8,7 +8,7 @@ impl Prefix for Dbg {}
 
 impl Language for Dbg {
     fn suffix(d: usize, _options: Options) -> String {
-        format!("({}-elements)", d - 1)
+        format!("({}D)", d)
     }
 
     fn pyramid(base: &Name, _options: Options) -> String {
@@ -23,24 +23,28 @@ impl Language for Dbg {
         format!("({}) tegum", Self::parse(base, Options::default()))
     }
 
-    fn simplex(rank: usize, _options: Options) -> String {
+    fn simplex(_regular: bool, rank: usize, _options: Options) -> String {
         format!("{}-simplex", rank)
     }
 
-    fn hypercube(rank: usize, _options: Options) -> String {
-        format!("{}-hypercube", rank)
+    fn hypercube(regular: bool, rank: usize, _options: Options) -> String {
+        if regular {
+            format!("{}-hypercube", rank)
+        } else {
+            format!("{}-hypercuboid", rank)
+        }
     }
 
-    fn orthoplex(rank: usize, _options: Options) -> String {
+    fn orthoplex(_regular: bool, rank: usize, _options: Options) -> String {
         format!("{}-orthoplex", rank)
     }
 
     fn multiproduct(name: &Name, _options: Options) -> String {
         let (bases, kind) = match name {
-            Name::Multipyramid(bases) => (bases, "multipyramid"),
-            Name::Multiprism(bases) => (bases, "multiprism"),
-            Name::Multitegum(bases) => (bases, "multitegum"),
-            Name::Multicomb(bases) => (bases, "multicomb"),
+            Name::Multipyramid(bases) => (bases, "pyramid"),
+            Name::Multiprism(bases) => (bases, "prism"),
+            Name::Multitegum(bases) => (bases, "tegum"),
+            Name::Multicomb(bases) => (bases, "comb"),
             _ => panic!("Not a product!"),
         };
 
@@ -53,6 +57,6 @@ impl Language for Dbg {
         }
         str_bases.push_str(&format!("({})", Self::parse(last, _options)));
 
-        format!("({}) {}", str_bases, kind)
+        format!("({}) {}-{}", str_bases, bases.len(), kind)
     }
 }

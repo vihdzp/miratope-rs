@@ -286,7 +286,7 @@ pub trait Polytope: Sized + Clone {
     /// given rank.
     fn simplex(rank: isize) -> Self {
         let mut simplex = Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize]);
-        simplex.set_name(Name::simplex(rank));
+        simplex.set_name(Name::simplex(true, rank));
         simplex
     }
 

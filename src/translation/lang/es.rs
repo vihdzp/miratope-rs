@@ -1,6 +1,7 @@
-pub struct Es;
-
 use super::super::{GreekPrefix, Language, Options, Prefix};
+
+/// The Spanish language.
+pub struct Es;
 
 impl GreekPrefix for Es {}
 
