@@ -6,7 +6,7 @@ pub use dbg::Dbg;
 pub use en::En;
 pub use es::Es;
 
-use super::{Name, Options, Prefix};
+use super::{name::NameType, Name, Options, Prefix};
 
 pub fn is_vowel(c: char) -> bool {
     matches!(c, 'a' | 'e' | 'i' | 'o' | 'u')
@@ -35,7 +35,7 @@ fn adj_or_plural<'a>(options: Options, adj: &'a str, plural: &'a str, none: &'a 
 /// The trait shared by all languages. Defaults to English.
 pub trait Language: Prefix {
     /// Parses the [`Name`] in the specified language, with the given [`Options`].
-    fn parse(name: &Name, options: Options) -> String {
+    fn parse<T: NameType>(name: &Name<T>, options: Options) -> String {
         debug_assert!(name.is_valid(), "Invalid name {:?}.", name);
 
         match name {
@@ -99,7 +99,7 @@ pub trait Language: Prefix {
     }
 
     /// The name of a triangle.
-    fn triangle(_regular: bool, options: Options) -> String {
+    fn triangle<T: NameType>(_regular: T, options: Options) -> String {
         format!("triang{}", adj_or_plural(options, "ular", "les", "le"))
     }
 
@@ -119,7 +119,7 @@ pub trait Language: Prefix {
     }
 
     /// The name for a pyramid with a given base.
-    fn pyramid(base: &Name, options: Options) -> String {
+    fn pyramid<T: NameType>(base: &Name<T>, options: Options) -> String {
         format!(
             "{} pyramid{}",
             Self::parse(
@@ -135,7 +135,7 @@ pub trait Language: Prefix {
     }
 
     /// The name for a prism with a given base.
-    fn prism(base: &Name, options: Options) -> String {
+    fn prism<T: NameType>(base: &Name<T>, options: Options) -> String {
         format!(
             "{} prism{}",
             Self::parse(
@@ -151,7 +151,7 @@ pub trait Language: Prefix {
     }
 
     /// The name for a tegum with a given base.
-    fn tegum(base: &Name, options: Options) -> String {
+    fn tegum<T: NameType>(base: &Name<T>, options: Options) -> String {
         format!(
             "{} teg{}",
             Self::parse(
@@ -166,7 +166,7 @@ pub trait Language: Prefix {
         )
     }
 
-    fn multiproduct(name: &Name, options: Options) -> String {
+    fn multiproduct<T: NameType>(name: &Name<T>, options: Options) -> String {
         // Gets the bases and the kind of multiproduct.
         let (bases, kind) = match name {
             Name::Multipyramid(bases) => (
@@ -218,12 +218,12 @@ pub trait Language: Prefix {
     }
 
     /// The name for a simplex with a given rank.
-    fn simplex(_regular: bool, rank: usize, options: Options) -> String {
+    fn simplex<T: NameType>(_regular: T, rank: usize, options: Options) -> String {
         Self::generic(rank + 1, rank, options)
     }
 
     /// The name for a hypercube with a given rank.
-    fn hypercube(_regular: bool, rank: usize, options: Options) -> String {
+    fn hypercube<T: NameType>(_regular: T, rank: usize, options: Options) -> String {
         match rank {
             3 => format!("cub{}", adj_or_plural(options, "ic", "s", "e")),
             4 => format!("tesseract{}", adj_or_plural(options, "ic", "s", "")),
@@ -253,12 +253,12 @@ pub trait Language: Prefix {
     }
 
     /// The name for an orthoplex with a given rank.
-    fn orthoplex(_regular: bool, rank: usize, options: Options) -> String {
+    fn orthoplex<T: NameType>(_regular: T, rank: usize, options: Options) -> String {
         Self::generic(2u32.pow(rank as u32) as usize, rank, options)
     }
 
     /// The name for the dual of another polytope.
-    fn dual(base: &Name, options: Options) -> String {
+    fn dual<T: NameType>(base: &Name<T>, options: Options) -> String {
         format!("dual {}", Self::parse(base, options))
     }
 

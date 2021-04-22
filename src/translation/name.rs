@@ -1,3 +1,50 @@
+use std::fmt::Debug;
+
+/// Determines whether a name is to be treated as the name for an abstract
+/// polytope. Doubles as a way to mark some name variants as coming from a
+/// regular polytope or not.
+pub trait NameType: Debug + Clone + PartialEq + Copy {
+    fn is_abstract() -> bool;
+
+    fn regular(x: bool) -> Self;
+
+    fn is_regular(&self) -> bool;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Abs;
+
+impl NameType for Abs {
+    fn is_abstract() -> bool {
+        true
+    }
+
+    fn regular(_: bool) -> Self {
+        Self
+    }
+
+    fn is_regular(&self) -> bool {
+        true
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Con(bool);
+
+impl NameType for Con {
+    fn is_abstract() -> bool {
+        false
+    }
+
+    fn regular(x: bool) -> Self {
+        Self(x)
+    }
+
+    fn is_regular(&self) -> bool {
+        self.0
+    }
+}
+
 /// A language-independent representation of a polytope name, in a syntax
 /// tree-like structure structure.
 ///
@@ -7,7 +54,7 @@
 /// invariants hold.** Convenience methods are provided, which will guarantee these
 /// invariants for you.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Name {
+pub enum Name<T: NameType> {
     /// A nullitope.
     Nullitope,
 
@@ -18,7 +65,7 @@ pub enum Name {
     Dyad,
 
     /// A triangle, which stores whether it's regular.
-    Triangle(bool),
+    Triangle(T),
 
     /// A square.
     Square,
@@ -28,45 +75,45 @@ pub enum Name {
 
     /// A pyramid based on some polytope. Don't instanciate this directly, use
     /// [`Name::pyramid`] instead.
-    Pyramid(Box<Name>),
+    Pyramid(Box<Name<T>>),
 
     /// A prism based on some polytope. Don't instanciate this directly, use
     /// [`Name::prism`] instead.
-    Prism(Box<Name>),
+    Prism(Box<Name<T>>),
 
     /// A tegum based on some polytope.
-    Tegum(Box<Name>),
+    Tegum(Box<Name<T>>),
 
     /// A multipyramid based on a list of polytopes. The list must contain **at
     /// least 2** elements, and contain nothing that can be interpreted as a
     /// multipyramid.
-    Multipyramid(Vec<Name>),
+    Multipyramid(Vec<Name<T>>),
 
     /// A multiprism based on a list of polytopes. The list must contain at
     /// least two elements, be "sorted", and contain nothing that can be
     /// interpreted as a multiprism.
-    Multiprism(Vec<Name>),
+    Multiprism(Vec<Name<T>>),
 
     /// A multitegum based on a list of polytopes.
-    Multitegum(Vec<Name>),
+    Multitegum(Vec<Name<T>>),
 
     /// A multicomb based on a list of polytopes.
-    Multicomb(Vec<Name>),
+    Multicomb(Vec<Name<T>>),
 
     /// The dual of a specified polytope.
-    Dual(Box<Name>),
+    Dual(Box<Name<T>>),
 
     /// A simplex of a given dimension, **at least 3.** The boolean stores
     /// whether it's regular, the integer stores its rank.
-    Simplex(bool, usize),
+    Simplex(T, usize),
 
     /// A regular hypercube of a given dimension, **at least 3.** The boolean stores
     /// whether it's regular, the integer stores its rank.
-    Hypercube(bool, usize),
+    Hypercube(T, usize),
 
     /// A regular orthoplex of a given dimension, **at least 2.** The boolean stores
     /// whether it's regular, the integer stores its rank.
-    Orthoplex(bool, usize),
+    Orthoplex(T, usize),
 
     /// A polytope with a given facet count and rank, in that order. The facet
     /// count must be **at least 2,** and the dimension must be **at most 20.**
@@ -76,7 +123,13 @@ pub enum Name {
     Unknown,
 }
 
-impl Name {
+impl<T: NameType> Default for Name<T> {
+    fn default() -> Self {
+        Self::Unknown
+    }
+}
+
+impl<T: NameType> Name<T> {
     /// Auxiliary function to get the rank of a multiproduct.
     fn rank_product(&self) -> Option<isize> {
         // The bases of the product, and the difference between the rank of a
@@ -190,17 +243,17 @@ impl Name {
             Self::Point => Self::Dyad,
             Self::Dyad => Self::Generic(3, 2),
             Self::Triangle(regular) => {
-                if regular {
+                if regular.is_regular() {
                     Self::Pyramid(Box::new(self))
                 } else {
-                    Self::Simplex(false, 3)
+                    Self::Simplex(T::regular(false), 3)
                 }
             }
             Self::Simplex(regular, n) => {
-                if regular {
+                if regular.is_regular() {
                     Self::Pyramid(Box::new(self))
                 } else {
-                    Self::Simplex(false, n + 1)
+                    Self::Simplex(T::regular(false), n + 1)
                 }
             }
             Self::Pyramid(base) => Self::multipyramid(vec![*base, Self::Dyad]),
@@ -218,12 +271,12 @@ impl Name {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
             Self::Dyad => Self::Square,
-            Self::Square => Self::Hypercube(false, 3),
+            Self::Square => Self::Hypercube(T::regular(false), 3),
             Self::Hypercube(regular, n) => {
-                if regular {
+                if regular.is_regular() {
                     Self::Prism(Box::new(self))
                 } else {
-                    Self::Hypercube(false, n + 1)
+                    Self::Hypercube(T::regular(false), n + 1)
                 }
             }
             Self::Prism(base) => Self::multiprism(vec![*base, Self::Rectangle]),
@@ -241,15 +294,17 @@ impl Name {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
             Self::Dyad => Self::Square,
-            Self::Square => Self::Orthoplex(false, 3),
+            Self::Square => Self::Orthoplex(T::regular(false), 3),
             Self::Orthoplex(regular, n) => {
-                if regular {
+                if regular.is_regular() {
                     Self::Tegum(Box::new(self))
                 } else {
-                    Self::Orthoplex(false, n + 1)
+                    Self::Orthoplex(T::regular(false), n + 1)
                 }
             }
-            Self::Tegum(base) => Self::multitegum(vec![*base, Self::Orthoplex(false, 2)]),
+            Self::Tegum(base) => {
+                Self::multitegum(vec![*base, Self::Orthoplex(T::regular(false), 2)])
+            }
             Self::Multitegum(mut bases) => {
                 bases.push(Self::Dyad);
                 Self::multitegum(bases)
@@ -279,16 +334,16 @@ impl Name {
                 if d <= 2 {
                     self
                 } else {
-                    Self::Unknown
+                    Self::default()
                 }
             }
-            Self::Multipyramid(_)=>self,
+            Self::Multipyramid(_) => self,
             _ => self,
         }
     }
 
     /// The name for an *n*-simplex.
-    pub fn simplex(regular: bool, n: isize) -> Self {
+    pub fn simplex(regular: T, n: isize) -> Self {
         match n {
             -1 => Self::Nullitope,
             0 => Self::Point,
@@ -299,13 +354,13 @@ impl Name {
     }
 
     /// The name for an *n*-hypercube.
-    pub fn hypercube(regular: bool, n: isize) -> Self {
+    pub fn hypercube(regular: T, n: isize) -> Self {
         match n {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
             2 => {
-                if regular {
+                if regular.is_regular() {
                     Self::Square
                 } else {
                     Self::Rectangle
@@ -316,12 +371,18 @@ impl Name {
     }
 
     /// The name for an *n*-orthoplex.
-    pub fn orthoplex(regular: bool, n: isize) -> Self {
+    pub fn orthoplex(regular: T, n: isize) -> Self {
         match n {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
-            2 => Self::Square,
+            2 => {
+                if regular.is_regular() {
+                    Self::Square
+                } else {
+                    Self::Orthoplex(regular, 2)
+                }
+            }
             _ => Self::Orthoplex(regular, n as usize),
         }
     }
@@ -329,7 +390,7 @@ impl Name {
     /// Returns the name for a regular polygon of `n` sides.
     pub fn reg_polygon(n: usize) -> Self {
         match n {
-            3 => Self::Triangle(true),
+            3 => Self::Triangle(T::regular(true)),
             4 => Self::Square,
             _ => Self::Generic(n, 2),
         }
@@ -338,7 +399,7 @@ impl Name {
     /// Returns the name for a polygon (not necessarily regular) of `n` sides.
     pub fn polygon(n: usize) -> Self {
         if n == 3 {
-            Self::Triangle(false)
+            Self::Triangle(T::regular(false))
         } else {
             Self::Generic(n, 2)
         }
@@ -346,7 +407,7 @@ impl Name {
 
     /// Sorts the bases of a multiproduct according to their rank, and then
     /// their facet count.
-    fn sort_bases(bases: &mut Vec<Name>) {
+    fn sort_bases(bases: &mut Vec<Name<T>>) {
         use std::cmp::Ordering;
 
         // Returns an Ordering if it's not equal to Ordering::Equal.
@@ -376,7 +437,7 @@ impl Name {
         });
     }
 
-    pub fn multipyramid(bases: Vec<Name>) -> Self {
+    pub fn multipyramid(bases: Vec<Name<T>>) -> Self {
         let mut new_bases = Vec::new();
         let mut pyramid_count = 0;
 
@@ -397,7 +458,7 @@ impl Name {
         // If we're taking more than one pyramid, we combine all of them into a
         // single simplex.
         if pyramid_count >= 2 {
-            new_bases.push(Name::simplex(false, pyramid_count as isize - 1));
+            new_bases.push(Name::simplex(T::regular(false), pyramid_count as isize - 1));
         }
 
         // Sorts the bases by convention.
@@ -419,7 +480,7 @@ impl Name {
         }
     }
 
-    pub fn multiprism(bases: Vec<Name>) -> Self {
+    pub fn multiprism(bases: Vec<Name<T>>) -> Self {
         let mut new_bases = Vec::new();
         let mut prism_count = 0;
 
@@ -442,7 +503,7 @@ impl Name {
         // If we're taking more than one prism, we combine all of them into a
         // single hypercube.
         if prism_count >= 2 {
-            new_bases.push(Name::hypercube(false, prism_count as isize));
+            new_bases.push(Name::hypercube(T::regular(false), prism_count as isize));
         }
 
         // Sorts the bases by convention.
@@ -464,7 +525,7 @@ impl Name {
         }
     }
 
-    pub fn multitegum(bases: Vec<Name>) -> Self {
+    pub fn multitegum(bases: Vec<Name<T>>) -> Self {
         let mut new_bases = Vec::new();
         let mut tegum_count = 0;
 
@@ -487,7 +548,7 @@ impl Name {
         // If we're taking more than one tegum, we combine all of them into a
         // single orthoplex.
         if tegum_count >= 2 {
-            new_bases.push(Name::orthoplex(false, tegum_count as isize));
+            new_bases.push(Name::orthoplex(T::regular(false), tegum_count as isize));
         }
 
         // Sorts the bases by convention.
@@ -509,7 +570,7 @@ impl Name {
         }
     }
 
-    pub fn multicomb(bases: Vec<Name>) -> Self {
+    pub fn multicomb(bases: Vec<Name<T>>) -> Self {
         let mut new_bases = Vec::new();
 
         // Figures out which bases of the multipyramid are multipyramids

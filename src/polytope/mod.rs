@@ -2,7 +2,10 @@
 //! [polytopes](https://polytope.miraheze.org/wiki/Polytope), as well as some
 //! basic methods to operate on them.
 
-use crate::{polytope::flag::FlagIter, translation::Name};
+use crate::{
+    polytope::flag::FlagIter,
+    translation::{name::NameType, Name},
+};
 use std::hash::Hash;
 
 use derive_deref::{Deref, DerefMut};
@@ -34,15 +37,15 @@ const ELEMENT_NAMES: [&str; 11] = [
 const COMPONENTS: &str = "Components";
 
 /// The trait for methods common to all polytopes.
-pub trait Polytope: Sized + Clone {
+pub trait Polytope<T: NameType>: Sized + Clone {
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
     fn rank(&self) -> isize;
 
-    fn name(&self) -> &Name;
+    fn name(&self) -> &Name<T>;
 
-    fn name_mut(&mut self) -> &mut Name;
+    fn name_mut(&mut self) -> &mut Name<T>;
 
-    fn with_name(mut self, name: Name) -> Self {
+    fn with_name(mut self, name: Name<T>) -> Self {
         *self.name_mut() = name;
         self
     }
@@ -123,7 +126,7 @@ pub trait Polytope: Sized + Clone {
     }
 
     /// Builds a compound polytope from an iterator over components.
-    fn compound_iter<T: Iterator<Item = Self>>(mut components: T) -> Option<Self> {
+    fn compound_iter<U: Iterator<Item = Self>>(mut components: U) -> Option<Self> {
         Some(if let Some(mut p) = components.next() {
             for q in components {
                 if p.append(q).is_err() {
@@ -228,7 +231,7 @@ pub trait Polytope: Sized + Clone {
 
     /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// of an iterator over polytopes.
-    fn multipyramid_iter<'a, T: Iterator<Item = &'a Self>>(factors: T) -> Self
+    fn multipyramid_iter<'a, U: Iterator<Item = &'a Self>>(factors: U) -> Self
     where
         Self: 'a,
     {
@@ -243,7 +246,7 @@ pub trait Polytope: Sized + Clone {
 
     /// Takes the [prism product](https://polytope.miraheze.org/wiki/Prism_product)
     /// of an iterator over polytopes.
-    fn multiprism_iter<'a, T: Iterator<Item = &'a Self>>(factors: T) -> Self
+    fn multiprism_iter<'a, U: Iterator<Item = &'a Self>>(factors: U) -> Self
     where
         Self: 'a,
     {
@@ -258,7 +261,7 @@ pub trait Polytope: Sized + Clone {
 
     /// Takes the [tegum product](https://polytope.miraheze.org/wiki/Tegum_product)
     /// of an iterator over polytopes.
-    fn multitegum_iter<'a, T: Iterator<Item = &'a Self>>(factors: T) -> Self
+    fn multitegum_iter<'a, U: Iterator<Item = &'a Self>>(factors: U) -> Self
     where
         Self: 'a,
     {
@@ -273,7 +276,7 @@ pub trait Polytope: Sized + Clone {
 
     /// Takes the [comb product](https://polytope.miraheze.org/wiki/Comb_product)
     /// of an iterator over polytopes.
-    fn multicomb_iter<'a, T: Iterator<Item = &'a Self>>(mut factors: T) -> Self
+    fn multicomb_iter<'a, U: Iterator<Item = &'a Self>>(mut factors: U) -> Self
     where
         Self: 'a,
     {
@@ -290,9 +293,8 @@ pub trait Polytope: Sized + Clone {
     /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
     /// given rank.
     fn simplex(rank: isize) -> Self {
-        let mut simplex = Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize]);
-        *simplex.name_mut() = Name::simplex(true, rank);
-        simplex
+        Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize])
+            .with_name(Name::simplex(T::regular(true), rank))
     }
 
     /// Builds a [hypercube](https://polytope.miraheze.org/wiki/Hypercube) with
@@ -301,9 +303,8 @@ pub trait Polytope: Sized + Clone {
         if rank == -1 {
             Self::nullitope()
         } else {
-            let mut hypercube = Self::multiprism(&vec![&Self::dyad(); rank as usize]);
-            *hypercube.name_mut() = Name::hypercube(true, rank);
-            hypercube
+            Self::multiprism(&vec![&Self::dyad(); rank as usize])
+                .with_name(Name::hypercube(T::regular(true), rank))
         }
     }
 
@@ -313,9 +314,8 @@ pub trait Polytope: Sized + Clone {
         if rank == -1 {
             Self::nullitope()
         } else {
-            let mut orthoplex = Self::multitegum(&vec![&Self::dyad(); rank as usize]);
-            *orthoplex.name_mut() = Name::orthoplex(true, rank);
-            orthoplex
+            Self::multitegum(&vec![&Self::dyad(); rank as usize])
+                .with_name(Name::orthoplex(T::regular(true), rank))
         }
     }
 }

@@ -6,7 +6,7 @@ use crate::{
         rank::RankVec,
         Element, ElementList, Polytope, Subelements, Subsupelements,
     },
-    translation::Name,
+    translation::{name::Abs, Name},
 };
 
 use super::ElementHash;
@@ -29,7 +29,7 @@ use super::ElementHash;
 #[derive(Debug, Clone)]
 pub struct Abstract {
     pub ranks: RankVec<ElementList>,
-    name: Name,
+    name: Name<Abs>,
 }
 
 impl Abstract {
@@ -392,17 +392,17 @@ impl Abstract {
     }
 }
 
-impl Polytope for Abstract {
+impl Polytope<Abs> for Abstract {
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
     fn rank(&self) -> isize {
         self.ranks.rank()
     }
 
-    fn name(&self) -> &Name {
+    fn name(&self) -> &Name<Abs> {
         &self.name
     }
 
-    fn name_mut(&mut self) -> &mut Name {
+    fn name_mut(&mut self) -> &mut Name<Abs> {
         &mut self.name
     }
 

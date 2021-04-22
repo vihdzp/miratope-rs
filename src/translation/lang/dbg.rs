@@ -1,5 +1,7 @@
 //! A language we can use for debugging.
 
+use crate::translation::name::NameType;
+
 use super::super::{Language, Name, Options, Prefix};
 
 pub struct Dbg;
@@ -11,35 +13,35 @@ impl Language for Dbg {
         format!("({}D)", d)
     }
 
-    fn pyramid(base: &Name, _options: Options) -> String {
+    fn pyramid<T: NameType>(base: &Name<T>, _options: Options) -> String {
         format!("({}) pyramid", Self::parse(base, Options::default()))
     }
 
-    fn prism(base: &Name, _options: Options) -> String {
+    fn prism<T: NameType>(base: &Name<T>, _options: Options) -> String {
         format!("({}) prism", Self::parse(base, Options::default()))
     }
 
-    fn tegum(base: &Name, _options: Options) -> String {
+    fn tegum<T: NameType>(base: &Name<T>, _options: Options) -> String {
         format!("({}) tegum", Self::parse(base, Options::default()))
     }
 
-    fn simplex(_regular: bool, rank: usize, _options: Options) -> String {
+    fn simplex<T: NameType>(_regular: T, rank: usize, _options: Options) -> String {
         format!("{}-simplex", rank)
     }
 
-    fn hypercube(regular: bool, rank: usize, _options: Options) -> String {
-        if regular {
+    fn hypercube<T: NameType>(regular: T, rank: usize, _options: Options) -> String {
+        if regular.is_regular() {
             format!("{}-hypercube", rank)
         } else {
             format!("{}-hypercuboid", rank)
         }
     }
 
-    fn orthoplex(_regular: bool, rank: usize, _options: Options) -> String {
+    fn orthoplex<T>(_regular: T, rank: usize, _options: Options) -> String {
         format!("{}-orthoplex", rank)
     }
 
-    fn multiproduct(name: &Name, _options: Options) -> String {
+    fn multiproduct<T: NameType>(name: &Name<T>, _options: Options) -> String {
         let (bases, kind) = match name {
             Name::Multipyramid(bases) => (bases, "pyramid"),
             Name::Multiprism(bases) => (bases, "prism"),

@@ -5,7 +5,7 @@ use crate::{
         rank::RankVec,
         Abstract, Element, ElementList, Polytope, Subelements, Subsupelements,
     },
-    translation::Name,
+    translation::{name::Con, Name},
     EPS,
 };
 
@@ -25,6 +25,8 @@ pub struct Concrete {
 
     /// The underlying abstract polytope.
     pub abs: Abstract,
+
+    pub name: Name<Con>,
 }
 
 impl Concrete {
@@ -41,7 +43,11 @@ impl Concrete {
             }
         }
 
-        Self { vertices, abs }
+        Self {
+            vertices,
+            abs,
+            name: Name::default(),
+        }
     }
 
     /// Returns the rank of the polytope.
@@ -616,18 +622,18 @@ impl Concrete {
     }
 }
 
-impl Polytope for Concrete {
+impl Polytope<Con> for Concrete {
     /// Returns the rank of the polytope.
     fn rank(&self) -> isize {
         self.abs.rank()
     }
 
-    fn name(&self) -> &Name {
-        self.abs.name()
+    fn name(&self) -> &Name<Con> {
+        &self.name
     }
 
-    fn name_mut(&mut self) -> &mut Name {
-        self.abs.name_mut()
+    fn name_mut(&mut self) -> &mut Name<Con> {
+        &mut self.name
     }
 
     /// Gets the number of elements of a given rank.
