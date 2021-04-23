@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hash};
+use std::collections::HashMap;
 
 use bevy::{
     prelude::Mesh,
@@ -9,7 +9,10 @@ use lyon::math::point;
 use lyon::path::Path;
 use lyon::tessellation::*;
 
-use crate::polytope::{geometry::Point, Concrete, ElementList};
+use crate::polytope::{
+    geometry::{Point, Subspace},
+    Concrete, ElementList,
+};
 
 #[derive(Clone, Copy)]
 /// Represents a set of at most two elements.
@@ -32,15 +35,17 @@ impl<T: Copy> Pair<T> {
 
 /// A loop of vertices. Each vertex is mapped to indices in an edge vector,
 /// which stores the two other vertices it's connected to.
-pub struct VertexLoop<T> {
+pub struct VertexLoop {
     /// A map from vertices to indices.
-    vertex_map: HashMap<T, usize>,
+    vertex_map: HashMap<usize, usize>,
 
     /// A map from indices to pairs of vertices.
-    edges: Vec<Pair<T>>,
+    edges: Vec<Pair<usize>>,
 }
 
-impl<T: Copy + Default + Eq + Hash> VertexLoop<T> {
+pub struct Cycle(Vec<usize>);
+
+impl VertexLoop {
     /// Initializes a new, empty vertex loop.
     pub fn new() -> Self {
         Self {
@@ -58,7 +63,7 @@ impl<T: Copy + Default + Eq + Hash> VertexLoop<T> {
     }
 
     /// Gets the index of a vertex, or adds it if it doesn't exist.
-    fn index_mut(&mut self, vertex: T) -> usize {
+    fn index_mut(&mut self, vertex: usize) -> usize {
         use std::collections::hash_map::Entry;
 
         let len = self.vertex_map.len();
@@ -75,12 +80,12 @@ impl<T: Copy + Default + Eq + Hash> VertexLoop<T> {
     }
 
     /// Gets the index of a vertex, or returns `None` if it doesn't exist.
-    fn index(&self, vertex: T) -> Option<usize> {
+    fn index(&self, vertex: usize) -> Option<usize> {
         self.vertex_map.get(&vertex).copied()
     }
 
     /// Pushes a pair of vertices into the vertex loop.
-    pub fn push(&mut self, vertex0: T, vertex1: T) {
+    pub fn push(&mut self, vertex0: usize, vertex1: usize) {
         let idx0 = self.index_mut(vertex0);
         let idx1 = self.index_mut(vertex1);
 
@@ -88,7 +93,7 @@ impl<T: Copy + Default + Eq + Hash> VertexLoop<T> {
         self.edges[idx1].push(vertex0);
     }
 
-    pub fn edge(&self, idx: usize) -> Option<(T, T)> {
+    pub fn edge(&self, idx: usize) -> Option<(usize, usize)> {
         if let Pair::Two(v0, v1) = self.edges.get(idx)? {
             Some((*v0, *v1))
         } else {
@@ -103,7 +108,7 @@ impl<T: Copy + Default + Eq + Hash> VertexLoop<T> {
 
     /// Cycles through the vertex loop, returns the vector of vertices in cyclic
     /// order.
-    pub fn cycle(&self) -> Option<Vec<T>> {
+    pub fn cycle(&self) -> Option<Cycle> {
         let mut cycle = Vec::with_capacity(self.len());
 
         let mut prev_idx = 0;
@@ -133,10 +138,57 @@ impl<T: Copy + Default + Eq + Hash> VertexLoop<T> {
         }
 
         if cycle.len() == self.len() {
-            Some(cycle)
+            Some(Cycle(cycle))
         } else {
             None
         }
+    }
+}
+
+impl Cycle {
+    pub fn path(&self, vertices: &[Point]) -> Option<Path> {
+        let dim = vertices[0].len();
+        let mut cycle_iter = self.0.iter().map(|&v| &vertices[v]);
+        let s = Subspace::from_point_refs(&cycle_iter.clone().collect::<Vec<_>>());
+
+        // We don't bother with any polygons that aren't in 2D space.
+        if s.rank() != 2 {
+            return None;
+        }
+
+        // We find the two axis directions most convenient for projecting down.
+        // Here, convenient means that we won't get something too thin.
+        let mut len0 = 0.0;
+        let mut idx0 = 0;
+        let mut len1 = 0.0;
+        let mut idx1 = 0;
+
+        for i in 0..dim {
+            let mut e = Point::zeros(dim);
+            e[i] = 1.0;
+
+            let len = s.project(&e).norm();
+            if len > len0 {
+                len1 = len0;
+                idx1 = idx0;
+                len0 = len;
+                idx0 = i;
+            } else if len > len1 {
+                len1 = len;
+                idx1 = i;
+            }
+        }
+        
+        // We build a path from the polygon.
+        let mut builder = Path::builder();
+        let v = cycle_iter.next().unwrap();
+        builder.begin(point(v[idx0] as f32, v[idx1] as f32));
+        for v in cycle_iter {
+            builder.line_to(point(v[idx0] as f32, v[idx1] as f32));
+        }
+        builder.close();
+
+        Some(builder.build())
     }
 }
 
@@ -186,64 +238,53 @@ impl Renderable {
                 vertex_loop.push(v0, v1);
             }
 
-            // We cycle through the vertices of the polygon in order.
-            let cycle = vertex_loop.cycle().unwrap();
-            let mut cycle_iter = cycle.iter();
-
-            // We build a path from the polygon.
-            let mut builder = Path::builder();
-            let p = &concrete.vertices[*cycle_iter.next().unwrap()];
-            builder.begin(point(p[0] as f32, p[1] as f32));
-            for &idx in cycle_iter {
-                let p = &concrete.vertices[idx];
-                builder.line_to(point(p[0] as f32, p[1] as f32));
-            }
-            builder.close();
-
             // We tesselate this path.
-            let path = builder.build();
-            let mut geometry: VertexBuffers<_, u16> = VertexBuffers::new();
-            FillTessellator::new()
-                .tessellate_with_ids(
-                    path.id_iter(),
-                    &path,
-                    None,
-                    &FillOptions::with_fill_rule(FillOptions::default(), FillRule::EvenOdd),
-                    &mut BuffersBuilder::new(&mut geometry, |vertex: FillVertex| {
-                        vertex.sources().next().unwrap()
-                    }),
-                )
-                .unwrap();
+            let cycle = vertex_loop.cycle().unwrap();
+            if let Some(path) = cycle.path(&concrete.vertices) {
+                let mut geometry: VertexBuffers<_, u16> = VertexBuffers::new();
+                FillTessellator::new()
+                    .tessellate_with_ids(
+                        path.id_iter(),
+                        &path,
+                        None,
+                        &FillOptions::with_fill_rule(FillOptions::default(), FillRule::EvenOdd),
+                        &mut BuffersBuilder::new(&mut geometry, |vertex: FillVertex| {
+                            vertex.sources().next().unwrap()
+                        }),
+                    )
+                    .unwrap();
 
-            // We map the output vertices to the original ones, and add any
-            // extra vertices that may be needed.
-            let mut vertex_hash = HashMap::new();
+                // We map the output vertices to the original ones, and add any
+                // extra vertices that may be needed.
+                let mut vertex_hash = HashMap::new();
 
-            for (new_id, vertex_source) in geometry.vertices.into_iter().enumerate() {
-                match vertex_source {
-                    VertexSource::Endpoint { id } => {
-                        vertex_hash.insert(new_id, VertexIndex::Concrete(cycle[id.to_usize()]));
-                    }
-                    VertexSource::Edge { from, to, t } => {
-                        let t = t as f64;
+                for (new_id, vertex_source) in geometry.vertices.into_iter().enumerate() {
+                    match vertex_source {
+                        VertexSource::Endpoint { id } => {
+                            vertex_hash
+                                .insert(new_id, VertexIndex::Concrete(cycle.0[id.to_usize()]));
+                        }
+                        VertexSource::Edge { from, to, t } => {
+                            let from = &concrete.vertices[cycle.0[from.to_usize()]];
+                            let to = &concrete.vertices[cycle.0[to.to_usize()]];
 
-                        let v0 = &concrete.vertices[from.to_usize()];
-                        let v1 = &concrete.vertices[to.to_usize()];
-                        let p = v1 * t + v0 * (1.0 - t);
+                            let t = t as f64;
+                            let p = from * (1.0 - t) + to * t;
 
-                        vertex_hash.insert(new_id, VertexIndex::Extra(extra_vertices.len()));
-                        extra_vertices.push(p);
+                            vertex_hash.insert(new_id, VertexIndex::Extra(extra_vertices.len()));
+                            extra_vertices.push(p);
+                        }
                     }
                 }
-            }
 
-            triangles.append(
-                &mut geometry
-                    .indices
-                    .into_iter()
-                    .map(|idx| *vertex_hash.get(&(idx as usize)).unwrap())
-                    .collect(),
-            );
+                triangles.append(
+                    &mut geometry
+                        .indices
+                        .into_iter()
+                        .map(|idx| *vertex_hash.get(&(idx as usize)).unwrap())
+                        .collect(),
+                );
+            }
         }
 
         Renderable {
@@ -310,7 +351,7 @@ impl Renderable {
         use itertools::Itertools;
 
         let vertices = self.get_vertex_coords();
-        let mut indices = Vec::with_capacity(self.triangles.len() * 3);
+        let mut indices = Vec::with_capacity(self.triangles.len());
         for mut chunk in &self.triangles.iter().chunks(3) {
             for _ in 0..3 {
                 indices.push(self.parse_index(*chunk.next().unwrap()));

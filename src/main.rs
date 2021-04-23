@@ -95,7 +95,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::from_path(&"Seside.off").unwrap();
+    let p = Concrete::star_polygon(5, 2).prism();
     let poly = Renderable::new(p);
 
     // Disables backface culling.
