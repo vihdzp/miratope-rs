@@ -66,19 +66,14 @@ impl Language for Es {
             "xendac",
         ];
 
-        format!(
-            "{}{}",
-            SUFFIXES[d],
-            Self::four(options, "o", "os", "al", "ales")
-        )
+        format!("{}{}", SUFFIXES[d], options.four("o", "os", "al", "ales"))
     }
 
     /// The name of a nullitope.
     fn nullitope(options: Options) -> String {
         format!(
             "nul{}",
-            Self::six(
-                options,
+            options.six(
                 "itopo",
                 "itopos",
                 "itópico",
@@ -91,14 +86,14 @@ impl Language for Es {
 
     /// The name of a point.
     fn point(options: Options) -> String {
-        format!("punt{}", Self::four(options, "o", "os", "ual", "uales"))
+        format!("punt{}", options.four("o", "os", "ual", "uales"))
     }
 
     /// The name of a dyad.
     fn dyad(options: Options) -> String {
         format!(
             "d{}",
-            Self::six(options, "íada", "íadas", "iádico", "iádicos", "iádica", "iádicas")
+            options.six("íada", "íadas", "iádico", "iádicos", "iádica", "iádicas")
         )
     }
 
@@ -106,23 +101,20 @@ impl Language for Es {
     fn triangle<T: NameType>(_regular: T, options: Options) -> String {
         format!(
             "tri{}",
-            Self::four(options, "ángulo", "ángulos", "angular", "angulares")
+            options.four("ángulo", "ángulos", "angular", "angulares")
         )
     }
 
     /// The name of a square.
     fn square(options: Options) -> String {
-        format!(
-            "cuadrad{}",
-            Self::six(options, "o", "os", "o", "os", "a", "as")
-        )
+        format!("cuadrad{}", options.six("o", "os", "o", "os", "a", "as"))
     }
 
     /// The name of a rectangle.
     fn rectangle(options: Options) -> String {
         format!(
             "rect{}",
-            Self::four(options, "ángulo", "ángulos", "angular", "angulares")
+            options.four("ángulo", "ángulos", "angular", "angulares")
         )
     }
 
@@ -146,7 +138,7 @@ impl Language for Es {
     fn pyramidal(options: Options) -> String {
         format!(
             "pir{}",
-            Self::four(options, "ámide", "ámides", "amidal", "amidales")
+            options.four("ámide", "ámides", "amidal", "amidales")
         )
     }
 
@@ -168,7 +160,7 @@ impl Language for Es {
     fn prismatic(options: Options) -> String {
         format!(
             "prism{}",
-            Self::six(options, "a", "as", "ático", "áticos", "ática", "áticas")
+            options.six("a", "as", "ático", "áticos", "ática", "áticas")
         )
     }
 
@@ -190,7 +182,7 @@ impl Language for Es {
     fn tegmatic(options: Options) -> String {
         format!(
             "teg{}",
-            Self::six(options, "o", "os", "mático", "máticos", "mática", "máticas")
+            options.six("o", "os", "mático", "máticos", "mática", "máticas")
         )
     }
 
@@ -217,13 +209,7 @@ impl Language for Es {
             Name::Multitegum(bases) => (bases, Self::tegmatic(options), Gender::Male),
             Name::Multicomb(bases) => (
                 bases,
-                String::from(Self::four(
-                    options,
-                    "panal",
-                    "panales",
-                    "de panal",
-                    "de panales",
-                )),
+                String::from(options.four("panal", "panales", "de panal", "de panales")),
                 Gender::Male,
             ),
             _ => panic!("Not a product!"),
@@ -256,13 +242,11 @@ impl Language for Es {
             match rank {
                 3 => format!(
                     "c{}",
-                    Self::six(options, "ubo", "ubos", "úbico", "úbicos", "úbica", "úbicas")
+                    options.six("ubo", "ubos", "úbico", "úbicos", "úbica", "úbicas")
                 ),
                 4 => format!(
                     "teser{}",
-                    Self::six(
-                        options, "acto", "actos", "áctico", "ácticoa", "áctica", "ácticas"
-                    )
+                    options.six("acto", "actos", "áctico", "ácticoa", "áctica", "ácticas")
                 ),
                 _ => {
                     let prefix = Self::prefix(rank).chars().collect::<Vec<_>>();
@@ -272,9 +256,8 @@ impl Language for Es {
                     let (_, str0) = prefix.split_last().unwrap();
                     let (c1, str1) = str0.split_last().unwrap();
 
-                    let suffix = Self::six(
-                        options, "acto", "actos", "áctico", "ácticos", "áctica", "ácticas",
-                    );
+                    let suffix =
+                        options.six("acto", "actos", "áctico", "ácticos", "áctica", "ácticas");
                     if *c1 == 'c' {
                         format!("{}quer{}", str1.iter().collect::<String>(), suffix)
                     } else {
@@ -284,13 +267,13 @@ impl Language for Es {
             }
         } else {
             match rank {
-                3 => format!("cuboid{}", Self::four(options, "e", "es", "al", "ales")),
+                3 => format!("cuboid{}", options.four("e", "es", "al", "ales")),
                 _ => {
                     format!(
                         "{} {}bloque{}",
                         if options.adjective { "de" } else { "" },
                         Self::prefix(rank),
-                        Self::two(options, "", "s")
+                        options.two("", "s")
                     )
                 }
             }
@@ -309,8 +292,7 @@ impl Language for Es {
 
     fn compound<T: NameType>(components: &[(usize, Name<T>)], options: Options) -> String {
         let ((last_rep, last_component), first_components) = components.split_last().unwrap();
-        let mut str = String::from(Self::four(
-            options,
+        let mut str = String::from(options.four(
             "compuesto",
             "compuestos",
             "del compuesto",

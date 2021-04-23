@@ -14,6 +14,7 @@ pub trait NameType: Debug + Clone + PartialEq + Copy {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+/// A name representing an abstract polytope.
 pub struct Abs;
 
 impl NameType for Abs {
@@ -31,6 +32,7 @@ impl NameType for Abs {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+/// A name representing a concrete polytope.
 pub struct Con(bool);
 
 impl NameType for Con {
@@ -125,6 +127,7 @@ pub enum Name<T: NameType> {
     /// A compound of some polytopes.
     Compound(Vec<(usize, Name<T>)>),
 }
+
 
 impl<T: NameType> Name<T> {
     /// Auxiliary function to get the rank of a multiproduct.
@@ -684,8 +687,6 @@ impl<T: NameType> Name<T> {
             .into_iter()
             .group_by(|(_, name)| name.clone())
         {
-            dbg!(&name);
-
             if let Self::Compound(mut extra_components) = name {
                 components.append(&mut extra_components);
             } else {
