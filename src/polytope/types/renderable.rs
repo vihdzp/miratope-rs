@@ -215,11 +215,8 @@ impl Renderable {
                 )
                 .unwrap();
 
-            // Renders only the last face for now (easily fixable, I'll do it later)
-
             // We map the output vertices to the original ones, and add any
             // extra vertices that may be needed.
-
             let mut vertex_hash = HashMap::new();
 
             for (new_id, vertex_source) in geometry.vertices.into_iter().enumerate() {

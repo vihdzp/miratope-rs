@@ -128,7 +128,6 @@ pub enum Name<T: NameType> {
     Compound(Vec<(usize, Name<T>)>),
 }
 
-
 impl<T: NameType> Name<T> {
     /// Auxiliary function to get the rank of a multiproduct.
     fn rank_product(&self) -> Option<isize> {

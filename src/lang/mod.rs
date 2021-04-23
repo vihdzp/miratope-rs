@@ -113,7 +113,7 @@ impl Options {
     /// * A plural.
     ///
     /// Assumes that plurals are from 2 onwards.
-    fn two<'a>( &self, base: &'a str, plural: &'a str) -> &'a str {
+    fn two<'a>(&self, base: &'a str, plural: &'a str) -> &'a str {
         if self.count > 1 {
             plural
         } else {
@@ -128,7 +128,7 @@ impl Options {
     /// * An adjective for both the singular and plural.
     ///
     /// Assumes that plurals are from 2 onwards.
-    fn three<'a>( &self, base: &'a str, plural: &'a str, adj: &'a str) -> &'a str {
+    fn three<'a>(&self, base: &'a str, plural: &'a str, adj: &'a str) -> &'a str {
         if self.adjective {
             adj
         } else if self.count > 1 {
@@ -147,7 +147,7 @@ impl Options {
     ///
     /// Assumes that plurals are from 2 onwards.
     fn four<'a>(
-         &self,
+        &self,
         base: &'a str,
         plural: &'a str,
         adj: &'a str,
@@ -177,7 +177,7 @@ impl Options {
     ///
     /// Assumes that plurals are from 2 onwards.
     fn six<'a>(
-         &self,
+        &self,
         base: &'a str,
         plural: &'a str,
         adj_m: &'a str,
@@ -390,43 +390,43 @@ pub trait Language: Prefix {
             "{}{}",
             SUFFIXES[d],
             if d == 2 {
-                options.three( "", "s", "al")
+                options.three("", "s", "al")
             } else if d == 3 {
-                options.three( "on", "a", "al")
+                options.three("on", "a", "al")
             } else {
-                options.three( "on", "a", "ic")
+                options.three("on", "a", "ic")
             }
         )
     }
 
     /// The name of a nullitope.
     fn nullitope(options: Options) -> String {
-        format!("nullitop{}", options.three( "e", "es", "ic"))
+        format!("nullitop{}", options.three("e", "es", "ic"))
     }
 
     /// The name of a point.
     fn point(options: Options) -> String {
-        format!("point{}", options.two( "", "s"))
+        format!("point{}", options.two("", "s"))
     }
 
     /// The name of a dyad.
     fn dyad(options: Options) -> String {
-        format!("dyad{}", options.three( "", "s", "ic"))
+        format!("dyad{}", options.three("", "s", "ic"))
     }
 
     /// The name of a triangle.
     fn triangle<T: NameType>(_regular: T, options: Options) -> String {
-        format!("triang{}", options.three( "le", "les", "ular"))
+        format!("triang{}", options.three("le", "les", "ular"))
     }
 
     /// The name of a square.
     fn square(options: Options) -> String {
-        format!("square{}", options.two( "", "s"))
+        format!("square{}", options.two("", "s"))
     }
 
     /// The name of a rectangle.
     fn rectangle(options: Options) -> String {
-        format!("rectang{}", options.three( "le", "les", "ular"))
+        format!("rectang{}", options.three("le", "les", "ular"))
     }
 
     /// The name of an orthodiagonal quadrilateral. You should probably just
@@ -458,7 +458,7 @@ pub trait Language: Prefix {
     }
 
     fn pyramidal(options: Options) -> String {
-        format!("pyramid{}", options.three( "", "s", "al"))
+        format!("pyramid{}", options.three("", "s", "al"))
     }
 
     /// The name for a pyramid with a given base.
@@ -471,7 +471,7 @@ pub trait Language: Prefix {
     }
 
     fn prismatic(options: Options) -> String {
-        format!("prism{}", options.three( "", "s", "atic"))
+        format!("prism{}", options.three("", "s", "atic"))
     }
 
     /// The name for a prism with a given base.
@@ -484,7 +484,7 @@ pub trait Language: Prefix {
     }
 
     fn tegmatic(options: Options) -> String {
-        format!("teg{}", options.three( "um", "ums", "matic"))
+        format!("teg{}", options.three("um", "ums", "matic"))
     }
 
     /// The name for a tegum with a given base.
@@ -502,7 +502,7 @@ pub trait Language: Prefix {
             Name::Multipyramid(bases) => (bases, Self::pyramidal(options)),
             Name::Multiprism(bases) => (bases, Self::prismatic(options)),
             Name::Multitegum(bases) => (bases, Self::tegmatic(options)),
-            Name::Multicomb(bases) => (bases, format!("comb{}", options.two( "", "s"))),
+            Name::Multicomb(bases) => (bases, format!("comb{}", options.two("", "s"))),
             _ => panic!("Not a product!"),
         };
         dbg!(&kind);
@@ -536,8 +536,8 @@ pub trait Language: Prefix {
     fn hypercube<T: NameType>(regular: T, rank: usize, options: Options) -> String {
         if regular.is_regular() {
             match rank {
-                3 => format!("cub{}", options.three( "e", "s", "ic")),
-                4 => format!("tesseract{}", options.three( "", "s", "ic")),
+                3 => format!("cub{}", options.three("e", "s", "ic")),
+                4 => format!("tesseract{}", options.three("", "s", "ic")),
                 _ => {
                     let prefix = Self::prefix(rank).chars().collect::<Vec<_>>();
 
@@ -545,7 +545,7 @@ pub trait Language: Prefix {
                     let (_, str0) = prefix.split_last().unwrap();
                     let (c1, str1) = str0.split_last().unwrap();
 
-                    let suffix = options.three( "", "s", "ic");
+                    let suffix = options.three("", "s", "ic");
                     if *c1 == 'c' {
                         format!("{}keract{}", str1.iter().collect::<String>(), suffix)
                     } else {
@@ -555,9 +555,9 @@ pub trait Language: Prefix {
             }
         } else {
             match rank {
-                3 => format!("cuboid{}", options.three( "", "s", "al")),
+                3 => format!("cuboid{}", options.three("", "s", "al")),
                 _ => {
-                    format!("{}block{}", Self::prefix(rank), options.two( "", "s"))
+                    format!("{}block{}", Self::prefix(rank), options.two("", "s"))
                 }
             }
         }
@@ -601,7 +601,7 @@ pub trait Language: Prefix {
             " and {} {} compound{}",
             last_rep,
             parse_component(*last_rep, last_component),
-            options.two( "", "s")
+            options.two("", "s")
         ));
 
         str
