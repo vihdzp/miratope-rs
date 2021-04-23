@@ -56,6 +56,14 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// The element counts of the polytope.
     fn el_counts(&self) -> RankVec<usize>;
 
+    fn vertex_count(&self) -> usize {
+        self.el_count(0)
+    }
+
+    fn facet_count(&self) -> usize {
+        self.el_count(self.rank() - 1)
+    }
+
     /// Returns an instance of the
     /// [nullitope](https://polytope.miraheze.org/wiki/Nullitope), the unique
     /// polytope of rank &minus;1.

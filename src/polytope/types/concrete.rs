@@ -46,10 +46,12 @@ impl Concrete {
             }
         }
 
+        let n = abs.facet_count();
+        let d = abs.rank();
         Self {
             vertices,
             abs,
-            name: Name::default(),
+            name: Name::generic(n, d),
         }
     }
 

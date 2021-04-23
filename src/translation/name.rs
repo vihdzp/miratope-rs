@@ -124,12 +124,6 @@ pub enum Name<T: NameType> {
     Unknown,
 }
 
-impl<T: NameType> Default for Name<T> {
-    fn default() -> Self {
-        Self::Unknown
-    }
-}
-
 impl<T: NameType> Name<T> {
     /// Auxiliary function to get the rank of a multiproduct.
     fn rank_product(&self) -> Option<isize> {
@@ -244,6 +238,15 @@ impl<T: NameType> Name<T> {
             Self::Square
         } else {
             Self::Orthodiagonal
+        }
+    }
+
+    pub fn generic(n: usize, d: isize) -> Self {
+        match d {
+            -1 => Self::Nullitope,
+            0 => Self::Point,
+            1 => Self::Dyad,
+            _ => Self::Generic(n, d as usize),
         }
     }
 

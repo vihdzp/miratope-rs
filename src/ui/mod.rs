@@ -144,14 +144,14 @@ pub fn ui(
         let x_max;
 
         if let Some(original) = &section_state.original_polytope {
-            x_min = original.concrete.x_min().unwrap();
-            x_max = original.concrete.x_max().unwrap();
+            x_min = original.concrete.x_min().unwrap() + 0.0001;
+            x_max = original.concrete.x_max().unwrap() - 0.0001;
         } else {
             x_min = -1.0;
             x_max = 1.0;
         }
         ui.add(
-            egui::Slider::f64(&mut new_hyperplane_pos, x_min..=x_max - 0.000001)
+            egui::Slider::f64(&mut new_hyperplane_pos, x_min..=x_max)
                 .max_decimals(5)
                 .text("Slice depth"),
         );

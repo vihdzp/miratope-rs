@@ -5,7 +5,23 @@ use super::super::{GreekPrefix, Language, Options, Prefix};
 /// The Spanish language.
 pub struct Es;
 
-impl GreekPrefix for Es {}
+impl GreekPrefix for Es {
+    const UNITS: [&'static str; 10] = [
+        "", "hena", "di", "tri", "tetra", "penta", "hexa", "hepta", "octa", "enea",
+    ];
+
+    const CHILIA: &'static str = "quilia";
+
+    const DISCHILIA: &'static str = "disquilia";
+
+    const TRISCHILIA: &'static str = "trisquilia";
+
+    const MYRIA: &'static str = "miria";
+
+    const DISMYRIA: &'static str = "dismiria";
+
+    const TRISMYRIA: &'static str = "trismiria";
+}
 
 /// In Spanish, polygon names have the last vowel in their prefix accented.
 /// This function places such accent.
@@ -41,6 +57,22 @@ fn last_vowel_tilde(prefix: String) -> String {
 }
 
 impl Language for Es {
+    /// Returns the suffix for a d-polytope. Only needs to work up to d = 20, we
+    /// won't offer support any higher than that.
+    fn suffix(d: usize, options: Options) -> String {
+        const SUFFIXES: [&str; 21] = [
+            "mon", "tel", "gon", "edr", "cor", "ter", "pet", "ex", "zet", "yot", "xen", "dac",
+            "hendac", "doc", "tradac", "teradac", "petadac", "exdac", "zetadac", "yotadac",
+            "xendac",
+        ];
+
+        format!(
+            "{}{}",
+            SUFFIXES[d],
+            Self::four(options, "o", "os", "al", "ales")
+        )
+    }
+
     /// The name of a nullitope.
     fn nullitope(options: Options) -> String {
         format!(
@@ -244,17 +276,22 @@ impl Language for Es {
                         options, "acto", "actos", "áctico", "ácticos", "áctica", "ácticas",
                     );
                     if *c1 == 'c' {
-                        format!("{}quer{}", str1.into_iter().collect::<String>(), suffix)
+                        format!("{}quer{}", str1.iter().collect::<String>(), suffix)
                     } else {
-                        format!("{}eract{}", str0.into_iter().collect::<String>(), suffix)
+                        format!("{}eract{}", str0.iter().collect::<String>(), suffix)
                     }
                 }
             }
         } else {
             match rank {
-                3 => format!("cuboid{}", Self::three(options, "", "s", "al")),
+                3 => format!("cuboid{}", Self::four(options, "e", "es", "al", "ales")),
                 _ => {
-                    format!("{}block{}", Self::prefix(rank), Self::two(options, "", "s"))
+                    format!(
+                        "{} {}bloque{}",
+                        if options.adjective { "de" } else { "" },
+                        Self::prefix(rank),
+                        Self::two(options, "", "s")
+                    )
                 }
             }
         }

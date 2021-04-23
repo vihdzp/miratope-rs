@@ -49,9 +49,12 @@ impl Abstract {
 
     /// Initializes a polytope from a vector of element lists.
     pub fn from_vec(ranks: RankVec<ElementList>) -> Self {
+        let d = ranks.rank();
+        let n = ranks.get(d - 1).map(|facets| facets.len()).unwrap_or(0);
+
         Self {
             ranks,
-            name: Name::Unknown,
+            name: Name::generic(n, d),
         }
     }
 
@@ -364,7 +367,7 @@ impl Abstract {
 
         // If !min, we have to set a minimal element manually.
         if !min {
-            let vertex_count = p.el_count(0) * q.el_count(0);
+            let vertex_count = p.vertex_count() * q.vertex_count();
             element_lists[-1] = ElementList::single();
             element_lists[0] = ElementList::vertices(vertex_count);
         }

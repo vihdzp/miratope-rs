@@ -61,7 +61,7 @@ pub trait Language: Prefix {
 
         format!(
             "{}{}",
-            SUFFIXES.get(d).unwrap_or(&"top"),
+            SUFFIXES[d],
             if d == 2 {
                 Self::three(options, "", "s", "al")
             } else if d == 3 {
@@ -220,9 +220,9 @@ pub trait Language: Prefix {
 
                     let suffix = Self::three(options, "", "s", "ic");
                     if *c1 == 'c' {
-                        format!("{}keract{}", str1.into_iter().collect::<String>(), suffix)
+                        format!("{}keract{}", str1.iter().collect::<String>(), suffix)
                     } else {
-                        format!("{}eract{}", str0.into_iter().collect::<String>(), suffix)
+                        format!("{}eract{}", str0.iter().collect::<String>(), suffix)
                     }
                 }
             }
