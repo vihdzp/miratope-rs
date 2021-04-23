@@ -178,7 +178,7 @@ impl Cycle {
                 idx1 = i;
             }
         }
-        
+
         // We build a path from the polygon.
         let mut builder = Path::builder();
         let v = cycle_iter.next().unwrap();
