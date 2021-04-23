@@ -3,8 +3,8 @@
 //! basic methods to operate on them.
 
 use crate::{
-    polytope::flag::FlagIter,
     lang::{name::NameType, Name},
+    polytope::flag::FlagIter,
 };
 use std::hash::Hash;
 

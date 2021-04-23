@@ -98,8 +98,9 @@ fn setup(
     let mut simplex = Concrete::simplex(4);
     simplex.scale(-1.0);
 
-    let p =
-        Concrete::compound(vec![Concrete::hypercube(4), Concrete::simplex(4), simplex]).unwrap();
+    let p = Concrete::compound(vec![Concrete::hypercube(4), Concrete::simplex(4), simplex])
+        .unwrap()
+        .prism();
 
     dbg!(lang::Es::parse(p.name(), Options::default()));
     dbg!(lang::Es::parse(p.abs.name(), Options::default()));
