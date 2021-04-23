@@ -212,14 +212,8 @@ impl<T: NameType> Name<T> {
             | Self::Multitegum(bases)
             | Self::Multicomb(bases) => {
                 // Any multiproduct must have at least two bases.
-                match bases.len() {
-                    0..=1 => return false,
-                    2 => {
-                        if self != &Self::Multitegum(vec![]) {
-                            return false;
-                        }
-                    }
-                    _ => {}
+                if bases.len() < 2 {
+                    return false;
                 }
 
                 // No base should have the same variant as self.
@@ -331,11 +325,12 @@ impl<T: NameType> Name<T> {
     }
 
     /// Builds a dual name from a given name.
-    pub fn dual(self, abs: bool) -> Self {
+    pub fn dual(self) -> Self {
         match self {
+            Self::Nullitope | Self::Point | Self::Dyad => self,
             Self::Dual(base) => {
                 // Abstractly, duals of duals give back the original polytope.
-                if abs {
+                if T::is_abstract() {
                     if let Self::Dual(original) = *base {
                         *original
                     } else {
@@ -347,15 +342,65 @@ impl<T: NameType> Name<T> {
                     Self::Dual(base)
                 }
             }
+            Self::Square | Self::Rectangle => Self::orthodiagonal(T::regular(false)),
+            Self::Orthodiagonal => Self::polygon(T::regular(false), 4),
+            Self::Simplex(_, n) => Self::Simplex(T::regular(false), n),
+            Self::Hypercube(_, n) => Self::Orthoplex(T::regular(false), n),
+            Self::Orthoplex(_, n) => Self::Hypercube(T::regular(false), n),
             Self::Generic(_, d) => {
                 if d <= 2 {
                     self
                 } else {
-                    Self::default()
+                    Self::Dual(Box::new(self))
                 }
             }
-            Self::Multipyramid(_) => self,
-            _ => self,
+            Self::Pyramid(base) => {
+                if T::is_abstract() {
+                    Self::Pyramid(Box::new(base.dual()))
+                } else {
+                    Self::Dual(Box::new(Self::Prism(base)))
+                }
+            }
+            Self::Prism(base) => {
+                if T::is_abstract() {
+                    Self::Tegum(Box::new(base.dual()))
+                } else {
+                    Self::Dual(Box::new(Self::Prism(base)))
+                }
+            }
+            Self::Tegum(base) => {
+                if T::is_abstract() {
+                    Self::Prism(Box::new(base.dual()))
+                } else {
+                    Self::Dual(Box::new(Self::Prism(base)))
+                }
+            }
+            Self::Multipyramid(bases) => {
+                // I don't know if this relation actually holds in concrete polytopes.
+                Self::Multipyramid(bases.into_iter().map(|base| base.dual()).collect())
+            }
+            Self::Multiprism(bases) => {
+                if T::is_abstract() {
+                    Self::Multitegum(bases.into_iter().map(|base| base.dual()).collect())
+                } else {
+                    Self::Dual(Box::new(Self::Multiprism(bases)))
+                }
+            }
+            Self::Multitegum(bases) => {
+                if T::is_abstract() {
+                    Self::Multiprism(bases.into_iter().map(|base| base.dual()).collect())
+                } else {
+                    Self::Dual(Box::new(Self::Multitegum(bases)))
+                }
+            }
+            Self::Multicomb(bases) => {
+                if T::is_abstract() {
+                    Self::Multicomb(bases.into_iter().map(|base| base.dual()).collect())
+                } else {
+                    Self::Dual(Box::new(Self::Multicomb(bases)))
+                }
+            }
+            _ => Self::Dual(Box::new(self)),
         }
     }
 
@@ -397,7 +442,7 @@ impl<T: NameType> Name<T> {
                 if regular.is_regular() {
                     Self::Square
                 } else {
-                    Self::Orthoplex(regular, 2)
+                    Self::Orthodiagonal
                 }
             }
             _ => Self::Orthoplex(regular, n as usize),

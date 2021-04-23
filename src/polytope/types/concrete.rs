@@ -330,6 +330,7 @@ impl Concrete {
 
         // Takes the abstract dual.
         self.abs.dual_mut();
+        *self.name_mut() = self.name().clone().dual();
 
         Ok(())
     }

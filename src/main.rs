@@ -95,9 +95,21 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::point().prism().prism().prism();
-    dbg!(lang::En::parse(p.name(), Options::default()));
-    dbg!(lang::En::parse(p.abs.name(), Options::default()));
+    let p = Concrete::point()
+        .prism()
+        .tegum()
+        .dual()
+        .unwrap()
+        .pyramid()
+        .prism()
+        .prism()
+        .dual()
+        .unwrap()
+        .dual()
+        .unwrap()
+        .prism();
+    dbg!(lang::Es::parse(p.name(), Options::default()));
+    dbg!(lang::Es::parse(p.abs.name(), Options::default()));
     let poly = Renderable::new(p);
 
     pipelines.set_untracked(

@@ -53,24 +53,39 @@ pub use lang::Language;
 pub use name::Name;
 
 /// The different grammatical genders.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Gender {
     Male,
     Female,
     Neutral,
+    None,
+}
+
+impl std::ops::BitOr for Gender {
+    type Output = Gender;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        match self {
+            Self::None => rhs,
+            _ => self,
+        }
+    }
 }
 
 /// Represents the different modifiers that can be applied to a term.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Options {
     /// Determines whether the polytope acts as an adjective.
-    adjective: bool,
+    pub adjective: bool,
 
     /// The number of the polytope there are.
-    count: usize,
+    pub count: usize,
 
     /// The grammatical gender of the polytope.
-    gender: Gender,
+    pub gender: Gender,
+
+    /// Whether we use parentheses for non-ambiguity.
+    pub parentheses: bool,
 }
 
 impl Default for Options {
@@ -79,7 +94,8 @@ impl Default for Options {
         Options {
             adjective: false,
             count: 1,
-            gender: Gender::Neutral,
+            gender: Gender::None,
+            parentheses: false,
         }
     }
 }

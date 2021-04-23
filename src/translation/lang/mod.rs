@@ -6,29 +6,17 @@ pub use dbg::Dbg;
 pub use en::En;
 pub use es::Es;
 
-use super::{name::NameType, Name, Options, Prefix};
+use super::{name::NameType, Gender, Name, Options, Prefix};
 
 pub fn is_vowel(c: char) -> bool {
     matches!(c, 'a' | 'e' | 'i' | 'o' | 'u')
 }
 
-/// A convenience method for declensing nouns in English.
-///
-/// In English, there's only three different ways a word can be modified:
-///
-/// * It can be made into an adjective.
-/// * It can be made into a plural noun.
-/// * It can remain as a singular noun.
-///
-/// This method reads the options and returns whichever string applies in the
-/// specific case.
-fn adj_or_plural<'a>(options: Options, adj: &'a str, plural: &'a str, none: &'a str) -> &'a str {
-    if options.adjective {
-        adj
-    } else if options.count > 1 {
-        plural
+pub fn parentheses(str: String, paren: bool) -> String {
+    if paren {
+        format!("({})", str)
     } else {
-        none
+        str
     }
 }
 
@@ -75,43 +63,43 @@ pub trait Language: Prefix {
             "{}{}",
             SUFFIXES.get(d).unwrap_or(&"top"),
             if d == 2 {
-                adj_or_plural(options, "al", "s", "")
+                Self::three(options, "", "s", "al")
             } else if d == 3 {
-                adj_or_plural(options, "al", "a", "on")
+                Self::three(options, "on", "a", "al")
             } else {
-                adj_or_plural(options, "ic", "a", "on")
+                Self::three(options, "on", "a", "ic")
             }
         )
     }
 
     /// The name of a nullitope.
     fn nullitope(options: Options) -> String {
-        format!("nullitop{}", adj_or_plural(options, "ic", "es", "e"))
+        format!("nullitop{}", Self::three(options, "e", "es", "ic"))
     }
 
     /// The name of a point.
     fn point(options: Options) -> String {
-        format!("point{}", adj_or_plural(options, "", "s", ""))
+        format!("point{}", Self::two(options, "", "s"))
     }
 
     /// The name of a dyad.
     fn dyad(options: Options) -> String {
-        format!("dyad{}", adj_or_plural(options, "ic", "s", ""))
+        format!("dyad{}", Self::three(options, "", "s", "ic"))
     }
 
     /// The name of a triangle.
     fn triangle<T: NameType>(_regular: T, options: Options) -> String {
-        format!("triang{}", adj_or_plural(options, "ular", "les", "le"))
+        format!("triang{}", Self::three(options, "le", "les", "ular"))
     }
 
     /// The name of a square.
     fn square(options: Options) -> String {
-        format!("square{}", adj_or_plural(options, "", "s", ""))
+        format!("square{}", Self::two(options, "", "s"))
     }
 
     /// The name of a rectangle.
     fn rectangle(options: Options) -> String {
-        format!("rectang{}", adj_or_plural(options, "ular", "les", "le"))
+        format!("rectang{}", Self::three(options, "le", "les", "ular"))
     }
 
     /// The name of an orthodiagonal quadrilateral. You should probably just
@@ -125,75 +113,72 @@ pub trait Language: Prefix {
         format!("{}{}", Self::prefix(n), Self::suffix(d, options))
     }
 
-    /// The name for a pyramid with a given base.
-    fn pyramid<T: NameType>(base: &Name<T>, options: Options) -> String {
-        format!(
-            "{} pyramid{}",
+    fn base<T: NameType>(base: &Name<T>, options: Options) -> String {
+        parentheses(Self::parse(base, options), options.parentheses)
+    }
+
+    fn base_adj<T: NameType>(base: &Name<T>, options: Options) -> String {
+        parentheses(
             Self::parse(
                 base,
                 Options {
                     adjective: true,
-                    gender: options.gender,
-                    count: 1
-                }
+                    ..options
+                },
             ),
-            adj_or_plural(options, "al", "s", "")
+            options.parentheses,
         )
+    }
+
+    fn pyramidal(options: Options) -> String {
+        format!("pyramid{}", Self::three(options, "", "s", "al"))
+    }
+
+    /// The name for a pyramid with a given base.
+    fn pyramid<T: NameType>(base: &Name<T>, options: Options) -> String {
+        format!(
+            "{} {}",
+            Self::base_adj(base, options),
+            Self::pyramidal(options)
+        )
+    }
+
+    fn prismatic(options: Options) -> String {
+        format!("prism{}", Self::three(options, "", "s", "atic"))
     }
 
     /// The name for a prism with a given base.
     fn prism<T: NameType>(base: &Name<T>, options: Options) -> String {
         format!(
-            "{} prism{}",
-            Self::parse(
-                base,
-                Options {
-                    adjective: true,
-                    gender: options.gender,
-                    count: 1
-                }
-            ),
-            adj_or_plural(options, "atic", "s", "")
+            "{} {}",
+            Self::base_adj(base, options),
+            Self::prismatic(options)
         )
+    }
+
+    fn tegmatic(options: Options) -> String {
+        format!("teg{}", Self::three(options, "um", "ums", "matic"))
     }
 
     /// The name for a tegum with a given base.
     fn tegum<T: NameType>(base: &Name<T>, options: Options) -> String {
         format!(
-            "{} teg{}",
-            Self::parse(
-                base,
-                Options {
-                    adjective: true,
-                    gender: options.gender,
-                    count: 1
-                }
-            ),
-            adj_or_plural(options, "matic", "a", "um")
+            "{} {}",
+            Self::base_adj(base, options),
+            Self::tegmatic(options)
         )
     }
 
     fn multiproduct<T: NameType>(name: &Name<T>, options: Options) -> String {
         // Gets the bases and the kind of multiproduct.
         let (bases, kind) = match name {
-            Name::Multipyramid(bases) => (
-                bases,
-                format!("pyramid{}", adj_or_plural(options, "al", "s", "")),
-            ),
-            Name::Multiprism(bases) => (
-                bases,
-                format!("prism{}", adj_or_plural(options, "atic", "s", "")),
-            ),
-            Name::Multitegum(bases) => (
-                bases,
-                format!("teg{}", adj_or_plural(options, "matic", "ums", "um")),
-            ),
-            Name::Multicomb(bases) => (
-                bases,
-                format!("comb{}", adj_or_plural(options, "", "s", "")),
-            ),
+            Name::Multipyramid(bases) => (bases, Self::pyramidal(options)),
+            Name::Multiprism(bases) => (bases, Self::prismatic(options)),
+            Name::Multitegum(bases) => (bases, Self::tegmatic(options)),
+            Name::Multicomb(bases) => (bases, format!("comb{}", Self::two(options, "", "s"))),
             _ => panic!("Not a product!"),
         };
+        dbg!(&kind);
 
         let n = bases.len();
         let prefix = match n {
@@ -204,22 +189,13 @@ pub trait Language: Prefix {
         let kind = format!("{}{}", prefix, kind);
 
         let mut str_bases = String::new();
-        let parse_base = |base| {
-            Self::parse(
-                base,
-                Options {
-                    adjective: true,
-                    ..Default::default()
-                },
-            )
-        };
 
         let (last, bases) = bases.split_last().unwrap();
         for base in bases {
-            str_bases.push_str(&parse_base(base));
+            str_bases.push_str(&Self::base_adj(base, options));
             str_bases.push('-');
         }
-        str_bases.push_str(&parse_base(last));
+        str_bases.push_str(&Self::base_adj(last, options));
 
         format!("{} {}", str_bases, kind)
     }
@@ -231,36 +207,31 @@ pub trait Language: Prefix {
 
     /// The name for a hypercube with a given rank.
     fn hypercube<T: NameType>(regular: T, rank: usize, options: Options) -> String {
-        match rank {
-            3 => {
-                if regular.is_regular() {
-                    format!("cub{}", adj_or_plural(options, "ic", "s", "e"))
-                } else {
-                    format!("cuboid{}", adj_or_plural(options, "al", "s", ""))
+        if regular.is_regular() {
+            match rank {
+                3 => format!("cub{}", Self::three(options, "e", "s", "ic")),
+                4 => format!("tesseract{}", Self::three(options, "", "s", "ic")),
+                _ => {
+                    let prefix = Self::prefix(rank).chars().collect::<Vec<_>>();
+
+                    // Penta -> Pente, or Deca -> Deke
+                    let (_, str0) = prefix.split_last().unwrap();
+                    let (c1, str1) = str0.split_last().unwrap();
+
+                    let suffix = Self::three(options, "", "s", "ic");
+                    if *c1 == 'c' {
+                        format!("{}keract{}", str1.into_iter().collect::<String>(), suffix)
+                    } else {
+                        format!("{}eract{}", str0.into_iter().collect::<String>(), suffix)
+                    }
                 }
             }
-            4 => format!("tesseract{}", adj_or_plural(options, "ic", "s", "")),
-            _ => {
-                let mut prefix = Self::prefix(rank).chars().collect::<Vec<_>>();
-                let len = prefix.len();
-
-                // Penta -> Pente, or Deca -> Deke
-                if let Some(c) = prefix.last_mut() {
-                    if is_vowel(*c) {
-                        *c = 'e';
-                    }
+        } else {
+            match rank {
+                3 => format!("cuboid{}", Self::three(options, "", "s", "al")),
+                _ => {
+                    format!("{}block{}", Self::prefix(rank), Self::two(options, "", "s"))
                 }
-                if let Some(c) = prefix.get_mut(len - 2) {
-                    if *c == 'c' {
-                        *c = 'k';
-                    }
-                }
-
-                format!(
-                    "{}ract{}",
-                    prefix.into_iter().collect::<String>(),
-                    adj_or_plural(options, "ic", "s", "")
-                )
             }
         }
     }
@@ -272,11 +243,110 @@ pub trait Language: Prefix {
 
     /// The name for the dual of another polytope.
     fn dual<T: NameType>(base: &Name<T>, options: Options) -> String {
-        format!("dual {}", Self::parse(base, options))
+        format!("dual {}", Self::base(base, options))
     }
 
     /// A placeholder name for a polytope whose name is not known.
     fn unknown() -> String {
         String::from("unknown")
+    }
+
+    /// Chooses a suffix from two options:
+    ///
+    /// * Base form.
+    /// * A plural.
+    ///
+    /// Assumes that plurals are from 2 onwards.
+    fn two<'a>(options: Options, base: &'a str, plural: &'a str) -> &'a str {
+        if options.count > 1 {
+            plural
+        } else {
+            base
+        }
+    }
+
+    /// Chooses a suffix from three options:
+    ///
+    /// * Base form.
+    /// * A plural.
+    /// * An adjective for both the singular and plural.
+    ///
+    /// Assumes that plurals are from 2 onwards.
+    fn three<'a>(options: Options, base: &'a str, plural: &'a str, adj: &'a str) -> &'a str {
+        if options.adjective {
+            adj
+        } else if options.count > 1 {
+            plural
+        } else {
+            base
+        }
+    }
+
+    /// Chooses a suffix from four options:
+    ///
+    /// * Base form.
+    /// * A plural.
+    /// * A singular adjective.
+    /// * A plural adjective.
+    ///
+    /// Assumes that plurals are from 2 onwards.
+    fn four<'a>(
+        options: Options,
+        base: &'a str,
+        plural: &'a str,
+        adj: &'a str,
+        plural_adj: &'a str,
+    ) -> &'a str {
+        if options.adjective {
+            if options.count == 1 {
+                adj
+            } else {
+                plural_adj
+            }
+        } else if options.count == 1 {
+            base
+        } else {
+            plural
+        }
+    }
+
+    /// Chooses a suffix from six options:
+    ///
+    /// * Base form.
+    /// * A plural.
+    /// * A singular adjective (male).
+    /// * A plural adjective (male).
+    /// * A singular adjective (female).
+    /// * A plural adjective (female).
+    ///
+    /// Assumes that plurals are from 2 onwards.
+    fn six<'a>(
+        options: Options,
+        base: &'a str,
+        plural: &'a str,
+        adj_m: &'a str,
+        plural_adj_m: &'a str,
+        adj_f: &'a str,
+        plural_adj_f: &'a str,
+    ) -> &'a str {
+        if options.adjective {
+            if options.count == 1 {
+                match options.gender {
+                    Gender::Male => adj_m,
+                    Gender::Female => adj_f,
+                    _ => panic!("Unexpected gender!"),
+                }
+            } else {
+                match options.gender {
+                    Gender::Male => plural_adj_m,
+                    Gender::Female => plural_adj_f,
+                    _ => panic!("Unexpected gender!"),
+                }
+            }
+        } else if options.count == 1 {
+            base
+        } else {
+            plural
+        }
     }
 }
