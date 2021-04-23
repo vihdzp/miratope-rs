@@ -1,6 +1,6 @@
-use crate::translation::{name::NameType, Gender, Name};
+use crate::lang::{name::NameType, Gender, Name};
 
-use super::super::{GreekPrefix, Language, Options, Prefix};
+use super::{GreekPrefix, Language, Options, Prefix};
 
 /// The Spanish language.
 pub struct Es;
@@ -259,7 +259,7 @@ impl Language for Es {
                     Self::six(options, "ubo", "ubos", "úbico", "úbicos", "úbica", "úbicas")
                 ),
                 4 => format!(
-                    "tesser{}",
+                    "teser{}",
                     Self::six(
                         options, "acto", "actos", "áctico", "ácticoa", "áctica", "ácticas"
                     )
@@ -307,7 +307,43 @@ impl Language for Es {
         format!("{} dual", Self::base(base, options))
     }
 
-    fn unknown() -> String {
-        String::from("desconocido")
+    fn compound<T: NameType>(components: &[(usize, Name<T>)], options: Options) -> String {
+        let ((last_rep, last_component), first_components) = components.split_last().unwrap();
+        let mut str = String::from(Self::four(
+            options,
+            "compuesto",
+            "compuestos",
+            "del compuesto",
+            "de los compuestos",
+        ));
+        str.push_str(" de");
+
+        let parse_component = |rep, component| {
+            Self::parse(
+                component,
+                Options {
+                    count: rep,
+                    ..Options::default()
+                },
+            )
+        };
+
+        let comma = if components.len() == 2 { "" } else { "," };
+        for (rep, component) in first_components {
+            str.push_str(&format!(
+                " {} {}{}",
+                rep,
+                parse_component(*rep, component),
+                comma
+            ));
+        }
+
+        str.push_str(&format!(
+            " y {} {}",
+            last_rep,
+            parse_component(*last_rep, last_component)
+        ));
+
+        str
     }
 }

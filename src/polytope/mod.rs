@@ -4,7 +4,7 @@
 
 use crate::{
     polytope::flag::FlagIter,
-    translation::{name::NameType, Name},
+    lang::{name::NameType, Name},
 };
 use std::hash::Hash;
 

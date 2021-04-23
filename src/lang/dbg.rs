@@ -1,8 +1,8 @@
 //! A language we can use for debugging.
 
-use crate::translation::name::NameType;
+use crate::lang::name::NameType;
 
-use super::super::{Language, Name, Options, Prefix};
+use super::{Language, Name, Options, Prefix};
 
 pub struct Dbg;
 

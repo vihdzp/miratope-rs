@@ -1,13 +1,13 @@
 use crate::{
+    lang::{
+        name::{Con, NameType},
+        Name,
+    },
     polytope::{
         flag::{FlagEvent, FlagIter},
         geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace},
         rank::RankVec,
         Abstract, Element, ElementList, Polytope, Subelements, Subsupelements,
-    },
-    translation::{
-        name::{Con, NameType},
-        Name,
     },
     EPS,
 };
@@ -129,7 +129,7 @@ impl Concrete {
         }
     }
 
-    /// Applies a matrix to all vertices of a polytope.
+    /// Applies a function to all vertices of a polytope.
     pub fn apply(mut self, m: &Matrix) -> Self {
         for v in &mut self.vertices {
             *v = m * v.clone();
@@ -699,6 +699,8 @@ impl Polytope<Con> for Concrete {
         }
 
         self.vertices.append(&mut p.vertices);
+        self.name = Name::compound(vec![(1, self.name().clone()), (1, p.name)]);
+
         Ok(())
     }
 

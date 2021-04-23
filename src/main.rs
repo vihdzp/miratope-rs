@@ -55,14 +55,14 @@ use bevy_egui::EguiPlugin;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
 #[allow(unused_imports)]
-use polytope::{geometry::*, group::*, off::*, Polytope, *};
+use lang::{Language, Options};
 #[allow(unused_imports)]
-use translation::{lang, Language, Options};
+use polytope::{geometry::*, group::*, off::*, Polytope, *};
 use ui::{input::CameraInputEvent, CrossSectionActive, CrossSectionState};
 
+mod lang;
 mod no_cull_pipeline;
 mod polytope;
-mod translation;
 mod ui;
 
 /// Standard constant used for floating point comparisons throughout the code.
@@ -95,19 +95,12 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::point()
-        .prism()
-        .tegum()
-        .dual()
-        .unwrap()
-        .pyramid()
-        .prism()
-        .prism()
-        .dual()
-        .unwrap()
-        .dual()
-        .unwrap()
-        .prism();
+    let mut simplex = Concrete::simplex(4);
+    simplex.scale(-1.0);
+
+    let p =
+        Concrete::compound(vec![Concrete::hypercube(4), Concrete::simplex(4), simplex]).unwrap();
+
     dbg!(lang::Es::parse(p.name(), Options::default()));
     dbg!(lang::Es::parse(p.abs.name(), Options::default()));
     let poly = Renderable::new(p);

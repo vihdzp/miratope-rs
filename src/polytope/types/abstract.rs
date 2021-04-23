@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use crate::{
+    lang::{
+        name::{Abs, NameType},
+        Name,
+    },
     polytope::{
         flag::{FlagEvent, FlagIter},
         rank::RankVec,
         Element, ElementList, Polytope, Subelements, Subsupelements,
-    },
-    translation::{
-        name::{Abs, NameType},
-        Name,
     },
 };
 
@@ -522,7 +522,7 @@ impl Polytope<Abs> for Abstract {
 
         let el_counts = self.el_counts();
 
-        for (r, elements) in p.into_iter().rank_enumerate() {
+        for (r, elements) in p.ranks.into_iter().rank_enumerate() {
             if r == -1 || r == rank {
                 continue;
             }
@@ -546,6 +546,8 @@ impl Polytope<Abs> for Abstract {
                 self.push_at(r, el);
             }
         }
+
+        self.name = Name::compound(vec![(1, self.name().clone()), (1, p.name)]);
 
         Ok(())
     }

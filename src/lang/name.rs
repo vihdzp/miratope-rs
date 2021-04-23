@@ -1,5 +1,7 @@
 use std::fmt::Debug;
 
+use itertools::Itertools;
+
 /// Determines whether a name is to be treated as the name for an abstract
 /// polytope. Doubles as a way to mark some name variants as coming from a
 /// regular polytope or not.
@@ -120,8 +122,8 @@ pub enum Name<T: NameType> {
     /// count must be **at least 2,** and the dimension must be **at most 20.**
     Generic(usize, usize),
 
-    /// The name of the polytope is unknown.
-    Unknown,
+    /// A compound of some polytopes.
+    Compound(Vec<(usize, Name<T>)>),
 }
 
 impl<T: NameType> Name<T> {
@@ -161,7 +163,7 @@ impl<T: NameType> Name<T> {
             | Name::Multiprism(_)
             | Name::Multitegum(_)
             | Name::Multicomb(_) => self.rank_product(),
-            _ => None,
+            Name::Compound(components) => components[0].1.rank(),
         }
     }
 
@@ -192,7 +194,17 @@ impl<T: NameType> Name<T> {
                 }
                 facet_count
             }
-            _ => return None,
+            Name::Pyramid(base) => base.facet_count()? + 1,
+            Name::Prism(base) => 2 * (base.facet_count()? + 1),
+            Name::Tegum(base) => 2 * base.facet_count()?,
+            Name::Compound(components) => {
+                let mut facet_count = 0;
+                for (rep, name) in components.iter() {
+                    facet_count += rep * name.facet_count()?;
+                }
+                facet_count
+            }
+            Name::Dual(_) => return None,
         })
     }
 
@@ -212,7 +224,7 @@ impl<T: NameType> Name<T> {
 
                 // No base should have the same variant as self.
                 for base in bases {
-                    if base == self {
+                    if std::mem::discriminant(base) == std::mem::discriminant(self) {
                         return false;
                     }
                 }
@@ -469,7 +481,7 @@ impl<T: NameType> Name<T> {
 
     /// Sorts the bases of a multiproduct according to their rank, and then
     /// their facet count.
-    fn sort_bases(bases: &mut Vec<Name<T>>) {
+    fn base_cmp(base0: &Self, base1: &Self) -> std::cmp::Ordering {
         use std::cmp::Ordering;
 
         // Returns an Ordering if it's not equal to Ordering::Equal.
@@ -483,20 +495,18 @@ impl<T: NameType> Name<T> {
             };
         }
 
-        bases.sort_unstable_by(|base0, base1| {
-            // Names are firstly compared by rank.
-            return_if_ne!(base0.rank().unwrap_or(-2).cmp(&base1.rank().unwrap_or(-2)));
+        // Names are firstly compared by rank.
+        return_if_ne!(base0.rank().unwrap_or(-2).cmp(&base1.rank().unwrap_or(-2)));
 
-            // If we know the facet count of the names, a name with less facets
-            // compares as less to one with more facets.
-            return_if_ne!(base0
-                .facet_count()
-                .unwrap_or(0)
-                .cmp(&base1.facet_count().unwrap_or(0)));
+        // If we know the facet count of the names, a name with less facets
+        // compares as less to one with more facets.
+        return_if_ne!(base0
+            .facet_count()
+            .unwrap_or(0)
+            .cmp(&base1.facet_count().unwrap_or(0)));
 
-            // The names are equal for all we care about.
-            Ordering::Equal
-        });
+        // The names are equal for all we care about.
+        Ordering::Equal
     }
 
     pub fn multipyramid(bases: Vec<Name<T>>) -> Self {
@@ -524,7 +534,7 @@ impl<T: NameType> Name<T> {
         }
 
         // Sorts the bases by convention.
-        Self::sort_bases(&mut new_bases);
+        new_bases.sort_by(&Self::base_cmp);
 
         let multipyramid = match new_bases.len() {
             0 => Self::Nullitope,
@@ -569,7 +579,7 @@ impl<T: NameType> Name<T> {
         }
 
         // Sorts the bases by convention.
-        Self::sort_bases(&mut new_bases);
+        new_bases.sort_by(&Self::base_cmp);
 
         let multiprism = match new_bases.len() {
             0 => Self::Point,
@@ -614,7 +624,7 @@ impl<T: NameType> Name<T> {
         }
 
         // Sorts the bases by convention.
-        Self::sort_bases(&mut new_bases);
+        new_bases.sort_by(&Self::base_cmp);
 
         let multitegum = match new_bases.len() {
             0 => Self::Point,
@@ -632,7 +642,7 @@ impl<T: NameType> Name<T> {
         }
     }
 
-    pub fn multicomb(bases: Vec<Name<T>>) -> Self {
+    pub fn multicomb(bases: Vec<Self>) -> Self {
         let mut new_bases = Vec::new();
 
         // Figures out which bases of the multipyramid are multipyramids
@@ -646,12 +656,47 @@ impl<T: NameType> Name<T> {
         }
 
         // Sorts the bases by convention.
-        Self::sort_bases(&mut new_bases);
+        new_bases.sort_by(&Self::base_cmp);
 
         match new_bases.len() {
             0 => Self::Point,
             1 => new_bases.swap_remove(0),
             _ => Self::Multicomb(new_bases),
+        }
+    }
+
+    pub fn compound(mut components: Vec<(usize, Self)>) -> Self {
+        components.sort_by(|(_, name0), (_, name1)| Self::base_cmp(name0, name1));
+
+        let mut new_components: Vec<(usize, _)> = Vec::new();
+        for (rep, name) in components {
+            if let Self::Compound(mut extra_components) = name {
+                new_components.append(&mut extra_components);
+            } else {
+                new_components.push((rep, name));
+            }
+        }
+
+        new_components.sort_by(|(_, name0), (_, name1)| Self::base_cmp(name0, name1));
+        let mut components = Vec::new();
+
+        for (name, group) in &new_components
+            .into_iter()
+            .group_by(|(_, name)| name.clone())
+        {
+            dbg!(&name);
+
+            if let Self::Compound(mut extra_components) = name {
+                components.append(&mut extra_components);
+            } else {
+                components.push((group.map(|(rep, _)| rep).sum(), name));
+            }
+        }
+
+        if components.len() == 1 {
+            components.swap_remove(0).1
+        } else {
+            Self::Compound(components)
         }
     }
 }
