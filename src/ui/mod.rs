@@ -151,8 +151,7 @@ pub fn ui(
             x_max = 1.0;
         }
         ui.add(
-            egui::Slider::f64(&mut new_hyperplane_pos, x_min..=x_max)
-                .max_decimals(5)
+            egui::Slider::f64(&mut new_hyperplane_pos, x_min..=x_max - 0.000001)
                 .text("Slice depth"),
         );
 
