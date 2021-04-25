@@ -102,7 +102,7 @@ impl Abstract {
         // We assume the superelements of the maximal rank haven't been set.
         if !self.ranks.is_empty() {
             for el in self[self.rank()].iter() {
-                debug_assert!(el.sups.is_empty(), "The method push_subs can only been used when the superelements of the elements of the maximal rank haven't already been set.");
+                debug_assert!(el.sups.is_empty(), "The method push_subs can only be used when the superelements of the elements of the maximal rank haven't already been set.");
             }
         }
 

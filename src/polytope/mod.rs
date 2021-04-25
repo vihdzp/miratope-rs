@@ -475,7 +475,12 @@ impl ElementList {
 
         els
     }
+
+    pub fn into_iter(self) -> std::vec::IntoIter<Element> {
+        self.0.into_iter()
+    }
 }
+
 
 impl IntoIterator for ElementList {
     type Item = Element;

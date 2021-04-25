@@ -95,9 +95,8 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::compound(vec![Concrete::polygon(3), Concrete::polygon(6)])
-        .unwrap()
-        .prism();
+    let poly = Concrete::star_polygon(5,2).prism();
+    //let poly = Concrete::from_path(&"F:/aaa/polytope stuff/off/3D/4. Nonconvex uniform solids/Small stellated truncated dodecahedron.off").unwrap();
 
     // Disables backface culling.
     pipelines.set_untracked(
@@ -127,6 +126,10 @@ fn setup(
         .spawn(PbrNoBackfaceBundle {
             mesh: meshes.add(poly.get_mesh()),
             material: materials.add(Color::rgb(0.93, 0.5, 0.93).into()),
+            visible: Visible {
+                is_visible: true,
+                ..Default::default()
+            },
             ..Default::default()
         })
         // Wireframe
@@ -134,6 +137,10 @@ fn setup(
             cb.spawn(PbrNoBackfaceBundle {
                 mesh: meshes.add(poly.get_wireframe()),
                 material: wf_unselected,
+                visible: Visible {
+                    is_visible: true,
+                    ..Default::default()
+                },
                 ..Default::default()
             });
         })

@@ -574,7 +574,7 @@ impl Concrete {
             return Self::nullitope();
         }
 
-        abs.push(ElementList::min(vertex_count));
+        abs.push(ElementList::single());
         abs.push(ElementList::vertices(vertex_count));
 
         // Takes care of building everything else.
@@ -597,15 +597,50 @@ impl Concrete {
                 }
             }
 
-            abs.push_subs(new_els);
+            abs.push(new_els);
             hash_element = new_hash_element;
         }
 
         // Adds a maximal element manually.
         let facet_count = abs.ranks.last().unwrap().len();
-        abs.push_subs(ElementList::max(facet_count));
+        abs.push(ElementList::max(facet_count));
 
-        Self::new(vertices, abs)
+        println!("{}", abs.ranks.len());
+
+        // Splits compounds of dyads.
+        let mut faces = abs[2].clone();
+
+        let mut i = abs[1].len();
+        let mut idx = 0;
+        let mut new_edges = Vec::<Element>::new();
+        for edge in abs[1].0.iter_mut() {
+            let edge_sub = &edge.subs;
+            let comps = edge_sub.len() / 2;
+            for comp in 1..comps {
+                let new_subs = Subelements::from_vec(edge_sub[2*comp..2*comp+2].to_vec());
+                new_edges.push(Element::from_subs(new_subs));
+                for face in faces.0.iter_mut() {
+                    if face.subs.contains(&idx) {
+                        face.subs.push(i);
+                    }
+                }
+                i += 1;
+            }
+            let new_subs = Subelements::from_vec(edge_sub[..2].to_vec());
+            *edge = Element::from_subs(new_subs);
+            println!("{} {}", edge.subs[0], edge.subs[1]);
+            idx += 1;
+        }
+        abs[1].append(&mut new_edges);
+        abs[2] = faces;
+
+        dbg!(&abs);
+        let mut abs2 = Abstract::new();
+        for r in abs {
+            abs2.push_subs(r);
+        }
+
+        Self::new(vertices, abs2)
     }
 
     /// Loads a polytope from a file path.
