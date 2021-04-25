@@ -95,7 +95,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::hypercube(3);
+    let p = Concrete::star_polygon(10, 3);
     let poly = Renderable::new(p);
 
     // Disables backface culling.
@@ -126,6 +126,10 @@ fn setup(
         .spawn(PbrNoBackfaceBundle {
             mesh: meshes.add(poly.get_mesh()),
             material: materials.add(Color::rgb(0.93, 0.5, 0.93).into()),
+            visible: Visible {
+                is_visible: true,
+                ..Default::default()
+            },
             ..Default::default()
         })
         // Wireframe
@@ -133,6 +137,10 @@ fn setup(
             cb.spawn(PbrNoBackfaceBundle {
                 mesh: meshes.add(poly.get_wireframe()),
                 material: wf_unselected,
+                visible: Visible {
+                    is_visible: true,
+                    ..Default::default()
+                },
                 ..Default::default()
             });
         })
