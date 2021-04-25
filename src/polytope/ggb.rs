@@ -158,7 +158,7 @@ fn parse_xml(xml: String) -> io::Result<Concrete> {
                         if name == "expression" {
                             if let Some(label) = get_attribute(&attributes, "label") {
                                 if let Ok(Some(vertex)) = read_point(&mut xml, label) {
-                                    vertices.push(dbg!(vertex));
+                                    vertices.push(vertex);
                                 }
                             }
                         } else if name == "element" {

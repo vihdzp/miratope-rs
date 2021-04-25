@@ -95,7 +95,9 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::hypercube(3);
+    let poly = Concrete::compound(vec![Concrete::polygon(3), Concrete::polygon(6)])
+        .unwrap()
+        .prism();
 
     // Disables backface culling.
     pipelines.set_untracked(

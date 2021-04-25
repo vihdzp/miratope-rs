@@ -313,7 +313,7 @@ impl Language for Es {
         let comma = if components.len() == 2 { "" } else { "," };
         for (rep, component) in first_components {
             str.push_str(&format!(
-                " {} {}{}",
+                "{} {}{} ",
                 rep,
                 parse_component(*rep, component),
                 comma
@@ -321,7 +321,7 @@ impl Language for Es {
         }
 
         str.push_str(&format!(
-            " y {} {}",
+            "y {} {}",
             last_rep,
             parse_component(*last_rep, last_component)
         ));

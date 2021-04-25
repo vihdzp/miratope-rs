@@ -77,6 +77,12 @@ impl Abstract {
 
     /// Pushes a given element into the vector of elements of a given rank.
     pub fn push_at(&mut self, rank: isize, el: Element) {
+        self[rank].push(el);
+    }
+
+    /// Pushes a given element into the vector of elements of a given rank.
+    /// Updates the superelements of its subelements automatically.
+    pub fn push_subs_at(&mut self, rank: isize, el: Element) {
         let i = self[rank].len();
 
         if let Some(lower_rank) = self.ranks.get_mut(rank - 1) {
@@ -86,7 +92,7 @@ impl Abstract {
             }
         }
 
-        self[rank].push(el);
+        self.push_at(rank, el);
     }
 
     /// Pushes a new element list, assuming that the superelements of the
@@ -101,10 +107,9 @@ impl Abstract {
         }
 
         self.push(ElementList::with_capacity(elements.len()));
-        let rank = self.rank();
 
         for el in elements.into_iter() {
-            self.push_at(rank, el);
+            self.push_subs_at(self.rank(), el);
         }
     }
 
@@ -599,7 +604,7 @@ impl Polytope<Abs> for Abstract {
         let rank = self.rank();
         let max = self[rank][0].clone();
 
-        self.push_at(rank, max);
+        self.push_subs_at(rank, max);
         self.push_subs(ElementList::max(2));
     }
 

@@ -505,7 +505,6 @@ pub trait Language: Prefix {
             Name::Multicomb(bases) => (bases, format!("comb{}", options.two("", "s"))),
             _ => panic!("Not a product!"),
         };
-        dbg!(&kind);
 
         let n = bases.len();
         let prefix = match n {
@@ -590,7 +589,7 @@ pub trait Language: Prefix {
         let comma = if components.len() == 2 { "" } else { "," };
         for (rep, component) in first_components {
             str.push_str(&format!(
-                " {} {}{}",
+                "{} {}{} ",
                 rep,
                 parse_component(*rep, component),
                 comma
@@ -598,7 +597,7 @@ pub trait Language: Prefix {
         }
 
         str.push_str(&format!(
-            " and {} {} compound{}",
+            "and {} {} compound{}",
             last_rep,
             parse_component(*last_rep, last_component),
             options.two("", "s")
