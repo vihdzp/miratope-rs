@@ -99,35 +99,37 @@ fn setup(
 
     let poly = Renderable::new(p);
 
+    // Disables backface culling.
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
         no_cull_pipeline::build_no_cull_pipeline(&mut shaders),
     );
 
+    // Selected object (unused as of yet).
     materials.set_untracked(
         WIREFRAME_SELECTED_MATERIAL,
         Color::rgb_u8(126, 192, 255).into(),
     );
 
+    // Unselected object (default material).
     let wf_unselected = materials.set(
         WIREFRAME_UNSELECTED_MATERIAL,
-        Color::rgb_u8(238, 130, 238).into(),
+        Color::rgb_u8(0, 0, 255).into(),
     );
 
+    // Camera configuration.
     let mut cam_anchor = Transform::default();
     let mut cam = Transform::default();
     CameraInputEvent::reset(&mut cam_anchor, &mut cam);
 
     commands
+        // Mesh
         .spawn(PbrNoBackfaceBundle {
             mesh: meshes.add(poly.get_mesh()),
-            visible: Visible {
-                is_visible: false,
-                ..Default::default()
-            },
             material: materials.add(Color::rgb(0.93, 0.5, 0.93).into()),
             ..Default::default()
         })
+        // Wireframe
         .with_children(|cb| {
             cb.spawn(PbrNoBackfaceBundle {
                 mesh: meshes.add(poly.get_wireframe()),
@@ -136,6 +138,7 @@ fn setup(
             });
         })
         .with(poly)
+        // Light source
         .spawn(LightBundle {
             transform: Transform::from_translation(Vec3::new(-2.0, 2.5, 2.0)),
             ..Default::default()

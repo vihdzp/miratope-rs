@@ -29,6 +29,7 @@ pub struct Concrete {
     /// The underlying abstract polytope.
     pub abs: Abstract,
 
+    /// The concrete name of the polytope.
     pub name: Name<Con>,
 }
 
@@ -46,6 +47,7 @@ impl Concrete {
             }
         }
 
+        // With no further info, we create a generic name for the polytope.
         let n = abs.facet_count();
         let d = abs.rank();
         Self {

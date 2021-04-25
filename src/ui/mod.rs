@@ -1,3 +1,4 @@
+use crate::lang::{self, Language, Options};
 use crate::polytope::geometry::{Hyperplane, Point};
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
@@ -183,10 +184,14 @@ pub fn update_changed_polytopes(
     mut meshes: ResMut<Assets<Mesh>>,
     polies: Query<(&Renderable, &Handle<Mesh>, &Children), Changed<Renderable>>,
     wfs: Query<&Handle<Mesh>, Without<Renderable>>,
+    mut windows: ResMut<Windows>,
 ) {
     for (poly, mesh_handle, children) in polies.iter() {
         let mesh: &mut Mesh = meshes.get_mut(mesh_handle).unwrap();
         *mesh = poly.get_mesh();
+
+        let window = windows.get_primary_mut().unwrap();
+        window.set_title(lang::En::parse(poly.concrete.name(), Options::default()));
 
         for child in children.iter() {
             if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {
