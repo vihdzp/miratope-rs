@@ -197,9 +197,9 @@ impl Cycle {
 /// This struct doesn't actually implement [`Polytope`](crate::Polytope), though
 /// it still acts as a type of polytope by virtue of storing one directly.
 #[derive(Debug, Clone)]
-pub struct Renderable {
+pub struct MeshBuilder<'a> {
     /// The underlying concrete polytope.
-    pub concrete: Concrete,
+    pub concrete: &'a Concrete,
 
     /// Extra vertices that might be needed for the triangulation.
     extra_vertices: Vec<Point>,
@@ -214,9 +214,9 @@ enum VertexIndex {
     Extra(usize),
 }
 
-impl Renderable {
+impl<'a> MeshBuilder<'a> {
     /// Generates the triangulation of a `Concrete`.
-    pub fn new(concrete: Concrete) -> Self {
+    pub fn new(concrete: &'a Concrete) -> Self {
         Self {
             concrete,
             extra_vertices: Vec::new(),
@@ -350,8 +350,10 @@ impl Renderable {
     }
 
     /// Generates a mesh from the polytope.
-    pub fn get_mesh(&self) -> Mesh {
+    pub fn get_mesh(&mut self) -> Mesh {
         use itertools::Itertools;
+
+        self.triangulate();
 
         let vertices = self.get_vertex_coords();
         let mut indices = Vec::with_capacity(self.triangles.len());

@@ -1,9 +1,12 @@
-use crate::lang::{self, Language, Options};
 use crate::polytope::geometry::{Hyperplane, Point};
+use crate::{
+    lang::{self, Language, Options},
+    polytope::Concrete,
+};
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
 
-use crate::polytope::{Polytope, Renderable};
+use crate::polytope::Polytope;
 use crate::OffOptions;
 
 pub mod input;
@@ -21,7 +24,7 @@ impl CrossSectionActive {
 /// Stores the state of the cross-section view.
 pub struct CrossSectionState {
     /// The polytope from which the cross-section originates.
-    original_polytope: Option<Renderable>,
+    original_polytope: Option<Concrete>,
 
     /// The position of the slicing hyperplane.
     hyperplane_pos: f64,
@@ -43,7 +46,7 @@ impl Default for CrossSectionState {
 /// The system in charge of the UI.
 pub fn ui(
     mut egui_ctx: ResMut<EguiContext>,
-    mut query: Query<&mut Renderable>,
+    mut query: Query<&mut Concrete>,
     mut section_state: ResMut<CrossSectionState>,
     mut section_active: ResMut<CrossSectionActive>,
 ) {
@@ -62,7 +65,7 @@ pub fn ui(
             // Converts the active polytope into its dual.
             if columns[0].button("Dual").clicked() {
                 for mut p in query.iter_mut() {
-                    match p.concrete.dual_mut() {
+                    match p.dual_mut() {
                         Ok(_) => println!("Dual succeeded"),
                         Err(_) => println!("Dual failed"),
                     }
@@ -82,10 +85,10 @@ pub fn ui(
                 for mut p in query.iter_mut() {
                     println!("Facet");
 
-                    if let Some(mut facet) = p.concrete.facet(0) {
+                    if let Some(mut facet) = p.facet(0) {
                         facet.flatten();
                         facet.recenter();
-                        *p = Renderable::new(facet);
+                        *p = facet;
                     };
 
                     // If we're currently viewing a cross-section, it gets "fixed"
@@ -100,10 +103,10 @@ pub fn ui(
                 for mut p in query.iter_mut() {
                     println!("Verf");
 
-                    if let Some(mut facet) = p.concrete.verf(0) {
+                    if let Some(mut facet) = p.verf(0) {
                         facet.flatten();
                         facet.recenter();
-                        *p = Renderable::new(facet);
+                        *p = facet;
                     };
 
                     // If we're currently viewing a cross-section, it gets "fixed"
@@ -115,15 +118,15 @@ pub fn ui(
 
             // Exports the active polytope as an OFF file (not yet functional!)
             if columns[3].button("Print OFF").clicked() {
-                for _p in query.iter_mut() {
-                    println!("{}", _p.concrete.to_off(OffOptions::default()));
+                for p in query.iter_mut() {
+                    println!("{}", p.to_off(OffOptions::default()));
                 }
             }
 
             // Gets the volume of the polytope.
             if columns[4].button("Volume").clicked() {
                 for p in query.iter_mut() {
-                    if let Some(vol) = p.concrete.volume() {
+                    if let Some(vol) = p.volume() {
                         println!("The volume is {}.", vol);
                     } else {
                         println!("The polytope has no volume.");
@@ -145,8 +148,8 @@ pub fn ui(
         let x_max;
 
         if let Some(original) = &section_state.original_polytope {
-            x_min = original.concrete.x_min().unwrap() + 0.0001;
-            x_max = original.concrete.x_max().unwrap() - 0.0001;
+            x_min = original.x_min().unwrap() + 0.0001;
+            x_max = original.x_max().unwrap() - 0.0001;
         } else {
             x_min = -1.0;
             x_max = 1.0;
@@ -182,8 +185,8 @@ pub fn update_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Res
 /// Updates polytopes after an operation.
 pub fn update_changed_polytopes(
     mut meshes: ResMut<Assets<Mesh>>,
-    polies: Query<(&Renderable, &Handle<Mesh>, &Children), Changed<Renderable>>,
-    wfs: Query<&Handle<Mesh>, Without<Renderable>>,
+    polies: Query<(&Concrete, &Handle<Mesh>, &Children), Changed<Concrete>>,
+    wfs: Query<&Handle<Mesh>, Without<Concrete>>,
     mut windows: ResMut<Windows>,
 ) {
     for (poly, mesh_handle, children) in polies.iter() {
@@ -191,7 +194,7 @@ pub fn update_changed_polytopes(
         *mesh = poly.get_mesh();
 
         let window = windows.get_primary_mut().unwrap();
-        window.set_title(lang::En::parse(poly.concrete.name(), Options::default()));
+        window.set_title(lang::En::parse(poly.name(), Options::default()));
 
         for child in children.iter() {
             if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {
@@ -206,7 +209,7 @@ pub fn update_changed_polytopes(
 
 /// Shows or hides the cross-section view.
 pub fn update_cross_section_state(
-    mut query: Query<&mut Renderable>,
+    mut query: Query<&mut Concrete>,
     mut state: ResMut<CrossSectionState>,
     active: ChangedRes<CrossSectionActive>,
 ) {
@@ -219,7 +222,7 @@ pub fn update_cross_section_state(
 
 /// Updates the cross-section shown.
 pub fn update_cross_section(
-    mut query: Query<&mut Renderable>,
+    mut query: Query<&mut Concrete>,
     state: ChangedRes<CrossSectionState>,
     active: Res<CrossSectionActive>,
 ) {
@@ -228,9 +231,9 @@ pub fn update_cross_section(
             let r = state.original_polytope.clone().unwrap();
             let hyp_pos = state.hyperplane_pos + 0.0000001; // Botch fix for degeneracies.
 
-            if let Some(dim) = r.concrete.dim() {
+            if let Some(dim) = r.dim() {
                 let hyperplane = Hyperplane::x(dim, hyp_pos);
-                let mut slice = r.concrete.slice(&hyperplane);
+                let mut slice = r.slice(&hyperplane);
 
                 if state.flatten {
                     slice.flatten_into(&hyperplane.subspace);
@@ -239,7 +242,7 @@ pub fn update_cross_section(
                     );
                 }
 
-                *p = Renderable::new(slice);
+                *p = slice;
             }
         }
     }

@@ -95,9 +95,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let mut p = Concrete::from_path(&"F:/aaa/polytope stuff/off/4D/Convex uniform polychora/Icoics/Icositetrachoron.off").unwrap();
-
-    let poly = Renderable::new(p);
+    let poly = Concrete::hypercube(3);
 
     // Disables backface culling.
     pipelines.set_untracked(
