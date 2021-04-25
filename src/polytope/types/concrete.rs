@@ -7,12 +7,13 @@ use crate::{
         flag::{FlagEvent, FlagIter},
         geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace},
         rank::RankVec,
-        Abstract, Element, ElementList, Polytope, Subelements, Subsupelements,
+        Abstract, Element, ElementList, MeshBuilder, Polytope, Subelements, Subsupelements,
     },
     EPS,
 };
 
 use approx::{abs_diff_eq, abs_diff_ne};
+use bevy::prelude::Mesh;
 use core::f64;
 use std::{
     collections::HashMap,
@@ -627,6 +628,14 @@ impl Concrete {
                 "File extension not recognized.",
             ))
         }
+    }
+
+    pub fn get_mesh(&self) -> Mesh {
+        MeshBuilder::new(self).get_mesh()
+    }
+
+    pub fn get_wireframe(&self) -> Mesh {
+        MeshBuilder::new(self).get_wireframe()
     }
 }
 

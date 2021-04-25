@@ -95,8 +95,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::star_polygon(10, 3);
-    let poly = Renderable::new(p);
+    let poly = Concrete::hypercube(3);
 
     // Disables backface culling.
     pipelines.set_untracked(
