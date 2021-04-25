@@ -217,12 +217,20 @@ enum VertexIndex {
 impl Renderable {
     /// Generates the triangulation of a `Concrete`.
     pub fn new(concrete: Concrete) -> Self {
-        let mut extra_vertices = Vec::new();
-        let mut triangles = Vec::new();
+        Self {
+            concrete,
+            extra_vertices: Vec::new(),
+            triangles: Vec::new(),
+        }
+    }
+
+    pub fn triangulate(&mut self) {
+        self.extra_vertices = Vec::new();
+        self.triangles = Vec::new();
 
         let empty_els = ElementList::new();
-        let edges = concrete.abs.ranks.get(1).unwrap_or(&empty_els);
-        let faces = concrete.abs.ranks.get(2).unwrap_or(&empty_els);
+        let edges = self.concrete.abs.ranks.get(1).unwrap_or(&empty_els);
+        let faces = self.concrete.abs.ranks.get(2).unwrap_or(&empty_els);
 
         // We render each face separately.
         for face in faces.iter() {
@@ -240,7 +248,7 @@ impl Renderable {
 
             // We tesselate this path.
             let cycle = vertex_loop.cycle().unwrap();
-            if let Some(path) = cycle.path(&concrete.vertices) {
+            if let Some(path) = cycle.path(&self.concrete.vertices) {
                 let mut geometry: VertexBuffers<_, u16> = VertexBuffers::new();
                 FillTessellator::new()
                     .tessellate_with_ids(
@@ -265,19 +273,20 @@ impl Renderable {
                                 .insert(new_id, VertexIndex::Concrete(cycle.0[id.to_usize()]));
                         }
                         VertexSource::Edge { from, to, t } => {
-                            let from = &concrete.vertices[cycle.0[from.to_usize()]];
-                            let to = &concrete.vertices[cycle.0[to.to_usize()]];
+                            let from = &self.concrete.vertices[cycle.0[from.to_usize()]];
+                            let to = &self.concrete.vertices[cycle.0[to.to_usize()]];
 
                             let t = t as f64;
                             let p = from * (1.0 - t) + to * t;
 
-                            vertex_hash.insert(new_id, VertexIndex::Extra(extra_vertices.len()));
-                            extra_vertices.push(p);
+                            vertex_hash
+                                .insert(new_id, VertexIndex::Extra(self.extra_vertices.len()));
+                            self.extra_vertices.push(p);
                         }
                     }
                 }
 
-                triangles.append(
+                self.triangles.append(
                     &mut geometry
                         .indices
                         .into_iter()
@@ -285,12 +294,6 @@ impl Renderable {
                         .collect(),
                 );
             }
-        }
-
-        Renderable {
-            concrete,
-            extra_vertices,
-            triangles,
         }
     }
 

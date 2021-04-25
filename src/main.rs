@@ -95,7 +95,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::from_path(&"Gidrid.off").unwrap();
+    let p = Concrete::hypercube(3);
     let poly = Renderable::new(p);
 
     // Disables backface culling.
