@@ -1,14 +1,20 @@
+pub mod cd;
+pub mod convex;
+pub mod cox;
+pub mod ggb;
+pub mod group;
+pub mod mesh_builder;
+pub mod off;
+
+use crate::geometry::{Hyperplane, Point, Segment, Subspace};
+use crate::{
+    geometry::{Hypersphere, Matrix},
+    r#abstract::{flag::FlagEvent, Abstract},
+};
 use crate::{
     lang::{
         name::{Con, NameType},
         Name,
-    },
-    polytope::{
-        flag::{FlagEvent, FlagIter},
-        geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace},
-        group::OrdPoint,
-        rank::RankVec,
-        Abstract, Element, ElementList, MeshBuilder, Polytope, Subelements, Subsupelements,
     },
     EPS,
 };
@@ -20,6 +26,10 @@ use std::{
     collections::HashMap,
     f64::consts::{SQRT_2, TAU},
 };
+
+use self::{group::OrdPoint, mesh_builder::MeshBuilder};
+
+use super::{Polytope,r#abstract::elements::Subsupelements, r#abstract::{flag::FlagIter, rank::RankVec}, r#abstract::elements::{Element, Subelements}, r#abstract::elements::ElementList};
 
 #[derive(Debug, Clone)]
 /// Represents a [concrete polytope](https://polytope.miraheze.org/wiki/Polytope),

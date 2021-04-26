@@ -1,13 +1,14 @@
+use crate::polytope::{COMPONENTS, ELEMENT_NAMES, r#abstract::elements::Subsupelements};
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 use std::{collections::HashMap, io, path::Path, str::FromStr};
 
 use super::{
-    Abstract, Concrete, Element, ElementList, Point, Polytope, RankVec, Subelements, Subsupelements,
+    Abstract, Concrete, Element, ElementList, Point, Polytope, RankVec, Subelements, 
 };
 
 /// Gets the name for an element with a given rank.
 fn element_name(rank: isize) -> String {
-    match super::ELEMENT_NAMES.get(rank as usize) {
+    match ELEMENT_NAMES.get(rank as usize) {
         Some(&name) => String::from(name),
         None => rank.to_string() + "-elements",
     }
@@ -317,7 +318,7 @@ fn write_faces(
         let el_name = if rank > 2 {
             element_name(2)
         } else {
-            super::COMPONENTS.to_string()
+            COMPONENTS.to_string()
         };
 
         off.push_str("\n# ");

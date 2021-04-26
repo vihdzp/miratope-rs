@@ -2,10 +2,9 @@ use std::collections::BTreeSet;
 use std::f64::NEG_INFINITY;
 
 use super::{
-    geometry::{Point, Subspace, Vector},
-    Concrete, RankVec,
+    Concrete, 
 };
-use derive_more::{Deref, DerefMut};
+use derive_deref::{Deref, DerefMut};
 use petgraph::{graph::NodeIndex, Directed, Direction, Graph};
 
 /// An entry in the priority queue used in Shell.

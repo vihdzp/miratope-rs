@@ -56,10 +56,13 @@ use no_cull_pipeline::PbrNoBackfaceBundle;
 
 #[allow(unused_imports)]
 use lang::{Language, Options};
-#[allow(unused_imports)]
-use polytope::{geometry::*, group::*, off::*, Polytope, *};
+use polytope::{
+    concrete::{off::*, Concrete},
+    Polytope, *,
+};
 use ui::{input::CameraInputEvent, CrossSectionActive, CrossSectionState};
 
+mod geometry;
 mod lang;
 mod no_cull_pipeline;
 mod polytope;
@@ -95,7 +98,8 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::duoprism(&Concrete::star_polygon(5, 2), &Concrete::star_polygon(5, 2));
+    let pentagram = Concrete::star_polygon(5, 2);
+    let poly = Concrete::duoprism(&pentagram, &pentagram);
 
     // Disables backface culling.
     pipelines.set_untracked(

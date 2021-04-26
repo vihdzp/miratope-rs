@@ -1,7 +1,7 @@
-use crate::polytope::geometry::{Hyperplane, Point};
+use crate::geometry::{Hyperplane, Point};
 use crate::{
     lang::{self, Language, Options},
-    polytope::Concrete,
+    polytope::concrete::Concrete,
 };
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};

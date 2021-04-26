@@ -44,13 +44,13 @@ impl CoxMatrix {
 #[macro_export]
 macro_rules! cox {
     () => (
-        crate::polytope::group::Group::cox_group(crate::cox_mat!()).unwrap()
+        crate::polytope::concrete::group::Group::cox_group(crate::cox_mat!()).unwrap()
     );
     ($($x:expr),+) => (
-        crate::polytope::group::Group::cox_group(crate::cox_mat!($($x),+)).unwrap()
+        crate::polytope::concrete::group::Group::cox_group(crate::cox_mat!($($x),+)).unwrap()
     );
     ($x:expr; $y:expr) => (
-        crate::polytope::group::Group::cox_group(crate::cox_mat!($x; $y)).unwrap()
+        crate::polytope::concrete::group::Group::cox_group(crate::cox_mat!($x; $y)).unwrap()
     )
 }
 
@@ -58,12 +58,12 @@ macro_rules! cox {
 #[macro_export]
 macro_rules! cox_mat {
     () => (
-        crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![])
+        crate::polytope::concrete::cox::CoxMatrix::from_lin_diagram(vec![])
     );
     ($($x:expr),+) => (
-        crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![$($x as f64),+])
+        crate::polytope::concrete::cox::CoxMatrix::from_lin_diagram(vec![$($x as f64),+])
     );
     ($x:expr; $y:expr) => (
-        crate::polytope::cox::CoxMatrix::from_lin_diagram(vec![$x as f64; $y])
+        crate::polytope::concrete::cox::CoxMatrix::from_lin_diagram(vec![$x as f64; $y])
     )
 }

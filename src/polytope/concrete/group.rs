@@ -1,10 +1,11 @@
 //! Contains methods to generate many symmetry groups.
 
+use crate::geometry::Point;
 // Circumvents rust-analyzer bug.
 #[allow(unused_imports)]
 use crate::{cox, EPS};
 
-use super::{convex, cox::CoxMatrix, geometry::Point, Concrete};
+use super::{convex, cox::CoxMatrix,Concrete};
 use approx::{abs_diff_ne, relative_eq};
 use derive_deref::Deref;
 use nalgebra::{

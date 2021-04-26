@@ -1,18 +1,19 @@
+use crate::{polytope::{r#abstract::elements::Element, r#abstract::{Abstract, elements::ElementList}}, r#abstract::elements::Subelements};
+use crate::geometry::Subspace;
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
 };
 
-use super::{
-    geometry::{Point, Subspace},
-    Abstract, Concrete, Element, ElementList, Subelements,
-};
-use crate::EPS;
+
+use crate::{EPS, geometry::Point};
 
 use nalgebra::DMatrix;
 use rand::Rng;
 use scapegoat::SGSet as BTreeSet;
 use std::fmt::Debug;
+
+use super::Concrete;
 
 #[derive(PartialEq, Debug)]
 enum Sign {

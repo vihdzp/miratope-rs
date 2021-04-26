@@ -1,3 +1,6 @@
+use elements::{Subelements, Subsupelements};
+
+use crate::r#abstract::elements::ElementHash;
 use std::collections::HashMap;
 
 use crate::{
@@ -5,14 +8,15 @@ use crate::{
         name::{Abs, NameType},
         Name,
     },
-    polytope::{
-        flag::{FlagEvent, FlagIter},
-        rank::RankVec,
-        Element, ElementList, Polytope, Subelements, Subsupelements,
-    },
 };
 
-use super::ElementHash;
+use self::{elements::{Element, ElementList}, flag::{FlagEvent, FlagIter}, rank::RankVec};
+
+use super::Polytope;
+
+pub mod elements;
+pub mod flag;
+pub mod rank;
 
 /// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
 /// to an [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
@@ -661,7 +665,7 @@ impl std::ops::IndexMut<isize> for Abstract {
 impl IntoIterator for Abstract {
     type Item = ElementList;
 
-    type IntoIter = crate::polytope::rank::IntoIter<ElementList>;
+    type IntoIter = crate::polytope::r#abstract::rank::IntoIter<ElementList>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.ranks.into_iter()

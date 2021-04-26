@@ -9,10 +9,9 @@ use lyon::math::point;
 use lyon::path::Path;
 use lyon::tessellation::*;
 
-use crate::polytope::{
-    geometry::{Point, Subspace},
-    Concrete, ElementList,
-};
+use crate::{geometry::{Point, Subspace}, polytope::r#abstract::elements::ElementList};
+
+use super::Concrete;
 
 #[derive(Clone, Copy)]
 /// Represents a set of at most two elements.
