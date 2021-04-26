@@ -1,11 +1,9 @@
-
 use std::{collections::HashMap, io, path::Path, str::FromStr};
 
-use crate::polytope::{r#abstract::elements::Subsupelements, COMPONENTS, ELEMENT_NAMES};
 use super::{Abstract, Concrete, Element, ElementList, Point, Polytope, RankVec, Subelements};
+use crate::polytope::{r#abstract::elements::Subsupelements, COMPONENTS, ELEMENT_NAMES};
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
-
 
 /// Gets the name for an element with a given rank.
 fn element_name(rank: isize) -> String {

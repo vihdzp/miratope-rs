@@ -8,10 +8,10 @@ pub trait Subsupelements: Sized {
     fn from_vec(vec: Vec<usize>) -> Self;
 
     /// Returns a reference to the internal vector.
-    fn as_vec<'a>(&'a self) -> &'a Vec<usize>;
+    fn as_vec(&self) -> &Vec<usize>;
 
     /// Returns a mutable reference to the internal vector.
-    fn as_vec_mut<'a>(&'a mut self) -> &'a mut Vec<usize>;
+    fn as_vec_mut(&mut self) -> &mut Vec<usize>;
 
     /// Returns `true` if the vector contains no elements.
     fn is_empty(&self) -> bool {
@@ -102,12 +102,12 @@ impl Subsupelements for Subelements {
     }
 
     /// Returns a reference to the internal vector. Use `.0` instead.
-    fn as_vec<'a>(&'a self) -> &'a Vec<usize> {
+    fn as_vec(&self) -> &Vec<usize> {
         &self.0
     }
 
     /// Returns a mutable reference to the internal vector. Use `.0` instead.
-    fn as_vec_mut<'a>(&'a mut self) -> &'a mut Vec<usize> {
+    fn as_vec_mut(&mut self) -> &mut Vec<usize> {
         &mut self.0
     }
 }
@@ -137,12 +137,12 @@ impl Subsupelements for Superelements {
     }
 
     /// Returns a reference to the internal vector. Use `.0` instead.
-    fn as_vec<'a>(&'a self) -> &'a Vec<usize> {
+    fn as_vec(&self) -> &Vec<usize> {
         &self.0
     }
 
     /// Returns a mutable reference to the internal vector. Use `.0` instead.
-    fn as_vec_mut<'a>(&'a mut self) -> &'a mut Vec<usize> {
+    fn as_vec_mut(&mut self) -> &mut Vec<usize> {
         &mut self.0
     }
 }

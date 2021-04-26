@@ -1,7 +1,5 @@
 //! Contains methods to generate many symmetry groups.
 
-
-
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     f64::consts::PI,
