@@ -847,8 +847,10 @@ mod tests {
         test(e6, 51840, 25920, &"E6");
     }
 
-    /// Tests the E7 symmetry group.
+    /// Tests the E7 symmetry group. This is very expensive, so we enable it 
+    /// only on release mode.
     #[test]
+    #[cfg(not(debug_assertions))]
     fn e7() {
         // In the future, we'll have better code for this, I hope.
         let e7 = Group::cox_group(CoxMatrix(Matrix::from_data(VecStorage::new(
