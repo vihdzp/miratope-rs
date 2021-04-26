@@ -1,14 +1,16 @@
-use derive_deref::{Deref, DerefMut};
-
 /// A `Vec` indexed by [rank](https://polytope.miraheze.org/wiki/Rank). Wraps
 /// around operations that offset by a constant for our own convenience.
-#[derive(Debug, Clone, Deref, DerefMut)]
+#[derive(Debug, Clone)]
 pub struct RankVec<T>(pub Vec<T>);
 
 impl<T> RankVec<T> {
     /// Constructs a new, empty `RankVec<T>`.
     pub fn new() -> Self {
         RankVec(Vec::new())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     /// Constructs a new, empty `RankVec<T>` with the capacity.
@@ -18,7 +20,11 @@ impl<T> RankVec<T> {
 
     /// Returns the greatest rank stored in the array.
     pub fn rank(&self) -> isize {
-        self.len() as isize - 2
+        self.0.len() as isize - 2
+    }
+
+    pub fn push(&mut self, value: T) {
+        self.0.push(value)
     }
 
     /// Returns a reference to the element at a given position or `None` if out
@@ -29,6 +35,22 @@ impl<T> RankVec<T> {
         } else {
             self.0.get((index + 1) as usize)
         }
+    }
+
+    pub fn last(&self) -> Option<&T> {
+        self.0.last()
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<T> {
+        self.0.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<T> {
+        self.0.iter_mut()
+    }
+
+    pub fn reverse(&mut self) {
+        self.0.reverse()
     }
 
     /// Divides one mutable slice into two at an index.

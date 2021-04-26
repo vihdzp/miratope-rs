@@ -5,9 +5,8 @@ use crate::geometry::Point;
 #[allow(unused_imports)]
 use crate::{cox, EPS};
 
-use super::{convex, cox::CoxMatrix,Concrete};
+use super::{convex, cox::CoxMatrix, Concrete};
 use approx::{abs_diff_ne, relative_eq};
-use derive_deref::Deref;
 use nalgebra::{
     storage::Storage, DMatrix as Matrix, DVector as Vector, Dim, Dynamic, Quaternion, VecStorage,
     U1,
@@ -424,7 +423,7 @@ type MatrixMN<R, C> = nalgebra::Matrix<f64, R, C, VecStorage<f64, R, C>>;
 /// A matrix ordered by fuzzy lexicographic ordering. Used to quickly
 /// determine whether an element in a [`GenIter`](GenIter) is a
 /// duplicate.
-#[derive(Clone, Debug, Deref)]
+#[derive(Clone, Debug)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct OrdMatrixMN<R: Dim, C: Dim>(pub MatrixMN<R, C>)
 where
@@ -485,6 +484,10 @@ where
 {
     pub fn new(mat: MatrixMN<R, C>) -> Self {
         Self(mat)
+    }
+
+    pub fn iter(&self) -> nalgebra::iter::MatrixIter<f64, R, C, VecStorage<f64, R, C>> {
+        self.0.iter()
     }
 }
 

@@ -29,7 +29,13 @@ use std::{
 
 use self::{group::OrdPoint, mesh_builder::MeshBuilder};
 
-use super::{Polytope,r#abstract::elements::Subsupelements, r#abstract::{flag::FlagIter, rank::RankVec}, r#abstract::elements::{Element, Subelements}, r#abstract::elements::ElementList};
+use super::{
+    r#abstract::elements::ElementList,
+    r#abstract::elements::Subsupelements,
+    r#abstract::elements::{Element, Subelements},
+    r#abstract::{flag::FlagIter, rank::RankVec},
+    Polytope,
+};
 
 #[derive(Debug, Clone)]
 /// Represents a [concrete polytope](https://polytope.miraheze.org/wiki/Polytope),
@@ -620,29 +626,30 @@ impl Concrete {
         let mut faces = abs[2].clone();
 
         let mut i = abs[1].len();
-        let mut new_edges = Vec::<Element>::new();
+        let mut new_edges = ElementList::new();
+
         for (idx, edge) in abs[1].0.iter_mut().enumerate() {
             let edge_sub = &mut edge.subs;
             let comps = edge_sub.len() / 2;
 
             if comps > 1 {
-                edge_sub.sort_by(|&i, &j| {
-                    OrdPoint::new(vertices[i].clone()).cmp(&OrdPoint::new(vertices[j].clone()))
-                });
+                edge_sub.sort_by_key(|&x| OrdPoint::new(vertices[x].clone()));
             }
 
             for comp in 1..comps {
-                let new_subs = Subelements::from_vec(edge_sub[2 * comp..2 * comp + 2].to_vec());
+                let new_subs = Subelements::from_vec(edge_sub.0[2 * comp..2 * comp + 2].to_vec());
                 new_edges.push(Element::from_subs(new_subs));
+
                 for face in faces.0.iter_mut() {
                     if face.subs.contains(&idx) {
                         face.subs.push(i);
                     }
                 }
+
                 i += 1;
             }
 
-            let new_subs = Subelements::from_vec(edge_sub[..2].to_vec());
+            let new_subs = Subelements::from_vec(edge_sub.0[..2].to_vec());
             *edge = Element::from_subs(new_subs);
         }
 

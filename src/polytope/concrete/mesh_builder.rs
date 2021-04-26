@@ -9,7 +9,10 @@ use lyon::math::point;
 use lyon::path::Path;
 use lyon::tessellation::*;
 
-use crate::{geometry::{Point, Subspace}, polytope::r#abstract::elements::ElementList};
+use crate::{
+    geometry::{Point, Subspace},
+    polytope::{r#abstract::elements::ElementList, r#abstract::elements::Subsupelements},
+};
 
 use super::Concrete;
 

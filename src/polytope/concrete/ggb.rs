@@ -5,7 +5,7 @@ use xml::{
 };
 use zip::read::ZipArchive;
 
-use crate::{Concrete, geometry::Point, polytope::Polytope};
+use crate::{geometry::Point, polytope::Polytope, Concrete};
 
 enum GgbErrors {
     MissingAttribute,

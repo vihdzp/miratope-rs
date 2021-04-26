@@ -1,10 +1,8 @@
-use crate::polytope::{COMPONENTS, ELEMENT_NAMES, r#abstract::elements::Subsupelements};
+use crate::polytope::{r#abstract::elements::Subsupelements, COMPONENTS, ELEMENT_NAMES};
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 use std::{collections::HashMap, io, path::Path, str::FromStr};
 
-use super::{
-    Abstract, Concrete, Element, ElementList, Point, Polytope, RankVec, Subelements, 
-};
+use super::{Abstract, Concrete, Element, ElementList, Point, Polytope, RankVec, Subelements};
 
 /// Gets the name for an element with a given rank.
 fn element_name(rank: isize) -> String {
@@ -382,7 +380,7 @@ fn write_faces(
 }
 
 /// Writes the n-elements of a polytope into an OFF file.
-fn write_els(off: &mut String, opt: &OffOptions, rank: isize, els: &[Element]) {
+fn write_els(off: &mut String, opt: &OffOptions, rank: isize, els: &ElementList) {
     // # n-elements
     if opt.comments {
         off.push_str("\n# ");
@@ -391,7 +389,7 @@ fn write_els(off: &mut String, opt: &OffOptions, rank: isize, els: &[Element]) {
     }
 
     // Adds the elements' indices.
-    for el in els {
+    for el in els.iter() {
         off.push_str(&el.subs.len().to_string());
 
         for &sub in &el.subs.0 {

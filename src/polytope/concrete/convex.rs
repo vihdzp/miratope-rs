@@ -1,12 +1,18 @@
-use crate::{polytope::{r#abstract::elements::Element, r#abstract::{Abstract, elements::ElementList}}, r#abstract::elements::Subelements};
 use crate::geometry::Subspace;
+use crate::{
+    polytope::{
+        r#abstract::elements::Element,
+        r#abstract::elements::Subsupelements,
+        r#abstract::{elements::ElementList, Abstract},
+    },
+    r#abstract::elements::Subelements,
+};
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
 };
 
-
-use crate::{EPS, geometry::Point};
+use crate::{geometry::Point, EPS};
 
 use nalgebra::DMatrix;
 use rand::Rng;
@@ -258,7 +264,7 @@ fn common(el0: &[usize], el1: &[usize]) -> Subelements {
 }
 
 /// Checks whether a given vertex set actually generates a valid d-polytope.
-fn check_subelement(vertices: &[Point], el: &[usize], rank: isize) -> bool {
+fn check_subelement(vertices: &[Point], el: &Subelements, rank: isize) -> bool {
     let rank = rank as usize;
 
     // A d-element must have at least d + 1 vertices.
@@ -316,7 +322,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
         for i in 0..(len - 1) {
             for j in (i + 1)..len {
                 // The intersection of the two elements.
-                let el = common(&els_verts[i].subs, &els_verts[j].subs);
+                let el = common(&els_verts[i].subs.0, &els_verts[j].subs.0);
 
                 // Checks that el actually has the correct rank.
                 if !check_subelement(&vertices, &el, r - 1) {

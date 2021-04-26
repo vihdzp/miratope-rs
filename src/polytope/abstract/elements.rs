@@ -1,13 +1,58 @@
 use std::collections::HashMap;
 
-use derive_deref::{Deref, DerefMut};
-
 use super::{rank::RankVec, Abstract};
 
 /// Common boilerplate code for subelements and superelements.
 pub trait Subsupelements: Sized {
     /// Builds a list of either subelements or superelements from a vector.
     fn from_vec(vec: Vec<usize>) -> Self;
+
+    fn as_vec<'a>(&'a self) -> &'a Vec<usize>;
+
+    fn as_vec_mut<'a>(&'a mut self) -> &'a mut Vec<usize>;
+
+    fn len(&self) -> usize {
+        self.as_vec().len()
+    }
+
+    fn iter(&self) -> std::slice::Iter<usize> {
+        self.as_vec().iter()
+    }
+
+    fn iter_mut(&mut self) -> std::slice::IterMut<usize> {
+        self.as_vec_mut().iter_mut()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.as_vec().is_empty()
+    }
+
+    fn sort_unstable(&mut self) {
+        self.as_vec_mut().sort_unstable()
+    }
+
+    fn sort_by<F>(&mut self, compare: F)
+    where
+        F: FnMut(&usize, &usize) -> std::cmp::Ordering,
+    {
+        self.as_vec_mut().sort_by(compare)
+    }
+
+    fn sort_by_key<K, F>(&mut self, f: F)
+    where
+        F: FnMut(&usize) -> K,
+        K: Ord,
+    {
+        self.as_vec_mut().sort_by_key(f)
+    }
+
+    fn push(&mut self, value: usize) {
+        self.as_vec_mut().push(value)
+    }
+
+    fn contains(&self, x: &usize) -> bool {
+        self.as_vec().contains(x)
+    }
 
     /// Constructs a new, empty subelement or superelement list.
     fn new() -> Self {
@@ -34,7 +79,7 @@ pub trait Subsupelements: Sized {
 }
 
 /// The indices of the subelements of a polytope.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Deref, DerefMut)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Subelements(pub Vec<usize>);
 
 impl Subsupelements for Subelements {
@@ -42,16 +87,60 @@ impl Subsupelements for Subelements {
     fn from_vec(vec: Vec<usize>) -> Self {
         Self(vec)
     }
+
+    fn as_vec<'a>(&'a self) -> &'a Vec<usize> {
+        &self.0
+    }
+
+    fn as_vec_mut<'a>(&'a mut self) -> &'a mut Vec<usize> {
+        &mut self.0
+    }
+}
+
+impl std::ops::Index<usize> for Subelements {
+    type Output = usize;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.as_vec()[index]
+    }
+}
+
+impl std::ops::IndexMut<usize> for Subelements {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.as_vec_mut()[index]
+    }
 }
 
 /// The indices of the superelements of a polytope.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Deref, DerefMut)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Superelements(pub Vec<usize>);
 
 impl Subsupelements for Superelements {
     /// Builds a list of superelements from a vector.
     fn from_vec(vec: Vec<usize>) -> Self {
         Self(vec)
+    }
+
+    fn as_vec<'a>(&'a self) -> &'a Vec<usize> {
+        &self.0
+    }
+
+    fn as_vec_mut<'a>(&'a mut self) -> &'a mut Vec<usize> {
+        &mut self.0
+    }
+}
+
+impl std::ops::Index<usize> for Superelements {
+    type Output = usize;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.as_vec()[index]
+    }
+}
+
+impl std::ops::IndexMut<usize> for Superelements {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.as_vec_mut()[index]
     }
 }
 
@@ -114,7 +203,7 @@ impl Element {
 
 /// A list of [`Elements`](Element) of the same
 /// [rank](https://polytope.miraheze.org/wiki/Rank).
-#[derive(Debug, Clone, Deref, DerefMut)]
+#[derive(Debug, Clone)]
 pub struct ElementList(pub Vec<Element>);
 
 impl ElementList {
@@ -126,6 +215,34 @@ impl ElementList {
     /// Initializes an empty element list with a given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
         ElementList(Vec::with_capacity(capacity))
+    }
+
+    pub fn append(&mut self, other: &mut ElementList) {
+        self.0.append(&mut other.0)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<Element> {
+        self.0.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<Element> {
+        self.0.iter_mut()
+    }
+
+    pub fn get(&self, idx: usize) -> Option<&Element> {
+        self.0.get(idx)
+    }
+
+    pub fn contains(&self, x: &Element) -> bool {
+        self.0.contains(x)
+    }
+
+    pub fn resize(&mut self, new_len: usize, value: Element) {
+        self.0.resize(new_len, value)
     }
 
     /// Returns an element list with a single, empty element. Often used as the
@@ -158,6 +275,10 @@ impl ElementList {
         els
     }
 
+    pub fn push(&mut self, value: Element) {
+        self.0.push(value)
+    }
+
     pub fn into_iter(self) -> std::vec::IntoIter<Element> {
         self.0.into_iter()
     }
@@ -173,7 +294,20 @@ impl IntoIterator for ElementList {
     }
 }
 
-#[derive(Deref, DerefMut)]
+impl std::ops::Index<usize> for ElementList {
+    type Output = Element;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl std::ops::IndexMut<usize> for ElementList {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
+
 /// As a byproduct of calculating either the vertices or the entire polytope
 /// corresponding to a given section, we generate a map from ranks and indices
 /// in the original polytope to ranks and indices in the section. This struct
@@ -181,6 +315,10 @@ impl IntoIterator for ElementList {
 pub struct ElementHash(RankVec<HashMap<usize, usize>>);
 
 impl ElementHash {
+    pub fn get(&self, idx: isize) -> Option<&HashMap<usize, usize>> {
+        self.0.get(idx)
+    }
+
     /// Returns a map from elements on the polytope to elements in an element.
     /// If the element doesn't exist, we return `None`.
     pub fn from_element(poly: &Abstract, rank: isize, idx: usize) -> Option<Self> {
@@ -229,12 +367,12 @@ impl ElementHash {
 
     /// Gets the indices of the vertices of a given element in a polytope.
     pub fn to_polytope(&self, poly: &Abstract) -> Abstract {
-        let rank = self.rank();
+        let rank = self.0.rank();
         let mut abs = Abstract::with_capacity(rank);
 
         for r in -1..=rank {
             let mut elements = ElementList::new();
-            let hash = &self[r];
+            let hash = &self.0[r];
 
             for _ in 0..hash.len() {
                 elements.push(Element::new());

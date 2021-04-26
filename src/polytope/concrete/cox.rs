@@ -1,4 +1,3 @@
-use derive_deref::{Deref, DerefMut};
 use nalgebra::DMatrix as Matrix;
 use std::mem;
 
@@ -6,7 +5,6 @@ use std::mem;
 /// matrix](https://en.wikipedia.org/wiki/Coxeter_group#Coxeter_matrix_and_Schl%C3%A4fli_matrix),
 /// which encodes the angles between the mirrors of the generators of a Coxeter
 /// group.
-#[derive(Deref, DerefMut)]
 pub struct CoxMatrix(pub Matrix<f64>);
 
 impl CoxMatrix {
@@ -25,6 +23,22 @@ impl CoxMatrix {
                 _ => 2.0,
             }
         }))
+    }
+
+    pub fn nrows(&self) -> usize {
+        self.0.nrows()
+    }
+
+    pub fn ncols(&self) -> usize {
+        self.0.ncols()
+    }
+}
+
+impl std::ops::Index<(usize, usize)> for CoxMatrix {
+    type Output = f64;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        &self.0[index]
     }
 }
 

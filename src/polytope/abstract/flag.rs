@@ -125,7 +125,7 @@ impl Flag {
         // above and the superelements of the element below.
         let below = polytope.get_element(r - 1, self[r - 1]).unwrap();
         let above = polytope.get_element(r + 1, self[r + 1]).unwrap();
-        let common = common(&below.sups, &above.subs);
+        let common = common(&below.sups.0, &above.subs.0);
 
         assert_eq!(
             common.len(),
