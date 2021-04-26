@@ -1,20 +1,16 @@
 use std::collections::HashMap;
 
-use bevy::{
-    prelude::Mesh,
-    render::{mesh::Indices, pipeline::PrimitiveTopology},
-};
-
-use lyon::math::point;
-use lyon::path::Path;
-use lyon::tessellation::*;
-
+use super::Concrete;
 use crate::{
     geometry::{Point, Subspace},
     polytope::{r#abstract::elements::ElementList, r#abstract::elements::Subsupelements},
 };
 
-use super::Concrete;
+use bevy::{
+    prelude::Mesh,
+    render::{mesh::Indices, pipeline::PrimitiveTopology},
+};
+use lyon::{math::point, path::Path, tessellation::*};
 
 #[derive(Clone, Copy)]
 /// Represents a set of at most two elements.

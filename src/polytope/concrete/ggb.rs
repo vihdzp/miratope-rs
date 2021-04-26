@@ -1,11 +1,12 @@
 use std::io::{self, Read};
+
+use crate::{geometry::Point, polytope::Polytope, Concrete};
+
 use xml::{
     attribute::OwnedAttribute,
     reader::{EventReader, Events, XmlEvent},
 };
 use zip::read::ZipArchive;
-
-use crate::{geometry::Point, polytope::Polytope, Concrete};
 
 enum GgbErrors {
     MissingAttribute,

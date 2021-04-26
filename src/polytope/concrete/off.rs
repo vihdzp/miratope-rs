@@ -1,8 +1,11 @@
-use crate::polytope::{r#abstract::elements::Subsupelements, COMPONENTS, ELEMENT_NAMES};
-use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
+
 use std::{collections::HashMap, io, path::Path, str::FromStr};
 
+use crate::polytope::{r#abstract::elements::Subsupelements, COMPONENTS, ELEMENT_NAMES};
 use super::{Abstract, Concrete, Element, ElementList, Point, Polytope, RankVec, Subelements};
+
+use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
+
 
 /// Gets the name for an element with a given rank.
 fn element_name(rank: isize) -> String {
@@ -128,7 +131,7 @@ fn parse_edges_and_faces<'a>(
                 face_verts[i],
                 face_verts[(i + 1) % face_sub_num],
             ]));
-            edge.subs.sort_unstable();
+            edge.subs.sort();
 
             if let Some(idx) = hash_edges.get(&edge) {
                 face.subs.push(*idx);

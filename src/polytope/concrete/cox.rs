@@ -1,11 +1,12 @@
-use nalgebra::DMatrix as Matrix;
+use crate::geometry::Matrix;
+
 use std::mem;
 
 /// Represents a [Coxeter
 /// matrix](https://en.wikipedia.org/wiki/Coxeter_group#Coxeter_matrix_and_Schl%C3%A4fli_matrix),
 /// which encodes the angles between the mirrors of the generators of a Coxeter
 /// group.
-pub struct CoxMatrix(pub Matrix<f64>);
+pub struct CoxMatrix(pub Matrix);
 
 impl CoxMatrix {
     pub fn from_lin_diagram(diagram: Vec<f64>) -> Self {

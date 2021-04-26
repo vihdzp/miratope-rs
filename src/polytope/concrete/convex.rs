@@ -405,7 +405,7 @@ pub fn convex_hull(mut vertices: Vec<Point>) -> Concrete {
 
         let mut facet = Element::from_subs(Subelements(old_ridge.vertices.clone()));
         facet.subs.push(new_vertex);
-        facet.subs.sort_unstable();
+        facet.subs.sort();
 
         // We skip the facet if it isn't new.
         if facets.contains(&facet) {

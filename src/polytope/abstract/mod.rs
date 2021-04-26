@@ -1,20 +1,15 @@
-use elements::{Subelements, Subsupelements};
-
-use crate::r#abstract::elements::ElementHash;
 use std::collections::HashMap;
 
+use self::{
+    elements::{Element, ElementHash, ElementList, Subelements, Subsupelements},
+    flag::{FlagEvent, FlagIter},
+    rank::RankVec,
+};
+use super::Polytope;
 use crate::lang::{
     name::{Abs, NameType},
     Name,
 };
-
-use self::{
-    elements::{Element, ElementList},
-    flag::{FlagEvent, FlagIter},
-    rank::RankVec,
-};
-
-use super::Polytope;
 
 pub mod elements;
 pub mod flag;

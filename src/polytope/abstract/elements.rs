@@ -7,49 +7,62 @@ pub trait Subsupelements: Sized {
     /// Builds a list of either subelements or superelements from a vector.
     fn from_vec(vec: Vec<usize>) -> Self;
 
+    /// Returns a reference to the internal vector.
     fn as_vec<'a>(&'a self) -> &'a Vec<usize>;
 
+    /// Returns a mutable reference to the internal vector.
     fn as_vec_mut<'a>(&'a mut self) -> &'a mut Vec<usize>;
 
-    fn len(&self) -> usize {
-        self.as_vec().len()
-    }
-
-    fn iter(&self) -> std::slice::Iter<usize> {
-        self.as_vec().iter()
-    }
-
-    fn iter_mut(&mut self) -> std::slice::IterMut<usize> {
-        self.as_vec_mut().iter_mut()
-    }
-
+    /// Returns `true` if the vector contains no elements.
     fn is_empty(&self) -> bool {
         self.as_vec().is_empty()
     }
 
-    fn sort_unstable(&mut self) {
+    /// Returns the number of indices stored.
+    fn len(&self) -> usize {
+        self.as_vec().len()
+    }
+
+    /// Returns an iterator over the element indices.
+    fn iter(&self) -> std::slice::Iter<usize> {
+        self.as_vec().iter()
+    }
+
+    /// Returns an iterator that allows modifying each index.
+    fn iter_mut(&mut self) -> std::slice::IterMut<usize> {
+        self.as_vec_mut().iter_mut()
+    }
+
+    /// Sorts the indices.
+    fn sort(&mut self) {
         self.as_vec_mut().sort_unstable()
     }
 
+    /// Sorts the indices by a specified comparison function.
     fn sort_by<F>(&mut self, compare: F)
     where
         F: FnMut(&usize, &usize) -> std::cmp::Ordering,
     {
-        self.as_vec_mut().sort_by(compare)
+        self.as_vec_mut().sort_unstable_by(compare)
     }
 
-    fn sort_by_key<K, F>(&mut self, f: F)
+    /// Sorts the indices with a key extraction function. The sorting is
+    /// unstable.
+    fn sort_unstable_by_key<K, F>(&mut self, f: F)
     where
         F: FnMut(&usize) -> K,
         K: Ord,
     {
-        self.as_vec_mut().sort_by_key(f)
+        self.as_vec_mut().sort_unstable_by_key(f)
     }
 
+    /// Appends an index to the back of the list of indices.
     fn push(&mut self, value: usize) {
         self.as_vec_mut().push(value)
     }
 
+    /// Returns `true` if the list of indices contains an index with the given
+    /// value.
     fn contains(&self, x: &usize) -> bool {
         self.as_vec().contains(x)
     }
@@ -59,14 +72,14 @@ pub trait Subsupelements: Sized {
         Self::from_vec(Vec::new())
     }
 
-    /// Constructs a new, empty subelement list with the capacity to store
-    /// elements up to the specified rank.
-    fn with_capacity(rank: usize) -> Self {
-        Self::from_vec(Vec::with_capacity(rank))
+    /// Constructs a new, empty subelement or superelement list with the
+    /// capacity to store a given amount of indices.
+    fn with_capacity(capacity: usize) -> Self {
+        Self::from_vec(Vec::with_capacity(capacity))
     }
 
-    /// Constructs a subelement list consisting of the indices from `0` to
-    /// `count`.
+    /// Constructs a subelement or superelement list consisting of the indices
+    /// from `0` to `count`.
     fn count(count: usize) -> Self {
         let mut vec = Vec::new();
 
@@ -88,10 +101,12 @@ impl Subsupelements for Subelements {
         Self(vec)
     }
 
+    /// Returns a reference to the internal vector. Use `.0` instead.
     fn as_vec<'a>(&'a self) -> &'a Vec<usize> {
         &self.0
     }
 
+    /// Returns a mutable reference to the internal vector. Use `.0` instead.
     fn as_vec_mut<'a>(&'a mut self) -> &'a mut Vec<usize> {
         &mut self.0
     }
@@ -121,10 +136,12 @@ impl Subsupelements for Superelements {
         Self(vec)
     }
 
+    /// Returns a reference to the internal vector. Use `.0` instead.
     fn as_vec<'a>(&'a self) -> &'a Vec<usize> {
         &self.0
     }
 
+    /// Returns a mutable reference to the internal vector. Use `.0` instead.
     fn as_vec_mut<'a>(&'a mut self) -> &'a mut Vec<usize> {
         &mut self.0
     }
@@ -194,10 +211,10 @@ impl Element {
         std::mem::swap(&mut self.subs.0, &mut self.sups.0)
     }
 
-    /// Sorts the subelements and superelements by index.
+    /// Sorts both the subelements and superelements by index.
     pub fn sort(&mut self) {
-        self.subs.sort_unstable();
-        self.sups.sort_unstable();
+        self.subs.sort();
+        self.sups.sort();
     }
 }
 
@@ -217,18 +234,22 @@ impl ElementList {
         ElementList(Vec::with_capacity(capacity))
     }
 
+    /// Moves all the elements of `other` into `Self`, leaving `other` empty.
     pub fn append(&mut self, other: &mut ElementList) {
         self.0.append(&mut other.0)
     }
 
+    /// Returns the number of elements in the element list.
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    /// Returns an iterator over the element list.
     pub fn iter(&self) -> std::slice::Iter<Element> {
         self.0.iter()
     }
 
+    /// Returns an iterator that allows modifying each value.
     pub fn iter_mut(&mut self) -> std::slice::IterMut<Element> {
         self.0.iter_mut()
     }

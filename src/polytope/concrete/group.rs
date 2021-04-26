@@ -1,19 +1,21 @@
 //! Contains methods to generate many symmetry groups.
 
-use crate::geometry::Point;
-// Circumvents rust-analyzer bug.
-#[allow(unused_imports)]
-use crate::{cox, EPS};
 
+
+use std::{
+    collections::{BTreeMap, BTreeSet, VecDeque},
+    f64::consts::PI,
+};
+
+// Circumvents rust-analyzer bug.
 use super::{convex, cox::CoxMatrix, Concrete};
+#[allow(unused_imports)]
+use crate::{cox, geometry::Point, EPS};
+
 use approx::{abs_diff_ne, relative_eq};
 use nalgebra::{
     storage::Storage, DMatrix as Matrix, DVector as Vector, Dim, Dynamic, Quaternion, VecStorage,
     U1,
-};
-use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
-    f64::consts::PI,
 };
 
 /// Converts a 3D rotation matrix into a quaternion. Uses the code from

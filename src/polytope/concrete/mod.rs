@@ -6,36 +6,35 @@ pub mod group;
 pub mod mesh_builder;
 pub mod off;
 
-use crate::geometry::{Hyperplane, Point, Segment, Subspace};
-use crate::{
-    geometry::{Hypersphere, Matrix},
-    r#abstract::{flag::FlagEvent, Abstract},
+use std::{
+    collections::HashMap,
+    f64::{
+        self,
+        consts::{SQRT_2, TAU},
+    },
+};
+
+use self::{group::OrdPoint, mesh_builder::MeshBuilder};
+use super::{
+    r#abstract::{
+        elements::{Element, ElementList, Subelements, Subsupelements},
+        flag::FlagIter,
+        rank::RankVec,
+    },
+    Polytope,
 };
 use crate::{
+    geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace},
     lang::{
         name::{Con, NameType},
         Name,
     },
+    r#abstract::{flag::FlagEvent, Abstract},
     EPS,
 };
 
 use approx::{abs_diff_eq, abs_diff_ne};
 use bevy::prelude::Mesh;
-use core::f64;
-use std::{
-    collections::HashMap,
-    f64::consts::{SQRT_2, TAU},
-};
-
-use self::{group::OrdPoint, mesh_builder::MeshBuilder};
-
-use super::{
-    r#abstract::elements::ElementList,
-    r#abstract::elements::Subsupelements,
-    r#abstract::elements::{Element, Subelements},
-    r#abstract::{flag::FlagIter, rank::RankVec},
-    Polytope,
-};
 
 #[derive(Debug, Clone)]
 /// Represents a [concrete polytope](https://polytope.miraheze.org/wiki/Polytope),
@@ -633,7 +632,7 @@ impl Concrete {
             let comps = edge_sub.len() / 2;
 
             if comps > 1 {
-                edge_sub.sort_by_key(|&x| OrdPoint::new(vertices[x].clone()));
+                edge_sub.sort_unstable_by_key(|&x| OrdPoint::new(vertices[x].clone()));
             }
 
             for comp in 1..comps {

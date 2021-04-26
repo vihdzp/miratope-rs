@@ -1,11 +1,11 @@
 use std::{
-    collections::{hash_map::Entry, VecDeque},
+    cmp::Ordering,
+    collections::{hash_map::Entry, HashMap, VecDeque},
     hash::{Hash, Hasher},
 };
 
-use std::{cmp::Ordering, collections::HashMap};
-
 use super::Abstract;
+
 #[derive(Clone, Copy, Debug, Hash, PartialEq)]
 pub enum Orientation {
     /// A flag of even orientation.

@@ -1,10 +1,7 @@
 use std::collections::BTreeSet;
 use std::f64::NEG_INFINITY;
 
-use super::{
-    Concrete, 
-};
-use derive_deref::{Deref, DerefMut};
+use super::Concrete;
 use petgraph::{graph::NodeIndex, Directed, Direction, Graph};
 
 /// An entry in the priority queue used in Shell.
