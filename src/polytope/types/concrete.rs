@@ -610,16 +610,17 @@ impl Concrete {
         let mut faces = abs[2].clone();
 
         let mut i = abs[1].len();
-        let mut idx = 0;
         let mut new_edges = Vec::<Element>::new();
-        for edge in abs[1].0.iter_mut() {
+        for (idx, edge) in abs[1].0.iter_mut().enumerate() {
             let edge_sub = &mut edge.subs;
             let comps = edge_sub.len() / 2;
+
             if comps > 1 {
                 edge_sub.sort_by(|&i, &j| {
                     OrdPoint::new(vertices[i].clone()).cmp(&OrdPoint::new(vertices[j].clone()))
                 });
             }
+
             for comp in 1..comps {
                 let new_subs = Subelements::from_vec(edge_sub[2 * comp..2 * comp + 2].to_vec());
                 new_edges.push(Element::from_subs(new_subs));
@@ -630,10 +631,11 @@ impl Concrete {
                 }
                 i += 1;
             }
+
             let new_subs = Subelements::from_vec(edge_sub[..2].to_vec());
             *edge = Element::from_subs(new_subs);
-            idx += 1;
         }
+
         abs[1].append(&mut new_edges);
         abs[2] = faces;
 
