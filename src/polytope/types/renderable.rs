@@ -138,7 +138,7 @@ impl VertexLoop {
         }
 
         if cycle.len() != self.len() {
-            println!("This won't yet work properly for compounds :(");
+            // println!("This won't yet work properly for compounds :(");
         }
 
         Some(Cycle(cycle))

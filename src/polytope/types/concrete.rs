@@ -6,6 +6,7 @@ use crate::{
     polytope::{
         flag::{FlagEvent, FlagIter},
         geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace},
+        group::OrdPoint,
         rank::RankVec,
         Abstract, Element, ElementList, MeshBuilder, Polytope, Subelements, Subsupelements,
     },
@@ -605,8 +606,6 @@ impl Concrete {
         let facet_count = abs.ranks.last().unwrap().len();
         abs.push(ElementList::max(facet_count));
 
-        println!("{}", abs.ranks.len());
-
         // Splits compounds of dyads.
         let mut faces = abs[2].clone();
 
@@ -614,8 +613,11 @@ impl Concrete {
         let mut idx = 0;
         let mut new_edges = Vec::<Element>::new();
         for edge in abs[1].0.iter_mut() {
-            let edge_sub = &edge.subs;
+            let edge_sub = &mut edge.subs;
             let comps = edge_sub.len() / 2;
+            if comps > 1 {
+                edge_sub.sort_by(|&i, &j| OrdPoint::new(vertices[i].clone()).cmp(&OrdPoint::new(vertices[j].clone())));
+            }
             for comp in 1..comps {
                 let new_subs = Subelements::from_vec(edge_sub[2*comp..2*comp+2].to_vec());
                 new_edges.push(Element::from_subs(new_subs));
@@ -628,13 +630,11 @@ impl Concrete {
             }
             let new_subs = Subelements::from_vec(edge_sub[..2].to_vec());
             *edge = Element::from_subs(new_subs);
-            println!("{} {}", edge.subs[0], edge.subs[1]);
             idx += 1;
         }
         abs[1].append(&mut new_edges);
         abs[2] = faces;
 
-        dbg!(&abs);
         let mut abs2 = Abstract::new();
         for r in abs {
             abs2.push_subs(r);

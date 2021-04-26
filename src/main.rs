@@ -95,8 +95,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::star_polygon(5,2).prism();
-    //let poly = Concrete::from_path(&"F:/aaa/polytope stuff/off/3D/4. Nonconvex uniform solids/Small stellated truncated dodecahedron.off").unwrap();
+    let poly = Concrete::duoprism(&Concrete::star_polygon(5,2), &Concrete::star_polygon(5,2));
 
     // Disables backface culling.
     pipelines.set_untracked(
@@ -127,7 +126,7 @@ fn setup(
             mesh: meshes.add(poly.get_mesh()),
             material: materials.add(Color::rgb(0.93, 0.5, 0.93).into()),
             visible: Visible {
-                is_visible: true,
+                is_visible: false,
                 ..Default::default()
             },
             ..Default::default()

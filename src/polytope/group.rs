@@ -488,7 +488,7 @@ where
 }
 
 type OrdMatrix = OrdMatrixMN<Dynamic, Dynamic>;
-type OrdPoint = OrdMatrixMN<Dynamic, U1>;
+pub type OrdPoint = OrdMatrixMN<Dynamic, U1>;
 
 /// An iterator for a `Group` [generated](https://en.wikipedia.org/wiki/Generator_(mathematics))
 /// by a set of floating point matrices. Its elements are built in a BFS order.
