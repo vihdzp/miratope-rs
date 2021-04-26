@@ -95,7 +95,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::duoprism(&Concrete::star_polygon(5,2), &Concrete::star_polygon(5,2));
+    let poly = Concrete::duoprism(&Concrete::star_polygon(5, 2), &Concrete::star_polygon(5, 2));
 
     // Disables backface culling.
     pipelines.set_untracked(

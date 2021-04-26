@@ -616,10 +616,12 @@ impl Concrete {
             let edge_sub = &mut edge.subs;
             let comps = edge_sub.len() / 2;
             if comps > 1 {
-                edge_sub.sort_by(|&i, &j| OrdPoint::new(vertices[i].clone()).cmp(&OrdPoint::new(vertices[j].clone())));
+                edge_sub.sort_by(|&i, &j| {
+                    OrdPoint::new(vertices[i].clone()).cmp(&OrdPoint::new(vertices[j].clone()))
+                });
             }
             for comp in 1..comps {
-                let new_subs = Subelements::from_vec(edge_sub[2*comp..2*comp+2].to_vec());
+                let new_subs = Subelements::from_vec(edge_sub[2 * comp..2 * comp + 2].to_vec());
                 new_edges.push(Element::from_subs(new_subs));
                 for face in faces.0.iter_mut() {
                     if face.subs.contains(&idx) {

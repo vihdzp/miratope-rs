@@ -481,7 +481,6 @@ impl ElementList {
     }
 }
 
-
 impl IntoIterator for ElementList {
     type Item = Element;
 
