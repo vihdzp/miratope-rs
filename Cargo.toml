@@ -14,6 +14,7 @@ factorial = "0.2"
 gcd = "2.0"
 itertools = "0.10"
 nalgebra = {version = "0.26", features = ["serde-serialize", "rand"]}
+native-dialog = "0.5"
 float-ord = "0.3"
 petgraph = "0.5"
 rand = "0.8"

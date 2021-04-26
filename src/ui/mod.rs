@@ -10,6 +10,7 @@ use crate::{
 
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
+use native_dialog::FileDialog;
 
 /// Stores whether the cross-section view is active.
 pub struct CrossSectionActive(pub bool);
@@ -55,7 +56,38 @@ pub fn ui(
     egui::TopPanel::top("top_panel").show(ctx, |ui| {
         egui::menu::bar(ui, |ui| {
             egui::menu::menu(ui, "File", |ui| {
-                if ui.button("Quit").clicked() {
+                // Loads a file.
+                if ui.button("Load").clicked() {
+                    let path = FileDialog::new()
+                        .add_filter("OFF File", &["off"])
+                        .add_filter("GGB file", &["ggb"])
+                        .show_open_single_file()
+                        .unwrap();
+
+                    if let Some(path) = path {
+                        for mut p in query.iter_mut() {
+                            *p = Concrete::from_path(&path).unwrap();
+                        }
+                    }
+                }
+
+                // Saves a file.
+                if ui.button("Save").clicked() {
+                    let path = FileDialog::new()
+                        .add_filter("OFF File", &["off"])
+                        .add_filter("GGB file", &["ggb"])
+                        .show_save_single_file()
+                        .unwrap();
+
+                    if let Some(path) = path {
+                        for p in query.iter_mut() {
+                            std::fs::write(path.clone(), p.to_off(OffOptions::default())).unwrap();
+                        }
+                    }
+                }
+
+                // Quits the application.
+                if ui.button("Exit").clicked() {
                     std::process::exit(0);
                 }
             });
