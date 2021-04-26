@@ -1,26 +1,22 @@
 //! Contains methods to generate many symmetry groups.
 
-use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
-    f64::consts::PI,
-};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-// Circumvents rust-analyzer bug.
 use super::{convex, cox::CoxMatrix, Concrete};
-#[allow(unused_imports)]
-use crate::{cox, geometry::Point, EPS};
+
+#[allow(unused_imports)] // Circumvents rust-analyzer bug.
+use crate::cox;
+use crate::geometry::{Matrix, Point, Vector};
+use crate::{Epsilon, Float};
 
 use approx::{abs_diff_ne, relative_eq};
-use nalgebra::{
-    storage::Storage, DMatrix as Matrix, DVector as Vector, Dim, Dynamic, Quaternion, VecStorage,
-    U1,
-};
+use nalgebra::{storage::Storage, Dim, Dynamic, Quaternion, VecStorage, U1};
 
 /// Converts a 3D rotation matrix into a quaternion. Uses the code from
 /// [Day (2015)](https://d3cw3dd2w32x2b.cloudfront.net/wp-content/uploads/2015/01/matrix-to-quat.pdf).
-fn mat_to_quat(mat: Matrix<f64>) -> Quaternion<f64> {
+fn mat_to_quat(mat: Matrix) -> Quaternion<Float> {
     debug_assert!(
-        relative_eq!(mat.determinant(), 1.0, epsilon = EPS),
+        relative_eq!(mat.determinant(), 1.0, epsilon = Float::EPS),
         "Only matrices with determinant 1 can be turned into quaternions."
     );
 
@@ -68,7 +64,7 @@ fn mat_to_quat(mat: Matrix<f64>) -> Quaternion<f64> {
 
 /// Converts a quaternion into a matrix, depending on whether it's a left or
 /// right quaternion multiplication.
-fn quat_to_mat(q: Quaternion<f64>, left: bool) -> Matrix<f64> {
+fn quat_to_mat(q: Quaternion<Float>, left: bool) -> Matrix {
     let size = Dynamic::new(4);
     let left = if left { 1.0 } else { -1.0 };
 
@@ -98,7 +94,7 @@ fn quat_to_mat(q: Quaternion<f64>, left: bool) -> Matrix<f64> {
 
 /// Computes the [direct sum](https://en.wikipedia.org/wiki/Block_matrix#Direct_sum)
 /// of two matrices.
-fn direct_sum(mat1: Matrix<f64>, mat2: Matrix<f64>) -> Matrix<f64> {
+fn direct_sum(mat1: Matrix, mat2: Matrix) -> Matrix {
     let dim1 = mat1.nrows();
     let dim = dim1 + mat2.nrows();
 
@@ -119,8 +115,8 @@ fn direct_sum(mat1: Matrix<f64>, mat2: Matrix<f64>) -> Matrix<f64> {
 
 /// An iterator such that `dyn` objects using it can be cloned. Used to get
 /// around orphan rules.
-trait GroupIter: Iterator<Item = Matrix<f64>> + dyn_clone::DynClone {}
-impl<T: Iterator<Item = Matrix<f64>> + dyn_clone::DynClone> GroupIter for T {}
+trait GroupIter: Iterator<Item = Matrix> + dyn_clone::DynClone {}
+impl<T: Iterator<Item = Matrix> + dyn_clone::DynClone> GroupIter for T {}
 dyn_clone::clone_trait_object!(GroupIter);
 
 /// A [group](https://en.wikipedia.org/wiki/Group_(mathematics)) of matrices,
@@ -136,7 +132,7 @@ pub struct Group {
 }
 
 impl Iterator for Group {
-    type Item = Matrix<f64>;
+    type Item = Matrix;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next()
@@ -145,7 +141,7 @@ impl Iterator for Group {
 
 impl Group {
     /// Gets all of the elements of the group. Consumes the iterator.
-    pub fn elements(self) -> Vec<Matrix<f64>> {
+    pub fn elements(self) -> Vec<Matrix> {
         self.collect()
     }
 
@@ -154,7 +150,7 @@ impl Group {
         self.count()
     }
 
-    pub fn from_gens(dim: usize, gens: Vec<Matrix<f64>>) -> Self {
+    pub fn from_gens(dim: usize, gens: Vec<Matrix>) -> Self {
         Self {
             dim,
             iter: Box::new(GenIter::new(dim, gens)),
@@ -251,7 +247,7 @@ impl Group {
 
     /// Generates a step prism group from a base group and a homomorphism into
     /// another group.
-    pub fn step(g: Self, f: impl Fn(Matrix<f64>) -> Matrix<f64> + Clone + 'static) -> Self {
+    pub fn step(g: Self, f: impl Fn(Matrix) -> Matrix + Clone + 'static) -> Self {
         let dim = g.dim * 2;
 
         Self {
@@ -278,7 +274,7 @@ impl Group {
         g: Self,
         h: Self,
         dim: usize,
-        product: (impl Fn((Matrix<f64>, Matrix<f64>)) -> Matrix<f64> + Clone + 'static),
+        product: (impl Fn((Matrix, Matrix)) -> Matrix + Clone + 'static),
     ) -> Self {
         Self {
             dim,
@@ -393,8 +389,8 @@ impl Group {
     }
 }
 
-impl From<Vec<Matrix<f64>>> for Group {
-    fn from(elements: Vec<Matrix<f64>>) -> Self {
+impl From<Vec<Matrix>> for Group {
+    fn from(elements: Vec<Matrix>) -> Self {
         Self {
             dim: elements
                 .get(0)
@@ -414,11 +410,11 @@ pub enum GroupNext {
     Repeat,
 
     /// We found a new element.
-    New(Matrix<f64>),
+    New(Matrix),
 }
 
 #[allow(clippy::upper_case_acronyms)]
-type MatrixMN<R, C> = nalgebra::Matrix<f64, R, C, VecStorage<f64, R, C>>;
+type MatrixMN<R, C> = nalgebra::Matrix<Float, R, C, VecStorage<Float, R, C>>;
 
 /// A matrix ordered by fuzzy lexicographic ordering. Used to quickly
 /// determine whether an element in a [`GenIter`](GenIter) is a
@@ -427,11 +423,11 @@ type MatrixMN<R, C> = nalgebra::Matrix<f64, R, C, VecStorage<f64, R, C>>;
 #[allow(clippy::upper_case_acronyms)]
 pub struct OrdMatrixMN<R: Dim, C: Dim>(pub MatrixMN<R, C>)
 where
-    VecStorage<f64, R, C>: Storage<f64, R, C>;
+    VecStorage<Float, R, C>: Storage<Float, R, C>;
 
 impl<R: Dim, C: Dim> PartialEq for OrdMatrixMN<R, C>
 where
-    VecStorage<f64, R, C>: Storage<f64, R, C>,
+    VecStorage<Float, R, C>: Storage<Float, R, C>,
 {
     fn eq(&self, other: &Self) -> bool {
         let mut other = other.iter();
@@ -439,7 +435,7 @@ where
         for x in self.iter() {
             let y = other.next().unwrap();
 
-            if abs_diff_ne!(x, y, epsilon = EPS) {
+            if abs_diff_ne!(x, y, epsilon = Float::EPS) {
                 return false;
             }
         }
@@ -448,11 +444,11 @@ where
     }
 }
 
-impl<R: Dim, C: Dim> Eq for OrdMatrixMN<R, C> where VecStorage<f64, R, C>: Storage<f64, R, C> {}
+impl<R: Dim, C: Dim> Eq for OrdMatrixMN<R, C> where VecStorage<Float, R, C>: Storage<Float, R, C> {}
 
 impl<R: Dim, C: Dim> PartialOrd for OrdMatrixMN<R, C>
 where
-    VecStorage<f64, R, C>: Storage<f64, R, C>,
+    VecStorage<Float, R, C>: Storage<Float, R, C>,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         let mut other = other.iter();
@@ -460,7 +456,7 @@ where
         for x in self.iter() {
             let y = other.next().unwrap();
 
-            if abs_diff_ne!(x, y, epsilon = EPS) {
+            if abs_diff_ne!(x, y, epsilon = Float::EPS) {
                 return x.partial_cmp(y);
             }
         }
@@ -471,7 +467,7 @@ where
 
 impl<R: Dim, C: Dim> Ord for OrdMatrixMN<R, C>
 where
-    VecStorage<f64, R, C>: Storage<f64, R, C>,
+    VecStorage<Float, R, C>: Storage<Float, R, C>,
 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other).unwrap()
@@ -480,13 +476,13 @@ where
 
 impl<R: Dim, C: Dim> OrdMatrixMN<R, C>
 where
-    VecStorage<f64, R, C>: Storage<f64, R, C>,
+    VecStorage<Float, R, C>: Storage<Float, R, C>,
 {
     pub fn new(mat: MatrixMN<R, C>) -> Self {
         Self(mat)
     }
 
-    pub fn iter(&self) -> nalgebra::iter::MatrixIter<f64, R, C, VecStorage<f64, R, C>> {
+    pub fn iter(&self) -> nalgebra::iter::MatrixIter<Float, R, C, VecStorage<Float, R, C>> {
         self.0.iter()
     }
 }
@@ -504,7 +500,7 @@ pub struct GenIter {
     pub dim: usize,
 
     /// The generators for the group.
-    pub gens: Vec<Matrix<f64>>,
+    pub gens: Vec<Matrix>,
 
     /// Stores the elements that have been generated and that can still be
     /// generated again. Is integral for the algorithm to work, as without it,
@@ -522,7 +518,7 @@ pub struct GenIter {
 }
 
 impl Iterator for GenIter {
-    type Item = Matrix<f64>;
+    type Item = Matrix;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -536,14 +532,14 @@ impl Iterator for GenIter {
 }
 
 /// Determines whether two matrices are "approximately equal" elementwise.
-fn matrix_approx(mat1: &Matrix<f64>, mat2: &Matrix<f64>) -> bool {
+fn matrix_approx(mat1: &Matrix, mat2: &Matrix) -> bool {
     let mat1 = mat1.iter();
     let mut mat2 = mat2.iter();
 
     for x in mat1 {
         let y = mat2.next().expect("Matrices don't have the same size!");
 
-        if abs_diff_ne!(x, y, epsilon = EPS) {
+        if abs_diff_ne!(x, y, epsilon = Float::EPS) {
             return false;
         }
     }
@@ -552,7 +548,7 @@ fn matrix_approx(mat1: &Matrix<f64>, mat2: &Matrix<f64>) -> bool {
 }
 
 /// Builds a reflection matrix from a given vector.
-pub fn refl_mat(n: Vector<f64>) -> Matrix<f64> {
+pub fn refl_mat(n: Vector) -> Matrix {
     let dim = n.nrows();
     let nn = n.norm_squared();
 
@@ -567,7 +563,7 @@ pub fn refl_mat(n: Vector<f64>) -> Matrix<f64> {
 
 impl GenIter {
     /// Builds a new group from a set of generators.
-    fn new(dim: usize, gens: Vec<Matrix<f64>>) -> Self {
+    fn new(dim: usize, gens: Vec<Matrix>) -> Self {
         // Initializes the queue with only the identity matrix.
         let mut queue = VecDeque::new();
         queue.push_back(OrdMatrix::new(Matrix::identity(dim, dim)));
@@ -588,7 +584,7 @@ impl GenIter {
     }
 
     /// Inserts a new element into the group. Returns whether the element is new.
-    fn insert(&mut self, el: Matrix<f64>) -> bool {
+    fn insert(&mut self, el: Matrix) -> bool {
         let el = OrdMatrix::new(el);
 
         // If the element has been found before.
@@ -615,7 +611,7 @@ impl GenIter {
 
     /// Gets the next element and the next generator to attempt to multiply.
     /// Advances the iterator.
-    fn next_el_gen(&mut self) -> Option<[Matrix<f64>; 2]> {
+    fn next_el_gen(&mut self) -> Option<[Matrix; 2]> {
         let el = self.queue.front()?.0.clone();
         let gen = self.gens[self.gen_idx].clone();
 
@@ -662,12 +658,12 @@ impl GenIter {
 
             for (j, gen_j) in generators.iter().enumerate() {
                 let dot = gen_i.dot(gen_j);
-                gen_i[j] = ((PI / cox[(i, j)] as f64).cos() - dot) / gen_j[j];
+                gen_i[j] = ((Float::PI / cox[(i, j)] as Float).cos() - dot) / gen_j[j];
             }
 
             // The vector doesn't fit in spherical space.
             let norm_sq = gen_i.norm_squared();
-            if norm_sq >= 1.0 - EPS {
+            if norm_sq >= 1.0 - Float::EPS {
                 return None;
             } else {
                 gen_i[i] = (1.0 - norm_sq).sqrt();
@@ -743,7 +739,12 @@ mod tests {
                     continue;
                 }
 
-                test(cox!(n as f64 / d as f64), 2 * n, n, &format!("I2({})", n));
+                test(
+                    cox!(n as Float / d as Float),
+                    2 * n,
+                    n,
+                    &format!("I2({})", n),
+                );
             }
         }
     }

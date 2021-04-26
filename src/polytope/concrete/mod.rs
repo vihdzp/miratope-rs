@@ -6,13 +6,7 @@ pub mod group;
 pub mod mesh_builder;
 pub mod off;
 
-use std::{
-    collections::HashMap,
-    f64::{
-        self,
-        consts::{SQRT_2, TAU},
-    },
-};
+use std::collections::HashMap;
 
 use self::{group::OrdPoint, mesh_builder::MeshBuilder};
 use super::{
@@ -30,7 +24,7 @@ use crate::{
         Name,
     },
     r#abstract::{flag::FlagEvent, Abstract},
-    EPS,
+    Epsilon, Float,
 };
 
 use approx::{abs_diff_eq, abs_diff_ne};
@@ -86,19 +80,19 @@ impl Concrete {
     }
 
     /// Builds the Grünbaumian star polygon `{n / d}`, rotated by an angle.
-    fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: f64) -> Self {
+    fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: Float) -> Self {
         assert!(n >= 2);
         assert!(d >= 1);
 
         // Scaling factor for unit edge length.
-        let angle = TAU * d as f64 / n as f64;
+        let angle = Float::TAU * d as Float / n as Float;
         let radius = (2.0 - 2.0 * angle.cos()).sqrt();
 
         Self::new(
             (0..n)
                 .into_iter()
                 .map(|k| {
-                    let (sin, cos) = (k as f64 * angle + rot).sin_cos();
+                    let (sin, cos) = (k as Float * angle + rot).sin_cos();
                     vec![sin / radius, cos / radius].into()
                 })
                 .collect(),
@@ -118,18 +112,18 @@ impl Concrete {
         use gcd::Gcd;
 
         let gcd = n.gcd(d);
-        let angle = TAU / n as f64;
+        let angle = Float::TAU / n as Float;
 
         Self::compound_iter(
-            (0..gcd)
-                .into_iter()
-                .map(|k| Self::grunbaum_star_polygon_with_rot(n / gcd, d / gcd, k as f64 * angle)),
+            (0..gcd).into_iter().map(|k| {
+                Self::grunbaum_star_polygon_with_rot(n / gcd, d / gcd, k as Float * angle)
+            }),
         )
         .unwrap()
     }
 
     /// Scales a polytope by a given factor.
-    pub fn scale(&mut self, k: f64) {
+    pub fn scale(&mut self, k: Float) {
         for v in &mut self.vertices {
             *v *= k;
         }
@@ -177,7 +171,7 @@ impl Concrete {
             }
             // If the new vertex lies on the others' hyperplane, but is not at
             // the correct distance from the first vertex:
-            else if abs_diff_ne!((&o - &v0).norm(), (&o - v).norm(), epsilon = EPS) {
+            else if abs_diff_ne!((&o - &v0).norm(), (&o - v).norm(), epsilon = Float::EPS) {
                 return None;
             }
         }
@@ -197,11 +191,11 @@ impl Concrete {
             g += v;
         }
 
-        Some(g / (self.vertices.len() as f64))
+        Some(g / (self.vertices.len() as Float))
     }
 
     /// Gets the least `x` coordinate of a vertex of the polytope.
-    pub fn x_min(&self) -> Option<f64> {
+    pub fn x_min(&self) -> Option<Float> {
         self.vertices
             .iter()
             .map(|v| float_ord::FloatOrd(v[0]))
@@ -210,7 +204,7 @@ impl Concrete {
     }
 
     /// Gets the greatest `x` coordinate of a vertex of the polytope.
-    pub fn x_max(&self) -> Option<f64> {
+    pub fn x_max(&self) -> Option<Float> {
         self.vertices
             .iter()
             .map(|v| float_ord::FloatOrd(v[0]))
@@ -219,7 +213,7 @@ impl Concrete {
     }
 
     /// Gets the edge lengths of all edges in the polytope, in order.
-    pub fn edge_lengths(&self) -> Vec<f64> {
+    pub fn edge_lengths(&self) -> Vec<Float> {
         let mut edge_lengths = Vec::new();
 
         // If there are no edges, we just return the empty vector.
@@ -239,12 +233,12 @@ impl Concrete {
 
     /// Checks whether a polytope is equilateral to a fixed precision, and with
     /// a specified edge length.
-    pub fn is_equilateral_with_len(&self, len: f64) -> bool {
+    pub fn is_equilateral_with_len(&self, len: Float) -> bool {
         let edge_lengths = self.edge_lengths().into_iter();
 
         // Checks that every other edge length is equal to the first.
         for edge_len in edge_lengths {
-            if abs_diff_eq!(edge_len, len, epsilon = EPS) {
+            if abs_diff_eq!(edge_len, len, epsilon = Float::EPS) {
                 return false;
             }
         }
@@ -267,7 +261,7 @@ impl Concrete {
     ///
     /// # Todo
     /// Maybe make this work in the general case?
-    pub fn midradius(&self) -> f64 {
+    pub fn midradius(&self) -> Float {
         let vertices = &self.vertices;
         let edges = &self[0];
         let edge = &edges[0];
@@ -380,7 +374,7 @@ impl Concrete {
 
     /// Generates the vertices for either a tegum or a pyramid product with two
     /// given vertex sets and a given height.
-    fn duopyramid_vertices(p: &[Point], q: &[Point], height: f64, tegum: bool) -> Vec<Point> {
+    fn duopyramid_vertices(p: &[Point], q: &[Point], height: Float, tegum: bool) -> Vec<Point> {
         let p_dim = p[0].len();
         let q_dim = q[0].len();
 
@@ -452,14 +446,14 @@ impl Concrete {
     }
 
     /// Generates a duopyramid from two given polytopes with a given height.
-    pub fn duopyramid_with_height(p: &Self, q: &Self, height: f64) -> Self {
+    pub fn duopyramid_with_height(p: &Self, q: &Self, height: Float) -> Self {
         Self::new(
             Self::duopyramid_vertices(&p.vertices, &q.vertices, height, false),
             Abstract::duopyramid(&p.abs, &q.abs),
         )
     }
 
-    pub fn volume(&self) -> Option<f64> {
+    pub fn volume(&self) -> Option<Float> {
         use factorial::Factorial;
 
         let rank = self.rank();
@@ -522,7 +516,7 @@ impl Concrete {
             }
         }
 
-        Some(volume.abs() / (rank as usize).factorial() as f64)
+        Some(volume.abs() / (rank as usize).factorial() as Float)
     }
 
     pub fn flat_vertices(&self) -> Option<Vec<Point>> {
@@ -879,12 +873,12 @@ impl Polytope<Con> for Concrete {
             // equal to 0.
             for i in 0..dim {
                 let mut v = vec![0.0; dim];
-                v[i] = SQRT_2 / 2.0;
+                v[i] = Float::SQRT_2 / 2.0;
                 vertices.push(v.into());
             }
 
             // Adds the remaining vertex, all of whose coordinates are equal.
-            let a = (1.0 - ((dim + 1) as f64).sqrt()) * SQRT_2 / (2.0 * dim as f64);
+            let a = (1.0 - ((dim + 1) as Float).sqrt()) * Float::SQRT_2 / (2.0 * dim as Float);
             vertices.push(vec![a; dim].into());
 
             let mut simplex = Concrete::new(vertices, Abstract::simplex(rank));

@@ -96,7 +96,7 @@ fn read_point<R: std::io::Read>(xml: &mut Events<R>, label: String) -> io::Resul
 
     macro_rules! read_coord {
         ($x:ident) => {
-            let $x: f64;
+            let $x: crate::Float;
 
             if let Some(c) = get_attribute(&attributes, stringify!($x)) {
                 if let Ok(c) = c.parse() {

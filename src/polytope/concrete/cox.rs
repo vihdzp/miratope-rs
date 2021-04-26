@@ -1,4 +1,4 @@
-use crate::geometry::Matrix;
+use crate::{geometry::Matrix, Float};
 
 use std::mem;
 
@@ -9,7 +9,7 @@ use std::mem;
 pub struct CoxMatrix(pub Matrix);
 
 impl CoxMatrix {
-    pub fn from_lin_diagram(diagram: Vec<f64>) -> Self {
+    pub fn from_lin_diagram(diagram: Vec<Float>) -> Self {
         let dim = diagram.len() + 1;
 
         CoxMatrix(Matrix::from_fn(dim, dim, |mut i, mut j| {
@@ -36,7 +36,7 @@ impl CoxMatrix {
 }
 
 impl std::ops::Index<(usize, usize)> for CoxMatrix {
-    type Output = f64;
+    type Output = Float;
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
         &self.0[index]
@@ -76,9 +76,9 @@ macro_rules! cox_mat {
         crate::polytope::concrete::cox::CoxMatrix::from_lin_diagram(vec![])
     );
     ($($x:expr),+) => (
-        crate::polytope::concrete::cox::CoxMatrix::from_lin_diagram(vec![$($x as f64),+])
+        crate::polytope::concrete::cox::CoxMatrix::from_lin_diagram(vec![$($x as Float),+])
     );
     ($x:expr; $y:expr) => (
-        crate::polytope::concrete::cox::CoxMatrix::from_lin_diagram(vec![$x as f64; $y])
+        crate::polytope::concrete::cox::CoxMatrix::from_lin_diagram(vec![$x as Float; $y])
     )
 }

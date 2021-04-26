@@ -1,25 +1,25 @@
-use crate::geometry::Subspace;
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+};
+
+use super::Concrete;
 use crate::{
+    geometry::Point,
+    geometry::Subspace,
     polytope::{
         r#abstract::elements::Element,
         r#abstract::elements::Subsupelements,
         r#abstract::{elements::ElementList, Abstract},
     },
     r#abstract::elements::Subelements,
+    Epsilon, Float,
 };
-use std::{
-    cmp::Ordering,
-    collections::{HashMap, HashSet},
-};
-
-use crate::{geometry::Point, EPS};
 
 use nalgebra::DMatrix;
 use rand::Rng;
 use scapegoat::SGSet as BTreeSet;
-use std::fmt::Debug;
-
-use super::Concrete;
 
 #[derive(PartialEq, Debug)]
 enum Sign {
@@ -85,10 +85,10 @@ impl VertexSet {
 }
 
 /// Returns the sign of a number, up to some imprecision.
-fn sign(x: f64) -> Sign {
-    if x > EPS {
+fn sign(x: Float) -> Sign {
+    if x > Float::EPS {
         Sign::Positive
-    } else if x < -EPS {
+    } else if x < -Float::EPS {
         Sign::Negative
     } else {
         Sign::Zero
@@ -373,14 +373,14 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
 }
 
 fn perturb(v: &Point) -> Point {
-    const PERTURB: f64 = 1e-4;
+    const PERTURB: Float = 1e-4;
 
     let dim = v.nrows();
     let mut rng = rand::thread_rng();
 
     let pert: Point = (0..dim)
         .into_iter()
-        .map(|_| rng.gen::<f64>() * PERTURB)
+        .map(|_| rng.gen::<Float>() * PERTURB)
         .collect::<Vec<_>>()
         .into();
 

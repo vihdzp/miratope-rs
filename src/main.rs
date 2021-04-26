@@ -68,8 +68,32 @@ mod no_cull_pipeline;
 mod polytope;
 mod ui;
 
-/// Standard constant used for floating point comparisons throughout the code.
-const EPS: f64 = 1e-9;
+trait Epsilon {
+    type T;
+    const EPS: Self::T;
+    const PI: Self::T;
+    const TAU: Self::T;
+    const SQRT_2: Self::T;
+}
+
+impl Epsilon for f64 {
+    type T = f64;
+    const EPS: f64 = 1e-9;
+    const PI: f64 = std::f64::consts::PI;
+    const TAU: f64 = std::f64::consts::TAU;
+    const SQRT_2: f64 = std::f64::consts::SQRT_2;
+}
+
+impl Epsilon for f32 {
+    type T = f32;
+    const EPS: f32 = 1e-5;
+    const PI: f32 = std::f32::consts::PI;
+    const TAU: f32 = std::f32::consts::TAU;
+    const SQRT_2: f32 = std::f32::consts::SQRT_2;
+}
+
+/// The floating point type used for all calculations.
+type Float = f32;
 
 /// Loads all of the necessary systems for the application to run.
 fn main() {

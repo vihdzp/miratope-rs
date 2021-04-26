@@ -1,15 +1,15 @@
-use crate::geometry::{Hyperplane, Point};
+pub mod input;
+
 use crate::{
+    geometry::{Hyperplane, Point},
     lang::{self, Language, Options},
     polytope::concrete::Concrete,
+    polytope::Polytope,
+    OffOptions,
 };
+
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
-
-use crate::polytope::Polytope;
-use crate::OffOptions;
-
-pub mod input;
 
 /// Stores whether the cross-section view is active.
 pub struct CrossSectionActive(pub bool);
@@ -27,7 +27,7 @@ pub struct CrossSectionState {
     original_polytope: Option<Concrete>,
 
     /// The position of the slicing hyperplane.
-    hyperplane_pos: f64,
+    hyperplane_pos: f32,
 
     /// Whether the cross-section is flattened into a dimension lower.
     flatten: bool,
@@ -155,7 +155,7 @@ pub fn ui(
             x_max = 1.0;
         }
         ui.add(
-            egui::Slider::f64(&mut new_hyperplane_pos, x_min..=x_max - 0.000001)
+            egui::Slider::f32(&mut new_hyperplane_pos, x_min..=x_max - 0.000001)
                 .text("Slice depth"),
         );
 

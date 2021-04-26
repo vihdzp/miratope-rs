@@ -5,33 +5,37 @@ use std::{
 };
 
 use super::Abstract;
+use crate::Float;
 
+/// The parity of a flag, which flips on any flag change.
 #[derive(Clone, Copy, Debug, Hash, PartialEq)]
-pub enum Orientation {
-    /// A flag of even orientation.
+pub enum Parity {
+    /// A flag of even parity.
     Even,
 
-    /// A flag of odd orientation.
+    /// A flag of odd parity.
     Odd,
 }
 
-impl Orientation {
+impl Parity {
+    /// Flips the parity of a flag.
     pub fn flip_mut(&mut self) {
         match self {
-            Orientation::Even => *self = Orientation::Odd,
-            Orientation::Odd => *self = Orientation::Even,
+            Parity::Even => *self = Parity::Odd,
+            Parity::Odd => *self = Parity::Even,
         }
     }
 
-    pub fn sign(&self) -> f64 {
+    /// Returns the "sign" associated with a flag, which is either `1.0` or `-1.0`.
+    pub fn sign(&self) -> Float {
         match self {
-            Orientation::Even => 1.0,
-            Orientation::Odd => -1.0,
+            Parity::Even => 1.0,
+            Parity::Odd => -1.0,
         }
     }
 }
 
-impl Default for Orientation {
+impl Default for Parity {
     fn default() -> Self {
         Self::Even
     }
@@ -45,7 +49,7 @@ pub struct Flag {
 
     /// The orientation of the flag. If the polytope is non-orientable, this
     /// will contain garbage.
-    pub orientation: Orientation,
+    pub orientation: Parity,
 }
 
 impl Hash for Flag {
@@ -95,7 +99,7 @@ impl Flag {
     pub fn with_capacity(rank: usize) -> Self {
         Self {
             elements: Vec::with_capacity(rank),
-            orientation: Orientation::default(),
+            orientation: Parity::default(),
         }
     }
 

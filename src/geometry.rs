@@ -2,18 +2,19 @@
 //! space.
 
 /// A point in *n*-dimensional space.
-pub type Point = nalgebra::DVector<f64>;
+pub type Point = nalgebra::DVector<Float>;
 
 /// A vector in *n*-dimensional space.
 pub type Vector = Point;
 
 /// An *n* by *n* matrix.
-pub type Matrix = nalgebra::DMatrix<f64>;
+pub type Matrix = nalgebra::DMatrix<Float>;
+
+use std::fmt;
+
+use crate::{Epsilon, Float};
 
 use approx::abs_diff_eq;
-
-use crate::EPS;
-use std::fmt;
 
 #[derive(Debug)]
 /// A hypersphere with a certain center and radius.
@@ -22,7 +23,7 @@ pub struct Hypersphere {
     pub center: Point,
 
     /// The radius of the hypersphere.
-    pub radius: f64,
+    pub radius: Float,
 }
 
 impl fmt::Display for Hypersphere {
@@ -34,7 +35,7 @@ impl fmt::Display for Hypersphere {
 impl Hypersphere {
     /// Constructs a hypersphere with a given dimension and radius, centered at
     /// the origin.
-    pub fn with_radius(dim: usize, radius: f64) -> Hypersphere {
+    pub fn with_radius(dim: usize, radius: Float) -> Hypersphere {
         Hypersphere {
             center: vec![0.0; dim].into(),
             radius,
@@ -54,7 +55,7 @@ impl Hypersphere {
 
         // If any face passes through the dual center, the dual does
         // not exist, and we return early.
-        if s < EPS {
+        if s < Float::EPS {
             return Err(());
         }
 
@@ -93,7 +94,8 @@ impl Hypersphere {
     /// Returns whether two hyperspheres are "approximately" equal.
     /// Used for testing.
     pub fn approx(&self, sphere: &Hypersphere) -> bool {
-        (&self.center - &sphere.center).norm() < EPS && self.radius - sphere.radius < EPS
+        (&self.center - &sphere.center).norm() < Float::EPS
+            && self.radius - sphere.radius < Float::EPS
     }
 }
 
@@ -147,7 +149,7 @@ impl Subspace {
     /// basis vector for the subspace.
     pub fn add(&mut self, p: &Point) -> Option<Point> {
         let mut v = p - self.project(p);
-        if v.normalize_mut() > EPS {
+        if v.normalize_mut() > Float::EPS {
             self.basis.push(v.clone());
             Some(v)
         } else {
@@ -196,14 +198,14 @@ impl Subspace {
     }
 
     /// Calculates the distance from a point to the subspace.
-    pub fn distance(&self, p: &Point) -> f64 {
+    pub fn distance(&self, p: &Point) -> Float {
         (p - self.project(p)).norm()
     }
 
     /// Computes a normal vector to the subspace, so that the specified point is
     /// left out of it. Returns `None` if the point given lies on the subspace.
     pub fn normal(&self, p: &Point) -> Option<Vector> {
-        (p - self.project(p)).try_normalize(EPS)
+        (p - self.project(p)).try_normalize(Float::EPS)
     }
 
     /// Applies a map from the subspace to a lower dimensional space to the
@@ -215,7 +217,7 @@ impl Subspace {
     }
 
     /// Returns a subspace defined by all points with a given x coordinate.
-    pub fn x(rank: usize, x: f64) -> Self {
+    pub fn x(rank: usize, x: Float) -> Self {
         // The basis is just all elementary unit vectors save for the
         // (1, 0, ..., 0) one.
         let mut basis = Vec::new();
@@ -271,7 +273,7 @@ impl Hyperplane {
 
     /// Calculates the signed distance from a point to the hyperplane. Points on
     /// the side of the hyperplane containing the vector have positive distance.
-    pub fn distance(&self, p: &Point) -> f64 {
+    pub fn distance(&self, p: &Point) -> Float {
         (p - self.project(p)).dot(&self.normal)
     }
 
@@ -283,7 +285,7 @@ impl Hyperplane {
 
     /// Returns whether a point is contained on the hyperplane.
     pub fn is_outer(&self, p: &Point) -> bool {
-        abs_diff_eq!(self.distance(p), 0.0, epsilon = EPS)
+        abs_diff_eq!(self.distance(p), 0.0, epsilon = Float::EPS)
     }
 
     /// Returns the intersection of itself and a line segment, or `None` if it
@@ -301,7 +303,7 @@ impl Hyperplane {
     }
 
     // Returns a hyperplane defined by all points with a given x coordinate.
-    pub fn x(rank: usize, x: f64) -> Self {
+    pub fn x(rank: usize, x: Float) -> Self {
         // The normal is the vector (1, 0, ..., 0).
         let mut normal = Vector::zeros(rank);
         normal[0] = 1.0;
@@ -313,7 +315,7 @@ impl Hyperplane {
     }
 
     // Returns a hyperplane defined by all points with a given last coordinate.
-    pub fn z(rank: usize, z: f64) -> Self {
+    pub fn z(rank: usize, z: Float) -> Self {
         let mut basis = Vec::new();
         for i in 0..rank - 1 {
             let mut p = Point::zeros(rank);
@@ -341,7 +343,7 @@ pub struct Segment(pub Point, pub Point);
 impl Segment {
     /// Returns the point at a certain position along the line. If `t` is
     /// between 0 and 1, the point will be contained on the line segment.
-    pub fn at(&self, t: f64) -> Point {
+    pub fn at(&self, t: Float) -> Point {
         &self.0 * t + &self.1 * (1.0 - t)
     }
 

@@ -1,9 +1,12 @@
 //! Contains the methods to setup the camera.
 
-use bevy::input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
-use bevy::prelude::*;
-use bevy::render::camera::Camera;
 use std::borrow::BorrowMut;
+
+use bevy::{
+    input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
+    prelude::*,
+    render::camera::Camera,
+};
 
 /// The plugin handling all input.
 ///

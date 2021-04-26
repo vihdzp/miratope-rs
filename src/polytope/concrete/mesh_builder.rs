@@ -4,6 +4,7 @@ use super::Concrete;
 use crate::{
     geometry::{Point, Subspace},
     polytope::{r#abstract::elements::ElementList, r#abstract::elements::Subsupelements},
+    Float,
 };
 
 use bevy::{
@@ -274,7 +275,7 @@ impl<'a> MeshBuilder<'a> {
                             let from = &self.concrete.vertices[cycle.0[from.to_usize()]];
                             let to = &self.concrete.vertices[cycle.0[to.to_usize()]];
 
-                            let t = t as f64;
+                            let t = t as Float;
                             let p = from * (1.0 - t) + to * t;
 
                             vertex_hash
@@ -321,17 +322,17 @@ impl<'a> MeshBuilder<'a> {
         // Else, we project it down.
         else {
             // Distance from the projection planes.
-            const DIST: f64 = 2.0;
+            const DIST: Float = 2.0;
 
             vert_iter
                 .map(|point| {
-                    let factor: f64 = point.iter().skip(3).map(|x| x + DIST).product();
+                    let factor: Float = point.iter().skip(3).map(|x| x + DIST).product();
 
                     // We scale the first three coordinates accordingly.
                     let mut iter = point.iter().copied().take(3);
-                    let x: f64 = iter.next().unwrap() / factor;
-                    let y: f64 = iter.next().unwrap() / factor;
-                    let z: f64 = iter.next().unwrap() / factor;
+                    let x: Float = iter.next().unwrap() / factor;
+                    let y: Float = iter.next().unwrap() / factor;
+                    let z: Float = iter.next().unwrap() / factor;
                     [x as f32, y as f32, z as f32]
                 })
                 .collect()
