@@ -847,7 +847,7 @@ mod tests {
         test(e6, 51840, 25920, &"E6");
     }
 
-    /// Tests the E7 symmetry group. This is very expensive, so we enable it 
+    /// Tests the E7 symmetry group. This is very expensive, so we enable it
     /// only on release mode.
     #[test]
     #[cfg(not(debug_assertions))]
