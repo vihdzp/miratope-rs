@@ -14,7 +14,7 @@ use crate::{
         r#abstract::{elements::ElementList, Abstract},
     },
     r#abstract::elements::Subelements,
-    Epsilon, Float,
+    Consts, Float,
 };
 
 use nalgebra::DMatrix;

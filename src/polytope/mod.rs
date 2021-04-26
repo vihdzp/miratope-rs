@@ -2,14 +2,14 @@
 //! [polytopes](https://polytope.miraheze.org/wiki/Polytope), as well as some
 //! basic methods to operate on them.
 
+pub mod r#abstract;
+pub mod concrete;
+
 use self::r#abstract::{
     flag::{Flag, FlagEvent, FlagIter},
     rank::RankVec,
 };
 use crate::lang::{name::NameType, Name};
-
-pub mod r#abstract;
-pub mod concrete;
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
 const ELEMENT_NAMES: [&str; 11] = [

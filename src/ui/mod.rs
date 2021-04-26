@@ -5,7 +5,7 @@ use crate::{
     lang::{self, Language, Options},
     polytope::concrete::Concrete,
     polytope::Polytope,
-    OffOptions,
+    Consts, Float, OffOptions,
 };
 
 use bevy::prelude::*;
@@ -27,7 +27,7 @@ pub struct CrossSectionState {
     original_polytope: Option<Concrete>,
 
     /// The position of the slicing hyperplane.
-    hyperplane_pos: f32,
+    hyperplane_pos: Float,
 
     /// Whether the cross-section is flattened into a dimension lower.
     flatten: bool,
@@ -154,10 +154,7 @@ pub fn ui(
             x_min = -1.0;
             x_max = 1.0;
         }
-        ui.add(
-            egui::Slider::f32(&mut new_hyperplane_pos, x_min..=x_max - 0.000001)
-                .text("Slice depth"),
-        );
+        ui.add(Float::slider(&mut new_hyperplane_pos, x_min..=x_max).text("Slice depth"));
 
         #[allow(clippy::float_cmp)]
         // Updates the slicing depth for the polytope, but only when needed.

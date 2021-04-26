@@ -1,3 +1,7 @@
+pub mod elements;
+pub mod flag;
+pub mod rank;
+
 use std::collections::HashMap;
 
 use self::{
@@ -10,10 +14,6 @@ use crate::lang::{
     name::{Abs, NameType},
     Name,
 };
-
-pub mod elements;
-pub mod flag;
-pub mod rank;
 
 /// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
 /// to an [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).

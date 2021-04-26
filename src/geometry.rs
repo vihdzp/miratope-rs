@@ -12,7 +12,7 @@ pub type Matrix = nalgebra::DMatrix<Float>;
 
 use std::fmt;
 
-use crate::{Epsilon, Float};
+use crate::{Consts, Float};
 
 use approx::abs_diff_eq;
 

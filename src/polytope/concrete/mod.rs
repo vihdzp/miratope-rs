@@ -24,7 +24,7 @@ use crate::{
         Name,
     },
     r#abstract::{flag::FlagEvent, Abstract},
-    Epsilon, Float,
+    Consts, Float,
 };
 
 use approx::{abs_diff_eq, abs_diff_ne};

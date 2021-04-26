@@ -68,32 +68,51 @@ mod no_cull_pipeline;
 mod polytope;
 mod ui;
 
-trait Epsilon {
+trait Consts {
     type T;
     const EPS: Self::T;
     const PI: Self::T;
     const TAU: Self::T;
     const SQRT_2: Self::T;
+
+    fn slider(
+        value: &mut Self::T,
+        range: std::ops::RangeInclusive<Self::T>,
+    ) -> bevy_egui::egui::widgets::Slider;
 }
 
-impl Epsilon for f64 {
+impl Consts for f64 {
     type T = f64;
     const EPS: f64 = 1e-9;
     const PI: f64 = std::f64::consts::PI;
     const TAU: f64 = std::f64::consts::TAU;
     const SQRT_2: f64 = std::f64::consts::SQRT_2;
+
+    fn slider(
+        value: &mut f64,
+        range: std::ops::RangeInclusive<f64>,
+    ) -> bevy_egui::egui::widgets::Slider {
+        bevy_egui::egui::Slider::f64(value, range)
+    }
 }
 
-impl Epsilon for f32 {
+impl Consts for f32 {
     type T = f32;
     const EPS: f32 = 1e-5;
     const PI: f32 = std::f32::consts::PI;
     const TAU: f32 = std::f32::consts::TAU;
     const SQRT_2: f32 = std::f32::consts::SQRT_2;
+
+    fn slider(
+        value: &mut f32,
+        range: std::ops::RangeInclusive<f32>,
+    ) -> bevy_egui::egui::widgets::Slider {
+        bevy_egui::egui::Slider::f32(value, range)
+    }
 }
 
 /// The floating point type used for all calculations.
-type Float = f32;
+type Float = f64;
 
 /// Loads all of the necessary systems for the application to run.
 fn main() {

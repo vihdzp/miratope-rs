@@ -7,7 +7,7 @@ use super::{convex, cox::CoxMatrix, Concrete};
 #[allow(unused_imports)] // Circumvents rust-analyzer bug.
 use crate::cox;
 use crate::geometry::{Matrix, Point, Vector};
-use crate::{Epsilon, Float};
+use crate::{Consts, Float};
 
 use approx::{abs_diff_ne, relative_eq};
 use nalgebra::{storage::Storage, Dim, Dynamic, Quaternion, VecStorage, U1};
@@ -845,6 +845,25 @@ mod tests {
         .unwrap();
 
         test(e6, 51840, 25920, &"E6");
+    }
+
+    /// Tests the E7 symmetry group.
+    #[test]
+    fn e7() {
+        // In the future, we'll have better code for this, I hope.
+        let e7 = Group::cox_group(CoxMatrix(Matrix::from_data(VecStorage::new(
+            Dynamic::new(7),
+            Dynamic::new(7),
+            vec![
+                1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 2.0, 3.0,
+                1.0, 3.0, 3.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0, 3.0, 2.0,
+                1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 2.0, 3.0,
+                1.0,
+            ],
+        ))))
+        .unwrap();
+
+        test(e7, 2903040, 1451520, &"E7");
     }
 
     #[test]
