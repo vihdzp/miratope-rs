@@ -10,7 +10,7 @@ use crate::{
 
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
-use native_dialog::FileDialog;
+use rfd::FileDialog;
 
 /// Stores whether the cross-section view is active.
 pub struct CrossSectionActive(pub bool);
@@ -61,8 +61,7 @@ pub fn ui(
                     let path = FileDialog::new()
                         .add_filter("OFF File", &["off"])
                         .add_filter("GGB file", &["ggb"])
-                        .show_open_single_file()
-                        .unwrap();
+                        .pick_file();
 
                     if let Some(path) = path {
                         for mut p in query.iter_mut() {
@@ -76,8 +75,7 @@ pub fn ui(
                     let path = FileDialog::new()
                         .add_filter("OFF File", &["off"])
                         .add_filter("GGB file", &["ggb"])
-                        .show_save_single_file()
-                        .unwrap();
+                        .save_file();
 
                     if let Some(path) = path {
                         for p in query.iter_mut() {
