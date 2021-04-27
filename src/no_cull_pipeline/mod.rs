@@ -2,21 +2,29 @@
 //! (backface culling)[https://en.wikipedia.org/wiki/Back-face_culling], needed
 //! so that most of the nonconvex polytopes work properly.
 
-use bevy::asset::{Assets, Handle, HandleUntyped};
-use bevy::ecs::Bundle;
-use bevy::prelude::{Draw, GlobalTransform, RenderPipelines, StandardMaterial, Transform, Visible};
 use bevy::reflect::TypeUuid;
+use bevy::render::pipeline::PrimitiveState;
 use bevy::render::{
     mesh::Mesh,
     pipeline::{
-        BlendDescriptor, BlendFactor, BlendOperation, ColorStateDescriptor, ColorWrite,
-        CompareFunction, CullMode, DepthStencilStateDescriptor, FrontFace, PipelineDescriptor,
-        RasterizationStateDescriptor, RenderPipeline, StencilStateDescriptor,
-        StencilStateFaceDescriptor,
+        BlendFactor, BlendOperation, ColorWrite, CompareFunction, CullMode, FrontFace,
+        PipelineDescriptor, RenderPipeline,
     },
     render_graph::base::MainPass,
     shader::{Shader, ShaderStage, ShaderStages},
     texture::TextureFormat,
+};
+use bevy::{
+    asset::{Assets, Handle, HandleUntyped},
+    render::pipeline::{DepthBiasState, DepthStencilState},
+};
+use bevy::{
+    ecs::bundle::Bundle,
+    render::pipeline::{BlendState, ColorTargetState},
+};
+use bevy::{
+    prelude::{Draw, GlobalTransform, RenderPipelines, StandardMaterial, Transform, Visible},
+    render::pipeline::{StencilFaceState, StencilState},
 };
 
 pub const NO_CULL_PIPELINE_HANDLE: HandleUntyped =
@@ -24,33 +32,36 @@ pub const NO_CULL_PIPELINE_HANDLE: HandleUntyped =
 
 pub fn build_no_cull_pipeline(shaders: &mut Assets<Shader>) -> PipelineDescriptor {
     PipelineDescriptor {
-        rasterization_state: Some(RasterizationStateDescriptor {
+        primitive: PrimitiveState {
             front_face: FrontFace::Ccw,
             cull_mode: CullMode::None,
-            depth_bias: 0,
-            depth_bias_slope_scale: 0.0,
-            depth_bias_clamp: 0.0,
-            clamp_depth: false,
-        }),
-        depth_stencil_state: Some(DepthStencilStateDescriptor {
+            ..Default::default()
+        },
+        depth_stencil: Some(DepthStencilState {
             format: TextureFormat::Depth32Float,
             depth_write_enabled: true,
             depth_compare: CompareFunction::Less,
-            stencil: StencilStateDescriptor {
-                front: StencilStateFaceDescriptor::IGNORE,
-                back: StencilStateFaceDescriptor::IGNORE,
+            stencil: StencilState {
+                front: StencilFaceState::IGNORE,
+                back: StencilFaceState::IGNORE,
                 read_mask: 0,
                 write_mask: 0,
             },
+            bias: DepthBiasState {
+                constant: 0,
+                slope_scale: 0.0,
+                clamp: 0.0,
+            },
+            clamp_depth: false,
         }),
-        color_states: vec![ColorStateDescriptor {
+        color_target_states: vec![ColorTargetState {
             format: TextureFormat::default(),
-            color_blend: BlendDescriptor {
+            color_blend: BlendState {
                 src_factor: BlendFactor::SrcAlpha,
                 dst_factor: BlendFactor::OneMinusSrcAlpha,
                 operation: BlendOperation::Add,
             },
-            alpha_blend: BlendDescriptor {
+            alpha_blend: BlendState {
                 src_factor: BlendFactor::One,
                 dst_factor: BlendFactor::One,
                 operation: BlendOperation::Add,

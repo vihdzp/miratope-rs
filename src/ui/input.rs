@@ -17,7 +17,7 @@ pub struct InputPlugin;
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_event::<CameraInputEvent>()
-            .add_system_to_stage(stage::EVENT, add_cam_input_events.system())
+            .add_system_to_stage(CoreStage::PreUpdate, add_cam_input_events.system())
             .add_system(update_cameras_and_anchors.system());
     }
 }
@@ -100,7 +100,7 @@ impl CameraInputEvent {
         *cam_tf = Transform::from_translation(Vec3::new(0.0, 0.0, 5.0));
         *anchor_tf = Transform::from_translation(Vec3::new(0.02, -0.025, -0.05))
             * Transform::from_translation(Vec3::new(-0.02, 0.025, 0.05))
-                .looking_at(Vec3::default(), Vec3::unit_y());
+                .looking_at(Vec3::default(), Vec3::Y);
     }
 
     fn update_camera_and_anchor(
@@ -125,7 +125,7 @@ impl CameraInputEvent {
 fn cam_events_from_kb(
     time: Res<Time>,
     keyboard: Res<Input<KeyCode>>,
-    cam_inputs: &mut Events<CameraInputEvent>,
+    cam_inputs: &mut EventWriter<CameraInputEvent>,
 ) -> (f32, f32) {
     const SPIN_RATE: f32 = std::f32::consts::TAU / 5.0;
     let real_scale = time.delta_seconds();
@@ -135,9 +135,9 @@ fn cam_events_from_kb(
         real_scale
     };
 
-    let fb = CameraInputEvent::Translate(Vec3::unit_z());
-    let lr = CameraInputEvent::Translate(Vec3::unit_x());
-    let ud = CameraInputEvent::Translate(Vec3::unit_y());
+    let fb = CameraInputEvent::Translate(Vec3::Z);
+    let lr = CameraInputEvent::Translate(Vec3::X);
+    let ud = CameraInputEvent::Translate(Vec3::Y);
     const ROLL: CameraInputEvent = CameraInputEvent::Roll(SPIN_RATE);
 
     for keycode in keyboard.get_pressed() {
@@ -161,14 +161,14 @@ fn cam_events_from_kb(
 /// Processes camera events coming from the mouse buttons.
 fn cam_events_from_mouse(
     mouse_button: Res<Input<MouseButton>>,
-    mouse_move: Res<Events<MouseMotion>>,
+    mut mouse_move: EventReader<MouseMotion>,
     width: f32,
     height: f32,
     real_scale: f32,
-    cam_inputs: &mut Events<CameraInputEvent>,
+    cam_inputs: &mut EventWriter<CameraInputEvent>,
 ) {
     if mouse_button.pressed(MouseButton::Right) {
-        for &MouseMotion { mut delta } in mouse_move.get_reader().iter(&mouse_move) {
+        for &MouseMotion { mut delta } in mouse_move.iter() {
             delta.x /= width;
             delta.y /= height;
             cam_inputs.send(CameraInputEvent::RotateAnchor(-100.0 * real_scale * delta))
@@ -178,11 +178,11 @@ fn cam_events_from_mouse(
 
 /// Processes camera events coming from the mouse wheel.
 fn cam_events_from_wheel(
-    mouse_wheel: Res<Events<MouseWheel>>,
+    mut mouse_wheel: EventReader<MouseWheel>,
     scale: f32,
-    cam_inputs: &mut Events<CameraInputEvent>,
+    cam_inputs: &mut EventWriter<CameraInputEvent>,
 ) {
-    for MouseWheel { unit, y, .. } in mouse_wheel.get_reader().iter(&mouse_wheel) {
+    for MouseWheel { unit, y, .. } in mouse_wheel.iter() {
         let unit_scale = match unit {
             MouseScrollUnit::Line => 12.0,
             MouseScrollUnit::Pixel => 1.0,
@@ -196,10 +196,10 @@ fn add_cam_input_events(
     time: Res<Time>,
     keyboard: Res<Input<KeyCode>>,
     mouse_button: Res<Input<MouseButton>>,
-    mouse_move: Res<Events<MouseMotion>>,
-    mouse_wheel: Res<Events<MouseWheel>>,
+    mouse_move: EventReader<MouseMotion>,
+    mouse_wheel: EventReader<MouseWheel>,
     windows: Res<Windows>,
-    mut cam_inputs: ResMut<Events<CameraInputEvent>>,
+    mut cam_inputs: EventWriter<CameraInputEvent>,
 ) {
     let (width, height) = {
         let primary_win = windows.get_primary().expect("There is no primary window");
@@ -224,7 +224,7 @@ fn add_cam_input_events(
 }
 
 fn update_cameras_and_anchors(
-    events: Res<Events<CameraInputEvent>>,
+    mut events: EventReader<CameraInputEvent>,
     q: Query<(
         &mut Transform,
         &GlobalTransform,
@@ -236,8 +236,10 @@ fn update_cameras_and_anchors(
         if cam.is_none() {
             continue;
         } else if let Some(parent) = parent {
-            if let Ok(mut anchor_tf) = unsafe { q.get_component_unsafe::<Transform>(parent.0) } {
-                for event in events.get_reader().iter(&events) {
+            if let Ok(mut anchor_tf) =
+                unsafe { q.get_component_unchecked_mut::<Transform>(parent.0) }
+            {
+                for event in events.iter() {
                     event.update_camera_and_anchor(
                         anchor_tf.borrow_mut(),
                         cam_tf.borrow_mut(),

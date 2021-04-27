@@ -74,11 +74,6 @@ trait Consts {
     const PI: Self::T;
     const TAU: Self::T;
     const SQRT_2: Self::T;
-
-    fn slider(
-        value: &mut Self::T,
-        range: std::ops::RangeInclusive<Self::T>,
-    ) -> bevy_egui::egui::widgets::Slider;
 }
 
 impl Consts for f64 {
@@ -87,13 +82,6 @@ impl Consts for f64 {
     const PI: f64 = std::f64::consts::PI;
     const TAU: f64 = std::f64::consts::TAU;
     const SQRT_2: f64 = std::f64::consts::SQRT_2;
-
-    fn slider(
-        value: &mut f64,
-        range: std::ops::RangeInclusive<f64>,
-    ) -> bevy_egui::egui::widgets::Slider {
-        bevy_egui::egui::Slider::f64(value, range)
-    }
 }
 
 impl Consts for f32 {
@@ -102,13 +90,6 @@ impl Consts for f32 {
     const PI: f32 = std::f32::consts::PI;
     const TAU: f32 = std::f32::consts::TAU;
     const SQRT_2: f32 = std::f32::consts::SQRT_2;
-
-    fn slider(
-        value: &mut f32,
-        range: std::ops::RangeInclusive<f32>,
-    ) -> bevy_egui::egui::widgets::Slider {
-        bevy_egui::egui::Slider::f32(value, range)
-    }
 }
 
 /// The floating point type used for all calculations.
@@ -117,25 +98,25 @@ type Float = f64;
 /// Loads all of the necessary systems for the application to run.
 fn main() {
     App::build()
-        .add_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
-        .add_resource(Msaa { samples: 4 })
-        .add_resource(CrossSectionActive(false))
-        .add_resource(CrossSectionState::default())
+        // .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
+        // .insert_resource(Msaa { samples: 4 })
+        .insert_resource(CrossSectionActive(false))
+        .insert_resource(CrossSectionState::default())
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
         .add_plugin(ui::input::InputPlugin)
         .add_startup_system(setup.system())
-        .add_system(ui::update_scale_factor.system())
-        .add_system_to_stage(stage::PRE_UPDATE, ui::ui.system())
-        .add_system_to_stage(stage::UPDATE, ui::update_cross_section_state.system())
-        .add_system_to_stage(stage::POST_UPDATE, ui::update_cross_section.system())
-        .add_system_to_stage(stage::POST_UPDATE, ui::update_changed_polytopes.system())
+        .add_system_to_stage(CoreStage::PreUpdate, ui::update_scale_factor.system())
+        .add_system_to_stage(CoreStage::PreUpdate, ui::ui.system())
+        // .add_system_to_stage(CoreStage::Update, ui::update_cross_section_state.system())
+        // .add_system_to_stage(CoreStage::PostUpdate, ui::update_cross_section.system())
+        // .add_system_to_stage(CoreStage::PostUpdate, ui::update_changed_polytopes.system())
         .run();
 }
 
 /// Initializes the scene.
 fn setup(
-    commands: &mut Commands,
+    mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut shaders: ResMut<Assets<Shader>>,
@@ -168,8 +149,9 @@ fn setup(
     CameraInputEvent::reset(&mut cam_anchor, &mut cam);
 
     commands
+        .spawn()
         // Mesh
-        .spawn(PbrNoBackfaceBundle {
+        .insert_bundle(PbrNoBackfaceBundle {
             mesh: meshes.add(poly.get_mesh()),
             material: materials.add(Color::rgb(0.93, 0.5, 0.93).into()),
             visible: Visible {
@@ -180,7 +162,7 @@ fn setup(
         })
         // Wireframe
         .with_children(|cb| {
-            cb.spawn(PbrNoBackfaceBundle {
+            cb.spawn().insert_bundle(PbrNoBackfaceBundle {
                 mesh: meshes.add(poly.get_wireframe()),
                 material: wf_unselected,
                 visible: Visible {
@@ -189,18 +171,23 @@ fn setup(
                 },
                 ..Default::default()
             });
-        })
-        .with(poly)
-        // Light source
-        .spawn(LightBundle {
-            transform: Transform::from_translation(Vec3::new(-2.0, 2.5, 2.0)),
-            ..Default::default()
-        })
-        // camera anchor
-        .spawn((GlobalTransform::default(), cam_anchor))
+        });
+
+    commands.spawn().insert(poly);
+
+    // Light source
+    commands.spawn_bundle(LightBundle {
+        transform: Transform::from_translation(Vec3::new(-2.0, 2.5, 2.0)),
+        ..Default::default()
+    });
+
+    // camera anchor
+    commands
+        .spawn()
+        .insert_bundle((GlobalTransform::default(), cam_anchor))
         .with_children(|cb| {
             // camera
-            cb.spawn(Camera3dBundle {
+            cb.spawn_bundle(PerspectiveCameraBundle {
                 transform: cam,
                 perspective_projection: PerspectiveProjection {
                     near: 0.0001,

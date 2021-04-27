@@ -5,7 +5,7 @@ use crate::{
     lang::{self, Language, Options},
     polytope::concrete::Concrete,
     polytope::Polytope,
-    Consts, Float, OffOptions,
+    Float, OffOptions,
 };
 
 use bevy::prelude::*;
@@ -46,12 +46,12 @@ impl Default for CrossSectionState {
 
 /// The system in charge of the UI.
 pub fn ui(
-    mut egui_ctx: ResMut<EguiContext>,
+    egui_ctx: ResMut<EguiContext>,
     mut query: Query<&mut Concrete>,
     mut section_state: ResMut<CrossSectionState>,
     mut section_active: ResMut<CrossSectionActive>,
 ) {
-    let ctx = &mut egui_ctx.ctx;
+    let ctx = egui_ctx.ctx();
 
     egui::TopPanel::top("top_panel").show(ctx, |ui| {
         egui::menu::bar(ui, |ui| {
@@ -184,7 +184,7 @@ pub fn ui(
             x_min = -1.0;
             x_max = 1.0;
         }
-        ui.add(Float::slider(&mut new_hyperplane_pos, x_min..=x_max).text("Slice depth"));
+        ui.add(egui::Slider::new(&mut new_hyperplane_pos, x_min..=x_max).text("Slice depth"));
 
         #[allow(clippy::float_cmp)]
         // Updates the slicing depth for the polytope, but only when needed.
@@ -238,22 +238,24 @@ pub fn update_changed_polytopes(
 pub fn update_cross_section_state(
     mut query: Query<&mut Concrete>,
     mut state: ResMut<CrossSectionState>,
-    active: ChangedRes<CrossSectionActive>,
+    active: Res<CrossSectionActive>,
 ) {
-    if active.0 {
-        state.original_polytope = Some(query.iter_mut().next().unwrap().clone());
-    } else if let Some(p) = state.original_polytope.take() {
-        *query.iter_mut().next().unwrap() = p;
+    if active.is_changed() {
+        if active.0 {
+            state.original_polytope = Some(query.iter_mut().next().unwrap().clone());
+        } else if let Some(p) = state.original_polytope.take() {
+            *query.iter_mut().next().unwrap() = p;
+        }
     }
 }
 
 /// Updates the cross-section shown.
 pub fn update_cross_section(
     mut query: Query<&mut Concrete>,
-    state: ChangedRes<CrossSectionState>,
+    state: Res<CrossSectionState>,
     active: Res<CrossSectionActive>,
 ) {
-    if active.0 {
+    if state.is_changed() && active.0 {
         for mut p in query.iter_mut() {
             let r = state.original_polytope.clone().unwrap();
             let hyp_pos = state.hyperplane_pos + 0.0000001; // Botch fix for degeneracies.
