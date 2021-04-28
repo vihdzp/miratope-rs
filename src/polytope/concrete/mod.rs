@@ -666,11 +666,9 @@ impl Concrete {
         let ext = fp.as_ref().extension();
 
         if ext == Some(off) {
-            Ok(Self::from_off(String::from_utf8(fs::read(fp)?).unwrap())?)
+            Self::from_off(String::from_utf8(fs::read(fp)?).unwrap())
         } else if ext == Some(ggb) {
-            Ok(Self::from_ggb(zip::read::ZipArchive::new(
-                &mut fs::File::open(fp)?,
-            )?)?)
+            Self::from_ggb(zip::read::ZipArchive::new(&mut fs::File::open(fp)?)?)
         } else {
             Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
