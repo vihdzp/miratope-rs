@@ -172,9 +172,9 @@ fn setup(
                 },
                 ..Default::default()
             });
-        });
-
-    commands.spawn().insert(poly);
+        })
+        // Polytope
+        .insert(poly);
 
     // Light source
     commands.spawn_bundle(LightBundle {
@@ -182,7 +182,7 @@ fn setup(
         ..Default::default()
     });
 
-    // camera anchor
+    // Camera anchor
     commands
         .spawn()
         .insert_bundle((GlobalTransform::default(), cam_anchor))
