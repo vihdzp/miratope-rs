@@ -2,29 +2,18 @@
 //! (backface culling)[https://en.wikipedia.org/wiki/Back-face_culling], needed
 //! so that most of the nonconvex polytopes work properly.
 
-use bevy::reflect::TypeUuid;
-use bevy::render::pipeline::PrimitiveState;
-use bevy::render::{
-    mesh::Mesh,
-    pipeline::{
-        BlendFactor, BlendOperation, ColorWrite, CompareFunction, CullMode, FrontFace,
-        PipelineDescriptor, RenderPipeline,
-    },
-    render_graph::base::MainPass,
-    shader::{Shader, ShaderStage, ShaderStages},
-    texture::TextureFormat,
-};
 use bevy::{
     asset::{Assets, Handle, HandleUntyped},
-    render::pipeline::{DepthBiasState, DepthStencilState},
-};
-use bevy::{
     ecs::bundle::Bundle,
-    render::pipeline::{BlendState, ColorTargetState},
-};
-use bevy::{
     prelude::{Draw, GlobalTransform, RenderPipelines, StandardMaterial, Transform, Visible},
-    render::pipeline::{StencilFaceState, StencilState},
+    reflect::TypeUuid,
+    render::{
+        mesh::Mesh,
+        pipeline::*,
+        render_graph::base::MainPass,
+        shader::{Shader, ShaderStage, ShaderStages},
+        texture::TextureFormat,
+    },
 };
 
 pub const NO_CULL_PIPELINE_HANDLE: HandleUntyped =
