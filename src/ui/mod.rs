@@ -1,5 +1,7 @@
 pub mod input;
 
+use std::{marker::PhantomData, path::PathBuf};
+
 use crate::{
     geometry::{Hyperplane, Point},
     lang::{self, Language, Options},
@@ -11,6 +13,28 @@ use crate::{
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
 use rfd::FileDialog;
+
+pub struct MainThreadToken(PhantomData<*const ()>);
+
+impl MainThreadToken {
+    pub fn new() -> Self {
+        Self(PhantomData::default())
+    }
+
+    fn pick_file(&self) -> Option<PathBuf> {
+        FileDialog::new()
+            .add_filter("OFF File", &["off"])
+            .add_filter("GGB file", &["ggb"])
+            .pick_file()
+    }
+
+    fn save_file(&self) -> Option<PathBuf> {
+        FileDialog::new()
+            .add_filter("OFF File", &["off"])
+            .add_filter("GGB file", &["ggb"])
+            .save_file()
+    }
+}
 
 /// Stores whether the cross-section view is active.
 pub struct CrossSectionActive(pub bool);
@@ -50,6 +74,7 @@ pub fn ui(
     mut query: Query<&mut Concrete>,
     mut section_state: ResMut<CrossSectionState>,
     mut section_active: ResMut<CrossSectionActive>,
+    token: NonSend<MainThreadToken>,
 ) {
     let ctx = egui_ctx.ctx();
 
@@ -58,10 +83,7 @@ pub fn ui(
             egui::menu::menu(ui, "File", |ui| {
                 // Loads a file.
                 if ui.button("Load").clicked() {
-                    let path = FileDialog::new()
-                        .add_filter("OFF File", &["off"])
-                        .add_filter("GGB file", &["ggb"])
-                        .pick_file();
+                    let path = token.pick_file();
 
                     if let Some(path) = path {
                         for mut p in query.iter_mut() {
@@ -72,10 +94,7 @@ pub fn ui(
 
                 // Saves a file.
                 if ui.button("Save").clicked() {
-                    let path = FileDialog::new()
-                        .add_filter("OFF File", &["off"])
-                        .add_filter("GGB file", &["ggb"])
-                        .save_file();
+                    let path = token.save_file();
 
                     if let Some(path) = path {
                         for p in query.iter_mut() {
@@ -220,8 +239,10 @@ pub fn update_changed_polytopes(
         let mesh: &mut Mesh = meshes.get_mut(mesh_handle).unwrap();
         *mesh = poly.get_mesh();
 
-        let window = windows.get_primary_mut().unwrap();
-        window.set_title(lang::En::parse(poly.name(), Options::default()));
+        windows
+            .get_primary_mut()
+            .unwrap()
+            .set_title(lang::En::parse(poly.name(), Options::default()));
 
         for child in children.iter() {
             if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {

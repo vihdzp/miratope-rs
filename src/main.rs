@@ -102,6 +102,7 @@ fn main() {
         .insert_resource(Msaa { samples: 4 })
         .insert_resource(CrossSectionActive(false))
         .insert_resource(CrossSectionState::default())
+        .insert_non_send_resource(ui::MainThreadToken::new())
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
         .add_plugin(ui::input::InputPlugin)
@@ -156,7 +157,7 @@ fn setup(
             mesh: meshes.add(poly.get_mesh()),
             material: materials.add(Color::rgb(0.93, 0.5, 0.93).into()),
             visible: Visible {
-                is_visible: true,
+                is_visible: false,
                 ..Default::default()
             },
             ..Default::default()
