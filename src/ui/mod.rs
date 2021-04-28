@@ -14,25 +14,32 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
 use rfd::FileDialog;
 
+/// Guarantees that file dialogs will be opened on the main thread, used to
+/// circumvent a MacOS limitation that all GUI operations must be done on the
+/// main thread.
 pub struct MainThreadToken(PhantomData<*const ()>);
 
 impl MainThreadToken {
+    /// Initializes a new token.
     pub fn new() -> Self {
-        Self(PhantomData::default())
+        Self(Default::default())
     }
 
+    /// Auxiliary function to create a new file dialog.
+    fn new_file_dialog() -> FileDialog {
+        FileDialog::new()
+            .add_filter("OFF File", &["off"])
+            .add_filter("GGB file", &["ggb"])
+    }
+
+    /// Returns the path given by an open file dialog.
     fn pick_file(&self) -> Option<PathBuf> {
-        FileDialog::new()
-            .add_filter("OFF File", &["off"])
-            .add_filter("GGB file", &["ggb"])
-            .pick_file()
+        Self::new_file_dialog().pick_file()
     }
 
-    fn save_file(&self) -> Option<PathBuf> {
-        FileDialog::new()
-            .add_filter("OFF File", &["off"])
-            .add_filter("GGB file", &["ggb"])
-            .save_file()
+    /// Returns the path given by a save file dialog.
+    fn save_file(&self, name: &str) -> Option<PathBuf> {
+        Self::new_file_dialog().set_file_name(name).save_file()
     }
 }
 
@@ -94,10 +101,10 @@ pub fn ui(
 
                 // Saves a file.
                 if ui.button("Save").clicked() {
-                    let path = token.save_file();
+                    for p in query.iter_mut() {
+                        let path = token.save_file(&lang::En::parse(p.name(), Default::default()));
 
-                    if let Some(path) = path {
-                        for p in query.iter_mut() {
+                        if let Some(path) = path {
                             std::fs::write(path.clone(), p.to_off(OffOptions::default())).unwrap();
                         }
                     }
