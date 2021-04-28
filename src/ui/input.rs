@@ -22,11 +22,6 @@ impl Plugin for InputPlugin {
     }
 }
 
-pub enum CameraType {
-    Projection,
-    Orthogonal,
-}
-
 /// An input event for the camera.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CameraInputEvent {

@@ -98,20 +98,23 @@ type Float = f64;
 /// Loads all of the necessary systems for the application to run.
 fn main() {
     App::build()
+        // Adds resources.
         .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
         .insert_resource(Msaa { samples: 4 })
         .insert_resource(CrossSectionActive(false))
         .insert_resource(CrossSectionState::default())
         .insert_resource(ui::FileDialogState::default())
         .insert_non_send_resource(ui::MainThreadToken::new())
+        // Adds plugins.
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
         .add_plugin(ui::input::InputPlugin)
+        // Adds systems
         .add_startup_system(setup.system())
-        .add_system_to_stage(CoreStage::Update, ui::update_scale_factor.system())
-        .add_system_to_stage(CoreStage::Update, ui::ui.system())
-        .add_system_to_stage(CoreStage::Update, ui::update_cross_section_state.system())
-        .add_system_to_stage(CoreStage::Update, ui::file_dialog.system())
+        .add_system(ui::update_scale_factor.system())
+        .add_system(ui::ui.system())
+        .add_system(ui::update_cross_section_state.system())
+        .add_system(ui::file_dialog.system())
         .add_system_to_stage(CoreStage::PostUpdate, ui::update_cross_section.system())
         .add_system_to_stage(CoreStage::PostUpdate, ui::update_changed_polytopes.system())
         .run();
