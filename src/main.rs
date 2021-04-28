@@ -102,6 +102,7 @@ fn main() {
         .insert_resource(Msaa { samples: 4 })
         .insert_resource(CrossSectionActive(false))
         .insert_resource(CrossSectionState::default())
+        .insert_resource(ui::FileDialogState::default())
         .insert_non_send_resource(ui::MainThreadToken::new())
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
@@ -110,6 +111,7 @@ fn main() {
         .add_system_to_stage(CoreStage::Update, ui::update_scale_factor.system())
         .add_system_to_stage(CoreStage::Update, ui::ui.system())
         .add_system_to_stage(CoreStage::Update, ui::update_cross_section_state.system())
+        .add_system_to_stage(CoreStage::Update, ui::file_dialog.system())
         .add_system_to_stage(CoreStage::PostUpdate, ui::update_cross_section.system())
         .add_system_to_stage(CoreStage::PostUpdate, ui::update_changed_polytopes.system())
         .run();

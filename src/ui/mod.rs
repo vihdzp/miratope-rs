@@ -43,6 +43,35 @@ impl MainThreadToken {
     }
 }
 
+enum FileDialogMode {
+    Disabled,
+    Open,
+    Save,
+}
+
+impl Default for FileDialogMode {
+    fn default() -> Self {
+        Self::Disabled
+    }
+}
+
+#[derive(Default)]
+pub struct FileDialogState {
+    mode: FileDialogMode,
+    name: Option<String>,
+}
+
+impl FileDialogState {
+    pub fn open(&mut self) {
+        self.mode = FileDialogMode::Open;
+    }
+
+    pub fn save(&mut self, name: String) {
+        self.mode = FileDialogMode::Save;
+        self.name = Some(name);
+    }
+}
+
 /// Stores whether the cross-section view is active.
 pub struct CrossSectionActive(pub bool);
 
@@ -81,7 +110,7 @@ pub fn ui(
     mut query: Query<&mut Concrete>,
     mut section_state: ResMut<CrossSectionState>,
     mut section_active: ResMut<CrossSectionActive>,
-    token: NonSend<MainThreadToken>,
+    mut file_dialog_state: ResMut<FileDialogState>,
 ) {
     let ctx = egui_ctx.ctx();
 
@@ -90,23 +119,13 @@ pub fn ui(
             egui::menu::menu(ui, "File", |ui| {
                 // Loads a file.
                 if ui.button("Load").clicked() {
-                    let path = token.pick_file();
-
-                    if let Some(path) = path {
-                        for mut p in query.iter_mut() {
-                            *p = Concrete::from_path(&path).unwrap();
-                        }
-                    }
+                    file_dialog_state.open();
                 }
 
                 // Saves a file.
                 if ui.button("Save").clicked() {
-                    for p in query.iter_mut() {
-                        let path = token.save_file(&lang::En::parse(p.name(), Default::default()));
-
-                        if let Some(path) = path {
-                            std::fs::write(path.clone(), p.to_off(OffOptions::default())).unwrap();
-                        }
+                    if let Some(p) = query.iter_mut().next() {
+                        file_dialog_state.save(lang::En::parse(p.name(), Default::default()));
                     }
                 }
 
@@ -226,6 +245,32 @@ pub fn ui(
             section_state.flatten = new_flatten;
         }
     });
+}
+
+pub fn file_dialog(
+    mut query: Query<&mut Concrete>,
+    file_dialog_state: ResMut<FileDialogState>,
+    token: NonSend<MainThreadToken>,
+) {
+    if file_dialog_state.is_changed() {
+        match file_dialog_state.mode {
+            FileDialogMode::Save => {
+                if let Some(path) = token.save_file(file_dialog_state.name.as_ref().unwrap()) {
+                    for p in query.iter_mut() {
+                        std::fs::write(path.clone(), p.to_off(OffOptions::default())).unwrap();
+                    }
+                }
+            }
+            FileDialogMode::Open => {
+                if let Some(path) = token.pick_file() {
+                    for mut p in query.iter_mut() {
+                        *p = Concrete::from_path(&path).unwrap();
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 /// Resizes the UI when the screen is resized.
