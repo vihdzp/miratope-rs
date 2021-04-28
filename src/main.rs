@@ -140,7 +140,7 @@ fn setup(
     // Unselected object (default material).
     let wf_unselected = materials.set(
         WIREFRAME_UNSELECTED_MATERIAL,
-        Color::rgb_u8(0, 0, 255).into(),
+        Color::rgb_u8(48, 48, 48).into(),
     );
 
     // Camera configuration.

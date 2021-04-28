@@ -616,45 +616,48 @@ impl Concrete {
         abs.push(ElementList::max(facet_count));
 
         // Splits compounds of dyads.
-        let mut faces = abs[2].clone();
+        if let Some(mut faces) = abs.ranks.get(2).cloned() {
+            let mut i = abs[1].len();
+            let mut new_edges = ElementList::new();
 
-        let mut i = abs[1].len();
-        let mut new_edges = ElementList::new();
+            for (idx, edge) in abs[1].0.iter_mut().enumerate() {
+                let edge_sub = &mut edge.subs;
+                let comps = edge_sub.len() / 2;
 
-        for (idx, edge) in abs[1].0.iter_mut().enumerate() {
-            let edge_sub = &mut edge.subs;
-            let comps = edge_sub.len() / 2;
-
-            if comps > 1 {
-                edge_sub.sort_unstable_by_key(|&x| OrdPoint::new(vertices[x].clone()));
-            }
-
-            for comp in 1..comps {
-                let new_subs = Subelements::from_vec(edge_sub.0[2 * comp..2 * comp + 2].to_vec());
-                new_edges.push(Element::from_subs(new_subs));
-
-                for face in faces.0.iter_mut() {
-                    if face.subs.contains(&idx) {
-                        face.subs.push(i);
-                    }
+                if comps > 1 {
+                    edge_sub.sort_unstable_by_key(|&x| OrdPoint::new(vertices[x].clone()));
                 }
 
-                i += 1;
+                for comp in 1..comps {
+                    let new_subs =
+                        Subelements::from_vec(edge_sub.0[2 * comp..2 * comp + 2].to_vec());
+                    new_edges.push(Element::from_subs(new_subs));
+
+                    for face in faces.0.iter_mut() {
+                        if face.subs.contains(&idx) {
+                            face.subs.push(i);
+                        }
+                    }
+
+                    i += 1;
+                }
+
+                let new_subs = Subelements::from_vec(edge_sub.0[..2].to_vec());
+                *edge = Element::from_subs(new_subs);
             }
 
-            let new_subs = Subelements::from_vec(edge_sub.0[..2].to_vec());
-            *edge = Element::from_subs(new_subs);
+            abs[1].append(&mut new_edges);
+            abs[2] = faces;
+
+            let mut abs2 = Abstract::new();
+            for r in abs {
+                abs2.push_subs(r);
+            }
+
+            Self::new(vertices, abs2)
+        } else {
+            Self::new(vertices, abs)
         }
-
-        abs[1].append(&mut new_edges);
-        abs[2] = faces;
-
-        let mut abs2 = Abstract::new();
-        for r in abs {
-            abs2.push_subs(r);
-        }
-
-        Self::new(vertices, abs2)
     }
 
     /// Loads a polytope from a file path.
@@ -666,11 +669,9 @@ impl Concrete {
         let ext = fp.as_ref().extension();
 
         if ext == Some(off) {
-            Ok(Self::from_off(String::from_utf8(fs::read(fp)?).unwrap())?)
+            Self::from_off(String::from_utf8(fs::read(fp)?).unwrap())
         } else if ext == Some(ggb) {
-            Ok(Self::from_ggb(zip::read::ZipArchive::new(
-                &mut fs::File::open(fp)?,
-            )?)?)
+            Self::from_ggb(zip::read::ZipArchive::new(&mut fs::File::open(fp)?)?)
         } else {
             Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
