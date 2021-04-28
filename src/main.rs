@@ -122,8 +122,9 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let pentagram = Concrete::star_polygon(5, 2);
-    let poly = Concrete::duoprism(&pentagram, &pentagram);
+    let p = Concrete::orthoplex(3);
+    let poly = Concrete::duoprism(&p, &p);
+    //let poly = Concrete::from_path(&"F:/aaa/polytope stuff/off/4D/Convex uniform polychora/Hyics/Bitruncated hecatonicosachoron.off").unwrap();
 
     // Disables backface culling.
     pipelines.set_untracked(
@@ -140,7 +141,7 @@ fn setup(
     // Unselected object (default material).
     let wf_unselected = materials.set(
         WIREFRAME_UNSELECTED_MATERIAL,
-        Color::rgb_u8(48, 48, 48).into(),
+        Color::rgb_u8(240, 240, 240).into(),
     );
 
     // Camera configuration.
