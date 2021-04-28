@@ -98,19 +98,19 @@ type Float = f64;
 /// Loads all of the necessary systems for the application to run.
 fn main() {
     App::build()
-        // .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
-        // .insert_resource(Msaa { samples: 4 })
+        .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
+        .insert_resource(Msaa { samples: 4 })
         .insert_resource(CrossSectionActive(false))
         .insert_resource(CrossSectionState::default())
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
         .add_plugin(ui::input::InputPlugin)
         .add_startup_system(setup.system())
-        .add_system_to_stage(CoreStage::PreUpdate, ui::update_scale_factor.system())
-        .add_system_to_stage(CoreStage::PreUpdate, ui::ui.system())
-        // .add_system_to_stage(CoreStage::Update, ui::update_cross_section_state.system())
-        // .add_system_to_stage(CoreStage::PostUpdate, ui::update_cross_section.system())
-        // .add_system_to_stage(CoreStage::PostUpdate, ui::update_changed_polytopes.system())
+        .add_system_to_stage(CoreStage::Update, ui::update_scale_factor.system())
+        .add_system_to_stage(CoreStage::Update, ui::ui.system())
+        .add_system_to_stage(CoreStage::Update, ui::update_cross_section_state.system())
+        .add_system_to_stage(CoreStage::PostUpdate, ui::update_cross_section.system())
+        .add_system_to_stage(CoreStage::PostUpdate, ui::update_changed_polytopes.system())
         .run();
 }
 
@@ -155,7 +155,7 @@ fn setup(
             mesh: meshes.add(poly.get_mesh()),
             material: materials.add(Color::rgb(0.93, 0.5, 0.93).into()),
             visible: Visible {
-                is_visible: false,
+                is_visible: true,
                 ..Default::default()
             },
             ..Default::default()
