@@ -117,7 +117,7 @@ type Float = f64;
 /// Loads all of the necessary systems for the application to run.
 fn main() {
     App::build()
-        .add_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
+        .add_resource(ClearColor(Color::rgb(0.95, 0.95, 0.95)))
         .add_resource(Msaa { samples: 4 })
         .add_resource(CrossSectionActive(false))
         .add_resource(CrossSectionState::default())
@@ -160,7 +160,7 @@ fn setup(
     // Unselected object (default material).
     let wf_unselected = materials.set(
         WIREFRAME_UNSELECTED_MATERIAL,
-        Color::rgb_u8(0, 0, 255).into(),
+        Color::rgb_u8(48, 48, 48).into(),
     );
 
     // Camera configuration.
