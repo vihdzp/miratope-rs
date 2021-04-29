@@ -196,20 +196,48 @@ impl Concrete {
 
     /// Gets the least `x` coordinate of a vertex of the polytope.
     pub fn x_min(&self) -> Option<Float> {
-        self.vertices
-            .iter()
-            .map(|v| float_ord::FloatOrd(v[0]))
-            .min()
-            .map(|x| x.0)
+        if self.dim()? == 0 {
+            None
+        } else {
+            self.vertices
+                .iter()
+                .map(|v| float_ord::FloatOrd(v[0]))
+                .min()
+                .map(|x| x.0)
+        }
     }
 
     /// Gets the greatest `x` coordinate of a vertex of the polytope.
     pub fn x_max(&self) -> Option<Float> {
-        self.vertices
-            .iter()
-            .map(|v| float_ord::FloatOrd(v[0]))
-            .max()
-            .map(|x| x.0)
+        if self.dim()? == 0 {
+            None
+        } else {
+            self.vertices
+                .iter()
+                .map(|v| float_ord::FloatOrd(v[0]))
+                .max()
+                .map(|x| x.0)
+        }
+    }
+
+    /// Gets the least and greatest `x` coordinate of a vertex of the polytope.
+    pub fn x_minmax(&self) -> Option<(Float, Float)> {
+        use itertools::{Itertools, MinMaxResult};
+
+        if self.dim()? == 0 {
+            None
+        } else {
+            match self
+                .vertices
+                .iter()
+                .map(|v| float_ord::FloatOrd(v[0]))
+                .minmax()
+            {
+                MinMaxResult::NoElements => None,
+                MinMaxResult::OneElement(x) => Some((x.0, x.0)),
+                MinMaxResult::MinMax(x, y) => Some((x.0, y.0)),
+            }
+        }
     }
 
     /// Gets the edge lengths of all edges in the polytope, in order.

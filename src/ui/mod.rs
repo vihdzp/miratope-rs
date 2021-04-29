@@ -219,16 +219,13 @@ pub fn ui(
 
         // Sets the slider range to the range of x coordinates in the polytope.
         let mut new_hyperplane_pos = section_state.hyperplane_pos;
-        let x_min;
-        let x_max;
+        let (x_min, x_max) = section_state
+            .original_polytope
+            .as_ref()
+            .map(|p| p.x_minmax())
+            .flatten()
+            .unwrap_or((-1.0, 1.0));
 
-        if let Some(original) = &section_state.original_polytope {
-            x_min = original.x_min().unwrap() + 0.0001;
-            x_max = original.x_max().unwrap() - 0.0001;
-        } else {
-            x_min = -1.0;
-            x_max = 1.0;
-        }
         ui.add(egui::Slider::new(&mut new_hyperplane_pos, x_min..=x_max).text("Slice depth"));
 
         #[allow(clippy::float_cmp)]
