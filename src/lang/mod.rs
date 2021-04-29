@@ -284,7 +284,7 @@ pub trait GreekPrefix {
     /// Converts a number into its Greek prefix equivalent.
     fn greek_prefix(n: usize) -> String {
         match n {
-            2..=9 => Self::UNITS[n].to_string(),
+            0..=9 => Self::UNITS[n].to_string(),
             11 => Self::HENDECA.to_string(),
             12 => Self::DODECA.to_string(),
             10 | 13..=19 => format!("{}{}", Self::UNITS[n % 10], Self::DECA),
