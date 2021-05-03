@@ -129,7 +129,7 @@ fn setup(
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
     let poly = Concrete::hypercube(3);
-    
+
     // Disables backface culling.
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
