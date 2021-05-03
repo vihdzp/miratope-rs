@@ -226,7 +226,13 @@ pub fn ui(
             .flatten()
             .unwrap_or((-1.0, 1.0));
 
-        ui.add(egui::Slider::new(&mut new_hyperplane_pos, x_min..=x_max).text("Slice depth"));
+        ui.add(
+            egui::Slider::new(
+                &mut new_hyperplane_pos,
+                (x_min + 0.00001)..=(x_max - 0.00001),
+            )
+            .text("Slice depth"),
+        );
 
         #[allow(clippy::float_cmp)]
         // Updates the slicing depth for the polytope, but only when needed.

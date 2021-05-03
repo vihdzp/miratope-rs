@@ -147,8 +147,12 @@ impl Subspace {
 
     /// Adds a point to the subspace. If the rank increases, returns a new
     /// basis vector for the subspace.
+    ///
+    /// # Todo:
+    /// Implement [this](https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process#Numerical_stability).
     pub fn add(&mut self, p: &Point) -> Option<Point> {
         let mut v = p - self.project(p);
+
         if v.normalize_mut() > Float::EPS {
             self.basis.push(v.clone());
             Some(v)
@@ -191,7 +195,7 @@ impl Subspace {
         let mut q = self.offset.clone();
 
         for b in &self.basis {
-            q += b * (p.dot(b));
+            q += b * p.dot(b);
         }
 
         q
@@ -312,28 +316,6 @@ impl Hyperplane {
             subspace: Subspace::x(rank, x),
             normal,
         }
-    }
-
-    // Returns a hyperplane defined by all points with a given last coordinate.
-    pub fn z(rank: usize, z: Float) -> Self {
-        let mut basis = Vec::new();
-        for i in 0..rank - 1 {
-            let mut p = Point::zeros(rank);
-            p[i] = 1.0;
-            basis.push(p);
-        }
-
-        // The offset is the point (0, ..., 0, z).
-        let mut offset = Point::zeros(rank);
-        offset[rank - 1] = z;
-
-        // The normal is the vector (0, ..., 0, 1).
-        let mut normal = Vector::zeros(rank);
-        normal[rank - 1] = 1.0;
-
-        let subspace = Subspace { basis, offset };
-
-        Self { subspace, normal }
     }
 }
 

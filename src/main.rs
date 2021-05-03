@@ -128,10 +128,8 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let p = Concrete::orthoplex(3);
-    let poly = Concrete::duoprism(&p, &p);
-    //let poly = Concrete::from_path(&"F:/aaa/polytope stuff/off/4D/Convex uniform polychora/Hyics/Bitruncated hecatonicosachoron.off").unwrap();
-
+    let poly = Concrete::hypercube(3);
+    
     // Disables backface culling.
     pipelines.set_untracked(
         no_cull_pipeline::NO_CULL_PIPELINE_HANDLE,
