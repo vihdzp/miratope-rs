@@ -1,7 +1,7 @@
 [package]
 name = "miratope"
 version = "0.1.0"
-authors = ["Violeta Hernández <vi.hdz.p@gmail.com>", "Grayson Burton <ocornoc@protonmail.com>"]
+authors = ["Violeta Hernández <vi.hdz.p@gmail.com>", "Grayson Burton <ocornoc@protonmail.com>", "Roman Salinas <ultraroman01@gmail.com>"]
 edition = "2018"
 
 [dependencies]
