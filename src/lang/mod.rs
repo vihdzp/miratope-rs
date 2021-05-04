@@ -379,7 +379,7 @@ pub trait Language: Prefix {
             | Name::Multicomb(_) => Self::multiproduct(name, options),
             Name::Simplex { regular: _, rank } => Self::simplex(*rank, options),
             Name::Hyperblock { regular, rank } => {
-                if regular.contains(true) {
+                if regular.satisfies(|r| r.is_yes()) {
                     Self::hypercube(*rank, options)
                 } else {
                     Self::cuboid(*rank, options)

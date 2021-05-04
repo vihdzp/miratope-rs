@@ -10,7 +10,7 @@ use self::r#abstract::{
     rank::RankVec,
 };
 use crate::lang::{
-    name::{NameData, NameType},
+    name::{NameData, NameType, Regular},
     Name,
 };
 
@@ -290,8 +290,16 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
     /// given rank.
     fn simplex(rank: isize) -> Self {
-        Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize])
-            .with_name(Name::simplex(T::DataBool::new(true), rank))
+        if rank == -1 {
+            Self::nullitope()
+        } else {
+            Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize]).with_name(Name::simplex(
+                T::DataRegular::new(Regular::Yes {
+                    center: vec![0.0; rank as usize].into(),
+                }),
+                rank,
+            ))
+        }
     }
 
     /// Builds a [hypercube](https://polytope.miraheze.org/wiki/Hypercube) with
@@ -300,8 +308,12 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         if rank == -1 {
             Self::nullitope()
         } else {
-            Self::multiprism(&vec![&Self::dyad(); rank as usize])
-                .with_name(Name::cuboid(T::DataBool::new(true), rank))
+            Self::multiprism(&vec![&Self::dyad(); rank as usize]).with_name(Name::cuboid(
+                T::DataRegular::new(Regular::Yes {
+                    center: vec![0.0; rank as usize].into(),
+                }),
+                rank,
+            ))
         }
     }
 
@@ -311,8 +323,12 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         if rank == -1 {
             Self::nullitope()
         } else {
-            Self::multitegum(&vec![&Self::dyad(); rank as usize])
-                .with_name(Name::orthoplex(T::DataBool::new(true), rank))
+            Self::multitegum(&vec![&Self::dyad(); rank as usize]).with_name(Name::orthoplex(
+                T::DataRegular::new(Regular::Yes {
+                    center: vec![0.0; rank as usize].into(),
+                }),
+                rank,
+            ))
         }
     }
 }

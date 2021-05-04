@@ -17,15 +17,7 @@ use super::{
     },
     Polytope,
 };
-use crate::{
-    geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace},
-    lang::{
-        name::{Con, ConData, NameData},
-        Name,
-    },
-    r#abstract::{flag::FlagEvent, Abstract},
-    Consts, Float,
-};
+use crate::{Consts, Float, geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace}, lang::{Name, name::{Con, ConData, NameData, Regular}}, r#abstract::{flag::FlagEvent, Abstract}};
 
 use approx::{abs_diff_eq, abs_diff_ne};
 use bevy::prelude::Mesh;
@@ -763,7 +755,12 @@ impl Polytope<Con> for Concrete {
 
     /// Builds a convex regular polygon with `n` sides and unit edge length.
     fn polygon(n: usize) -> Self {
-        Self::grunbaum_star_polygon(n, 1).with_name(Name::polygon(ConData::new(true), n))
+        Self::grunbaum_star_polygon(n, 1).with_name(Name::polygon(
+            ConData::new(Regular::Yes {
+                center: vec![0.0, 0.0].into(),
+            }),
+            n,
+        ))
     }
 
     /// Returns the dual of a polytope, or `None` if any facets pass through the

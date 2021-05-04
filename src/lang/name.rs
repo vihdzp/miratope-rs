@@ -2,18 +2,18 @@
 
 use std::{fmt::Debug, marker::PhantomData};
 
-use crate::geometry::Point;
+use crate::{geometry::Point, Consts, Float};
 
 /// A type marker that determines whether a name describes an abstract or
 /// concrete polytope.
 pub trait NameType: Debug + Clone + PartialEq {
-    /// Either `AbsData<bool>` or `ConData<bool>`. Workaround until generic
-    /// associated types are stable.
-    type DataBool: NameData<bool> + Copy;
-
     /// Either `AbsData<Point>` or `ConData<Point>`. Workaround until generic
     /// associated types are stable.
     type DataPoint: NameData<Point>;
+
+    /// Either `AbsData<Regular>` or `ConData<Regular>`. Workaround until generic
+    /// associated types are stable.
+    type DataRegular: NameData<Regular>;
 
     /// Whether the name marker is for an abstract polytope.
     fn is_abstract() -> bool;
@@ -22,12 +22,18 @@ pub trait NameType: Debug + Clone + PartialEq {
 /// A trait for data associated to a name. It can either be [`AbsData`], which
 /// is zero size and compares `true` with anything, or [`ConData`], which stores
 /// an actual value which is used for comparisons.
+///
+/// The idea is that `NameData` should be used to store whichever conditions on
+/// concrete polytopes always hold on abstract polytopes.
 pub trait NameData<T>: PartialEq + Debug + Clone {
     /// Initializes a new `NameData` with a given value.
     fn new(value: T) -> Self;
 
     /// Determines whether `self` contains a given value.
-    fn contains(&self, value: T) -> bool;
+    fn contains(&self, value: &T) -> bool;
+
+    /// Determines whether `self` satisfies a given predicate.
+    fn satisfies<F: Fn(&T) -> bool>(&self, f: F) -> bool;
 }
 
 #[derive(Debug)]
@@ -64,7 +70,13 @@ impl<T: Debug> NameData<T> for AbsData<T> {
 
     /// Returns `true` no matter what, as if `self` pretended to hold the given
     /// value.
-    fn contains(&self, _: T) -> bool {
+    fn contains(&self, _: &T) -> bool {
+        true
+    }
+
+    /// Returns `true` no matter what, as if `self` pretended to satisfy the
+    /// given predicate.
+    fn satisfies<F: Fn(&T) -> bool>(&self, _: F) -> bool {
         true
     }
 }
@@ -74,8 +86,8 @@ impl<T: Debug> NameData<T> for AbsData<T> {
 pub struct Abs;
 
 impl NameType for Abs {
-    type DataBool = AbsData<bool>;
     type DataPoint = AbsData<Point>;
+    type DataRegular = AbsData<Regular>;
 
     fn is_abstract() -> bool {
         true
@@ -101,8 +113,13 @@ impl<T: PartialEq + Debug + Clone> NameData<T> for ConData<T> {
     }
 
     /// Determines whether `self` contains a given value.
-    fn contains(&self, value: T) -> bool {
-        self.0 == value
+    fn contains(&self, value: &T) -> bool {
+        &self.0 == value
+    }
+
+    /// Determines whether `self` satisfies the given predicate.
+    fn satisfies<F: Fn(&T) -> bool>(&self, f: F) -> bool {
+        f(&self.0)
     }
 }
 
@@ -111,11 +128,29 @@ impl<T: PartialEq + Debug + Clone> NameData<T> for ConData<T> {
 pub struct Con(bool);
 
 impl NameType for Con {
-    type DataBool = ConData<bool>;
     type DataPoint = ConData<Point>;
+    type DataRegular = ConData<Regular>;
 
     fn is_abstract() -> bool {
         false
+    }
+}
+
+/// Determines whether a `Name` refers to a concrete regular polytope. This is
+/// often indirectly stored as a `NameData<Regular>`, so that all abstract
+/// polytopes behave as regular.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Regular {
+    Yes { center: Point },
+    No,
+}
+
+impl Regular {
+    pub fn is_yes(&self) -> bool {
+        match self {
+            Regular::Yes { center: _ } => true,
+            Regular::No => false,
+        }
     }
 }
 
@@ -139,7 +174,7 @@ pub enum Name<T: NameType> {
     Dyad,
 
     /// A triangle.
-    Triangle { regular: T::DataBool },
+    Triangle { regular: T::DataRegular },
 
     /// A square.
     Square,
@@ -152,7 +187,7 @@ pub enum Name<T: NameType> {
 
     /// A polygon with **at least 4** sides if irregular, or **at least 5**
     /// sides if regular.
-    Polygon { regular: T::DataBool, n: usize },
+    Polygon { regular: T::DataRegular, n: usize },
 
     /// A pyramid based on some polytope.
     Pyramid(Box<Name<T>>),
@@ -186,14 +221,23 @@ pub enum Name<T: NameType> {
     },
 
     /// A simplex of a given dimension, **at least 3.**
-    Simplex { regular: T::DataBool, rank: usize },
+    Simplex {
+        regular: T::DataRegular,
+        rank: usize,
+    },
 
     /// A hyperblock of a given rank, **at least 3.**
-    Hyperblock { regular: T::DataBool, rank: usize },
+    Hyperblock {
+        regular: T::DataRegular,
+        rank: usize,
+    },
 
     /// An orthoplex (polytope whose opposite vertices form an orthogonal basis)
     /// of a given dimension, **at least 3.**
-    Orthoplex { regular: T::DataBool, rank: usize },
+    Orthoplex {
+        regular: T::DataRegular,
+        rank: usize,
+    },
 
     /// A polytope with a given facet count and rank, in that order. The facet
     /// count must be **at least 2,** and the dimension must be **at least 3**
@@ -303,7 +347,7 @@ impl<T: NameType> Name<T> {
     pub fn is_valid(&self) -> bool {
         match self {
             Self::Polygon { regular, n } => {
-                if regular.contains(true) {
+                if regular.satisfies(|r| r.is_yes()) {
                     *n >= 5
                 } else {
                     *n >= 4
@@ -344,20 +388,20 @@ impl<T: NameType> Name<T> {
             1 => Self::Dyad,
             2 => match n {
                 3 => Self::Triangle {
-                    regular: T::DataBool::new(false),
+                    regular: T::DataRegular::new(Regular::No),
                 },
                 4 => {
                     if T::is_abstract() {
                         Self::Square
                     } else {
                         Self::Polygon {
-                            regular: T::DataBool::new(false),
+                            regular: T::DataRegular::new(Regular::No),
                             n: 4,
                         }
                     }
                 }
                 _ => Self::Polygon {
-                    regular: T::DataBool::new(false),
+                    regular: T::DataRegular::new(Regular::No),
                     n,
                 },
             },
@@ -374,17 +418,23 @@ impl<T: NameType> Name<T> {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
             Self::Dyad => Self::Triangle {
-                regular: T::DataBool::new(false),
+                regular: T::DataRegular::new(Regular::No),
             },
-            Self::Triangle { regular } => Self::Simplex { regular, rank: 3 },
+            Self::Triangle { regular } => {
+                if T::is_abstract() || regular.contains(&Regular::No) {
+                    Self::Simplex { regular, rank: 3 }
+                } else {
+                    Self::Pyramid(Box::new(Self::Triangle { regular }))
+                }
+            }
             Self::Simplex { regular, rank } => {
-                if T::is_abstract() || regular.contains(false) {
+                if T::is_abstract() || regular.contains(&Regular::No) {
                     Self::Simplex {
                         regular,
                         rank: rank + 1,
                     }
                 } else {
-                    Self::Pyramid(Box::new(self))
+                    Self::Pyramid(Box::new(Self::Simplex { regular, rank }))
                 }
             }
             Self::Pyramid(base) => Self::multipyramid(vec![*base, Self::Dyad]),
@@ -401,22 +451,22 @@ impl<T: NameType> Name<T> {
         match self {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
-            Self::Dyad => Self::rectangle(T::is_abstract()),
+            Self::Dyad => Self::rectangle(),
             Self::Rectangle => Self::Hyperblock {
-                regular: T::DataBool::new(false),
+                regular: T::DataRegular::new(Regular::No),
                 rank: 3,
             },
             Self::Hyperblock { regular, rank } => {
-                if T::is_abstract() || regular.contains(false) {
+                if T::is_abstract() || regular.contains(&Regular::No) {
                     Self::Hyperblock {
                         regular,
                         rank: rank + 1,
                     }
                 } else {
-                    Self::Prism(Box::new(self))
+                    Self::Prism(Box::new(Self::Hyperblock { regular, rank }))
                 }
             }
-            Self::Prism(base) => Self::multiprism(vec![*base, Self::rectangle(T::is_abstract())]),
+            Self::Prism(base) => Self::multiprism(vec![*base, Self::rectangle()]),
             Self::Multiprism(mut bases) => {
                 bases.push(Self::Dyad);
                 Self::multiprism(bases)
@@ -430,19 +480,19 @@ impl<T: NameType> Name<T> {
         match self {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
-            Self::Dyad => Self::orthodiagonal(T::is_abstract()),
+            Self::Dyad => Self::orthodiagonal(),
             Self::Orthodiagonal => Self::Orthoplex {
-                regular: T::DataBool::new(false),
+                regular: T::DataRegular::new(Regular::No),
                 rank: 3,
             },
             Self::Orthoplex { regular, rank } => {
-                if T::is_abstract() || regular.contains(false) {
+                if T::is_abstract() || regular.contains(&Regular::No) {
                     Self::Orthoplex {
                         regular,
                         rank: rank + 1,
                     }
                 } else {
-                    Self::Tegum(Box::new(self))
+                    Self::Tegum(Box::new(Self::Orthoplex { regular, rank }))
                 }
             }
             Self::Tegum(base) => Self::multitegum(vec![*base, Self::Orthodiagonal]),
@@ -456,6 +506,42 @@ impl<T: NameType> Name<T> {
 
     /// Builds a dual name from a given name.
     pub fn dual(self, center: T::DataPoint) -> Self {
+        /// Constructs a regular dual from a regular polytope.
+        macro_rules! regular_dual {
+            ($regular: ident, $second_field: ident, $dual: ident) => {
+                if $regular.satisfies(|r| match r {
+                    Regular::Yes {
+                        center: original_center,
+                    } => center.satisfies(|c| (c - original_center).norm() < Float::EPS),
+                    Regular::No => true,
+                }) {
+                    Name::$dual {
+                        $regular,
+                        $second_field,
+                    }
+                } else {
+                    Name::$dual {
+                        regular: T::DataRegular::new(Regular::No),
+                        $second_field,
+                    }
+                }
+            };
+        }
+
+        /// Constructs a regular dual from a pyramid, prism, or tegum.
+        macro_rules! modifier_dual {
+            ($base: ident, $modifier: ident, $dual: ident) => {
+                if T::is_abstract() {
+                    Name::$dual(Box::new($base.dual(center)))
+                } else {
+                    Name::Dual {
+                        base: Box::new(Name::$modifier($base)),
+                        center,
+                    }
+                }
+            };
+        }
+
         match self {
             Self::Nullitope | Self::Point | Self::Dyad => self,
             Self::Dual {
@@ -473,61 +559,15 @@ impl<T: NameType> Name<T> {
                     }
                 }
             }
-            Self::Square | Self::Rectangle => Self::orthodiagonal(T::is_abstract()),
-            Self::Orthodiagonal => Self::polygon(T::DataBool::new(false), 4),
-            Self::Simplex { regular: _, rank } => Self::Simplex {
-                regular: T::DataBool::new(false),
-                rank,
-            },
-            Self::Hyperblock { regular: _, rank } => Self::Orthoplex {
-                regular: T::DataBool::new(false),
-                rank,
-            },
-            Self::Orthoplex { regular: _, rank } => Self::Hyperblock {
-                regular: T::DataBool::new(false),
-                rank,
-            },
-
-            Self::Generic { n: _, rank } => {
-                if rank <= 2 {
-                    self
-                } else {
-                    Self::Dual {
-                        base: Box::new(self),
-                        center,
-                    }
-                }
-            }
-            Self::Pyramid(base) => {
-                if T::is_abstract() {
-                    Self::Pyramid(Box::new(base.dual(center)))
-                } else {
-                    Self::Dual {
-                        base: Box::new(Self::Prism(base)),
-                        center,
-                    }
-                }
-            }
-            Self::Prism(base) => {
-                if T::is_abstract() {
-                    Self::Tegum(Box::new(base.dual(center)))
-                } else {
-                    Self::Dual {
-                        base: Box::new(Self::Prism(base)),
-                        center,
-                    }
-                }
-            }
-            Self::Tegum(base) => {
-                if T::is_abstract() {
-                    Self::Prism(Box::new(base.dual(center)))
-                } else {
-                    Self::Dual {
-                        base: Box::new(Self::Prism(base)),
-                        center,
-                    }
-                }
-            }
+            Self::Square | Self::Rectangle => Self::orthodiagonal(),
+            Self::Orthodiagonal => Self::polygon(T::DataRegular::new(Regular::No), 4),
+            Self::Polygon { regular, n } => regular_dual!(regular, n, Polygon),
+            Self::Simplex { regular, rank } => regular_dual!(regular, rank, Simplex),
+            Self::Hyperblock { regular, rank } => regular_dual!(regular, rank, Orthoplex),
+            Self::Orthoplex { regular, rank } => regular_dual!(regular, rank, Hyperblock),
+            Self::Pyramid(base) => modifier_dual!(base, Pyramid, Pyramid),
+            Self::Prism(base) => modifier_dual!(base, Prism, Tegum),
+            Self::Tegum(base) => modifier_dual!(base, Tegum, Prism),
             Self::Multipyramid(bases) => {
                 // I don't know if this relation actually holds in concrete polytopes.
                 Self::Multipyramid(
@@ -589,16 +629,20 @@ impl<T: NameType> Name<T> {
         }
     }
 
-    pub fn rectangle(abs: bool) -> Self {
-        if abs {
+    /// Returns the name for a rectangle, depending on whether it's abstract or
+    /// not.
+    pub fn rectangle() -> Self {
+        if T::is_abstract() {
             Self::Square
         } else {
             Self::Rectangle
         }
     }
 
-    pub fn orthodiagonal(abs: bool) -> Self {
-        if abs {
+    /// Returns the name for an orthodiagonal quadrilateral, depending on
+    /// whether it's abstract or not.
+    pub fn orthodiagonal() -> Self {
+        if T::is_abstract() {
             Self::Square
         } else {
             Self::Orthodiagonal
@@ -606,7 +650,7 @@ impl<T: NameType> Name<T> {
     }
 
     /// The name for an *n*-simplex.
-    pub fn simplex(regular: T::DataBool, rank: isize) -> Self {
+    pub fn simplex(regular: T::DataRegular, rank: isize) -> Self {
         match rank {
             -1 => Self::Nullitope,
             0 => Self::Point,
@@ -619,13 +663,14 @@ impl<T: NameType> Name<T> {
         }
     }
 
-    pub fn cuboid(regular: T::DataBool, rank: isize) -> Self {
+    /// The name for an *n*-cuboid, regular or not.
+    pub fn cuboid(regular: T::DataRegular, rank: isize) -> Self {
         match rank {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
             2 => {
-                if regular.contains(true) {
+                if regular.satisfies(|r| r.is_yes()) {
                     Self::Square
                 } else {
                     Self::Rectangle
@@ -639,13 +684,13 @@ impl<T: NameType> Name<T> {
     }
 
     /// The name for an *n*-orthoplex.
-    pub fn orthoplex(regular: T::DataBool, rank: isize) -> Self {
+    pub fn orthoplex(regular: T::DataRegular, rank: isize) -> Self {
         match rank {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
             2 => {
-                if regular.contains(true) {
+                if regular.satisfies(|r| r.is_yes()) {
                     Self::Square
                 } else {
                     Self::Orthodiagonal
@@ -659,11 +704,11 @@ impl<T: NameType> Name<T> {
     }
 
     /// Returns the name for a polygon (not necessarily regular) of `n` sides.
-    pub fn polygon(regular: T::DataBool, n: usize) -> Self {
+    pub fn polygon(regular: T::DataRegular, n: usize) -> Self {
         match n {
             3 => Self::Triangle { regular },
             4 => {
-                if regular.contains(true) {
+                if regular.satisfies(|r| r.is_yes()) {
                     Self::Square
                 } else {
                     Self::Generic { n, rank: 2 }
@@ -725,7 +770,7 @@ impl<T: NameType> Name<T> {
         // single simplex.
         if pyramid_count >= 2 {
             new_bases.push(Name::simplex(
-                T::DataBool::new(false),
+                T::DataRegular::new(Regular::No),
                 pyramid_count as isize - 1,
             ));
         }
@@ -772,7 +817,10 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one prism, we combine all of them into a
         // single hyperblock.
         if prism_count >= 2 {
-            new_bases.push(Name::cuboid(T::DataBool::new(false), prism_count as isize));
+            new_bases.push(Name::cuboid(
+                T::DataRegular::new(Regular::No),
+                prism_count as isize,
+            ));
         }
 
         // Sorts the bases by convention.
@@ -818,7 +866,7 @@ impl<T: NameType> Name<T> {
         // single orthoplex.
         if tegum_count >= 2 {
             new_bases.push(Self::orthoplex(
-                T::DataBool::new(false),
+                T::DataRegular::new(Regular::No),
                 tegum_count as isize,
             ));
         }
