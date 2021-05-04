@@ -17,7 +17,15 @@ use super::{
     },
     Polytope,
 };
-use crate::{Consts, Float, geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace}, lang::{Name, name::{Con, ConData, NameData, Regular}}, r#abstract::{flag::FlagEvent, Abstract}};
+use crate::{
+    geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace},
+    lang::{
+        name::{Con, ConData, NameData, Regular},
+        Name,
+    },
+    r#abstract::{flag::FlagEvent, Abstract},
+    Consts, Float,
+};
 
 use approx::{abs_diff_eq, abs_diff_ne};
 use bevy::prelude::Mesh;
