@@ -33,7 +33,7 @@ use bevy::prelude::Mesh;
 pub struct ElementType {
     multiplicity: usize,
     facet_count: usize,
-    volume: Option<f64>,
+    volume: Option<Float>,
 }
 
 #[derive(Debug, Clone)]
@@ -760,15 +760,15 @@ impl Concrete {
 
         // The edge types are the edges of each different length.
         let mut edge_types = Vec::new();
-        for length in &self.edge_lengths() {
+        for &length in &self.edge_lengths() {
             if let Some(index) = edge_types
                 .iter()
-                .position(|&x: &f64| (x - length).abs() < EPS)
+                .position(|&x| abs_diff_eq!(x, length, epsilon = Float::EPS))
             {
                 element_types[1].push(index);
             } else {
                 element_types[1].push(edge_types.len());
-                edge_types.push(*length);
+                edge_types.push(length);
             }
         }
         types.push(edge_types);
@@ -787,11 +787,14 @@ impl Concrete {
             types.push(Vec::new());
             for el in self.abs.ranks[d].iter() {
                 let count = el.subs.len();
-                if let Some(index) = types[d].iter().position(|&x| x == count as f64) {
+                if let Some(index) = types[d]
+                    .iter()
+                    .position(|&x| abs_diff_eq!(x, count as Float, epsilon = Float::EPS))
+                {
                     element_types[d].push(index);
                 } else {
                     element_types[d].push(types[d].len());
-                    types[d].push(count as f64);
+                    types[d].push(count as Float);
                 }
             }
             let mut types_in_rank = Vec::with_capacity(types[d].len());
@@ -820,13 +823,16 @@ impl Concrete {
             "xennon", "dakon",
         ]);
 
-        output.push_str(&format!("{}:\n", el_names[0]));
+        output.push_str(&el_names[0].to_string());
+        output.push('\n');
         for t in &types[0] {
-            output.push_str(&format!("{}\n", t.multiplicity));
+            output.push_str(&t.multiplicity.to_string());
+            output.push('\n');
         }
-        output.push_str("\n");
+        output.push('\n');
 
-        output.push_str(&format!("{}:\n", el_names[1]));
+        output.push_str(&el_names[1].to_string());
+        output.push('\n');
         for t in &types[1] {
             output.push_str(&format!(
                 "{} of length {}\n",
@@ -837,14 +843,15 @@ impl Concrete {
         output.push_str("\n");
 
         for d in 2..self.rank() {
-            output.push_str(&format!("{}:\n", el_names[d]));
+            output.push_str(&el_names[d].to_string());
+            output.push('\n');
             for t in &types[d] {
                 output.push_str(&format!(
                     "{} × {}-{}\n",
                     t.multiplicity, t.facet_count, el_suffixes[d]
                 ));
             }
-            output.push_str("\n");
+            output.push('\n');
         }
 
         output.push_str("Components:\n");
@@ -857,7 +864,7 @@ impl Concrete {
             ));
         }
 
-        return output;
+        output
     }
 }
 

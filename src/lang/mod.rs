@@ -98,6 +98,12 @@ impl std::ops::BitOr for Gender {
     }
 }
 
+impl std::default::Default for Gender {
+    fn default() -> Self {
+        Gender::None
+    }
+}
+
 /// Represents the different modifiers that can be applied to a term.
 #[derive(Clone, Copy, Debug)]
 pub struct Options {
@@ -120,7 +126,7 @@ impl Default for Options {
         Options {
             adjective: false,
             count: 1,
-            gender: Gender::None,
+            gender: Default::default(),
             parentheses: false,
         }
     }
