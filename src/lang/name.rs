@@ -144,14 +144,15 @@ pub enum Name<T: NameType> {
     /// A square.
     Square,
 
-    /// A rectangle or square.
+    /// A rectangle (a 2-cuboid).
     Rectangle,
 
-    /// A polygon with **at least 5** sides.
-    Polygon { regular: T::DataBool, n: usize },
-
-    /// An orthodiagonal quadrilateral.
+    /// An orthodiagonal quadrilateral (a 2-orthoplex).
     Orthodiagonal,
+
+    /// A polygon with **at least 4** sides if irregular, or **at least 5**
+    /// sides if regular.
+    Polygon { regular: T::DataBool, n: usize },
 
     /// A pyramid based on some polytope.
     Pyramid(Box<Name<T>>),
@@ -242,10 +243,7 @@ impl<T: NameType> Name<T> {
             | Name::Hyperblock { regular: _, rank }
             | Name::Orthoplex { regular: _, rank } => Some(*rank as isize),
             Name::Dual { base, center: _ } => base.rank(),
-            Name::Generic {
-                n: _,
-                rank,
-            } => Some(*rank as isize),
+            Name::Generic { n: _, rank } => Some(*rank as isize),
             Name::Pyramid(base) | Name::Prism(base) | Name::Tegum(base) => Some(base.rank()? + 1),
             Name::Multipyramid(_)
             | Name::Multiprism(_)
@@ -268,11 +266,7 @@ impl<T: NameType> Name<T> {
             Name::Dyad => 2,
             Name::Triangle { regular: _ } => 3,
             Name::Square | Name::Rectangle | Name::Orthodiagonal => 4,
-            Name::Polygon { regular: _, n }
-            | Name::Generic {
-                n,
-                rank: _,
-            } => *n,
+            Name::Polygon { regular: _, n } | Name::Generic { n, rank: _ } => *n,
             Name::Simplex { regular: _, rank } => *rank + 1,
             Name::Hyperblock { regular: _, rank } => *rank * 2,
             Name::Orthoplex { regular: _, rank } => 2u32.pow(*rank as u32) as usize,
@@ -308,7 +302,13 @@ impl<T: NameType> Name<T> {
     /// specified on its variants hold. Used for debugging.
     pub fn is_valid(&self) -> bool {
         match self {
-            Self::Polygon { regular: _, n } => *n >= 5,
+            Self::Polygon { regular, n } => {
+                if regular.contains(true) {
+                    *n >= 5
+                } else {
+                    *n >= 4
+                }
+            }
             Self::Simplex { regular: _, rank }
             | Self::Hyperblock { regular: _, rank }
             | Self::Orthoplex { regular: _, rank } => *rank >= 3,
@@ -488,10 +488,7 @@ impl<T: NameType> Name<T> {
                 rank,
             },
 
-            Self::Generic {
-                n: _,
-                rank,
-            } => {
+            Self::Generic { n: _, rank } => {
                 if rank <= 2 {
                     self
                 } else {
@@ -665,11 +662,14 @@ impl<T: NameType> Name<T> {
     pub fn polygon(regular: T::DataBool, n: usize) -> Self {
         match n {
             3 => Self::Triangle { regular },
-
-            _ => Self::Generic {
-                n,
-                rank: 2,
-            },
+            4 => {
+                if regular.contains(true) {
+                    Self::Square
+                } else {
+                    Self::Generic { n, rank: 2 }
+                }
+            }
+            _ => Self::Generic { n, rank: 2 },
         }
     }
 

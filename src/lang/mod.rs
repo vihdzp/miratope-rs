@@ -366,7 +366,10 @@ pub trait Language: Prefix {
             Name::Rectangle => Self::rectangle(options),
             Name::Orthodiagonal => Self::generic(4, 2, options),
             Name::Polygon { regular: _, n } => Self::generic(*n, 2, options),
-            Name::Generic { n: facet_count, rank } => Self::generic(*facet_count, *rank, options),
+            Name::Generic {
+                n: facet_count,
+                rank,
+            } => Self::generic(*facet_count, *rank, options),
             Name::Pyramid(base) => Self::pyramid(base, options),
             Name::Prism(base) => Self::prism(base, options),
             Name::Tegum(base) => Self::tegum(base, options),
