@@ -268,6 +268,7 @@ pub fn file_dialog(
                 if let Some(path) = token.pick_file() {
                     for mut p in query.iter_mut() {
                         *p = Concrete::from_path(&path).unwrap();
+                        p.recenter();
                     }
                 }
             }

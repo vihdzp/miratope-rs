@@ -357,7 +357,7 @@ pub trait Language: Prefix {
             Name::Nullitope => Self::nullitope(options),
             Name::Point => Self::point(options),
             Name::Dyad => Self::dyad(options),
-            Name::Triangle(regular) => Self::triangle::<T>(regular.clone(), options),
+            Name::Triangle(regular) => Self::triangle::<T>(*regular, options),
             Name::Square => Self::square(options),
             Name::Rectangle => Self::rectangle(options),
             Name::Orthodiagonal => Self::orthodiagonal(options),
@@ -369,9 +369,9 @@ pub trait Language: Prefix {
             | Name::Multiprism(_)
             | Name::Multitegum(_)
             | Name::Multicomb(_) => Self::multiproduct(name, options),
-            Name::Simplex(regular, rank) => Self::simplex::<T>(regular.clone(), *rank, options),
-            Name::Hypercube(regular, rank) => Self::hypercube::<T>(regular.clone(), *rank, options),
-            Name::Orthoplex(regular, rank) => Self::orthoplex::<T>(regular.clone(), *rank, options),
+            Name::Simplex(regular, rank) => Self::simplex::<T>(*regular, *rank, options),
+            Name::Hypercube(regular, rank) => Self::hypercube::<T>(*regular, *rank, options),
+            Name::Orthoplex(regular, rank) => Self::orthoplex::<T>(*regular, *rank, options),
             Name::Dual(base) => Self::dual(base, options),
             Name::Compound(components) => Self::compound(components, options),
         }
