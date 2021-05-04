@@ -11,7 +11,7 @@ use self::{
 };
 use super::Polytope;
 use crate::lang::{
-    name::{Abs, AbsData, NameData},
+    name::{Abs, AbsData},
     Name,
 };
 
@@ -492,7 +492,7 @@ impl Polytope<Abs> for Abstract {
         poly.push_subs(edges);
         poly.push_subs(maximal);
 
-        poly.with_name(Name::polygon(AbsData::new(true), n))
+        poly.with_name(Name::regular_polygon(n))
     }
 
     /// Converts a polytope into its dual.
@@ -503,7 +503,7 @@ impl Polytope<Abs> for Abstract {
     }
 
     /// Converts a polytope into its dual in place.
-    fn _dual_mut(&mut self) -> Result<(), ()> {
+    fn _dual_mut(&mut self) -> Result<(), usize> {
         for elements in self.ranks.iter_mut() {
             for el in elements.iter_mut() {
                 el.swap_mut();
@@ -511,7 +511,7 @@ impl Polytope<Abs> for Abstract {
         }
 
         self.ranks.reverse();
-        self.name = self.name.clone().dual();
+        self.name = self.name.clone().dual(AbsData::default());
 
         Ok(())
     }

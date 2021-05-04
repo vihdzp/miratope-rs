@@ -9,10 +9,7 @@ use self::r#abstract::{
     flag::{Flag, FlagEvent, FlagIter},
     rank::RankVec,
 };
-use crate::lang::{
-    name::{NameData, NameType},
-    Name,
-};
+use crate::lang::{name::NameType, Name};
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
 const ELEMENT_NAMES: [&str; 11] = [
@@ -77,8 +74,10 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// Returns the dual of a polytope.
     fn _dual(&self) -> Option<Self>;
 
-    /// Builds the dual of a polytope in place.
-    fn _dual_mut(&mut self) -> Result<(), ()>;
+    /// Builds the dual of a polytope in place. Never fails for an abstract
+    /// polytope. In case of failing on a concrete polytope, returns the index
+    /// of the facet through the inversion center.
+    fn _dual_mut(&mut self) -> Result<(), usize>;
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks.
@@ -289,7 +288,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// given rank.
     fn simplex(rank: isize) -> Self {
         Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize])
-            .with_name(Name::simplex(T::DataBool::new(true), rank))
+            .with_name(Name::regular_simplex(rank))
     }
 
     /// Builds a [hypercube](https://polytope.miraheze.org/wiki/Hypercube) with
@@ -298,8 +297,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         if rank == -1 {
             Self::nullitope()
         } else {
-            Self::multiprism(&vec![&Self::dyad(); rank as usize])
-                .with_name(Name::hypercube(T::DataBool::new(true), rank))
+            Self::multiprism(&vec![&Self::dyad(); rank as usize]).with_name(Name::hypercube(rank))
         }
     }
 
@@ -310,7 +308,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
             Self::nullitope()
         } else {
             Self::multitegum(&vec![&Self::dyad(); rank as usize])
-                .with_name(Name::orthoplex(T::DataBool::new(true), rank))
+                .with_name(Name::regular_orthoplex(rank))
         }
     }
 }

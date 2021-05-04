@@ -141,8 +141,11 @@ pub fn ui(
             if columns[0].button("Dual").clicked() {
                 for mut p in query.iter_mut() {
                     match p.dual_mut() {
-                        Ok(_) => println!("Dual succeeded"),
-                        Err(_) => println!("Dual failed"),
+                        Ok(_) => println!("Dual succeeded."),
+                        Err(idx) => println!(
+                            "Dual failed: Facet {} passes through inversion center.",
+                            idx
+                        ),
                     }
 
                     // If we're currently viewing a cross-section, it gets "fixed"

@@ -1,7 +1,4 @@
-use crate::lang::{
-    name::{NameData, NameType},
-    Gender, Name,
-};
+use crate::lang::{name::NameType, Gender, Name};
 
 use super::{GreekPrefix, Language, Options, Prefix};
 
@@ -101,7 +98,7 @@ impl Language for Es {
     }
 
     /// The name of a triangle.
-    fn triangle<T: NameType>(_regular: T::DataBool, options: Options) -> String {
+    fn triangle(options: Options) -> String {
         format!(
             "tri{}",
             options.four("ángulo", "ángulos", "angular", "angulares")
@@ -119,12 +116,6 @@ impl Language for Es {
             "rect{}",
             options.four("ángulo", "ángulos", "angular", "angulares")
         )
-    }
-
-    /// The name of an orthodiagonal quadrilateral. You should probably just
-    /// default this one to "tetragon," as it only exists for tracking purposes.
-    fn orthodiagonal(options: Options) -> String {
-        Self::generic(4, 2, options)
     }
 
     /// The generic name for a polytope with `n` facets in `d` dimensions.
@@ -239,52 +230,51 @@ impl Language for Es {
         format!("{} {}", kind, str_bases)
     }
 
-    /// The name for a hypercube with a given rank.
-    fn hypercube<T: NameType>(regular: T::DataBool, rank: usize, options: Options) -> String {
-        if regular == T::DataBool::new(true) {
-            match rank {
-                3 => format!(
-                    "c{}",
-                    options.six("ubo", "ubos", "úbico", "úbicos", "úbica", "úbicas")
-                ),
-                4 => format!(
-                    "teser{}",
-                    options.six("acto", "actos", "áctico", "ácticoa", "áctica", "ácticas")
-                ),
-                _ => {
-                    let prefix = Self::prefix(rank).chars().collect::<Vec<_>>();
-
-                    // Penta -> Pente, or Deca -> Deque
-                    // Penta -> Pente, or Deca -> Deke
-                    let (_, str0) = prefix.split_last().unwrap();
-                    let (c1, str1) = str0.split_last().unwrap();
-
-                    let suffix =
-                        options.six("acto", "actos", "áctico", "ácticos", "áctica", "ácticas");
-                    if *c1 == 'c' {
-                        format!("{}quer{}", str1.iter().collect::<String>(), suffix)
-                    } else {
-                        format!("{}eract{}", str0.iter().collect::<String>(), suffix)
-                    }
-                }
+    fn cuboid(rank: usize, options: Options) -> String {
+        match rank {
+            3 => format!("cuboid{}", options.four("e", "es", "al", "ales")),
+            _ => {
+                format!(
+                    "{} {}bloque{}",
+                    if options.adjective { "de" } else { "" },
+                    Self::prefix(rank),
+                    options.two("", "s")
+                )
             }
-        } else {
-            match rank {
-                3 => format!("cuboid{}", options.four("e", "es", "al", "ales")),
-                _ => {
-                    format!(
-                        "{} {}bloque{}",
-                        if options.adjective { "de" } else { "" },
-                        Self::prefix(rank),
-                        options.two("", "s")
-                    )
+        }
+    }
+
+    /// The name for a hypercube with a given rank.
+    fn hypercube(rank: usize, options: Options) -> String {
+        match rank {
+            3 => format!(
+                "c{}",
+                options.six("ubo", "ubos", "úbico", "úbicos", "úbica", "úbicas")
+            ),
+            4 => format!(
+                "teser{}",
+                options.six("acto", "actos", "áctico", "ácticoa", "áctica", "ácticas")
+            ),
+            _ => {
+                let prefix = Self::prefix(rank).chars().collect::<Vec<_>>();
+
+                // Penta -> Pente, or Deca -> Deque
+                // Penta -> Pente, or Deca -> Deke
+                let (_, str0) = prefix.split_last().unwrap();
+                let (c1, str1) = str0.split_last().unwrap();
+
+                let suffix = options.six("acto", "actos", "áctico", "ácticos", "áctica", "ácticas");
+                if *c1 == 'c' {
+                    format!("{}quer{}", str1.iter().collect::<String>(), suffix)
+                } else {
+                    format!("{}eract{}", str0.iter().collect::<String>(), suffix)
                 }
             }
         }
     }
 
     /// The name for an orthoplex with a given rank.
-    fn orthoplex<T: NameType>(_regular: T::DataBool, rank: usize, options: Options) -> String {
+    fn orthoplex(rank: usize, options: Options) -> String {
         Self::generic(2u32.pow(rank as u32) as usize, rank, options)
     }
 

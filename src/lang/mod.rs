@@ -56,7 +56,7 @@ pub use en::En;
 pub use es::Es;
 pub use name::Name;
 
-use self::name::{NameData, NameType};
+use self::name::NameType;
 
 /// The different grammatical genders.
 #[derive(Clone, Copy, Debug)]
@@ -357,10 +357,11 @@ pub trait Language: Prefix {
             Name::Nullitope => Self::nullitope(options),
             Name::Point => Self::point(options),
             Name::Dyad => Self::dyad(options),
-            Name::Triangle { regular } => Self::triangle::<T>(*regular, options),
+            Name::Triangle | Name::RegularTriangle => Self::triangle(options),
             Name::Square => Self::square(options),
             Name::Rectangle => Self::rectangle(options),
-            Name::Orthodiagonal => Self::orthodiagonal(options),
+            Name::Orthodiagonal => Self::generic(4, 2, options),
+            Name::Polygon(n) | Name::RegularPolygon(n) => Self::generic(*n, 2, options),
             Name::Generic { facet_count, rank } => Self::generic(*facet_count, *rank, options),
             Name::Pyramid(base) => Self::pyramid(base, options),
             Name::Prism(base) => Self::prism(base, options),
@@ -369,10 +370,11 @@ pub trait Language: Prefix {
             | Name::Multiprism(_)
             | Name::Multitegum(_)
             | Name::Multicomb(_) => Self::multiproduct(name, options),
-            Name::Simplex { regular, rank: dim } => Self::simplex::<T>(*regular, *dim, options),
-            Name::Hypercube { regular, rank: dim } => Self::hypercube::<T>(*regular, *dim, options),
-            Name::Orthoplex { regular, rank: dim } => Self::orthoplex::<T>(*regular, *dim, options),
-            Name::Dual(base) => Self::dual(base, options),
+            Name::Simplex(rank) | Name::RegularSimplex(rank) => Self::simplex(*rank, options),
+            Name::Hypercube(rank) => Self::hypercube(*rank, options),
+            Name::Hyperblock(rank) => Self::cuboid(*rank, options),
+            Name::Orthoplex(rank) | Name::RegularOrthoplex(rank) => Self::orthoplex(*rank, options),
+            Name::Dual { base, center: _ } => Self::dual(base, options),
             Name::Compound(components) => Self::compound(components, options),
         }
     }
@@ -415,7 +417,7 @@ pub trait Language: Prefix {
     }
 
     /// The name of a triangle.
-    fn triangle<T: NameType>(_regular: T::DataBool, options: Options) -> String {
+    fn triangle(options: Options) -> String {
         format!("triang{}", options.three("le", "les", "ular"))
     }
 
@@ -427,12 +429,6 @@ pub trait Language: Prefix {
     /// The name of a rectangle.
     fn rectangle(options: Options) -> String {
         format!("rectang{}", options.three("le", "les", "ular"))
-    }
-
-    /// The name of an orthodiagonal quadrilateral. You should probably just
-    /// default this one to "tetragon," as it only exists for tracking purposes.
-    fn orthodiagonal(options: Options) -> String {
-        Self::generic(4, 2, options)
     }
 
     /// The generic name for a polytope with `n` facets in `d` dimensions.
@@ -527,43 +523,43 @@ pub trait Language: Prefix {
     }
 
     /// The name for a simplex with a given rank.
-    fn simplex<T: NameType>(_regular: T::DataBool, rank: usize, options: Options) -> String {
+    fn simplex(rank: usize, options: Options) -> String {
         Self::generic(rank + 1, rank, options)
     }
 
-    /// The name for a hypercube with a given rank.
-    fn hypercube<T: NameType>(regular: T::DataBool, rank: usize, options: Options) -> String {
-        if regular == T::DataBool::new(true) {
-            match rank {
-                3 => format!("cub{}", options.three("e", "s", "ic")),
-                4 => format!("tesseract{}", options.three("", "s", "ic")),
-                _ => {
-                    let prefix = Self::prefix(rank).chars().collect::<Vec<_>>();
-
-                    // Penta -> Pente, or Deca -> Deke
-                    let (_, str0) = prefix.split_last().unwrap();
-                    let (c1, str1) = str0.split_last().unwrap();
-
-                    let suffix = options.three("", "s", "ic");
-                    if *c1 == 'c' {
-                        format!("{}keract{}", str1.iter().collect::<String>(), suffix)
-                    } else {
-                        format!("{}eract{}", str0.iter().collect::<String>(), suffix)
-                    }
-                }
+    fn cuboid(rank: usize, options: Options) -> String {
+        match rank {
+            3 => format!("cuboid{}", options.three("", "s", "al")),
+            _ => {
+                format!("{}block{}", Self::prefix(rank), options.two("", "s"))
             }
-        } else {
-            match rank {
-                3 => format!("cuboid{}", options.three("", "s", "al")),
-                _ => {
-                    format!("{}block{}", Self::prefix(rank), options.two("", "s"))
+        }
+    }
+
+    /// The name for a hypercube with a given rank.
+    fn hypercube(rank: usize, options: Options) -> String {
+        match rank {
+            3 => format!("cub{}", options.three("e", "s", "ic")),
+            4 => format!("tesseract{}", options.three("", "s", "ic")),
+            _ => {
+                let prefix = Self::prefix(rank).chars().collect::<Vec<_>>();
+
+                // Penta -> Pente, or Deca -> Deke
+                let (_, str0) = prefix.split_last().unwrap();
+                let (c1, str1) = str0.split_last().unwrap();
+
+                let suffix = options.three("", "s", "ic");
+                if *c1 == 'c' {
+                    format!("{}keract{}", str1.iter().collect::<String>(), suffix)
+                } else {
+                    format!("{}eract{}", str0.iter().collect::<String>(), suffix)
                 }
             }
         }
     }
 
     /// The name for an orthoplex with a given rank.
-    fn orthoplex<T: NameType>(_regular: T::DataBool, rank: usize, options: Options) -> String {
+    fn orthoplex(rank: usize, options: Options) -> String {
         Self::generic(2u32.pow(rank as u32) as usize, rank, options)
     }
 

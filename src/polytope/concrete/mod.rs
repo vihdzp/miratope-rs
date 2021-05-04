@@ -316,14 +316,15 @@ impl Concrete {
         }
     }
 
-    pub fn dual_mut(&mut self) -> Result<(), ()> {
+    pub fn dual_mut(&mut self) -> Result<(), usize> {
         self._dual_mut()
     }
 
     /// Builds the dual of a polytope with a given reciprocation sphere in
     /// place, or does nothing in case any facets go through the reciprocation
-    /// center. Returns the dual if successful, and `None` otherwise.
-    pub fn dual_mut_with_sphere(&mut self, sphere: &Hypersphere) -> Result<(), ()> {
+    /// center. In case of failure, returns the index of the facet through the
+    /// projection center.
+    pub fn dual_mut_with_sphere(&mut self, sphere: &Hypersphere) -> Result<(), usize> {
         // If we're dealing with a nullitope, the dual is itself.
         let rank = self.rank();
         if rank == -1 {
@@ -331,9 +332,9 @@ impl Concrete {
         }
         // In the case of points, we reciprocate them.
         else if rank == 0 {
-            for v in self.vertices.iter_mut() {
+            for (idx, v) in self.vertices.iter_mut().enumerate() {
                 if sphere.reciprocate_mut(v).is_err() {
-                    return Err(());
+                    return Err(idx);
                 }
             }
         }
@@ -363,9 +364,9 @@ impl Concrete {
         }
 
         // Reciprocates the projected points.
-        for v in projections.iter_mut() {
+        for (idx, v) in projections.iter_mut().enumerate() {
             if sphere.reciprocate_mut(v).is_err() {
-                return Err(());
+                return Err(idx);
             }
         }
 
@@ -373,7 +374,10 @@ impl Concrete {
 
         // Takes the abstract dual.
         self.abs.dual_mut();
-        *self.name_mut() = self.name().clone().dual();
+        *self.name_mut() = self
+            .name()
+            .clone()
+            .dual(ConData::new(sphere.center.clone()));
 
         Ok(())
     }
@@ -759,7 +763,7 @@ impl Polytope<Con> for Concrete {
 
     /// Builds a convex regular polygon with `n` sides and unit edge length.
     fn polygon(n: usize) -> Self {
-        Self::grunbaum_star_polygon(n, 1).with_name(Name::polygon(ConData::new(true), n))
+        Self::grunbaum_star_polygon(n, 1).with_name(Name::regular_polygon(n))
     }
 
     /// Returns the dual of a polytope, or `None` if any facets pass through the
@@ -777,7 +781,7 @@ impl Polytope<Con> for Concrete {
     /// Builds the dual of a polytope in place, or does nothing in case any
     /// facets go through the origin. Returns the dual if successful, and `None`
     /// otherwise.
-    fn _dual_mut(&mut self) -> Result<(), ()> {
+    fn _dual_mut(&mut self) -> Result<(), usize> {
         self.dual_mut_with_sphere(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 

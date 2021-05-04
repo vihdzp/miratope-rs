@@ -68,6 +68,7 @@ mod no_cull_pipeline;
 mod polytope;
 mod ui;
 
+/// A trait containing the constants associated to each floating point type.
 trait Consts {
     type T;
     const EPS: Self::T;
@@ -76,6 +77,7 @@ trait Consts {
     const SQRT_2: Self::T;
 }
 
+/// Constants for `f64`.
 impl Consts for f64 {
     type T = f64;
     const EPS: f64 = 1e-9;
@@ -84,6 +86,7 @@ impl Consts for f64 {
     const SQRT_2: f64 = std::f64::consts::SQRT_2;
 }
 
+/// Constants for `f32`.
 impl Consts for f32 {
     type T = f32;
     const EPS: f32 = 1e-5;
