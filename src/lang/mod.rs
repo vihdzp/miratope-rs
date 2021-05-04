@@ -22,6 +22,8 @@
 //! ]));
 //! ```
 //!
+//! For more information, see the [`Name`] module's documentation.
+//!
 //! To parse a name into a target language, one must specify the following set
 //! of options:
 //!
@@ -55,6 +57,8 @@ pub use dbg::Dbg;
 pub use en::En;
 pub use es::Es;
 pub use name::Name;
+
+use crate::lang::name::NameData;
 
 use self::name::NameType;
 
@@ -357,12 +361,12 @@ pub trait Language: Prefix {
             Name::Nullitope => Self::nullitope(options),
             Name::Point => Self::point(options),
             Name::Dyad => Self::dyad(options),
-            Name::Triangle | Name::RegularTriangle => Self::triangle(options),
+            Name::Triangle { regular: _ } => Self::triangle(options),
             Name::Square => Self::square(options),
             Name::Rectangle => Self::rectangle(options),
             Name::Orthodiagonal => Self::generic(4, 2, options),
-            Name::Polygon(n) | Name::RegularPolygon(n) => Self::generic(*n, 2, options),
-            Name::Generic { facet_count, rank } => Self::generic(*facet_count, *rank, options),
+            Name::Polygon { regular: _, n } => Self::generic(*n, 2, options),
+            Name::Generic { n: facet_count, rank } => Self::generic(*facet_count, *rank, options),
             Name::Pyramid(base) => Self::pyramid(base, options),
             Name::Prism(base) => Self::prism(base, options),
             Name::Tegum(base) => Self::tegum(base, options),
@@ -370,10 +374,15 @@ pub trait Language: Prefix {
             | Name::Multiprism(_)
             | Name::Multitegum(_)
             | Name::Multicomb(_) => Self::multiproduct(name, options),
-            Name::Simplex(rank) | Name::RegularSimplex(rank) => Self::simplex(*rank, options),
-            Name::Hypercube(rank) => Self::hypercube(*rank, options),
-            Name::Hyperblock(rank) => Self::cuboid(*rank, options),
-            Name::Orthoplex(rank) | Name::RegularOrthoplex(rank) => Self::orthoplex(*rank, options),
+            Name::Simplex { regular: _, rank } => Self::simplex(*rank, options),
+            Name::Hyperblock { regular, rank } => {
+                if regular.contains(true) {
+                    Self::hypercube(*rank, options)
+                } else {
+                    Self::cuboid(*rank, options)
+                }
+            }
+            Name::Orthoplex { regular: _, rank } => Self::orthoplex(*rank, options),
             Name::Dual { base, center: _ } => Self::dual(base, options),
             Name::Compound(components) => Self::compound(components, options),
         }

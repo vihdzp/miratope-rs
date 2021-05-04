@@ -492,7 +492,7 @@ impl Polytope<Abs> for Abstract {
         poly.push_subs(edges);
         poly.push_subs(maximal);
 
-        poly.with_name(Name::regular_polygon(n))
+        poly.with_name(Name::polygon(AbsData::default(), n))
     }
 
     /// Converts a polytope into its dual.

@@ -1,5 +1,5 @@
 //! Configures a render pipeline without
-//! (backface culling)[https://en.wikipedia.org/wiki/Back-face_culling], needed
+//! [backface culling](https://en.wikipedia.org/wiki/Back-face_culling), needed
 //! so that most of the non-convex polytopes work properly.
 
 use bevy::{

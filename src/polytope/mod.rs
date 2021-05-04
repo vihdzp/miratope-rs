@@ -9,7 +9,10 @@ use self::r#abstract::{
     flag::{Flag, FlagEvent, FlagIter},
     rank::RankVec,
 };
-use crate::lang::{name::NameType, Name};
+use crate::lang::{
+    name::{NameData, NameType},
+    Name,
+};
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
 const ELEMENT_NAMES: [&str; 11] = [
@@ -288,7 +291,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// given rank.
     fn simplex(rank: isize) -> Self {
         Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize])
-            .with_name(Name::regular_simplex(rank))
+            .with_name(Name::simplex(T::DataBool::new(true), rank))
     }
 
     /// Builds a [hypercube](https://polytope.miraheze.org/wiki/Hypercube) with
@@ -297,7 +300,8 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         if rank == -1 {
             Self::nullitope()
         } else {
-            Self::multiprism(&vec![&Self::dyad(); rank as usize]).with_name(Name::hypercube(rank))
+            Self::multiprism(&vec![&Self::dyad(); rank as usize])
+                .with_name(Name::cuboid(T::DataBool::new(true), rank))
         }
     }
 
@@ -308,7 +312,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
             Self::nullitope()
         } else {
             Self::multitegum(&vec![&Self::dyad(); rank as usize])
-                .with_name(Name::regular_orthoplex(rank))
+                .with_name(Name::orthoplex(T::DataBool::new(true), rank))
         }
     }
 }

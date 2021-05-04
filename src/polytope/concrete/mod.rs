@@ -763,7 +763,7 @@ impl Polytope<Con> for Concrete {
 
     /// Builds a convex regular polygon with `n` sides and unit edge length.
     fn polygon(n: usize) -> Self {
-        Self::grunbaum_star_polygon(n, 1).with_name(Name::regular_polygon(n))
+        Self::grunbaum_star_polygon(n, 1).with_name(Name::polygon(ConData::new(true), n))
     }
 
     /// Returns the dual of a polytope, or `None` if any facets pass through the
