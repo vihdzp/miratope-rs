@@ -38,7 +38,7 @@
 //! 2. Next, open a command line. On Windows you can do this by opening Run with `Win+R` and typing `cmd` in the search box.
 //! 3. In the command line, first type `cd [FILE PATH]`. If you don't know how to get the file path, in your files go and open the unzipped Miratope file folder, and click on the address bar at the top. Copy the highlighted file path and paste it into the command line in place of `[FILE PATH]`, and press Enter. The last name in the command header should now be the name of the folder Miratope is in.
 //! 4. Finally, type `cargo run` and hit Enter. It will take a while for the computer to open Miratope for the first time, but after that opening it should be a lot faster. A window should appear, if the version of Miratope you downloaded was a stable one. If it wasn't you'll get an error, and you should wait until the devs have fixed what ever they broke. Once you have completed all the steps you will only need to do step 4 to run Miratope from start up (but if the `[FILE PATH]` changes, you'll need to do step 3 again).
-//! 
+//!
 //! These steps are in place because it would be too costly now to update the application each time a bug is fixed or feature is added. Once Miratope leaves the alpha stage, a simple `.exe` for Version 1 will be provided.
 //!
 //! ## Where do I get these "OFF files"?
