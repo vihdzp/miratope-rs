@@ -7,7 +7,13 @@ pub trait NameType: Debug + Clone + PartialEq {
     /// associated types are stable.
     type DataBool: NameData<bool> + Copy;
 
+    /// Whether the name marker is for an abstract polytope.
     fn is_abstract() -> bool;
+
+    /// Whether the name marker is for a concrete polytope.
+    fn is_concrete() -> bool {
+        !Self::is_abstract()
+    }
 }
 
 /// A trait for data associated to a name. It can either be [`AbsData`], which
@@ -22,6 +28,7 @@ pub trait NameData<T>: PartialEq + Debug + Clone {
 /// and compares as `true` with anything else.
 pub struct AbsData<T>(PhantomData<T>);
 
+/// Any two `AbsData` compare as equal to one another.
 impl<T> PartialEq for AbsData<T> {
     fn eq(&self, _other: &Self) -> bool {
         true
@@ -103,8 +110,8 @@ pub enum Name<T: NameType> {
     /// A dyad.
     Dyad,
 
-    /// A triangle, which stores whether it's regular.
-    Triangle(T::DataBool),
+    /// A triangle.
+    Triangle { regular: T::DataBool },
 
     /// A square.
     Square,
@@ -145,19 +152,19 @@ pub enum Name<T: NameType> {
 
     /// A simplex of a given dimension, **at least 3.** The boolean stores
     /// whether it's regular, the integer stores its rank.
-    Simplex(T::DataBool, usize),
+    Simplex { regular: T::DataBool, rank: usize },
 
     /// A regular hypercube of a given dimension, **at least 3.** The boolean
     /// stores whether it's regular, the integer stores its rank.
-    Hypercube(T::DataBool, usize),
+    Hypercube { regular: T::DataBool, rank: usize },
 
     /// A regular orthoplex of a given dimension, **at least 2.** The boolean
     /// stores whether it's regular, the integer stores its rank.
-    Orthoplex(T::DataBool, usize),
+    Orthoplex { regular: T::DataBool, rank: usize },
 
     /// A polytope with a given facet count and rank, in that order. The facet
     /// count must be **at least 2,** and the dimension must be **at most 20.**
-    Generic(usize, usize),
+    Generic { facet_count: usize, rank: usize },
 
     /// A compound of some polytopes.
     Compound(Vec<(usize, Name<T>)>),
@@ -189,12 +196,18 @@ impl<T: NameType> Name<T> {
             Name::Nullitope => Some(-1),
             Name::Point => Some(0),
             Name::Dyad => Some(1),
-            Name::Triangle(_) | Name::Square | Name::Rectangle | Name::Orthodiagonal => Some(2),
-            Name::Simplex(_, rank) | Name::Hypercube(_, rank) | Name::Orthoplex(_, rank) => {
-                Some(*rank as isize)
-            }
+            Name::Triangle { regular: _ }
+            | Name::Square
+            | Name::Rectangle
+            | Name::Orthodiagonal => Some(2),
+            Name::Simplex { regular: _, rank }
+            | Name::Hypercube { regular: _, rank }
+            | Name::Orthoplex { regular: _, rank } => Some(*rank as isize),
             Name::Dual(base) => base.rank(),
-            Name::Generic(_, d) => Some(*d as isize),
+            Name::Generic {
+                facet_count: _,
+                rank,
+            } => Some(*rank as isize),
             Name::Pyramid(base) | Name::Prism(base) | Name::Tegum(base) => Some(base.rank()? + 1),
             Name::Multipyramid(_)
             | Name::Multiprism(_)
@@ -211,12 +224,15 @@ impl<T: NameType> Name<T> {
             Name::Nullitope => 0,
             Name::Point => 1,
             Name::Dyad => 2,
-            Name::Triangle(_) => 3,
+            Name::Triangle { regular: _ } => 3,
             Name::Square | Name::Rectangle | Name::Orthodiagonal => 4,
-            Name::Generic(n, _) => *n,
-            Name::Simplex(_, n) => *n + 1,
-            Name::Hypercube(_, n) => *n * 2,
-            Name::Orthoplex(_, n) => 2u32.pow(*n as u32) as usize,
+            Name::Generic {
+                facet_count,
+                rank: _,
+            } => *facet_count,
+            Name::Simplex { regular: _, rank } => *rank + 1,
+            Name::Hypercube { regular: _, rank } => *rank * 2,
+            Name::Orthoplex { regular: _, rank } => 2u32.pow(*rank as u32) as usize,
             Name::Multipyramid(bases) | Name::Multitegum(bases) => {
                 let mut facet_count = 1;
                 for base in bases {
@@ -249,7 +265,18 @@ impl<T: NameType> Name<T> {
     /// specified on its variants hold. Used for debugging.
     pub fn is_valid(&self) -> bool {
         match self {
-            Self::Simplex(_, n) | Self::Hypercube(_, n) | Self::Orthoplex(_, n) => *n >= 3,
+            Self::Simplex {
+                regular: _,
+                rank: dim,
+            }
+            | Self::Hypercube {
+                regular: _,
+                rank: dim,
+            }
+            | Self::Orthoplex {
+                regular: _,
+                rank: dim,
+            } => *dim >= 3,
             Self::Multipyramid(bases)
             | Self::Multiprism(bases)
             | Self::Multitegum(bases)
@@ -295,7 +322,10 @@ impl<T: NameType> Name<T> {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
-            _ => Self::Generic(n, d as usize),
+            _ => Self::Generic {
+                facet_count: n,
+                rank: d as usize,
+            },
         }
     }
 
@@ -304,19 +334,27 @@ impl<T: NameType> Name<T> {
         match self {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
-            Self::Dyad => Self::Generic(3, 2),
-            Self::Triangle(regular) => {
+            Self::Dyad => Self::Triangle {
+                regular: T::DataBool::new(false),
+            },
+            Self::Triangle { regular } => {
                 if regular == T::DataBool::new(true) {
                     Self::Pyramid(Box::new(self))
                 } else {
-                    Self::Simplex(T::DataBool::new(false), 3)
+                    Self::Simplex {
+                        regular: T::DataBool::new(false),
+                        rank: 3,
+                    }
                 }
             }
-            Self::Simplex(regular, n) => {
+            Self::Simplex { regular, rank } => {
                 if regular == T::DataBool::new(true) {
                     Self::Pyramid(Box::new(self))
                 } else {
-                    Self::Simplex(T::DataBool::new(false), n + 1)
+                    Self::Simplex {
+                        regular: T::DataBool::new(false),
+                        rank: rank + 1,
+                    }
                 }
             }
             Self::Pyramid(base) => Self::multipyramid(vec![*base, Self::Dyad]),
@@ -334,12 +372,18 @@ impl<T: NameType> Name<T> {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
             Self::Dyad => Self::rectangle(T::DataBool::new(false)),
-            Self::Rectangle => Self::Hypercube(T::DataBool::new(false), 3),
-            Self::Hypercube(regular, n) => {
+            Self::Rectangle => Self::Hypercube {
+                regular: T::DataBool::new(false),
+                rank: 3,
+            },
+            Self::Hypercube { regular, rank } => {
                 if regular == T::DataBool::new(true) {
                     Self::Prism(Box::new(self))
                 } else {
-                    Self::Hypercube(T::DataBool::new(false), n + 1)
+                    Self::Hypercube {
+                        regular: T::DataBool::new(false),
+                        rank: rank + 1,
+                    }
                 }
             }
             Self::Prism(base) => {
@@ -359,17 +403,27 @@ impl<T: NameType> Name<T> {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
             Self::Dyad => Self::orthoplex(T::DataBool::new(false), 2),
-            Self::Orthodiagonal => Self::Orthoplex(T::DataBool::new(false), 3),
-            Self::Orthoplex(regular, n) => {
+            Self::Orthodiagonal => Self::Orthoplex {
+                regular: T::DataBool::new(false),
+                rank: 3,
+            },
+            Self::Orthoplex { regular, rank } => {
                 if regular == T::DataBool::new(true) {
                     Self::Tegum(Box::new(self))
                 } else {
-                    Self::Orthoplex(T::DataBool::new(false), n + 1)
+                    Self::Orthoplex {
+                        regular: T::DataBool::new(false),
+                        rank: rank + 1,
+                    }
                 }
             }
-            Self::Tegum(base) => {
-                Self::multitegum(vec![*base, Self::Orthoplex(T::DataBool::new(false), 2)])
-            }
+            Self::Tegum(base) => Self::multitegum(vec![
+                *base,
+                Self::Orthoplex {
+                    regular: T::DataBool::new(false),
+                    rank: 2,
+                },
+            ]),
             Self::Multitegum(mut bases) => {
                 bases.push(Self::Dyad);
                 Self::multitegum(bases)
@@ -398,11 +452,23 @@ impl<T: NameType> Name<T> {
             }
             Self::Square | Self::Rectangle => Self::orthodiagonal(T::DataBool::new(false)),
             Self::Orthodiagonal => Self::polygon(T::DataBool::new(false), 4),
-            Self::Simplex(_, n) => Self::Simplex(T::DataBool::new(false), n),
-            Self::Hypercube(_, n) => Self::Orthoplex(T::DataBool::new(false), n),
-            Self::Orthoplex(_, n) => Self::Hypercube(T::DataBool::new(false), n),
-            Self::Generic(_, d) => {
-                if d <= 2 {
+            Self::Simplex { regular: _, rank } => Self::Simplex {
+                regular: T::DataBool::new(false),
+                rank,
+            },
+            Self::Hypercube { regular: _, rank } => Self::Orthoplex {
+                regular: T::DataBool::new(false),
+                rank,
+            },
+            Self::Orthoplex { regular: _, rank } => Self::Hypercube {
+                regular: T::DataBool::new(false),
+                rank,
+            },
+            Self::Generic {
+                facet_count: _,
+                rank,
+            } => {
+                if rank <= 2 {
                     self
                 } else {
                     Self::Dual(Box::new(self))
@@ -464,8 +530,11 @@ impl<T: NameType> Name<T> {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
-            2 => Self::Triangle(regular),
-            _ => Self::Simplex(regular, n as usize),
+            2 => Self::Triangle { regular },
+            _ => Self::Simplex {
+                regular,
+                rank: n as usize,
+            },
         }
     }
 
@@ -482,7 +551,10 @@ impl<T: NameType> Name<T> {
                     Self::Rectangle
                 }
             }
-            _ => Self::Hypercube(regular, n as usize),
+            _ => Self::Hypercube {
+                regular,
+                rank: n as usize,
+            },
         }
     }
 
@@ -499,22 +571,31 @@ impl<T: NameType> Name<T> {
                     Self::Orthodiagonal
                 }
             }
-            _ => Self::Orthoplex(regular, n as usize),
+            _ => Self::Orthoplex {
+                regular,
+                rank: n as usize,
+            },
         }
     }
 
     /// Returns the name for a polygon (not necessarily regular) of `n` sides.
     pub fn polygon(regular: T::DataBool, n: usize) -> Self {
         match n {
-            3 => Self::Triangle(regular),
+            3 => Self::Triangle { regular },
             4 => {
                 if regular == T::DataBool::new(true) {
                     Self::Square
                 } else {
-                    Self::Generic(4, 2)
+                    Self::Generic {
+                        facet_count: 4,
+                        rank: 2,
+                    }
                 }
             }
-            _ => Self::Generic(n, 2),
+            _ => Self::Generic {
+                facet_count: n,
+                rank: 2,
+            },
         }
     }
 
@@ -559,8 +640,8 @@ impl<T: NameType> Name<T> {
                 Self::Nullitope => {}
                 Self::Point => pyramid_count += 1,
                 Self::Dyad => pyramid_count += 2,
-                Self::Triangle(_) => pyramid_count += 2,
-                Self::Simplex(_, n) => pyramid_count += n + 1,
+                Self::Triangle { regular: _ } => pyramid_count += 2,
+                Self::Simplex { regular: _, rank } => pyramid_count += rank + 1,
                 Self::Multipyramid(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
             }
@@ -608,7 +689,7 @@ impl<T: NameType> Name<T> {
                 Self::Point => {}
                 Self::Dyad => prism_count += 1,
                 Self::Square | Self::Rectangle => prism_count += 2,
-                Self::Hypercube(_, n) => prism_count += n,
+                Self::Hypercube { regular: _, rank } => prism_count += rank,
                 Self::Multiprism(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
             }
@@ -656,7 +737,7 @@ impl<T: NameType> Name<T> {
                 Self::Point => {}
                 Self::Dyad => tegum_count += 1,
                 Self::Square => tegum_count += 2,
-                Self::Orthoplex(_, n) => tegum_count += n,
+                Self::Orthoplex { regular: _, rank } => tegum_count += rank,
                 Self::Multitegum(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
             }

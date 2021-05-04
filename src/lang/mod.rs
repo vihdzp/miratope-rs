@@ -357,11 +357,11 @@ pub trait Language: Prefix {
             Name::Nullitope => Self::nullitope(options),
             Name::Point => Self::point(options),
             Name::Dyad => Self::dyad(options),
-            Name::Triangle(regular) => Self::triangle::<T>(*regular, options),
+            Name::Triangle { regular } => Self::triangle::<T>(*regular, options),
             Name::Square => Self::square(options),
             Name::Rectangle => Self::rectangle(options),
             Name::Orthodiagonal => Self::orthodiagonal(options),
-            Name::Generic(n, d) => Self::generic(*n, *d, options),
+            Name::Generic { facet_count, rank } => Self::generic(*facet_count, *rank, options),
             Name::Pyramid(base) => Self::pyramid(base, options),
             Name::Prism(base) => Self::prism(base, options),
             Name::Tegum(base) => Self::tegum(base, options),
@@ -369,9 +369,9 @@ pub trait Language: Prefix {
             | Name::Multiprism(_)
             | Name::Multitegum(_)
             | Name::Multicomb(_) => Self::multiproduct(name, options),
-            Name::Simplex(regular, rank) => Self::simplex::<T>(*regular, *rank, options),
-            Name::Hypercube(regular, rank) => Self::hypercube::<T>(*regular, *rank, options),
-            Name::Orthoplex(regular, rank) => Self::orthoplex::<T>(*regular, *rank, options),
+            Name::Simplex { regular, rank: dim } => Self::simplex::<T>(*regular, *dim, options),
+            Name::Hypercube { regular, rank: dim } => Self::hypercube::<T>(*regular, *dim, options),
+            Name::Orthoplex { regular, rank: dim } => Self::orthoplex::<T>(*regular, *dim, options),
             Name::Dual(base) => Self::dual(base, options),
             Name::Compound(components) => Self::compound(components, options),
         }
