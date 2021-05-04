@@ -1,4 +1,7 @@
-use crate::lang::{name::NameType, Gender, Name};
+use crate::lang::{
+    name::{NameData, NameType},
+    Gender, Name,
+};
 
 use super::{GreekPrefix, Language, Options, Prefix};
 
@@ -98,7 +101,7 @@ impl Language for Es {
     }
 
     /// The name of a triangle.
-    fn triangle<T: NameType>(_regular: T, options: Options) -> String {
+    fn triangle<T: NameType>(_regular: T::DataBool, options: Options) -> String {
         format!(
             "tri{}",
             options.four("ángulo", "ángulos", "angular", "angulares")
@@ -237,8 +240,8 @@ impl Language for Es {
     }
 
     /// The name for a hypercube with a given rank.
-    fn hypercube<T: NameType>(regular: T, rank: usize, options: Options) -> String {
-        if regular.is_regular() {
+    fn hypercube<T: NameType>(regular: T::DataBool, rank: usize, options: Options) -> String {
+        if regular == T::DataBool::new(true) {
             match rank {
                 3 => format!(
                     "c{}",
@@ -281,7 +284,7 @@ impl Language for Es {
     }
 
     /// The name for an orthoplex with a given rank.
-    fn orthoplex<T: NameType>(_regular: T, rank: usize, options: Options) -> String {
+    fn orthoplex<T: NameType>(_regular: T::DataBool, rank: usize, options: Options) -> String {
         Self::generic(2u32.pow(rank as u32) as usize, rank, options)
     }
 

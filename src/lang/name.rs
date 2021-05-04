@@ -1,16 +1,45 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, marker::PhantomData};
 
-use itertools::Itertools;
+/// A type marker that determines whether a name describes an abstract or
+/// concrete polytope.
+pub trait NameType: Debug + Clone + PartialEq {
+    /// Either `AbsData<bool>` or `ConData<bool>`. Workaround until generic
+    /// associated types are stable.
+    type DataBool: NameData<bool> + Copy;
 
-/// Determines whether a name is to be treated as the name for an abstract
-/// polytope. Doubles as a way to mark some name variants as coming from a
-/// regular polytope or not.
-pub trait NameType: Debug + Clone + PartialEq + Copy {
     fn is_abstract() -> bool;
+}
 
-    fn regular(x: bool) -> Self;
+/// A trait for data associated to a name. It can either be [`AbsData`], which
+/// is zero size and compares `true` with anything, or [`ConData`], which stores
+/// an actual value which is used for comparisons.
+pub trait NameData<T>: PartialEq + Debug + Clone {
+    fn new(value: T) -> Self;
+}
 
-    fn is_regular(&self) -> bool;
+#[derive(Debug)]
+/// Phantom data associated with an abstract polytope. Internally stores nothing,
+/// and compares as `true` with anything else.
+pub struct AbsData<T>(PhantomData<T>);
+
+impl<T> PartialEq for AbsData<T> {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl<T> Clone for AbsData<T> {
+    fn clone(&self) -> Self {
+        Self(Default::default())
+    }
+}
+
+impl<T> Copy for AbsData<T> {}
+
+impl<T: Debug> NameData<T> for AbsData<T> {
+    fn new(_value: T) -> Self {
+        Self(Default::default())
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -18,16 +47,28 @@ pub trait NameType: Debug + Clone + PartialEq + Copy {
 pub struct Abs;
 
 impl NameType for Abs {
+    type DataBool = AbsData<bool>;
+
     fn is_abstract() -> bool {
         true
     }
+}
 
-    fn regular(_: bool) -> Self {
-        Self
+#[derive(Debug, Clone)]
+/// Data associated with a concrete polytope.
+pub struct ConData<T>(T);
+
+impl<T: PartialEq> PartialEq for ConData<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
     }
+}
 
-    fn is_regular(&self) -> bool {
-        true
+impl<T: Copy> Copy for ConData<T> {}
+
+impl<T: PartialEq + Debug + Clone> NameData<T> for ConData<T> {
+    fn new(value: T) -> Self {
+        Self(value)
     }
 }
 
@@ -36,16 +77,10 @@ impl NameType for Abs {
 pub struct Con(bool);
 
 impl NameType for Con {
+    type DataBool = ConData<bool>;
+
     fn is_abstract() -> bool {
         false
-    }
-
-    fn regular(x: bool) -> Self {
-        Self(x)
-    }
-
-    fn is_regular(&self) -> bool {
-        self.0
     }
 }
 
@@ -69,7 +104,7 @@ pub enum Name<T: NameType> {
     Dyad,
 
     /// A triangle, which stores whether it's regular.
-    Triangle(T),
+    Triangle(T::DataBool),
 
     /// A square.
     Square,
@@ -110,15 +145,15 @@ pub enum Name<T: NameType> {
 
     /// A simplex of a given dimension, **at least 3.** The boolean stores
     /// whether it's regular, the integer stores its rank.
-    Simplex(T, usize),
+    Simplex(T::DataBool, usize),
 
     /// A regular hypercube of a given dimension, **at least 3.** The boolean
     /// stores whether it's regular, the integer stores its rank.
-    Hypercube(T, usize),
+    Hypercube(T::DataBool, usize),
 
     /// A regular orthoplex of a given dimension, **at least 2.** The boolean
     /// stores whether it's regular, the integer stores its rank.
-    Orthoplex(T, usize),
+    Orthoplex(T::DataBool, usize),
 
     /// A polytope with a given facet count and rank, in that order. The facet
     /// count must be **at least 2,** and the dimension must be **at most 20.**
@@ -239,16 +274,16 @@ impl<T: NameType> Name<T> {
         }
     }
 
-    pub fn rectangle(regular: T) -> Self {
-        if regular.is_regular() {
+    pub fn rectangle(regular: T::DataBool) -> Self {
+        if regular == T::DataBool::new(true) {
             Self::Square
         } else {
             Self::Rectangle
         }
     }
 
-    pub fn orthodiagonal(regular: T) -> Self {
-        if regular.is_regular() {
+    pub fn orthodiagonal(regular: T::DataBool) -> Self {
+        if regular == T::DataBool::new(true) {
             Self::Square
         } else {
             Self::Orthodiagonal
@@ -271,17 +306,17 @@ impl<T: NameType> Name<T> {
             Self::Point => Self::Dyad,
             Self::Dyad => Self::Generic(3, 2),
             Self::Triangle(regular) => {
-                if regular.is_regular() {
+                if regular == T::DataBool::new(true) {
                     Self::Pyramid(Box::new(self))
                 } else {
-                    Self::Simplex(T::regular(false), 3)
+                    Self::Simplex(T::DataBool::new(false), 3)
                 }
             }
             Self::Simplex(regular, n) => {
-                if regular.is_regular() {
+                if regular == T::DataBool::new(true) {
                     Self::Pyramid(Box::new(self))
                 } else {
-                    Self::Simplex(T::regular(false), n + 1)
+                    Self::Simplex(T::DataBool::new(false), n + 1)
                 }
             }
             Self::Pyramid(base) => Self::multipyramid(vec![*base, Self::Dyad]),
@@ -298,16 +333,18 @@ impl<T: NameType> Name<T> {
         match self {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
-            Self::Dyad => Self::rectangle(T::regular(false)),
-            Self::Rectangle => Self::Hypercube(T::regular(false), 3),
+            Self::Dyad => Self::rectangle(T::DataBool::new(false)),
+            Self::Rectangle => Self::Hypercube(T::DataBool::new(false), 3),
             Self::Hypercube(regular, n) => {
-                if regular.is_regular() {
+                if regular == T::DataBool::new(true) {
                     Self::Prism(Box::new(self))
                 } else {
-                    Self::Hypercube(T::regular(false), n + 1)
+                    Self::Hypercube(T::DataBool::new(false), n + 1)
                 }
             }
-            Self::Prism(base) => Self::multiprism(vec![*base, Self::rectangle(T::regular(false))]),
+            Self::Prism(base) => {
+                Self::multiprism(vec![*base, Self::rectangle(T::DataBool::new(false))])
+            }
             Self::Multiprism(mut bases) => {
                 bases.push(Self::Dyad);
                 Self::multiprism(bases)
@@ -321,17 +358,17 @@ impl<T: NameType> Name<T> {
         match self {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
-            Self::Dyad => Self::orthoplex(T::regular(false), 2),
-            Self::Orthodiagonal => Self::Orthoplex(T::regular(false), 3),
+            Self::Dyad => Self::orthoplex(T::DataBool::new(false), 2),
+            Self::Orthodiagonal => Self::Orthoplex(T::DataBool::new(false), 3),
             Self::Orthoplex(regular, n) => {
-                if regular.is_regular() {
+                if regular == T::DataBool::new(true) {
                     Self::Tegum(Box::new(self))
                 } else {
-                    Self::Orthoplex(T::regular(false), n + 1)
+                    Self::Orthoplex(T::DataBool::new(false), n + 1)
                 }
             }
             Self::Tegum(base) => {
-                Self::multitegum(vec![*base, Self::Orthoplex(T::regular(false), 2)])
+                Self::multitegum(vec![*base, Self::Orthoplex(T::DataBool::new(false), 2)])
             }
             Self::Multitegum(mut bases) => {
                 bases.push(Self::Dyad);
@@ -359,11 +396,11 @@ impl<T: NameType> Name<T> {
                     Self::Dual(base)
                 }
             }
-            Self::Square | Self::Rectangle => Self::orthodiagonal(T::regular(false)),
-            Self::Orthodiagonal => Self::polygon(T::regular(false), 4),
-            Self::Simplex(_, n) => Self::Simplex(T::regular(false), n),
-            Self::Hypercube(_, n) => Self::Orthoplex(T::regular(false), n),
-            Self::Orthoplex(_, n) => Self::Hypercube(T::regular(false), n),
+            Self::Square | Self::Rectangle => Self::orthodiagonal(T::DataBool::new(false)),
+            Self::Orthodiagonal => Self::polygon(T::DataBool::new(false), 4),
+            Self::Simplex(_, n) => Self::Simplex(T::DataBool::new(false), n),
+            Self::Hypercube(_, n) => Self::Orthoplex(T::DataBool::new(false), n),
+            Self::Orthoplex(_, n) => Self::Hypercube(T::DataBool::new(false), n),
             Self::Generic(_, d) => {
                 if d <= 2 {
                     self
@@ -422,7 +459,7 @@ impl<T: NameType> Name<T> {
     }
 
     /// The name for an *n*-simplex.
-    pub fn simplex(regular: T, n: isize) -> Self {
+    pub fn simplex(regular: T::DataBool, n: isize) -> Self {
         match n {
             -1 => Self::Nullitope,
             0 => Self::Point,
@@ -433,13 +470,13 @@ impl<T: NameType> Name<T> {
     }
 
     /// The name for an *n*-hypercube.
-    pub fn hypercube(regular: T, n: isize) -> Self {
+    pub fn hypercube(regular: T::DataBool, n: isize) -> Self {
         match n {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
             2 => {
-                if regular.is_regular() {
+                if regular == T::DataBool::new(true) {
                     Self::Square
                 } else {
                     Self::Rectangle
@@ -450,13 +487,13 @@ impl<T: NameType> Name<T> {
     }
 
     /// The name for an *n*-orthoplex.
-    pub fn orthoplex(regular: T, n: isize) -> Self {
+    pub fn orthoplex(regular: T::DataBool, n: isize) -> Self {
         match n {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
             2 => {
-                if regular.is_regular() {
+                if regular == T::DataBool::new(true) {
                     Self::Square
                 } else {
                     Self::Orthodiagonal
@@ -467,11 +504,11 @@ impl<T: NameType> Name<T> {
     }
 
     /// Returns the name for a polygon (not necessarily regular) of `n` sides.
-    pub fn polygon(regular: T, n: usize) -> Self {
+    pub fn polygon(regular: T::DataBool, n: usize) -> Self {
         match n {
             3 => Self::Triangle(regular),
             4 => {
-                if regular.is_regular() {
+                if regular == T::DataBool::new(true) {
                     Self::Square
                 } else {
                     Self::Generic(4, 2)
@@ -532,7 +569,10 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one pyramid, we combine all of them into a
         // single simplex.
         if pyramid_count >= 2 {
-            new_bases.push(Name::simplex(T::regular(false), pyramid_count as isize - 1));
+            new_bases.push(Name::simplex(
+                T::DataBool::new(false),
+                pyramid_count as isize - 1,
+            ));
         }
 
         // Sorts the bases by convention.
@@ -577,7 +617,10 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one prism, we combine all of them into a
         // single hypercube.
         if prism_count >= 2 {
-            new_bases.push(Name::hypercube(T::regular(false), prism_count as isize));
+            new_bases.push(Name::hypercube(
+                T::DataBool::new(false),
+                prism_count as isize,
+            ));
         }
 
         // Sorts the bases by convention.
@@ -622,7 +665,10 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one tegum, we combine all of them into a
         // single orthoplex.
         if tegum_count >= 2 {
-            new_bases.push(Name::orthoplex(T::regular(false), tegum_count as isize));
+            new_bases.push(Name::orthoplex(
+                T::DataBool::new(false),
+                tegum_count as isize,
+            ));
         }
 
         // Sorts the bases by convention.
@@ -668,6 +714,8 @@ impl<T: NameType> Name<T> {
     }
 
     pub fn compound(mut components: Vec<(usize, Self)>) -> Self {
+        use itertools::Itertools;
+
         components.sort_by(|(_, name0), (_, name1)| Self::base_cmp(name0, name1));
 
         let mut new_components: Vec<(usize, _)> = Vec::new();

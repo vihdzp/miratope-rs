@@ -1,6 +1,6 @@
 //! A language we can use for debugging.
 
-use crate::lang::name::NameType;
+use crate::lang::name::{NameData, NameType};
 
 use super::{Language, Name, Options, Prefix};
 
@@ -25,19 +25,19 @@ impl Language for Dbg {
         format!("({}) tegum", Self::parse(base, Options::default()))
     }
 
-    fn simplex<T: NameType>(_regular: T, rank: usize, _options: Options) -> String {
+    fn simplex<T: NameType>(_regular: T::DataBool, rank: usize, _options: Options) -> String {
         format!("{}-simplex", rank)
     }
 
-    fn hypercube<T: NameType>(regular: T, rank: usize, _options: Options) -> String {
-        if regular.is_regular() {
+    fn hypercube<T: NameType>(regular: T::DataBool, rank: usize, _options: Options) -> String {
+        if regular == T::DataBool::new(true) {
             format!("{}-hypercube", rank)
         } else {
             format!("{}-hypercuboid", rank)
         }
     }
 
-    fn orthoplex<T>(_regular: T, rank: usize, _options: Options) -> String {
+    fn orthoplex<T: NameType>(_regular: T::DataBool, rank: usize, _options: Options) -> String {
         format!("{}-orthoplex", rank)
     }
 

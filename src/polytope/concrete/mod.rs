@@ -20,7 +20,7 @@ use super::{
 use crate::{
     geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace},
     lang::{
-        name::{Con, NameType},
+        name::{Con, ConData, NameData},
         Name,
     },
     r#abstract::{flag::FlagEvent, Abstract},
@@ -759,7 +759,7 @@ impl Polytope<Con> for Concrete {
 
     /// Builds a convex regular polygon with `n` sides and unit edge length.
     fn polygon(n: usize) -> Self {
-        Self::grunbaum_star_polygon(n, 1).with_name(Name::polygon(Con::regular(true), n))
+        Self::grunbaum_star_polygon(n, 1).with_name(Name::polygon(ConData::new(true), n))
     }
 
     /// Returns the dual of a polytope, or `None` if any facets pass through the

@@ -56,7 +56,7 @@ pub use en::En;
 pub use es::Es;
 pub use name::Name;
 
-use self::name::NameType;
+use self::name::{NameData, NameType};
 
 /// The different grammatical genders.
 #[derive(Clone, Copy, Debug)]
@@ -357,7 +357,7 @@ pub trait Language: Prefix {
             Name::Nullitope => Self::nullitope(options),
             Name::Point => Self::point(options),
             Name::Dyad => Self::dyad(options),
-            Name::Triangle(regular) => Self::triangle(*regular, options),
+            Name::Triangle(regular) => Self::triangle::<T>(regular.clone(), options),
             Name::Square => Self::square(options),
             Name::Rectangle => Self::rectangle(options),
             Name::Orthodiagonal => Self::orthodiagonal(options),
@@ -369,9 +369,9 @@ pub trait Language: Prefix {
             | Name::Multiprism(_)
             | Name::Multitegum(_)
             | Name::Multicomb(_) => Self::multiproduct(name, options),
-            Name::Simplex(regular, rank) => Self::simplex(*regular, *rank, options),
-            Name::Hypercube(regular, rank) => Self::hypercube(*regular, *rank, options),
-            Name::Orthoplex(regular, rank) => Self::orthoplex(*regular, *rank, options),
+            Name::Simplex(regular, rank) => Self::simplex::<T>(regular.clone(), *rank, options),
+            Name::Hypercube(regular, rank) => Self::hypercube::<T>(regular.clone(), *rank, options),
+            Name::Orthoplex(regular, rank) => Self::orthoplex::<T>(regular.clone(), *rank, options),
             Name::Dual(base) => Self::dual(base, options),
             Name::Compound(components) => Self::compound(components, options),
         }
@@ -415,7 +415,7 @@ pub trait Language: Prefix {
     }
 
     /// The name of a triangle.
-    fn triangle<T: NameType>(_regular: T, options: Options) -> String {
+    fn triangle<T: NameType>(_regular: T::DataBool, options: Options) -> String {
         format!("triang{}", options.three("le", "les", "ular"))
     }
 
@@ -527,13 +527,13 @@ pub trait Language: Prefix {
     }
 
     /// The name for a simplex with a given rank.
-    fn simplex<T: NameType>(_regular: T, rank: usize, options: Options) -> String {
+    fn simplex<T: NameType>(_regular: T::DataBool, rank: usize, options: Options) -> String {
         Self::generic(rank + 1, rank, options)
     }
 
     /// The name for a hypercube with a given rank.
-    fn hypercube<T: NameType>(regular: T, rank: usize, options: Options) -> String {
-        if regular.is_regular() {
+    fn hypercube<T: NameType>(regular: T::DataBool, rank: usize, options: Options) -> String {
+        if regular == T::DataBool::new(true) {
             match rank {
                 3 => format!("cub{}", options.three("e", "s", "ic")),
                 4 => format!("tesseract{}", options.three("", "s", "ic")),
@@ -563,7 +563,7 @@ pub trait Language: Prefix {
     }
 
     /// The name for an orthoplex with a given rank.
-    fn orthoplex<T: NameType>(_regular: T, rank: usize, options: Options) -> String {
+    fn orthoplex<T: NameType>(_regular: T::DataBool, rank: usize, options: Options) -> String {
         Self::generic(2u32.pow(rank as u32) as usize, rank, options)
     }
 
