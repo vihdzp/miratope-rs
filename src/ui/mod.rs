@@ -167,7 +167,10 @@ pub fn ui(
                         facet.flatten();
                         facet.recenter();
                         *p = facet;
-                    };
+                        println!("Facet succeeded.")
+                    } else {
+                        println!("Facet failed.")
+                    }
 
                     // If we're currently viewing a cross-section, it gets "fixed"
                     // as the active polytope.
@@ -185,7 +188,10 @@ pub fn ui(
                         facet.flatten();
                         facet.recenter();
                         *p = facet;
-                    };
+                        println!("Verf succeeded.")
+                    } else {
+                        println!("Verf failed.")
+                    }
 
                     // If we're currently viewing a cross-section, it gets "fixed"
                     // as the active polytope.

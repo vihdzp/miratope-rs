@@ -47,6 +47,22 @@
 //! polytopes into their names, in reality, it's just a big `match` statement
 //! that calls specific functions to parse every specific polytope type. These
 //! are the functions that need to be coded in the target language.
+//!
+//! The list of functions you'll definitely need to translate are the following:
+//!
+//! - [`nullitope`](Language::nullitope)
+//! - [`point`](Language::point)
+//! - [`dyad`](Language::dyad)
+//! - [`triangle`](Language::triangle)
+//! - [`square`](Language::square)
+//! - [`rectangle`](Language::rectangle)
+//! - [`generic`](Language::generic)
+//! - [`pyramid`](Language::pyramid)
+//! - [`prism`](Language::prism)
+//! - [`tegum`](Language::tegum)
+//! - [`hyperblock`](Language::hyperblock)
+//! - [`hypercube`](Language::hypercube)
+//! - [`dual`](Language::dual)
 
 pub mod dbg;
 pub mod en;
@@ -366,13 +382,10 @@ pub trait Language: Prefix {
             Name::Rectangle => Self::rectangle(options),
             Name::Orthodiagonal => Self::generic(4, 2, options),
             Name::Polygon { regular: _, n } => Self::generic(*n, 2, options),
-            Name::Generic {
-                n: facet_count,
-                rank,
-            } => Self::generic(*facet_count, *rank, options),
-            Name::Pyramid(base) => Self::pyramid(base, options),
-            Name::Prism(base) => Self::prism(base, options),
-            Name::Tegum(base) => Self::tegum(base, options),
+            Name::Generic { n, rank } => Self::generic(*n, *rank, options),
+            Name::Pyramid(base) => Self::pyramid_of(base, options),
+            Name::Prism(base) => Self::prism_of(base, options),
+            Name::Tegum(base) => Self::tegum_of(base, options),
             Name::Multipyramid(_)
             | Name::Multiprism(_)
             | Name::Multitegum(_)
@@ -382,7 +395,7 @@ pub trait Language: Prefix {
                 if regular.satisfies(|r| r.is_yes()) {
                     Self::hypercube(*rank, options)
                 } else {
-                    Self::cuboid(*rank, options)
+                    Self::hyperblock(*rank, options)
                 }
             }
             Name::Orthoplex { regular: _, rank } => Self::orthoplex(*rank, options),
@@ -443,73 +456,51 @@ pub trait Language: Prefix {
         format!("rectang{}", options.three("le", "les", "ular"))
     }
 
-    /// The generic name for a polytope with `n` facets in `d` dimensions.
-    fn generic(n: usize, d: usize, options: Options) -> String {
-        format!("{}{}", Self::prefix(n), Self::suffix(d, options))
+    /// The generic name for a polytope with `n` facets with a given rank.
+    fn generic(n: usize, rank: usize, options: Options) -> String {
+        format!("{}{}", Self::prefix(n), Self::suffix(rank, options))
     }
 
-    fn base<T: NameType>(base: &Name<T>, options: Options) -> String {
-        parentheses(Self::parse(base, options), options.parentheses)
-    }
-
-    fn base_adj<T: NameType>(base: &Name<T>, options: Options) -> String {
-        parentheses(
-            Self::parse(
-                base,
-                Options {
-                    adjective: true,
-                    ..options
-                },
-            ),
-            options.parentheses,
-        )
-    }
-
-    fn pyramidal(options: Options) -> String {
+    /// The name of a pyramid.
+    fn pyramid(options: Options) -> String {
         format!("pyramid{}", options.three("", "s", "al"))
     }
 
     /// The name for a pyramid with a given base.
-    fn pyramid<T: NameType>(base: &Name<T>, options: Options) -> String {
+    fn pyramid_of<T: NameType>(base: &Name<T>, options: Options) -> String {
         format!(
             "{} {}",
             Self::base_adj(base, options),
-            Self::pyramidal(options)
+            Self::pyramid(options)
         )
     }
 
-    fn prismatic(options: Options) -> String {
+    /// The name for a prism.
+    fn prism(options: Options) -> String {
         format!("prism{}", options.three("", "s", "atic"))
     }
 
     /// The name for a prism with a given base.
-    fn prism<T: NameType>(base: &Name<T>, options: Options) -> String {
-        format!(
-            "{} {}",
-            Self::base_adj(base, options),
-            Self::prismatic(options)
-        )
+    fn prism_of<T: NameType>(base: &Name<T>, options: Options) -> String {
+        format!("{} {}", Self::base_adj(base, options), Self::prism(options))
     }
 
-    fn tegmatic(options: Options) -> String {
+    /// The name for a tegum.
+    fn tegum(options: Options) -> String {
         format!("teg{}", options.three("um", "ums", "matic"))
     }
 
     /// The name for a tegum with a given base.
-    fn tegum<T: NameType>(base: &Name<T>, options: Options) -> String {
-        format!(
-            "{} {}",
-            Self::base_adj(base, options),
-            Self::tegmatic(options)
-        )
+    fn tegum_of<T: NameType>(base: &Name<T>, options: Options) -> String {
+        format!("{} {}", Self::base_adj(base, options), Self::tegum(options))
     }
 
     fn multiproduct<T: NameType>(name: &Name<T>, options: Options) -> String {
         // Gets the bases and the kind of multiproduct.
         let (bases, kind) = match name {
-            Name::Multipyramid(bases) => (bases, Self::pyramidal(options)),
-            Name::Multiprism(bases) => (bases, Self::prismatic(options)),
-            Name::Multitegum(bases) => (bases, Self::tegmatic(options)),
+            Name::Multipyramid(bases) => (bases, Self::pyramid(options)),
+            Name::Multiprism(bases) => (bases, Self::prism(options)),
+            Name::Multitegum(bases) => (bases, Self::tegum(options)),
             Name::Multicomb(bases) => (bases, format!("comb{}", options.two("", "s"))),
             _ => panic!("Not a product!"),
         };
@@ -539,7 +530,8 @@ pub trait Language: Prefix {
         Self::generic(rank + 1, rank, options)
     }
 
-    fn cuboid(rank: usize, options: Options) -> String {
+    /// The name for a hyperblock with a given rank.
+    fn hyperblock(rank: usize, options: Options) -> String {
         match rank {
             3 => format!("cuboid{}", options.three("", "s", "al")),
             _ => {
@@ -612,5 +604,26 @@ pub trait Language: Prefix {
         ));
 
         str
+    }
+
+    /// The name of a base of some other construction, parenthesized if
+    /// necessary.
+    fn base<T: NameType>(base: &Name<T>, options: Options) -> String {
+        parentheses(Self::parse(base, options), options.parentheses)
+    }
+
+    /// The name of a base of some other construction, as an adjective,
+    /// parenthesized if necessary.
+    fn base_adj<T: NameType>(base: &Name<T>, options: Options) -> String {
+        parentheses(
+            Self::parse(
+                base,
+                Options {
+                    adjective: true,
+                    ..options
+                },
+            ),
+            options.parentheses,
+        )
     }
 }

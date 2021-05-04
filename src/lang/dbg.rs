@@ -13,15 +13,15 @@ impl Language for Dbg {
         format!("({}D)", d)
     }
 
-    fn pyramid<T: NameType>(base: &Name<T>, _options: Options) -> String {
+    fn pyramid_of<T: NameType>(base: &Name<T>, _options: Options) -> String {
         format!("({}) pyramid", Self::parse(base, Options::default()))
     }
 
-    fn prism<T: NameType>(base: &Name<T>, _options: Options) -> String {
+    fn prism_of<T: NameType>(base: &Name<T>, _options: Options) -> String {
         format!("({}) prism", Self::parse(base, Options::default()))
     }
 
-    fn tegum<T: NameType>(base: &Name<T>, _options: Options) -> String {
+    fn tegum_of<T: NameType>(base: &Name<T>, _options: Options) -> String {
         format!("({}) tegum", Self::parse(base, Options::default()))
     }
 
@@ -29,7 +29,7 @@ impl Language for Dbg {
         format!("{}-simplex", rank)
     }
 
-    fn cuboid(rank: usize, _options: Options) -> String {
+    fn hyperblock(rank: usize, _options: Options) -> String {
         format!("{}-hyperblock", rank)
     }
 

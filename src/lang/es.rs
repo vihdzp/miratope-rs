@@ -129,7 +129,8 @@ impl Language for Es {
         format!("{}{}", prefix, Self::suffix(d, options))
     }
 
-    fn pyramidal(options: Options) -> String {
+    /// The name for a pyramid.
+    fn pyramid(options: Options) -> String {
         format!(
             "pir{}",
             options.four("ámide", "ámides", "amidal", "amidales")
@@ -137,10 +138,10 @@ impl Language for Es {
     }
 
     /// The name for a pyramid with a given base.
-    fn pyramid<T: NameType>(base: &Name<T>, options: Options) -> String {
+    fn pyramid_of<T: NameType>(base: &Name<T>, options: Options) -> String {
         format!(
             "{} {}",
-            Self::pyramidal(options),
+            Self::pyramid(options),
             Self::base_adj(
                 base,
                 Options {
@@ -151,7 +152,8 @@ impl Language for Es {
         )
     }
 
-    fn prismatic(options: Options) -> String {
+    /// The name for a prism.
+    fn prism(options: Options) -> String {
         format!(
             "prism{}",
             options.six("a", "as", "ático", "áticos", "ática", "áticas")
@@ -159,10 +161,10 @@ impl Language for Es {
     }
 
     /// The name for a prism with a given base.
-    fn prism<T: NameType>(base: &Name<T>, options: Options) -> String {
+    fn prism_of<T: NameType>(base: &Name<T>, options: Options) -> String {
         format!(
             "{} {}",
-            Self::prismatic(options),
+            Self::prism(options),
             Self::base_adj(
                 base,
                 Options {
@@ -173,7 +175,8 @@ impl Language for Es {
         )
     }
 
-    fn tegmatic(options: Options) -> String {
+    /// The name for a tegum.
+    fn tegum(options: Options) -> String {
         format!(
             "teg{}",
             options.six("o", "os", "mático", "máticos", "mática", "máticas")
@@ -181,10 +184,10 @@ impl Language for Es {
     }
 
     /// The name for a tegum with a given base.
-    fn tegum<T: NameType>(base: &Name<T>, options: Options) -> String {
+    fn tegum_of<T: NameType>(base: &Name<T>, options: Options) -> String {
         format!(
             "{} {}",
-            Self::tegmatic(options),
+            Self::tegum(options),
             Self::base_adj(
                 base,
                 Options {
@@ -198,9 +201,9 @@ impl Language for Es {
     fn multiproduct<T: NameType>(name: &Name<T>, options: Options) -> String {
         // Gets the bases and the kind of multiproduct.
         let (bases, kind, gender) = match name {
-            Name::Multipyramid(bases) => (bases, Self::pyramidal(options), Gender::Female),
-            Name::Multiprism(bases) => (bases, Self::prismatic(options), Gender::Male),
-            Name::Multitegum(bases) => (bases, Self::tegmatic(options), Gender::Male),
+            Name::Multipyramid(bases) => (bases, Self::pyramid(options), Gender::Female),
+            Name::Multiprism(bases) => (bases, Self::prism(options), Gender::Male),
+            Name::Multitegum(bases) => (bases, Self::tegum(options), Gender::Male),
             Name::Multicomb(bases) => (
                 bases,
                 String::from(options.four("panal", "panales", "de panal", "de panales")),
@@ -230,7 +233,7 @@ impl Language for Es {
         format!("{} {}", kind, str_bases)
     }
 
-    fn cuboid(rank: usize, options: Options) -> String {
+    fn hyperblock(rank: usize, options: Options) -> String {
         match rank {
             3 => format!("cuboid{}", options.four("e", "es", "al", "ales")),
             _ => {

@@ -30,6 +30,12 @@ use crate::{
 use approx::{abs_diff_eq, abs_diff_ne};
 use bevy::prelude::Mesh;
 
+pub struct ElementType {
+    multiplicity: usize,
+    facet_count: usize,
+    volume: Option<f64>,
+}
+
 #[derive(Debug, Clone)]
 /// Represents a [concrete polytope](https://polytope.miraheze.org/wiki/Polytope),
 /// which is an [`Abstract`] together with its corresponding vertices.
@@ -719,6 +725,139 @@ impl Concrete {
 
     pub fn get_wireframe(&self) -> Mesh {
         MeshBuilder::new(self).get_wireframe()
+    }
+
+    /// Gets the element "types" of a polytope.
+    fn get_element_types(&self) -> RankVec<Vec<ElementType>> {
+        const EPS: f64 = 1e-9;
+
+        let rank = self.rank();
+        let mut element_types = RankVec::with_capacity(rank);
+        let el_counts = self.el_counts();
+
+        for &el_count in el_counts.iter() {
+            element_types.push(Vec::with_capacity(el_count));
+        }
+
+        let mut types = RankVec::with_capacity(rank);
+        let mut output = RankVec::with_capacity(rank);
+
+        // There's only one type of nullitope.
+        types.push(Vec::new());
+        output.push(vec![ElementType {
+            multiplicity: 1,
+            facet_count: 0,
+            volume: None,
+        }]);
+
+        // There's only one type of point.
+        types.push(Vec::new());
+        output.push(vec![ElementType {
+            multiplicity: el_counts[0],
+            facet_count: 1,
+            volume: Some(1.0),
+        }]);
+
+        // The edge types are the edges of each different length.
+        let mut edge_types = Vec::new();
+        for length in &self.edge_lengths() {
+            if let Some(index) = edge_types
+                .iter()
+                .position(|&x: &f64| (x - length).abs() < EPS)
+            {
+                element_types[1].push(index);
+            } else {
+                element_types[1].push(edge_types.len());
+                edge_types.push(*length);
+            }
+        }
+        types.push(edge_types);
+
+        let mut edge_types = Vec::with_capacity(types[1].len());
+        for (idx, &edge_type) in types[1].iter().enumerate() {
+            edge_types.push(ElementType {
+                multiplicity: element_types[1].iter().filter(|&x| *x == idx).count(),
+                facet_count: 2,
+                volume: Some(edge_type),
+            })
+        }
+        output.push(edge_types);
+
+        for d in 2..=rank {
+            types.push(Vec::new());
+            for el in self.abs.ranks[d].iter() {
+                let count = el.subs.len();
+                if let Some(index) = types[d].iter().position(|&x| x == count as f64) {
+                    element_types[d].push(index);
+                } else {
+                    element_types[d].push(types[d].len());
+                    types[d].push(count as f64);
+                }
+            }
+            let mut types_in_rank = Vec::with_capacity(types[d].len());
+            for i in 0..types[d].len() {
+                types_in_rank.push(ElementType {
+                    multiplicity: element_types[d].iter().filter(|&x| *x == i).count(),
+                    facet_count: types[d][i] as usize,
+                    volume: None,
+                })
+            }
+            output.push(types_in_rank);
+        }
+
+        output
+    }
+
+    fn print_element_types(&self) -> String {
+        let types = self.get_element_types();
+        let mut output = String::new();
+        let el_names = RankVec(vec![
+            "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta",
+            "Xenna", "Daka", "Henda",
+        ]);
+        let el_suffixes = RankVec(vec![
+            "", "", "gon", "hedron", "choron", "teron", "peton", "exon", "zetton", "yotton",
+            "xennon", "dakon",
+        ]);
+
+        output.push_str(&format!("{}:\n", el_names[0]));
+        for t in &types[0] {
+            output.push_str(&format!("{}\n", t.multiplicity));
+        }
+        output.push_str("\n");
+
+        output.push_str(&format!("{}:\n", el_names[1]));
+        for t in &types[1] {
+            output.push_str(&format!(
+                "{} of length {}\n",
+                t.multiplicity,
+                t.volume.unwrap_or(0.0)
+            ));
+        }
+        output.push_str("\n");
+
+        for d in 2..self.rank() {
+            output.push_str(&format!("{}:\n", el_names[d]));
+            for t in &types[d] {
+                output.push_str(&format!(
+                    "{} × {}-{}\n",
+                    t.multiplicity, t.facet_count, el_suffixes[d]
+                ));
+            }
+            output.push_str("\n");
+        }
+
+        output.push_str("Components:\n");
+        for t in &types[self.rank()] {
+            output.push_str(&format!(
+                "{} × {}-{}\n",
+                t.multiplicity,
+                t.facet_count,
+                el_suffixes[self.rank()]
+            ));
+        }
+
+        return output;
     }
 }
 

@@ -508,7 +508,7 @@ impl<T: NameType> Name<T> {
     pub fn dual(self, center: T::DataPoint) -> Self {
         /// Constructs a regular dual from a regular polytope.
         macro_rules! regular_dual {
-            ($regular: ident, $second_field: ident, $dual: ident) => {
+            ($regular: ident, $dual: ident $(, $other_fields: ident)*) => {
                 if $regular.satisfies(|r| match r {
                     Regular::Yes {
                         center: original_center,
@@ -517,12 +517,12 @@ impl<T: NameType> Name<T> {
                 }) {
                     Name::$dual {
                         $regular,
-                        $second_field,
+                        $($other_fields)*
                     }
                 } else {
                     Name::$dual {
                         regular: T::DataRegular::new(Regular::No),
-                        $second_field,
+                        $($other_fields)*
                     }
                 }
             };
@@ -567,6 +567,7 @@ impl<T: NameType> Name<T> {
             Self::Nullitope | Self::Point | Self::Dyad => self,
 
             // Other hardcoded cases.
+            Self::Triangle { regular } => regular_dual!(regular, Triangle),
             Self::Square | Self::Rectangle => Self::orthodiagonal(),
             Self::Orthodiagonal => Self::polygon(T::DataRegular::new(Regular::No), 4),
 
@@ -587,10 +588,10 @@ impl<T: NameType> Name<T> {
             }
 
             // Regular duals.
-            Self::Polygon { regular, n } => regular_dual!(regular, n, Polygon),
-            Self::Simplex { regular, rank } => regular_dual!(regular, rank, Simplex),
-            Self::Hyperblock { regular, rank } => regular_dual!(regular, rank, Orthoplex),
-            Self::Orthoplex { regular, rank } => regular_dual!(regular, rank, Hyperblock),
+            Self::Polygon { regular, n } => regular_dual!(regular, Polygon, n),
+            Self::Simplex { regular, rank } => regular_dual!(regular, Simplex, rank),
+            Self::Hyperblock { regular, rank } => regular_dual!(regular, Orthoplex, rank),
+            Self::Orthoplex { regular, rank } => regular_dual!(regular, Hyperblock, rank),
 
             // Duals of modifiers.
             Self::Pyramid(base) => modifier_dual!(base, Pyramid, Pyramid),
