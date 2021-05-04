@@ -308,7 +308,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         if rank == -1 {
             Self::nullitope()
         } else {
-            Self::multiprism(&vec![&Self::dyad(); rank as usize]).with_name(Name::cuboid(
+            Self::multiprism(&vec![&Self::dyad(); rank as usize]).with_name(Name::hyperblock(
                 T::DataRegular::new(Regular::Yes {
                     center: vec![0.0; rank as usize].into(),
                 }),

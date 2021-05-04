@@ -131,7 +131,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::hypercube(3);
+    let poly = Concrete::duoprism(&Concrete::hypercube(3), &Concrete::orthoplex(3));
 
     // Disables backface culling.
     pipelines.set_untracked(

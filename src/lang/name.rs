@@ -250,21 +250,21 @@ pub enum Name<T: NameType> {
 
 impl<T: NameType> Name<T> {
     /// Auxiliary function to get the rank of a multiproduct.
-    fn rank_product(&self) -> Option<isize> {
+    fn rank_product(&self) -> isize {
         // The bases of the product, and the difference between the rank of a
         // product of two polytopes and the sum of their ranks.
         let (bases, offset) = match self {
             Self::Multipyramid(bases) => (bases, 1),
             Self::Multiprism(bases) | Self::Multitegum(bases) => (bases, 0),
             Self::Multicomb(bases) => (bases, -1),
-            _ => return None,
+            _ => panic!("rank_product called on something that wasn't a multiproduct!"),
         };
 
         let mut rank = -offset;
         for base in bases.iter() {
-            rank += base.rank()? + offset;
+            rank += base.rank() + offset;
         }
-        Some(rank)
+        rank
     }
 
     /// Returns the rank of the polytope that the name describes, or `None` if
@@ -273,22 +273,22 @@ impl<T: NameType> Name<T> {
     /// # Todo
     /// We need to embed enough metadata in the name for this to always be able
     /// to figure out a rank.
-    pub fn rank(&self) -> Option<isize> {
+    pub fn rank(&self) -> isize {
         match self {
-            Name::Nullitope => Some(-1),
-            Name::Point => Some(0),
-            Name::Dyad => Some(1),
+            Name::Nullitope => -1,
+            Name::Point => 0,
+            Name::Dyad => 1,
             Name::Triangle { regular: _ }
             | Name::Square
             | Name::Rectangle
             | Name::Orthodiagonal
-            | Name::Polygon { regular: _, n: _ } => Some(2),
+            | Name::Polygon { regular: _, n: _ } => 2,
             Name::Simplex { regular: _, rank }
             | Name::Hyperblock { regular: _, rank }
-            | Name::Orthoplex { regular: _, rank } => Some(*rank as isize),
+            | Name::Orthoplex { regular: _, rank } => *rank as isize,
             Name::Dual { base, center: _ } => base.rank(),
-            Name::Generic { n: _, rank } => Some(*rank as isize),
-            Name::Pyramid(base) | Name::Prism(base) | Name::Tegum(base) => Some(base.rank()? + 1),
+            Name::Generic { n: _, rank } => *rank as isize,
+            Name::Pyramid(base) | Name::Prism(base) | Name::Tegum(base) => base.rank() + 1,
             Name::Multipyramid(_)
             | Name::Multiprism(_)
             | Name::Multitegum(_)
@@ -542,8 +542,36 @@ impl<T: NameType> Name<T> {
             };
         }
 
+        /// Constructs a regular dual from a multipyramid, multiprism,
+        /// multitegum, or multicomb.
+        macro_rules! multimodifier_dual {
+            ($bases: ident, $modifier: ident, $dual: ident) => {
+                if T::is_abstract() {
+                    Self::$dual(
+                        $bases
+                            .into_iter()
+                            .map(|base| base.dual(center.clone()))
+                            .collect(),
+                    )
+                } else {
+                    Self::Dual {
+                        base: Box::new(Self::$modifier($bases)),
+                        center,
+                    }
+                }
+            };
+        }
+
         match self {
+            // Self-dual polytopes.
             Self::Nullitope | Self::Point | Self::Dyad => self,
+
+            // Other hardcoded cases.
+            Self::Square | Self::Rectangle => Self::orthodiagonal(),
+            Self::Orthodiagonal => Self::polygon(T::DataRegular::new(Regular::No), 4),
+
+            // Duals of duals become the original polytopes if possible, and
+            // default to generic names otherwise.
             Self::Dual {
                 base,
                 center: original_center,
@@ -551,77 +579,31 @@ impl<T: NameType> Name<T> {
                 if center == original_center {
                     *base
                 } else {
-                    // Instead of stacking duals, we just default to generic
-                    // names after two duals.
                     Self::Generic {
                         n: base.facet_count().unwrap(),
-                        rank: base.rank().unwrap() as usize,
+                        rank: base.rank() as usize,
                     }
                 }
             }
-            Self::Square | Self::Rectangle => Self::orthodiagonal(),
-            Self::Orthodiagonal => Self::polygon(T::DataRegular::new(Regular::No), 4),
+
+            // Regular duals.
             Self::Polygon { regular, n } => regular_dual!(regular, n, Polygon),
             Self::Simplex { regular, rank } => regular_dual!(regular, rank, Simplex),
             Self::Hyperblock { regular, rank } => regular_dual!(regular, rank, Orthoplex),
             Self::Orthoplex { regular, rank } => regular_dual!(regular, rank, Hyperblock),
+
+            // Duals of modifiers.
             Self::Pyramid(base) => modifier_dual!(base, Pyramid, Pyramid),
             Self::Prism(base) => modifier_dual!(base, Prism, Tegum),
             Self::Tegum(base) => modifier_dual!(base, Tegum, Prism),
-            Self::Multipyramid(bases) => {
-                // I don't know if this relation actually holds in concrete polytopes.
-                Self::Multipyramid(
-                    bases
-                        .into_iter()
-                        .map(|base| base.dual(center.clone()))
-                        .collect(),
-                )
-            }
-            Self::Multiprism(bases) => {
-                if T::is_abstract() {
-                    Self::Multitegum(
-                        bases
-                            .into_iter()
-                            .map(|base| base.dual(center.clone()))
-                            .collect(),
-                    )
-                } else {
-                    Self::Dual {
-                        base: Box::new(Self::Multiprism(bases)),
-                        center,
-                    }
-                }
-            }
-            Self::Multitegum(bases) => {
-                if T::is_abstract() {
-                    Self::Multiprism(
-                        bases
-                            .into_iter()
-                            .map(|base| base.dual(center.clone()))
-                            .collect(),
-                    )
-                } else {
-                    Self::Dual {
-                        base: Box::new(Self::Multitegum(bases)),
-                        center,
-                    }
-                }
-            }
-            Self::Multicomb(bases) => {
-                if T::is_abstract() {
-                    Self::Multicomb(
-                        bases
-                            .into_iter()
-                            .map(|base| base.dual(center.clone()))
-                            .collect(),
-                    )
-                } else {
-                    Self::Dual {
-                        base: Box::new(Self::Multicomb(bases)),
-                        center,
-                    }
-                }
-            }
+
+            // Duals of multi-modifiers.
+            Self::Multipyramid(bases) => multimodifier_dual!(bases, Multipyramid, Multipyramid),
+            Self::Multiprism(bases) => multimodifier_dual!(bases, Multiprism, Multitegum),
+            Self::Multitegum(bases) => multimodifier_dual!(bases, Multitegum, Multiprism),
+            Self::Multicomb(bases) => multimodifier_dual!(bases, Multicomb, Multicomb),
+
+            // Defaults to just adding a dual before the name.
             _ => Self::Dual {
                 base: Box::new(self),
                 center,
@@ -649,7 +631,7 @@ impl<T: NameType> Name<T> {
         }
     }
 
-    /// The name for an *n*-simplex.
+    /// The name for an *n*-simplex, regular or not.
     pub fn simplex(regular: T::DataRegular, rank: isize) -> Self {
         match rank {
             -1 => Self::Nullitope,
@@ -663,8 +645,8 @@ impl<T: NameType> Name<T> {
         }
     }
 
-    /// The name for an *n*-cuboid, regular or not.
-    pub fn cuboid(regular: T::DataRegular, rank: isize) -> Self {
+    /// The name for an *n*-block, regular or not.
+    pub fn hyperblock(regular: T::DataRegular, rank: isize) -> Self {
         match rank {
             -1 => Self::Nullitope,
             0 => Self::Point,
@@ -735,7 +717,7 @@ impl<T: NameType> Name<T> {
         }
 
         // Names are firstly compared by rank.
-        return_if_ne!(base0.rank().unwrap_or(-2).cmp(&base1.rank().unwrap_or(-2)));
+        return_if_ne!(base0.rank().cmp(&base1.rank()));
 
         // If we know the facet count of the names, a name with less facets
         // compares as less to one with more facets.
@@ -817,7 +799,7 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one prism, we combine all of them into a
         // single hyperblock.
         if prism_count >= 2 {
-            new_bases.push(Name::cuboid(
+            new_bases.push(Name::hyperblock(
                 T::DataRegular::new(Regular::No),
                 prism_count as isize,
             ));
