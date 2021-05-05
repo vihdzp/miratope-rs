@@ -1,6 +1,7 @@
 //! Contains the basic code that configures the UI.
 
 pub mod camera;
+pub mod library;
 
 use std::{marker::PhantomData, path::PathBuf};
 
@@ -15,7 +16,7 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
 use rfd::FileDialog;
 
-use self::camera::ProjectionType;
+use self::{camera::ProjectionType, library::Library};
 
 /// Guarantees that file dialogs will be opened on the main thread, used to
 /// circumvent a MacOS limitation that all GUI operations must be done on the
@@ -115,6 +116,7 @@ pub fn ui(
     mut section_active: ResMut<CrossSectionActive>,
     mut file_dialog_state: ResMut<FileDialogState>,
     mut projection_type: ResMut<ProjectionType>,
+    mut library: ResMut<Library>,
 ) {
     // If we're currently viewing a cross-section, it gets "fixed" as the active
     // polytope. This needs to be a macro due to captured variables.
@@ -125,8 +127,20 @@ pub fn ui(
         };
     }
 
+    // Assigns a variable to another only if it has changed, so that Bevy
+    // doesn't believe that it's updating each frame.
+    macro_rules! assign_if_changed {
+        ($x: expr, $y: expr) => {
+            #[allow(clippy::float_cmp)]
+            if $x != $y {
+                $x = $y;
+            }
+        };
+    }
+
     let ctx = egui_ctx.ctx();
 
+    // The top bar.
     egui::TopPanel::top("top_panel").show(ctx, |ui| {
         egui::menu::bar(ui, |ui| {
             // Operations on files.
@@ -243,6 +257,7 @@ pub fn ui(
                             if let Some(mut facet) = p.facet(0) {
                                 facet.flatten();
                                 facet.recenter();
+
                                 *p = facet;
                                 println!("Facet succeeded.")
                             } else {
@@ -258,10 +273,11 @@ pub fn ui(
                         for mut p in query.iter_mut() {
                             println!("Verf");
 
-                            if let Some(mut facet) = p.verf(0) {
-                                facet.flatten();
-                                facet.recenter();
-                                *p = facet;
+                            if let Some(mut verf) = p.verf(0) {
+                                verf.flatten();
+                                verf.recenter();
+                                *p = verf;
+
                                 println!("Verf succeeded.")
                             } else {
                                 println!("Verf failed.")
@@ -341,11 +357,8 @@ pub fn ui(
                 .text("Slice depth"),
             );
 
-            #[allow(clippy::float_cmp)]
-            // Updates the slicing depth for the polytope, but only when needed.
-            if section_state.hyperplane_pos != new_hyperplane_pos {
-                section_state.hyperplane_pos = new_hyperplane_pos;
-            }
+            // Updates the slicing depth.
+            assign_if_changed!(section_state.hyperplane_pos, new_hyperplane_pos);
 
             ui.horizontal(|ui| {
                 // Makes the current cross-section into the main polytope.
@@ -357,10 +370,20 @@ pub fn ui(
                 ui.add(egui::Checkbox::new(&mut new_flatten, "Flatten"));
 
                 // Updates the flattening setting.
-                if section_state.flatten != new_flatten {
-                    section_state.flatten = new_flatten;
-                }
+                assign_if_changed!(section_state.flatten, new_flatten);
             });
+        }
+    });
+
+    egui::SidePanel::left("side_panel", 300.0).show(ctx, |ui| {
+        if let Some(file) = library.show(ui) {
+            if let Some(mut p) = query.iter_mut().next() {
+                if let Ok(q) = Concrete::from_path(&file) {
+                    *p = q;
+                } else {
+                    println!("File open failed!");
+                }
+            }
         }
     });
 }
