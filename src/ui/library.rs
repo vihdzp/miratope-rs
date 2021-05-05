@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, fs, path::PathBuf};
+use std::{ffi::OsStr, fs, path::{Path, PathBuf}};
 
 use bevy_egui::egui::Ui;
 
@@ -17,7 +17,9 @@ pub enum Library {
     File { path: PathBuf, name: String },
 }
 
-fn get_name(path: &PathBuf) -> Result<String, &str> {
+/// Reads a folder's name from the `.metadata` file, or defaults to the folder's
+/// actual name.
+fn get_name(path: &Path) -> Result<String, &str> {
     assert!(path.is_dir(), "Path {:?} not a directory!", path);
 
     let new_path = path.join(".metadata");
