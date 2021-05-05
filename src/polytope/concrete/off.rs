@@ -183,14 +183,15 @@ impl Concrete {
     /// Builds a polytope from the string representation of an OFF file.
     pub fn from_off(src: String) -> io::Result<Self> {
         // Reads name.
-        let mut first_line = src.lines().next().unwrap().chars();
         let mut name = None;
 
-        if first_line.next() == Some('#') {
-            println!("Comment detected");
+        if let Some(mut first_line) = src.lines().next().map(|line| line.chars()) {
+            if first_line.next() == Some('#') {
+                println!("Comment detected");
 
-            if let Ok(new_name) = ron::from_str(&first_line.collect::<String>()) {
-                name = Some(new_name);
+                if let Ok(new_name) = ron::from_str(&first_line.collect::<String>()) {
+                    name = Some(new_name);
+                }
             }
         }
 
