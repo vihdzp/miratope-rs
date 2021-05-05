@@ -117,7 +117,7 @@ pub fn ui(
         egui::menu::bar(ui, |ui| {
             egui::menu::menu(ui, "File", |ui| {
                 // Loads a file.
-                if ui.button("Load").clicked() {
+                if ui.button("Open").clicked() {
                     file_dialog_state.open();
                 }
 
@@ -127,6 +127,8 @@ pub fn ui(
                         file_dialog_state.save(lang::En::parse(p.name(), Default::default()));
                     }
                 }
+
+                ui.separator();
 
                 // Quits the application.
                 if ui.button("Exit").clicked() {
@@ -202,7 +204,7 @@ pub fn ui(
             // Prints the wiki link to the polytope on the terminal.
             if columns[3].button("Wiki").clicked() {
                 for p in query.iter_mut() {
-                    println!("{}", p.wiki_link());
+                    let _ = webbrowser::open(&p.wiki_link());
                 }
             }
 
