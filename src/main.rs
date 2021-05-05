@@ -69,7 +69,11 @@ use polytope::{
     concrete::{off::*, Concrete},
     Polytope, *,
 };
-use ui::{*, camera::{CameraInputEvent, ProjectionType}, library::Library};
+use ui::{
+    camera::{CameraInputEvent, ProjectionType},
+    library::Library,
+    *,
+};
 
 mod geometry;
 mod lang;

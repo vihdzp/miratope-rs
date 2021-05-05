@@ -84,7 +84,7 @@ impl<T: Debug> NameData<T> for AbsData<T> {
 }
 
 /// A name representing an abstract polytope.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize,Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Abs;
 
 impl NameType for Abs {
@@ -126,7 +126,7 @@ impl<T: PartialEq + Debug + Clone + Serialize> NameData<T> for ConData<T> {
 }
 
 /// A name representing a concrete polytope.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize,Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Con(bool);
 
 impl NameType for Con {
