@@ -281,11 +281,6 @@ impl Language for Es {
         Self::generic(2u32.pow(rank as u32) as usize, rank, options)
     }
 
-    /// The name for the dual of another polytope.
-    fn dual<T: NameType>(base: &Name<T>, options: Options) -> String {
-        format!("{} dual", Self::base(base, options))
-    }
-
     fn compound<T: NameType>(components: &[(usize, Name<T>)], options: Options) -> String {
         let ((last_rep, last_component), first_components) = components.split_last().unwrap();
         let mut str = String::from(options.four(

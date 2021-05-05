@@ -840,7 +840,7 @@ impl Concrete {
                 t.volume.unwrap_or(0.0)
             ));
         }
-        output.push_str("\n");
+        output.push('\n');
 
         for d in 2..self.rank() {
             output.push_str(&el_names[d].to_string());

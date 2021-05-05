@@ -67,7 +67,10 @@
 pub mod dbg;
 pub mod en;
 pub mod es;
+mod fr;
+mod ja;
 pub mod name;
+mod pii;
 
 pub use dbg::Dbg;
 pub use en::En;
@@ -373,8 +376,19 @@ pub fn parentheses(str: String, paren: bool) -> String {
     }
 }
 
+/// Whether an adjective *usually* goes before or after a word in the language.
+pub enum Position {
+    Before,
+    After,
+}
+
 /// The trait shared by all languages. Defaults to English.
 pub trait Language: Prefix {
+    /// The usual position for adjectives.
+    fn adj_pos() -> Position {
+        Position::Before
+    }
+
     /// Parses the [`Name`] in the specified language, with the given [`Options`].
     fn parse<T: NameType>(name: &Name<T>, options: Options) -> String {
         debug_assert!(name.is_valid(), "Invalid name {:?}.", name);
@@ -405,7 +419,7 @@ pub trait Language: Prefix {
                 }
             }
             Name::Orthoplex { regular: _, rank } => Self::orthoplex(*rank, options),
-            Name::Dual { base, center: _ } => Self::dual(base, options),
+            Name::Dual { base, center: _ } => Self::dual_of(base, options),
             Name::Compound(components) => Self::compound(components, options),
         }
     }
@@ -467,6 +481,13 @@ pub trait Language: Prefix {
         format!("{}{}", Self::prefix(n), Self::suffix(rank, options))
     }
 
+    fn combine(adj: String, noun: String) -> String {
+        match Self::adj_pos() {
+            Position::Before => format!("{} {}", adj, noun),
+            Position::After => format!("{} {}", noun, adj),
+        }
+    }
+
     /// The name of a pyramid.
     fn pyramid(options: Options) -> String {
         format!("pyramid{}", options.three("", "s", "al"))
@@ -474,11 +495,7 @@ pub trait Language: Prefix {
 
     /// The name for a pyramid with a given base.
     fn pyramid_of<T: NameType>(base: &Name<T>, options: Options) -> String {
-        format!(
-            "{} {}",
-            Self::base_adj(base, options),
-            Self::pyramid(options)
-        )
+        Self::combine(Self::base_adj(base, options), Self::pyramid(options))
     }
 
     /// The name for a prism.
@@ -488,7 +505,7 @@ pub trait Language: Prefix {
 
     /// The name for a prism with a given base.
     fn prism_of<T: NameType>(base: &Name<T>, options: Options) -> String {
-        format!("{} {}", Self::base_adj(base, options), Self::prism(options))
+        Self::combine(Self::base_adj(base, options), Self::prism(options))
     }
 
     /// The name for a tegum.
@@ -498,7 +515,7 @@ pub trait Language: Prefix {
 
     /// The name for a tegum with a given base.
     fn tegum_of<T: NameType>(base: &Name<T>, options: Options) -> String {
-        format!("{} {}", Self::base_adj(base, options), Self::tegum(options))
+        Self::combine(Self::base_adj(base, options), Self::tegum(options))
     }
 
     fn multiproduct<T: NameType>(name: &Name<T>, options: Options) -> String {
@@ -574,8 +591,13 @@ pub trait Language: Prefix {
     }
 
     /// The name for the dual of another polytope.
-    fn dual<T: NameType>(base: &Name<T>, options: Options) -> String {
-        format!("dual {}", Self::base(base, options))
+    fn dual(_options: Options) -> String {
+        String::from("dual")
+    }
+
+    /// The name for the dual of another polytope.
+    fn dual_of<T: NameType>(base: &Name<T>, options: Options) -> String {
+        Self::combine(Self::dual(options), Self::base(base, options))
     }
 
     fn compound<T: NameType>(components: &[(usize, Name<T>)], options: Options) -> String {
