@@ -349,6 +349,8 @@ pub fn ui(
                 new_hyperplane_pos = (x_min + x_max) / 2.0;
             }
 
+            ui.spacing_mut().slider_width = 800.0;
+
             ui.add(
                 egui::Slider::new(
                     &mut new_hyperplane_pos,
