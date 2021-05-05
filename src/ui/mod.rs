@@ -110,6 +110,7 @@ impl Default for CrossSectionState {
 }
 
 /// The system in charge of the UI.
+#[allow(clippy::too_many_arguments)]
 pub fn ui(
     egui_ctx: ResMut<EguiContext>,
     mut query: Query<&mut Concrete>,
