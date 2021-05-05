@@ -769,7 +769,7 @@ impl<T: NameType> Name<T> {
 
         // If we take exactly one pyramid, we apply it at the end.
         if pyramid_count == 1 {
-            multipyramid.pyramid()
+            Self::Pyramid(Box::new(multipyramid))
         }
         // Otherwise, we already combined them.
         else {
@@ -817,7 +817,7 @@ impl<T: NameType> Name<T> {
 
         // If we take exactly one prism, we apply it at the end.
         if prism_count == 1 {
-            multiprism.prism()
+            Self::Prism(Box::new(multiprism))
         }
         // Otherwise, we already combined them.
         else {
@@ -838,7 +838,7 @@ impl<T: NameType> Name<T> {
                 }
                 Self::Point => {}
                 Self::Dyad => tegum_count += 1,
-                Self::Square => tegum_count += 2,
+                Self::Square | Self::Orthodiagonal => tegum_count += 2,
                 Self::Orthoplex { regular: _, rank } => tegum_count += rank,
                 Self::Multitegum(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
@@ -865,7 +865,7 @@ impl<T: NameType> Name<T> {
 
         // If we take exactly one tegum, we apply it at the end.
         if tegum_count == 1 {
-            multitegum.tegum()
+            Self::Tegum(Box::new(multitegum))
         }
         // Otherwise, we already combined them.
         else {
