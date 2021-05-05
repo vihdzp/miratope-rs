@@ -4,9 +4,11 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use crate::{geometry::Point, Consts, Float};
 
+use serde::{Deserialize, Serialize};
+
 /// A type marker that determines whether a name describes an abstract or
 /// concrete polytope.
-pub trait NameType: Debug + Clone + PartialEq {
+pub trait NameType: Debug + Clone + PartialEq + Serialize {
     /// Either `AbsData<Point>` or `ConData<Point>`. Workaround until generic
     /// associated types are stable.
     type DataPoint: NameData<Point>;
@@ -25,7 +27,7 @@ pub trait NameType: Debug + Clone + PartialEq {
 ///
 /// The idea is that `NameData` should be used to store whichever conditions on
 /// concrete polytopes always hold on abstract polytopes.
-pub trait NameData<T>: PartialEq + Debug + Clone {
+pub trait NameData<T>: PartialEq + Debug + Clone + Serialize {
     /// Initializes a new `NameData` with a given value.
     fn new(value: T) -> Self;
 
@@ -36,9 +38,9 @@ pub trait NameData<T>: PartialEq + Debug + Clone {
     fn satisfies<F: Fn(&T) -> bool>(&self, f: F) -> bool;
 }
 
-#[derive(Debug)]
 /// Phantom data associated with an abstract polytope. Internally stores nothing,
 /// and compares as `true` with anything else.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AbsData<T>(PhantomData<T>);
 
 impl<T> Default for AbsData<T> {
@@ -81,8 +83,8 @@ impl<T: Debug> NameData<T> for AbsData<T> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
 /// A name representing an abstract polytope.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize,Deserialize)]
 pub struct Abs;
 
 impl NameType for Abs {
@@ -94,8 +96,8 @@ impl NameType for Abs {
     }
 }
 
-#[derive(Debug, Clone)]
 /// Data associated with a concrete polytope.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConData<T>(T);
 
 impl<T: PartialEq> PartialEq for ConData<T> {
@@ -106,7 +108,7 @@ impl<T: PartialEq> PartialEq for ConData<T> {
 
 impl<T: Copy> Copy for ConData<T> {}
 
-impl<T: PartialEq + Debug + Clone> NameData<T> for ConData<T> {
+impl<T: PartialEq + Debug + Clone + Serialize> NameData<T> for ConData<T> {
     /// Initializes a new `ConData` that holds a given value.
     fn new(value: T) -> Self {
         Self(value)
@@ -123,8 +125,8 @@ impl<T: PartialEq + Debug + Clone> NameData<T> for ConData<T> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
 /// A name representing a concrete polytope.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize,Deserialize)]
 pub struct Con(bool);
 
 impl NameType for Con {
@@ -139,7 +141,7 @@ impl NameType for Con {
 /// Determines whether a `Name` refers to a concrete regular polytope. This is
 /// often indirectly stored as a `NameData<Regular>`, so that all abstract
 /// polytopes behave as regular.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Regular {
     Yes { center: Point },
     No,
@@ -162,7 +164,7 @@ impl Regular {
 /// instanciate a `Name` directly, **you ought to guarantee that these
 /// invariants hold.** Convenience methods are provided, which will guarantee these
 /// invariants for you.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Name<T: NameType> {
     /// A nullitope.
     Nullitope,

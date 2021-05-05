@@ -182,6 +182,18 @@ fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> Ele
 impl Concrete {
     /// Builds a polytope from the string representation of an OFF file.
     pub fn from_off(src: String) -> io::Result<Self> {
+        // Reads name.
+        let mut first_line = src.lines().next().unwrap().chars();
+        let mut name = None;
+
+        if first_line.next() == Some('#') {
+            println!("Comment detected");
+
+            if let Ok(new_name) = ron::from_str(&first_line.collect::<String>()) {
+                name = Some(new_name);
+            }
+        }
+
         let mut toks = data_tokens(&src);
         let rank = {
             let first = toks.next().expect("OFF file empty");
@@ -229,7 +241,13 @@ impl Concrete {
             abs.push_max();
         }
 
-        Ok(Self::new(vertices, abs))
+        let poly = Self::new(vertices, abs);
+
+        Ok(if let Some(name) = name {
+            poly.with_name(name)
+        } else {
+            poly
+        })
     }
 }
 
@@ -410,10 +428,15 @@ impl Concrete {
         let abs = &self.abs;
         let mut off = String::new();
 
+        // Serialized name.
+        off.push_str("# ");
+        off.push_str(&ron::to_string(self.name()).unwrap());
+        off.push('\n');
+
         // Blatant advertising.
         if opt.comments {
             off += &format!(
-                "# Generated using Miratope v{} (https://github.com/OfficialURL/miratope-rs)\n",
+                "# Generated using Miratope v{} (https://github.com/OfficialURL/miratope-rs)\n\n",
                 env!("CARGO_PKG_VERSION")
             );
         }

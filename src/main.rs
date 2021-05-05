@@ -69,10 +69,7 @@ use polytope::{
     concrete::{off::*, Concrete},
     Polytope, *,
 };
-use ui::{
-    camera::{CameraInputEvent, ProjectionType},
-    CrossSectionActive, CrossSectionState,
-};
+use ui::{*, camera::{CameraInputEvent, ProjectionType}, library::Library};
 
 mod geometry;
 mod lang;
@@ -121,9 +118,9 @@ fn main() {
         .insert_resource(Msaa { samples: 4 })
         .insert_resource(CrossSectionActive(false))
         .insert_resource(CrossSectionState::default())
-        .insert_resource(ui::FileDialogState::default())
-        .insert_resource(ui::camera::ProjectionType::Perspective)
-        .insert_resource(ui::library::Library::new(&"./lib/"))
+        .insert_resource(FileDialogState::default())
+        .insert_resource(ProjectionType::Perspective)
+        .insert_resource(Library::new(&"./lib/"))
         .insert_non_send_resource(ui::MainThreadToken::new())
         // Adds plugins.
         .add_plugins(DefaultPlugins)

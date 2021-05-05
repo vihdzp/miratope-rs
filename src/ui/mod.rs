@@ -380,6 +380,8 @@ pub fn ui(
             if let Some(mut p) = query.iter_mut().next() {
                 if let Ok(q) = Concrete::from_path(&file) {
                     *p = q;
+
+                    exit_cross_section!();
                 } else {
                     println!("File open failed!");
                 }
