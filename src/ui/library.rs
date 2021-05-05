@@ -1,4 +1,8 @@
-use std::{ffi::OsStr, fs, path::{Path, PathBuf}};
+use std::{
+    ffi::OsStr,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use bevy_egui::egui::Ui;
 
