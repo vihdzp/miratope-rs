@@ -158,8 +158,9 @@ pub fn ui(
                 if ui.checkbox(&mut checked, "Orthogonal projection").clicked() {
                     projection_type.flip();
 
-                    // Forces an update on all polytopes.
-                    for mut p in query.iter_mut().next() {
+                    // Forces an update on all polytopes. (This does have an effect!)
+                    for mut p in query.iter_mut() {
+                        #[allow(clippy::no_effect)]
                         &mut *p;
                     }
                 }
