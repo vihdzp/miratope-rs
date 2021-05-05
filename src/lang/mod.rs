@@ -427,10 +427,10 @@ pub trait Language: Prefix {
     /// Returns the suffix for a d-polytope. Only needs to work up to d = 20, we
     /// won't offer support any higher than that.
     fn suffix(d: usize, options: Options) -> String {
-        const SUFFIXES: [&str; 21] = [
+        const SUFFIXES: [&str; 25] = [
             "mon", "tel", "gon", "hedr", "chor", "ter", "pet", "ex", "zett", "yott", "xenn", "dak",
-            "hendak", "dok", "tradak", "teradak", "petadak", "exdak", "zettadak", "yottadak",
-            "xendak",
+            "hend", "dok", "tradak", "tedak", "pedak", "exdak", "zedak", "yodak",
+            "nedak", "ik", "iken", "ikod", "iktr",
         ];
 
         format!(
