@@ -295,10 +295,8 @@ pub fn ui(
             // Stuff related to the Polytope Wiki.
             egui::menu::menu(ui, "Wiki", |ui| {
                 // Goes to the wiki main page.
-                if ui.button("Main Page").clicked() {
-                    if webbrowser::open(crate::WIKI_LINK).is_err() {
-                        println!("Website opening failed!")
-                    }
+                if ui.button("Main Page").clicked() && webbrowser::open(crate::WIKI_LINK).is_err() {
+                    println!("Website opening failed!")
                 }
 
                 // Searches the current polytope on the wiki.
@@ -412,7 +410,6 @@ pub fn update_changed_polytopes(
     orthogonal: Res<camera::ProjectionType>,
 ) {
     for (poly, mesh_handle, children) in polies.iter() {
-        println!("test");
         *meshes.get_mut(mesh_handle).unwrap() = poly.get_mesh(*orthogonal);
 
         windows
