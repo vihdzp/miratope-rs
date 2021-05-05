@@ -184,7 +184,6 @@ impl Concrete {
     pub fn from_off(src: String) -> io::Result<Self> {
         // Reads name.
         let mut name = None;
-
         if let Some(mut first_line) = src.lines().next().map(|line| line.chars()) {
             if first_line.next() == Some('#') {
                 println!("Comment detected");

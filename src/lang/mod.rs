@@ -75,11 +75,16 @@ mod pii;
 pub use dbg::Dbg;
 pub use en::En;
 pub use es::Es;
+pub use fr::Fr;
+pub use ja::Ja;
 pub use name::Name;
+pub use pii::Pii;
 
 use crate::lang::name::NameData;
 
 use self::name::NameType;
+
+use strum_macros::EnumIter;
 
 /// The different grammatical genders.
 #[derive(Clone, Copy, Debug)]
@@ -653,5 +658,43 @@ pub trait Language: Prefix {
             ),
             options.parentheses,
         )
+    }
+}
+
+/// We should maybe make `dyn Language` work eventually.
+#[derive(Debug, EnumIter)]
+pub enum SelectedLanguage {
+    En,
+    Es,
+    Fr,
+    Ja,
+    Pii,
+}
+
+impl SelectedLanguage {
+    pub fn parse<T: NameType>(&self, name: &Name<T>, options: Options) -> String {
+        match self {
+            Self::En => En::parse(name, options),
+            Self::Es => Es::parse(name, options),
+            Self::Fr => Fr::parse(name, options),
+            Self::Ja => Ja::parse(name, options),
+            Self::Pii => Pii::parse(name, options),
+        }
+    }
+
+    pub fn to_string(&self) -> &str {
+        match self {
+            Self::En => "English",
+            Self::Es => "Spanish",
+            Self::Fr => "French",
+            Self::Ja => "Japanese",
+            Self::Pii => "Proto Indo-European",
+        }
+    }
+}
+
+impl Default for SelectedLanguage {
+    fn default() -> Self {
+        Self::En
     }
 }

@@ -7,16 +7,17 @@ use std::{marker::PhantomData, path::PathBuf};
 
 use crate::{
     geometry::{Hyperplane, Point},
-    lang::{self, Language, Options},
+    lang::{self, Language, Options, SelectedLanguage},
     polytope::{concrete::Concrete, Polytope},
     Float, OffOptions,
 };
+use camera::ProjectionType;
+use library::Library;
 
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
 use rfd::FileDialog;
-
-use self::{camera::ProjectionType, library::Library};
+use strum::IntoEnumIterator;
 
 /// Guarantees that file dialogs will be opened on the main thread, used to
 /// circumvent a MacOS limitation that all GUI operations must be done on the
@@ -117,6 +118,7 @@ pub fn ui(
     mut file_dialog_state: ResMut<FileDialogState>,
     mut projection_type: ResMut<ProjectionType>,
     mut library: ResMut<Library>,
+    mut selected_language: ResMut<SelectedLanguage>,
 ) {
     // If we're currently viewing a cross-section, it gets "fixed" as the active
     // polytope. This needs to be a macro due to captured variables.
@@ -329,6 +331,15 @@ pub fn ui(
                     }
                 }
             });
+
+            // Switch language.
+            egui::menu::menu(ui, "Language", |ui| {
+                for lang in SelectedLanguage::iter() {
+                    if ui.button(lang.to_string()).clicked() {
+                        *selected_language = dbg!(lang);
+                    }
+                }
+            });
         });
 
         // The cross-section settings.
@@ -439,7 +450,8 @@ pub fn update_changed_polytopes(
     polies: Query<(&Concrete, &Handle<Mesh>, &Children), Changed<Concrete>>,
     wfs: Query<&Handle<Mesh>, Without<Concrete>>,
     mut windows: ResMut<Windows>,
-    orthogonal: Res<camera::ProjectionType>,
+    selected_language: Res<SelectedLanguage>,
+    orthogonal: Res<ProjectionType>,
 ) {
     for (poly, mesh_handle, children) in polies.iter() {
         *meshes.get_mut(mesh_handle).unwrap() = poly.get_mesh(*orthogonal);
@@ -447,7 +459,7 @@ pub fn update_changed_polytopes(
         windows
             .get_primary_mut()
             .unwrap()
-            .set_title(lang::En::parse(poly.name(), Options::default()));
+            .set_title(selected_language.parse(poly.name(), Options::default()));
 
         for child in children.iter() {
             if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {
@@ -499,6 +511,21 @@ pub fn update_cross_section(
 
                 *p = slice;
             }
+        }
+    }
+}
+
+pub fn update_language(
+    mut polies: Query<&Concrete>,
+    mut windows: ResMut<Windows>,
+    selected_language: Res<SelectedLanguage>,
+) {
+    if selected_language.is_changed() {
+        if let Some(poly) = polies.iter_mut().next() {
+            windows
+                .get_primary_mut()
+                .unwrap()
+                .set_title(selected_language.parse(poly.name(), Options::default()));
         }
     }
 }

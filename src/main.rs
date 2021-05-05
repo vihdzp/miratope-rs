@@ -61,6 +61,7 @@ use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::EguiPlugin;
+use lang::SelectedLanguage;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
 #[allow(unused_imports)]
@@ -125,6 +126,7 @@ fn main() {
         .insert_resource(FileDialogState::default())
         .insert_resource(ProjectionType::Perspective)
         .insert_resource(Library::new(&"./lib/"))
+        .insert_resource(SelectedLanguage::default())
         .insert_non_send_resource(ui::MainThreadToken::new())
         // Adds plugins.
         .add_plugins(DefaultPlugins)
@@ -136,6 +138,7 @@ fn main() {
         .add_system(ui::ui.system())
         .add_system(ui::update_cross_section_state.system())
         .add_system(ui::file_dialog.system())
+        .add_system(ui::update_language.system())
         .add_system_to_stage(CoreStage::PostUpdate, ui::update_cross_section.system())
         .add_system_to_stage(CoreStage::PostUpdate, ui::update_changed_polytopes.system())
         .run();
