@@ -1,12 +1,11 @@
-pub mod input;
+pub mod camera;
 
 use std::{marker::PhantomData, path::PathBuf};
 
 use crate::{
     geometry::{Hyperplane, Point},
     lang::{self, Language, Options},
-    polytope::concrete::Concrete,
-    polytope::Polytope,
+    polytope::{concrete::Concrete, Polytope},
     Float, OffOptions,
 };
 
@@ -200,10 +199,10 @@ pub fn ui(
                 }
             }
 
-            // Exports the active polytope as an OFF file (not yet functional!)
-            if columns[3].button("Print OFF").clicked() {
+            // Prints the wiki link to the polytope on the terminal.
+            if columns[3].button("Wiki").clicked() {
                 for p in query.iter_mut() {
-                    println!("{}", p.to_off(OffOptions::default()));
+                    println!("{}", p.wiki_link());
                 }
             }
 

@@ -69,7 +69,7 @@ use polytope::{
     concrete::{off::*, Concrete},
     Polytope, *,
 };
-use ui::{input::CameraInputEvent, CrossSectionActive, CrossSectionState};
+use ui::{camera::CameraInputEvent, CrossSectionActive, CrossSectionState};
 
 mod geometry;
 mod lang;
@@ -120,7 +120,7 @@ fn main() {
         // Adds plugins.
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
-        .add_plugin(ui::input::InputPlugin)
+        .add_plugin(ui::camera::InputPlugin)
         // Adds systems
         .add_startup_system(setup.system())
         .add_system(ui::update_scale_factor.system())

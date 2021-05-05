@@ -10,8 +10,9 @@ use self::r#abstract::{
     rank::RankVec,
 };
 use crate::lang::{
+    self,
     name::{NameData, NameType, Regular},
-    Name,
+    Language, Name,
 };
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
@@ -32,6 +33,16 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// A mutable reference to the name of the polytope.
     fn name_mut(&mut self) -> &mut Name<T>;
+
+    /// Gets the wiki link to the polytope, based on its name.
+    fn wiki_link(&self) -> String {
+        format!(
+            "https://polytope.miraheze.org/wiki/{}",
+            lang::En::parse(self.name(), Default::default())
+                .replace(" ", "_")
+                .to_ascii_uppercase()
+        )
+    }
 
     /// Used as a chaining operator to set the name of a polytope.
     fn with_name(mut self, name: Name<T>) -> Self {

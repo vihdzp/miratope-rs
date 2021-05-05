@@ -8,6 +8,7 @@ use xml::{
 };
 use zip::read::ZipArchive;
 
+/// Possible errors while reading a GGB file.
 enum GgbErrors {
     MissingAttribute,
     MissingElement,
