@@ -160,8 +160,12 @@ pub fn ui(
 
                     // Forces an update on all polytopes. (This does have an effect!)
                     for mut p in query.iter_mut() {
-                        #[allow(clippy::no_effect)]
-                        &mut *p;
+                        // We'll use this code once Clippy Issue #7171 is fixed:
+                        // #[allow(clippy::no_effect)]
+                        // &mut *p;
+
+                        // Workaround:
+                        p.name_mut();
                     }
                 }
             });
