@@ -262,6 +262,8 @@ pub fn ui(
 pub fn file_dialog(
     mut query: Query<&mut Concrete>,
     file_dialog_state: ResMut<FileDialogState>,
+    mut section_state: ResMut<CrossSectionState>,
+    mut section_active: ResMut<CrossSectionActive>,
     token: NonSend<MainThreadToken>,
 ) {
     if file_dialog_state.is_changed() {
@@ -279,6 +281,11 @@ pub fn file_dialog(
                         *p = Concrete::from_path(&path).unwrap();
                         p.recenter();
                     }
+
+                    // If we're currently viewing a cross-section, it gets "fixed"
+                    // as the active polytope.
+                    section_state.original_polytope = None;
+                    section_active.0 = false;
                 }
             }
             _ => {}

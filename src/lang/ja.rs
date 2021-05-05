@@ -41,7 +41,13 @@ impl Language for Ja {
             2 => format!("{}形", Self::prefix(n)),
             3 => format!("{}面体", Self::prefix(n)),
             4 => format!("{}胞体", Self::prefix(n)),
-            _ => format!("{}-tope", n), // placeholder
+            // We made the following ones up:
+            5 => format!("{}ペタ体", Self::prefix(n)),
+            6 => format!("{}エクサ体", Self::prefix(n)),
+            7 => format!("{}ゼタ体", Self::prefix(n)),
+            8 => format!("{}ヨタ体", Self::prefix(n)),
+            // Placeholder
+            _ => format!("{}-tope", Self::prefix(n)),
         }
     }
 
