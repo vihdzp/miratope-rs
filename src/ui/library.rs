@@ -1,54 +1,28 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::PathBuf};
 
 use bevy_egui::egui::Ui;
 
 pub enum Library {
-    ClosedFolder {
-        path: PathBuf,
-        name: String,
-    },
-    OpenFolder {
+    /// A folder whose contents have not yet been read.
+    UnloadedFolder { path: PathBuf, name: String },
+
+    /// A folder whose contents have been read.
+    LoadedFolder {
         path: PathBuf,
         name: String,
         contents: Vec<Library>,
     },
-    File {
-        path: PathBuf,
-        name: String,
-    },
+
+    /// A file that can be loaded into Miratope.
+    File { path: PathBuf, name: String },
 }
 
 impl Library {
-    pub fn path(&self) -> &Path {
-        match self {
-            Self::ClosedFolder { path, name: _ } => path,
-            Self::OpenFolder {
-                path,
-                name: _,
-                contents: _,
-            } => path,
-            Self::File { path, name: _ } => path,
-        }
-    }
-
-    pub fn name(&self) -> &String {
-        match self {
-            Self::ClosedFolder { path: _, name } => name,
-            Self::OpenFolder {
-                path: _,
-                name,
-                contents: _,
-            } => name,
-            Self::File { path: _, name } => name,
-        }
-    }
-
+    /// Shows the library.
     pub fn show(&mut self, ui: &mut Ui) -> Option<PathBuf> {
         match self {
-            Self::ClosedFolder { path, name } => {
+            // Shows a collapsing drop-down, and loads the folder in case it's clicked.
+            Self::UnloadedFolder { path, name } => {
                 // Clones so that the closure doesn't require unique access.
                 let path = path.clone();
                 let name = name.clone();
@@ -66,18 +40,31 @@ impl Library {
                                 match entry {
                                     Ok(entry) => {
                                         let path = entry.path();
-                                        let name = String::from(
-                                            path.file_name()
-                                                .map(|s| s.to_str())
-                                                .flatten()
-                                                .unwrap_or("none"),
-                                        );
 
-                                        // Adds the file to the folder's contents.
+                                        // Adds the subfolder to the folder's contents.
                                         if path.is_dir() {
-                                            contents.push(Self::ClosedFolder { path, name });
+                                            let name = String::from(
+                                                path.file_name()
+                                                    .map(|s| s.to_str())
+                                                    .flatten()
+                                                    .unwrap_or("none"),
+                                            );
+
+                                            contents.push(Self::UnloadedFolder { path, name });
                                         } else {
-                                            contents.push(Self::File { path, name });
+                                            // Adds the file to the folder's contents.
+                                            if let Some(ext) = path.extension() {
+                                                if ext == "off" || ext == "ggb" {
+                                                    let name = String::from(
+                                                        path.file_stem()
+                                                            .map(|s| s.to_str())
+                                                            .flatten()
+                                                            .unwrap_or("none"),
+                                                    );
+
+                                                    contents.push(Self::File { path, name });
+                                                }
+                                            }
                                         }
                                     }
                                     Err(err) => {
@@ -89,12 +76,12 @@ impl Library {
                             // Contents of drop down.
                             for lib in contents.iter_mut() {
                                 if let Some(file) = lib.show(ui) {
-                                    res = Some(PathBuf::from(file));
+                                    res = Some(file);
                                 }
                             }
 
                             // Opens the folder.
-                            *self = Self::OpenFolder {
+                            *self = Self::LoadedFolder {
                                 path,
                                 name,
                                 contents,
@@ -108,7 +95,8 @@ impl Library {
 
                 res
             }
-            Self::OpenFolder {
+            // Shows a drop-down with all of the files and folders.
+            Self::LoadedFolder {
                 path: _,
                 name,
                 contents,
@@ -124,6 +112,7 @@ impl Library {
 
                 res
             }
+            // Shows a button that loads the file if clicked.
             Self::File { path, name } => {
                 if ui.button(name.clone()).clicked() {
                     Some(path.clone())

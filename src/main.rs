@@ -125,7 +125,7 @@ fn main() {
         .insert_resource(CrossSectionState::default())
         .insert_resource(ui::FileDialogState::default())
         .insert_resource(ui::camera::ProjectionType::Perspective)
-        .insert_resource(ui::library::Library::ClosedFolder {
+        .insert_resource(ui::library::Library::UnloadedFolder {
             path: PathBuf::from("./lib/"),
             name: String::from("Library"),
         })
