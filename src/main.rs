@@ -57,8 +57,6 @@
 //! ## Why is the rendering buggy?
 //! Proper rendering, even in 3D, is a work in progress.
 
-use std::path::PathBuf;
-
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
@@ -125,10 +123,7 @@ fn main() {
         .insert_resource(CrossSectionState::default())
         .insert_resource(ui::FileDialogState::default())
         .insert_resource(ui::camera::ProjectionType::Perspective)
-        .insert_resource(ui::library::Library::UnloadedFolder {
-            path: PathBuf::from("./lib/"),
-            name: String::from("Library"),
-        })
+        .insert_resource(ui::library::Library::new(&"./lib/"))
         .insert_non_send_resource(ui::MainThreadToken::new())
         // Adds plugins.
         .add_plugins(DefaultPlugins)

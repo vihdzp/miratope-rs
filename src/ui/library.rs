@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::{ffi::OsStr, fs, path::PathBuf};
 
 use bevy_egui::egui::Ui;
 
@@ -17,7 +17,30 @@ pub enum Library {
     File { path: PathBuf, name: String },
 }
 
+fn get_name(path: &PathBuf) -> Result<String, &str> {
+    assert!(path.is_dir(), "Path {:?} not a directory!", path);
+
+    let new_path = path.join(".metadata");
+
+    if path.exists() {
+        String::from_utf8(fs::read(new_path).map_err(|_| "File could not be read.")?)
+            .map_err(|_| "File not UTF-8.")
+    } else {
+        Ok(String::from(
+            path.file_name().map(|f| f.to_str()).flatten().unwrap_or(""),
+        ))
+    }
+}
+
 impl Library {
+    /// An unloaded folder.
+    pub fn new(path: &impl AsRef<OsStr>) -> Self {
+        let path = PathBuf::from(&path);
+        let name = get_name(&path).unwrap();
+
+        Self::UnloadedFolder { path, name }
+    }
+
     /// Shows the library.
     pub fn show(&mut self, ui: &mut Ui) -> Option<PathBuf> {
         match self {
@@ -43,14 +66,9 @@ impl Library {
 
                                         // Adds the subfolder to the folder's contents.
                                         if path.is_dir() {
-                                            let name = String::from(
-                                                path.file_name()
-                                                    .map(|s| s.to_str())
-                                                    .flatten()
-                                                    .unwrap_or("none"),
-                                            );
-
-                                            contents.push(Self::UnloadedFolder { path, name });
+                                            if let Ok(name) = get_name(&path) {
+                                                contents.push(Self::UnloadedFolder { path, name });
+                                            }
                                         } else {
                                             // Adds the file to the folder's contents.
                                             if let Some(ext) = path.extension() {
