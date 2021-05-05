@@ -160,7 +160,7 @@ pub fn ui(
 
                     // Forces an update on all polytopes. (This does have an effect!)
                     for mut p in query.iter_mut() {
-                        #[allow(clippy::no_effect)]
+                        #[allow(clippy::no-effect)]
                         &mut *p;
                     }
                 }
