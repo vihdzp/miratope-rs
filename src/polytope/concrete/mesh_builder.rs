@@ -4,6 +4,7 @@ use super::Concrete;
 use crate::{
     geometry::{Point, Subspace},
     polytope::{r#abstract::elements::ElementList, r#abstract::elements::Subsupelements},
+    ui::camera::ProjectionType,
     Float,
 };
 
@@ -297,10 +298,7 @@ impl<'a> MeshBuilder<'a> {
     }
 
     /// Gets the coordinates of the vertices, after projecting down into 3D.
-    fn get_vertex_coords(&self) -> Vec<[f32; 3]> {
-        // Enables orthogonal projection.
-        const ORTHOGONAL: bool = false;
-
+    fn get_vertex_coords(&self, projection_type: ProjectionType) -> Vec<[f32; 3]> {
         let vert_iter = self
             .concrete
             .vertices
@@ -308,7 +306,7 @@ impl<'a> MeshBuilder<'a> {
             .chain(self.extra_vertices.iter());
 
         // If the polytope is at most 3D, we just embed it into 3D space.
-        if ORTHOGONAL || self.concrete.dim().unwrap_or(0) <= 3 {
+        if projection_type.is_orthogonal() || self.concrete.dim().unwrap_or(0) <= 3 {
             vert_iter
                 .map(|point| {
                     let mut iter = point.iter().copied().take(3);
@@ -349,12 +347,12 @@ impl<'a> MeshBuilder<'a> {
     }
 
     /// Generates a mesh from the polytope.
-    pub fn get_mesh(&mut self) -> Mesh {
+    pub fn get_mesh(&mut self, orthogonal: ProjectionType) -> Mesh {
         use itertools::Itertools;
 
         self.triangulate();
 
-        let vertices = self.get_vertex_coords();
+        let vertices = self.get_vertex_coords(orthogonal);
         let mut indices = Vec::with_capacity(self.triangles.len());
         for mut chunk in &self.triangles.iter().chunks(3) {
             for _ in 0..3 {
@@ -375,10 +373,10 @@ impl<'a> MeshBuilder<'a> {
     }
 
     /// Generates the wireframe for a polytope.
-    pub fn get_wireframe(&self) -> Mesh {
+    pub fn get_wireframe(&self, projection_type: ProjectionType) -> Mesh {
         let empty_els = ElementList::new();
         let edges = self.concrete.abs.ranks.get(1).unwrap_or(&empty_els);
-        let vertices = self.get_vertex_coords();
+        let vertices = self.get_vertex_coords(projection_type);
         let mut indices = Vec::with_capacity(edges.len() * 2);
 
         for edge in edges.iter() {

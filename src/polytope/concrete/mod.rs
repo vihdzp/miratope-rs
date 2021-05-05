@@ -24,6 +24,7 @@ use crate::{
         Name,
     },
     r#abstract::{flag::FlagEvent, Abstract},
+    ui::camera::ProjectionType,
     Consts, Float,
 };
 
@@ -719,12 +720,12 @@ impl Concrete {
         }
     }
 
-    pub fn get_mesh(&self) -> Mesh {
-        MeshBuilder::new(self).get_mesh()
+    pub fn get_mesh(&self, projection_type: ProjectionType) -> Mesh {
+        MeshBuilder::new(self).get_mesh(projection_type)
     }
 
-    pub fn get_wireframe(&self) -> Mesh {
-        MeshBuilder::new(self).get_wireframe()
+    pub fn get_wireframe(&self, projection_type: ProjectionType) -> Mesh {
+        MeshBuilder::new(self).get_wireframe(projection_type)
     }
 
     /// Gets the element "types" of a polytope.

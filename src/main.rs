@@ -69,13 +69,19 @@ use polytope::{
     concrete::{off::*, Concrete},
     Polytope, *,
 };
-use ui::{camera::CameraInputEvent, CrossSectionActive, CrossSectionState};
+use ui::{
+    camera::{CameraInputEvent, ProjectionType},
+    CrossSectionActive, CrossSectionState,
+};
 
 mod geometry;
 mod lang;
 mod no_cull_pipeline;
 mod polytope;
 mod ui;
+
+/// The wiki link.
+const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
 
 /// A trait containing the constants associated to each floating point type.
 trait Consts {
@@ -116,6 +122,7 @@ fn main() {
         .insert_resource(CrossSectionActive(false))
         .insert_resource(CrossSectionState::default())
         .insert_resource(ui::FileDialogState::default())
+        .insert_resource(ui::camera::ProjectionType::Perspective)
         .insert_non_send_resource(ui::MainThreadToken::new())
         // Adds plugins.
         .add_plugins(DefaultPlugins)
@@ -169,7 +176,7 @@ fn setup(
         .spawn()
         // Mesh
         .insert_bundle(PbrNoBackfaceBundle {
-            mesh: meshes.add(poly.get_mesh()),
+            mesh: meshes.add(poly.get_mesh(ProjectionType::Perspective)),
             material: materials.add(Color::rgb(0.93, 0.5, 0.93).into()),
             visible: Visible {
                 is_visible: false,
@@ -180,7 +187,7 @@ fn setup(
         // Wireframe
         .with_children(|cb| {
             cb.spawn().insert_bundle(PbrNoBackfaceBundle {
-                mesh: meshes.add(poly.get_wireframe()),
+                mesh: meshes.add(poly.get_wireframe(ProjectionType::Perspective)),
                 material: wf_unselected,
                 visible: Visible {
                     is_visible: true,

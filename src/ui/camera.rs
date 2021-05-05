@@ -8,6 +8,28 @@ use bevy::{
     render::camera::Camera,
 };
 
+#[derive(Clone, Copy)]
+pub enum ProjectionType {
+    Orthogonal,
+    Perspective,
+}
+
+impl ProjectionType {
+    pub fn flip(&mut self) {
+        match self {
+            Self::Orthogonal => *self = Self::Perspective,
+            Self::Perspective => *self = Self::Orthogonal,
+        }
+    }
+
+    pub fn is_orthogonal(&self) -> bool {
+        match self {
+            Self::Orthogonal => true,
+            Self::Perspective => false,
+        }
+    }
+}
+
 /// The plugin handling all input.
 ///
 /// This plugin handles just camera controls at the moment, but when we set up

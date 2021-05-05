@@ -1,3 +1,5 @@
+//! Contains the basic code that configures the UI.
+
 pub mod camera;
 
 use std::{marker::PhantomData, path::PathBuf};
@@ -12,6 +14,8 @@ use crate::{
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
 use rfd::FileDialog;
+
+use self::camera::ProjectionType;
 
 /// Guarantees that file dialogs will be opened on the main thread, used to
 /// circumvent a MacOS limitation that all GUI operations must be done on the
@@ -110,11 +114,22 @@ pub fn ui(
     mut section_state: ResMut<CrossSectionState>,
     mut section_active: ResMut<CrossSectionActive>,
     mut file_dialog_state: ResMut<FileDialogState>,
+    mut projection_type: ResMut<ProjectionType>,
 ) {
+    // If we're currently viewing a cross-section, it gets "fixed" as the active
+    // polytope. This needs to be a macro due to captured variables.
+    macro_rules! exit_cross_section {
+        () => {
+            section_state.original_polytope = None;
+            section_active.0 = false;
+        };
+    }
+
     let ctx = egui_ctx.ctx();
 
     egui::TopPanel::top("top_panel").show(ctx, |ui| {
         egui::menu::bar(ui, |ui| {
+            // Operations on files.
             egui::menu::menu(ui, "File", |ui| {
                 // Loads a file.
                 if ui.button("Open").clicked() {
@@ -135,127 +150,214 @@ pub fn ui(
                     std::process::exit(0);
                 }
             });
+
+            // Configures the view.
+            egui::menu::menu(ui, "View", |ui| {
+                let mut checked = projection_type.is_orthogonal();
+
+                if ui.checkbox(&mut checked, "Orthogonal projection").clicked() {
+                    projection_type.flip();
+
+                    // Forces an update on all polytopes.
+                    for mut p in query.iter_mut().next() {
+                        &mut *p;
+                    }
+                }
+            });
+
+            // Operations on polytopes.
+            egui::menu::menu(ui, "Polytope", |ui| {
+                ui.collapsing("Operations", |ui| {
+                    // Converts the active polytope into its dual.
+                    if ui.button("Dual").clicked() {
+                        for mut p in query.iter_mut() {
+                            match p.dual_mut() {
+                                Ok(_) => println!("Dual succeeded."),
+                                Err(idx) => println!(
+                                    "Dual failed: Facet {} passes through inversion center.",
+                                    idx
+                                ),
+                            }
+
+                            exit_cross_section!();
+                        }
+                    }
+
+                    ui.separator();
+
+                    // Makes a pyramid out of the current polytope.
+                    if ui.button("Pyramid").clicked() {
+                        for mut p in query.iter_mut() {
+                            *p = p.pyramid();
+                        }
+
+                        exit_cross_section!();
+                    }
+
+                    // Makes a prism out of the current polytope.
+                    if ui.button("Prism").clicked() {
+                        for mut p in query.iter_mut() {
+                            *p = p.prism();
+                        }
+
+                        exit_cross_section!();
+                    }
+
+                    // Makes a tegum out of the current polytope.
+                    if ui.button("Tegum").clicked() {
+                        for mut p in query.iter_mut() {
+                            *p = p.tegum();
+                        }
+                    }
+
+                    ui.separator();
+
+                    // Recenters a polytope.
+                    if ui.button("Recenter").clicked() {
+                        for mut p in query.iter_mut() {
+                            p.recenter();
+                        }
+
+                        exit_cross_section!();
+                    }
+
+                    ui.separator();
+
+                    // Toggles cross-section mode.
+                    if ui.button("Cross-section").clicked() {
+                        section_active.flip();
+                    }
+                });
+
+                ui.collapsing("Elements", |ui| {
+                    // Converts the active polytope into any of its facets.
+                    if ui.button("Facet").clicked() {
+                        for mut p in query.iter_mut() {
+                            println!("Facet");
+
+                            if let Some(mut facet) = p.facet(0) {
+                                facet.flatten();
+                                facet.recenter();
+                                *p = facet;
+                                println!("Facet succeeded.")
+                            } else {
+                                println!("Facet failed.")
+                            }
+
+                            exit_cross_section!();
+                        }
+                    }
+
+                    // Converts the active polytope into any of its verfs.
+                    if ui.button("Verf").clicked() {
+                        for mut p in query.iter_mut() {
+                            println!("Verf");
+
+                            if let Some(mut facet) = p.verf(0) {
+                                facet.flatten();
+                                facet.recenter();
+                                *p = facet;
+                                println!("Verf succeeded.")
+                            } else {
+                                println!("Verf failed.")
+                            }
+
+                            exit_cross_section!();
+                        }
+                    }
+                });
+
+                ui.collapsing("Properties", |ui| {
+                    // Determines whether the polytope is orientable.
+                    if ui.button("Orientability").clicked() {
+                        for p in query.iter_mut() {
+                            if p.orientable() {
+                                println!("The polytope is orientable.");
+                            } else {
+                                println!("The polytope is not orientable.");
+                            }
+                        }
+                    }
+
+                    // Gets the volume of the polytope.
+                    if ui.button("Volume").clicked() {
+                        for p in query.iter_mut() {
+                            if let Some(vol) = p.volume() {
+                                println!("The volume is {}.", vol);
+                            } else {
+                                println!("The polytope has no volume.");
+                            }
+                        }
+                    }
+                });
+            });
+
+            // Stuff related to the Polytope Wiki.
+            egui::menu::menu(ui, "Wiki", |ui| {
+                // Goes to the wiki main page.
+                if ui.button("Main Page").clicked() {
+                    if webbrowser::open(crate::WIKI_LINK).is_err() {
+                        println!("Website opening failed!")
+                    }
+                }
+
+                // Searches the current polytope on the wiki.
+                if ui.button("Current").clicked() {
+                    for p in query.iter_mut() {
+                        if webbrowser::open(&p.wiki_link()).is_err() {
+                            println!("Website opening failed!")
+                        }
+                    }
+                }
+            });
         });
 
-        ui.columns(6, |columns| {
-            // Converts the active polytope into its dual.
-            if columns[0].button("Dual").clicked() {
-                for mut p in query.iter_mut() {
-                    match p.dual_mut() {
-                        Ok(_) => println!("Dual succeeded."),
-                        Err(idx) => println!(
-                            "Dual failed: Facet {} passes through inversion center.",
-                            idx
-                        ),
-                    }
+        // The cross-section settings.
+        if section_active.0 {
+            ui.label("Cross section settings:");
 
-                    // If we're currently viewing a cross-section, it gets "fixed"
-                    // as the active polytope.
-                    section_state.original_polytope = None;
-                    section_active.0 = false;
+            // Sets the slider range to the range of x coordinates in the polytope.
+            let mut new_hyperplane_pos = section_state.hyperplane_pos;
+            let (x_min, x_max) = section_state
+                .original_polytope
+                .as_ref()
+                .map(|p| p.x_minmax())
+                .flatten()
+                .unwrap_or((-1.0, 1.0));
 
-                    // Crashes for some reason.
-                    // println!("{}", &p.concrete.to_src(off::OffOptions { comments: true }));
+            // Resets the position of the slider if it's just become active.
+            if section_active.is_changed() {
+                new_hyperplane_pos = (x_min + x_max) / 2.0;
+            }
+
+            ui.add(
+                egui::Slider::new(
+                    &mut new_hyperplane_pos,
+                    (x_min + 0.00001)..=(x_max - 0.00001),
+                )
+                .text("Slice depth"),
+            );
+
+            #[allow(clippy::float_cmp)]
+            // Updates the slicing depth for the polytope, but only when needed.
+            if section_state.hyperplane_pos != new_hyperplane_pos {
+                section_state.hyperplane_pos = new_hyperplane_pos;
+            }
+
+            ui.horizontal(|ui| {
+                // Makes the current cross-section into the main polytope.
+                if ui.button("Make main").clicked() {
+                    exit_cross_section!();
                 }
-            }
 
-            // Converts the active polytope into any of its facets.
-            if columns[1].button("Facet").clicked() {
-                for mut p in query.iter_mut() {
-                    println!("Facet");
+                let mut new_flatten = section_state.flatten;
+                ui.add(egui::Checkbox::new(&mut new_flatten, "Flatten"));
 
-                    if let Some(mut facet) = p.facet(0) {
-                        facet.flatten();
-                        facet.recenter();
-                        *p = facet;
-                        println!("Facet succeeded.")
-                    } else {
-                        println!("Facet failed.")
-                    }
-
-                    // If we're currently viewing a cross-section, it gets "fixed"
-                    // as the active polytope.
-                    section_state.original_polytope = None;
-                    section_active.0 = false;
+                // Updates the flattening setting.
+                if section_state.flatten != new_flatten {
+                    section_state.flatten = new_flatten;
                 }
-            }
-
-            // Converts the active polytope into any of its verfs.
-            if columns[2].button("Verf").clicked() {
-                for mut p in query.iter_mut() {
-                    println!("Verf");
-
-                    if let Some(mut facet) = p.verf(0) {
-                        facet.flatten();
-                        facet.recenter();
-                        *p = facet;
-                        println!("Verf succeeded.")
-                    } else {
-                        println!("Verf failed.")
-                    }
-
-                    // If we're currently viewing a cross-section, it gets "fixed"
-                    // as the active polytope.
-                    section_state.original_polytope = None;
-                    section_active.0 = false;
-                }
-            }
-
-            // Prints the wiki link to the polytope on the terminal.
-            if columns[3].button("Wiki").clicked() {
-                for p in query.iter_mut() {
-                    let _ = webbrowser::open(&p.wiki_link());
-                }
-            }
-
-            // Gets the volume of the polytope.
-            if columns[4].button("Volume").clicked() {
-                for p in query.iter_mut() {
-                    if let Some(vol) = p.volume() {
-                        println!("The volume is {}.", vol);
-                    } else {
-                        println!("The polytope has no volume.");
-                    }
-                }
-            }
-
-            // Toggles cross-section mode.
-            if columns[5].button("Cross-section").clicked() {
-                section_active.flip();
-            }
-        });
-
-        ui.spacing_mut().slider_width = 800.0;
-
-        // Sets the slider range to the range of x coordinates in the polytope.
-        let mut new_hyperplane_pos = section_state.hyperplane_pos;
-        let (x_min, x_max) = section_state
-            .original_polytope
-            .as_ref()
-            .map(|p| p.x_minmax())
-            .flatten()
-            .unwrap_or((-1.0, 1.0));
-
-        ui.add(
-            egui::Slider::new(
-                &mut new_hyperplane_pos,
-                (x_min + 0.00001)..=(x_max - 0.00001),
-            )
-            .text("Slice depth"),
-        );
-
-        #[allow(clippy::float_cmp)]
-        // Updates the slicing depth for the polytope, but only when needed.
-        if section_state.hyperplane_pos != new_hyperplane_pos {
-            section_state.hyperplane_pos = new_hyperplane_pos;
-        }
-
-        // Updates the flattening setting.
-        let mut new_flatten = section_state.flatten;
-        ui.add(egui::Checkbox::new(&mut new_flatten, "Flatten"));
-
-        if section_state.flatten != new_flatten {
-            section_state.flatten = new_flatten;
+            });
         }
     });
 }
@@ -307,10 +409,11 @@ pub fn update_changed_polytopes(
     polies: Query<(&Concrete, &Handle<Mesh>, &Children), Changed<Concrete>>,
     wfs: Query<&Handle<Mesh>, Without<Concrete>>,
     mut windows: ResMut<Windows>,
+    orthogonal: Res<camera::ProjectionType>,
 ) {
     for (poly, mesh_handle, children) in polies.iter() {
-        let mesh: &mut Mesh = meshes.get_mut(mesh_handle).unwrap();
-        *mesh = poly.get_mesh();
+        println!("test");
+        *meshes.get_mut(mesh_handle).unwrap() = poly.get_mesh(*orthogonal);
 
         windows
             .get_primary_mut()
@@ -320,7 +423,7 @@ pub fn update_changed_polytopes(
         for child in children.iter() {
             if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {
                 let wf: &mut Mesh = meshes.get_mut(wf_handle).unwrap();
-                *wf = poly.get_wireframe();
+                *wf = poly.get_wireframe(*orthogonal);
 
                 break;
             }

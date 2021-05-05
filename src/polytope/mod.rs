@@ -23,9 +23,6 @@ const ELEMENT_NAMES: [&str; 11] = [
 /// The word "Components".
 const COMPONENTS: &str = "Components";
 
-/// The wiki link.
-const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
-
 /// The trait for methods common to all polytopes.
 pub trait Polytope<T: NameType>: Sized + Clone {
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
@@ -41,7 +38,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     fn wiki_link(&self) -> String {
         format!(
             "{}{}",
-            WIKI_LINK,
+            crate::WIKI_LINK,
             lang::En::parse(self.name(), Default::default()).replace(" ", "_")
         )
     }
