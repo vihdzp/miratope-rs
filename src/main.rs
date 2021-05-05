@@ -121,8 +121,7 @@ fn main() {
         // Adds resources.
         .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
         .insert_resource(Msaa { samples: 4 })
-        .insert_resource(CrossSectionActive(false))
-        .insert_resource(CrossSectionState::default())
+        .insert_resource(SectionState::default())
         .insert_resource(FileDialogState::default())
         .insert_resource(ProjectionType::Perspective)
         .insert_resource(Library::new(&"./lib/"))
@@ -136,7 +135,6 @@ fn main() {
         .add_startup_system(setup.system())
         .add_system(ui::update_scale_factor.system())
         .add_system(ui::ui.system())
-        .add_system(ui::update_cross_section_state.system())
         .add_system(ui::file_dialog.system())
         .add_system(ui::update_language.system())
         .add_system_to_stage(CoreStage::PostUpdate, ui::update_cross_section.system())

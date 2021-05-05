@@ -77,70 +77,73 @@ impl FileDialogState {
     }
 }
 
-/// Stores whether the cross-section view is active.
-pub struct CrossSectionActive(pub bool);
-
-impl CrossSectionActive {
-    /// Flips the state.
-    pub fn flip(&mut self) {
-        self.0 = !self.0;
-    }
-}
-
 /// Stores the state of the cross-section view.
-pub struct CrossSectionState {
-    /// The polytope from which the cross-section originates.
-    original_polytope: Option<Concrete>,
+pub enum SectionState {
+    /// The view is active.
+    Active {
+        /// The polytope from which the cross-section originates.
+        original_polytope: Concrete,
 
-    /// The position of the slicing hyperplane.
-    hyperplane_pos: Float,
+        /// The range of the slider.
+        minmax: (Float, Float),
 
-    /// Whether the cross-section is flattened into a dimension lower.
-    flatten: bool,
+        /// The position of the slicing hyperplane.
+        hyperplane_pos: Float,
+
+        /// Whether the cross-section is flattened into a dimension lower.
+        flatten: bool,
+    },
+
+    /// The view is inactive.
+    Inactive,
 }
 
-impl Default for CrossSectionState {
-    fn default() -> Self {
-        Self {
-            original_polytope: None,
-            hyperplane_pos: 0.0,
-            flatten: true,
+impl SectionState {
+    pub fn reset(&mut self) {
+        *self = Self::Inactive;
+    }
+
+    pub fn set_pos(&mut self, pos: Float) {
+        if let Self::Active {
+            original_polytope: _,
+            minmax: _,
+            hyperplane_pos,
+            flatten: _,
+        } = self
+        {
+            *hyperplane_pos = pos;
+        }
+    }
+
+    pub fn set_flat(&mut self, flat: bool) {
+        if let Self::Active {
+            original_polytope: _,
+            minmax: _,
+            hyperplane_pos: _,
+            flatten,
+        } = self
+        {
+            *flatten = flat;
         }
     }
 }
 
+impl Default for SectionState {
+    fn default() -> Self {
+        Self::Inactive
+    }
+}
+
 /// The system in charge of the UI.
-#[allow(clippy::too_many_arguments)]
 pub fn ui(
     egui_ctx: ResMut<EguiContext>,
     mut query: Query<&mut Concrete>,
-    mut section_state: ResMut<CrossSectionState>,
-    mut section_active: ResMut<CrossSectionActive>,
+    mut section_state: ResMut<SectionState>,
     mut file_dialog_state: ResMut<FileDialogState>,
     mut projection_type: ResMut<ProjectionType>,
     mut library: ResMut<Library>,
     mut selected_language: ResMut<SelectedLanguage>,
 ) {
-    // If we're currently viewing a cross-section, it gets "fixed" as the active
-    // polytope. This needs to be a macro due to captured variables.
-    macro_rules! exit_cross_section {
-        () => {
-            section_state.original_polytope = None;
-            section_active.0 = false;
-        };
-    }
-
-    // Assigns a variable to another only if it has changed, so that Bevy
-    // doesn't believe that it's updating each frame.
-    macro_rules! assign_if_changed {
-        ($x: expr, $y: expr) => {
-            #[allow(clippy::float_cmp)]
-            if $x != $y {
-                $x = $y;
-            }
-        };
-    }
-
     let ctx = egui_ctx.ctx();
 
     // The top bar.
@@ -201,7 +204,7 @@ pub fn ui(
                                 ),
                             }
 
-                            exit_cross_section!();
+                            section_state.reset();
                         }
                     }
 
@@ -213,7 +216,7 @@ pub fn ui(
                             *p = p.pyramid();
                         }
 
-                        exit_cross_section!();
+                        section_state.reset();
                     }
 
                     // Makes a prism out of the current polytope.
@@ -222,7 +225,7 @@ pub fn ui(
                             *p = p.prism();
                         }
 
-                        exit_cross_section!();
+                        section_state.reset();
                     }
 
                     // Makes a tegum out of the current polytope.
@@ -240,14 +243,32 @@ pub fn ui(
                             p.recenter();
                         }
 
-                        exit_cross_section!();
+                        section_state.reset();
                     }
 
                     ui.separator();
 
                     // Toggles cross-section mode.
                     if ui.button("Cross-section").clicked() {
-                        section_active.flip();
+                        *section_state = match *section_state {
+                            SectionState::Active {
+                                original_polytope: _,
+                                minmax: _,
+                                hyperplane_pos: _,
+                                flatten: _,
+                            } => SectionState::Inactive,
+                            SectionState::Inactive => {
+                                let p = query.iter_mut().next().unwrap();
+                                let minmax = p.x_minmax().unwrap_or((-1.0, 1.0));
+
+                                SectionState::Active {
+                                    original_polytope: p.clone(),
+                                    minmax,
+                                    hyperplane_pos: (minmax.0 + minmax.1) / 2.0,
+                                    flatten: false,
+                                }
+                            }
+                        };
                     }
                 });
 
@@ -267,7 +288,7 @@ pub fn ui(
                                 println!("Facet failed.")
                             }
 
-                            exit_cross_section!();
+                            section_state.reset();
                         }
                     }
 
@@ -286,7 +307,7 @@ pub fn ui(
                                 println!("Verf failed.")
                             }
 
-                            exit_cross_section!();
+                            section_state.reset();
                         }
                     }
                 });
@@ -337,54 +358,51 @@ pub fn ui(
             egui::menu::menu(ui, "Language", |ui| {
                 for lang in SelectedLanguage::iter() {
                     if ui.button(lang.to_string()).clicked() {
-                        *selected_language = dbg!(lang);
+                        *selected_language = lang;
                     }
                 }
             });
         });
 
         // The cross-section settings.
-        if section_active.0 {
+        if let SectionState::Active {
+            original_polytope: _,
+            minmax,
+            hyperplane_pos,
+            flatten,
+        } = *section_state
+        {
             ui.label("Cross section settings:");
 
             // Sets the slider range to the range of x coordinates in the polytope.
-            let mut new_hyperplane_pos = section_state.hyperplane_pos;
-            let (x_min, x_max) = section_state
-                .original_polytope
-                .as_ref()
-                .map(|p| p.x_minmax())
-                .flatten()
-                .unwrap_or((-1.0, 1.0));
-
-            // Resets the position of the slider if it's just become active.
-            if section_active.is_changed() {
-                new_hyperplane_pos = (x_min + x_max) / 2.0;
-            }
-
-            ui.spacing_mut().slider_width = 800.0;
-
+            let mut new_hyperplane_pos = hyperplane_pos;
             ui.add(
                 egui::Slider::new(
                     &mut new_hyperplane_pos,
-                    (x_min + 0.00001)..=(x_max - 0.00001),
+                    (minmax.0 + 0.00001)..=(minmax.1 - 0.00001),
                 )
                 .text("Slice depth"),
             );
 
             // Updates the slicing depth.
-            assign_if_changed!(section_state.hyperplane_pos, new_hyperplane_pos);
+            #[allow(clippy::float_cmp)]
+            if hyperplane_pos != new_hyperplane_pos {
+                section_state.set_pos(new_hyperplane_pos);
+            }
 
             ui.horizontal(|ui| {
                 // Makes the current cross-section into the main polytope.
                 if ui.button("Make main").clicked() {
-                    exit_cross_section!();
+                    section_state.reset();
                 }
 
-                let mut new_flatten = section_state.flatten;
+                let mut new_flatten = flatten;
                 ui.add(egui::Checkbox::new(&mut new_flatten, "Flatten"));
 
                 // Updates the flattening setting.
-                assign_if_changed!(section_state.flatten, new_flatten);
+                if flatten != new_flatten {
+                    section_state.set_flat(new_flatten);
+                }
             });
         }
     });
@@ -395,7 +413,7 @@ pub fn ui(
                 if let Ok(q) = Concrete::from_path(&file) {
                     *p = q;
 
-                    exit_cross_section!();
+                    section_state.reset();
                 } else {
                     println!("File open failed!");
                 }
@@ -407,8 +425,7 @@ pub fn ui(
 pub fn file_dialog(
     mut query: Query<&mut Concrete>,
     file_dialog_state: ResMut<FileDialogState>,
-    mut section_state: ResMut<CrossSectionState>,
-    mut section_active: ResMut<CrossSectionActive>,
+    mut section_state: ResMut<SectionState>,
     token: NonSend<MainThreadToken>,
 ) {
     if file_dialog_state.is_changed() {
@@ -427,10 +444,7 @@ pub fn file_dialog(
                         p.recenter();
                     }
 
-                    // If we're currently viewing a cross-section, it gets "fixed"
-                    // as the active polytope.
-                    section_state.original_polytope = None;
-                    section_active.0 = false;
+                    section_state.reset();
                 }
             }
             _ => {}
@@ -473,44 +487,33 @@ pub fn update_changed_polytopes(
     }
 }
 
-/// Shows or hides the cross-section view.
-pub fn update_cross_section_state(
-    mut query: Query<&mut Concrete>,
-    mut state: ResMut<CrossSectionState>,
-    active: Res<CrossSectionActive>,
-) {
-    if active.is_changed() {
-        if active.0 {
-            state.original_polytope = Some(query.iter_mut().next().unwrap().clone());
-        } else if let Some(p) = state.original_polytope.take() {
-            *query.iter_mut().next().unwrap() = p;
-        }
-    }
-}
-
 /// Updates the cross-section shown.
-pub fn update_cross_section(
-    mut query: Query<&mut Concrete>,
-    state: Res<CrossSectionState>,
-    active: Res<CrossSectionActive>,
-) {
-    if state.is_changed() && active.0 {
-        for mut p in query.iter_mut() {
-            let r = state.original_polytope.clone().unwrap();
-            let hyp_pos = state.hyperplane_pos + 0.0000001; // Botch fix for degeneracies.
+pub fn update_cross_section(mut query: Query<&mut Concrete>, state: Res<SectionState>) {
+    if state.is_changed() {
+        if let SectionState::Active {
+            original_polytope,
+            hyperplane_pos,
+            minmax: _,
+            flatten,
+        } = &*state
+        {
+            for mut p in query.iter_mut() {
+                let r = original_polytope.clone();
+                let hyp_pos = hyperplane_pos + 0.0000001; // Botch fix for degeneracies.
 
-            if let Some(dim) = r.dim() {
-                let hyperplane = Hyperplane::x(dim, hyp_pos);
-                let mut slice = r.slice(&hyperplane);
+                if let Some(dim) = r.dim() {
+                    let hyperplane = Hyperplane::x(dim, hyp_pos);
+                    let mut slice = r.slice(&hyperplane);
 
-                if state.flatten {
-                    slice.flatten_into(&hyperplane.subspace);
-                    slice.recenter_with(
-                        &hyperplane.flatten(&hyperplane.project(&Point::zeros(dim))),
-                    );
+                    if *flatten {
+                        slice.flatten_into(&hyperplane.subspace);
+                        slice.recenter_with(
+                            &hyperplane.flatten(&hyperplane.project(&Point::zeros(dim))),
+                        );
+                    }
+
+                    *p = slice;
                 }
-
-                *p = slice;
             }
         }
     }

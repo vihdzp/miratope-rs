@@ -431,7 +431,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb36a879cdc96f554b62dd7c7c02392a9a10e94082e4bc686a8242e1d674e7cc"
 dependencies = [
  "bevy_reflect",
- "glam",
+ "glam 0.13.1",
 ]
 
 [[package]]
@@ -462,7 +462,7 @@ dependencies = [
  "bevy_utils",
  "downcast-rs",
  "erased-serde",
- "glam",
+ "glam 0.13.1",
  "parking_lot",
  "serde",
  "smallvec",
@@ -1618,6 +1618,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "glam"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "333928d5eb103c5d4050533cec0384302db6be8ef7d3cebd30ec6a35350353da"
+
+[[package]]
 name = "glib-sys"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1800,11 +1806,11 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hexasphere"
-version = "3.2.0"
+version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c592a42961cf144138e04a4bddbe3ef5c6f9fe6ef5eff6fd3bb767b254194171"
+checksum = "975eea4013d77d7de292f50e77884fa879e0aa24197f95468681a2bd8209c344"
 dependencies = [
- "glam",
+ "glam 0.14.0",
  "lazy_static",
 ]
 
@@ -3505,7 +3511,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 [[package]]
 name = "winit"
 version = "0.24.0"
-source = "git+https://github.com/OfficialURL/winit#82f59ab5681296e8ee5adfd2785c1f8c1d065ab2"
+source = "git+https://github.com/OfficialURL/winit#a87caf328ef517d3ee653168a8e78727b1ecde82"
 dependencies = [
  "bitflags",
  "cocoa",
