@@ -415,7 +415,10 @@ pub fn ui(
 
     egui::SidePanel::left("side_panel", 350.0).show(ctx, |ui| {
         match library.show_root(ui, *selected_language) {
+            // No action needs to be taken.
             ShowResult::None => {}
+
+            // Loads a selected file.
             ShowResult::Load(file) => {
                 if let Some(mut p) = query.iter_mut().next() {
                     if let Ok(q) = Concrete::from_path(&file) {
@@ -427,6 +430,8 @@ pub fn ui(
                     }
                 }
             }
+
+            // Loads a special polytope.
             ShowResult::Special(special) => match special {
                 SpecialLibrary::Polygon(n, d) => {
                     if let Some(mut p) = query.iter_mut().next() {

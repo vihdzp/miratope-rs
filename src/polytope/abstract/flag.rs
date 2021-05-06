@@ -356,11 +356,7 @@ impl Iterator for FlagIter {
         }
         // A point has a single flag.
         else if rank == 0 {
-            if let Some(f) = self.queue.pop_front() {
-                Some(FlagEvent::Flag(f))
-            } else {
-                None
-            }
+            self.queue.pop_front().map(FlagEvent::Flag)
         } else {
             loop {
                 match self.try_next() {
