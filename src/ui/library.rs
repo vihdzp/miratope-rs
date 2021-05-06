@@ -25,7 +25,7 @@ pub enum Name {
 impl Name {
     pub fn parse(&self) -> String {
         match self {
-            Self::Abstract(name) => En::parse(name, Default::default()),
+            Self::Abstract(name) => En::parse_uppercase(name, Default::default()),
             Self::Literal(name) => name.clone(),
         }
     }

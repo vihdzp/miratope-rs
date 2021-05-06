@@ -7,7 +7,7 @@ use std::{marker::PhantomData, path::PathBuf};
 
 use crate::{
     geometry::{Hyperplane, Point},
-    lang::{self, Language, Options, SelectedLanguage},
+    lang::{Options, SelectedLanguage},
     polytope::{concrete::Concrete, Polytope},
     Float, OffOptions,
 };
@@ -159,7 +159,8 @@ pub fn ui(
                 // Saves a file.
                 if ui.button("Save").clicked() {
                     if let Some(p) = query.iter_mut().next() {
-                        file_dialog_state.save(lang::En::parse(p.name(), Default::default()));
+                        file_dialog_state
+                            .save(selected_language.parse_uppercase(p.name(), Default::default()));
                     }
                 }
 
@@ -474,7 +475,7 @@ pub fn update_changed_polytopes(
         windows
             .get_primary_mut()
             .unwrap()
-            .set_title(selected_language.parse(poly.name(), Options::default()));
+            .set_title(selected_language.parse_uppercase(poly.name(), Options::default()));
 
         for child in children.iter() {
             if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {

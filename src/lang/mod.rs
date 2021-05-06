@@ -429,6 +429,16 @@ pub trait Language: Prefix {
         }
     }
 
+    fn parse_uppercase<T: NameType>(name: &Name<T>, options: Options) -> String {
+        let result = Self::parse(name, options);
+        let mut c = result.chars();
+
+        match c.next() {
+            None => String::new(),
+            Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+        }
+    }
+
     /// Returns the suffix for a d-polytope. Only needs to work up to d = 20, we
     /// won't offer support any higher than that.
     fn suffix(d: usize, options: Options) -> String {
@@ -679,6 +689,16 @@ impl SelectedLanguage {
             Self::Fr => Fr::parse(name, options),
             Self::Ja => Ja::parse(name, options),
             Self::Pii => Pii::parse(name, options),
+        }
+    }
+
+    pub fn parse_uppercase<T: NameType>(&self, name: &Name<T>, options: Options) -> String {
+        match self {
+            Self::En => En::parse_uppercase(name, options),
+            Self::Es => Es::parse_uppercase(name, options),
+            Self::Fr => Fr::parse_uppercase(name, options),
+            Self::Ja => Ja::parse(name, options),
+            Self::Pii => Pii::parse_uppercase(name, options),
         }
     }
 
