@@ -124,7 +124,7 @@ fn main() {
         .insert_resource(SectionState::default())
         .insert_resource(FileDialogState::default())
         .insert_resource(ProjectionType::Perspective)
-        .insert_resource(Library::new(&"./lib/"))
+        .insert_resource(Library::new_folder(&"./lib/"))
         .insert_resource(SelectedLanguage::default())
         .insert_non_send_resource(ui::MainThreadToken::new())
         // Adds plugins.

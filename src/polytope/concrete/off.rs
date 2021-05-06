@@ -1,7 +1,10 @@
-use std::{collections::HashMap, io, path::Path, str::FromStr};
+use std::{collections::HashMap, fs, io, path::Path, str::FromStr};
 
 use super::{Abstract, Concrete, Element, ElementList, Point, Polytope, RankVec, Subelements};
-use crate::polytope::{r#abstract::elements::Subsupelements, COMPONENTS, ELEMENT_NAMES};
+use crate::{
+    lang::{name::Con, Name},
+    polytope::{r#abstract::elements::Subsupelements, COMPONENTS, ELEMENT_NAMES},
+};
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 
@@ -180,19 +183,38 @@ fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> Ele
 }
 
 impl Concrete {
+    /// Gets the name from the first line of an OFF file.
+    fn name_from_src(first_line: &str) -> Option<Name<Con>> {
+        let mut first_line = first_line.chars();
+
+        if first_line.next() == Some('#') {
+            if let Ok(new_name) = ron::from_str(&first_line.collect::<String>()) {
+                return Some(new_name);
+            }
+        }
+
+        None
+    }
+
+    /// Gets the name from an OFF file, assuming it's stored in RON in the first
+    /// line of the file.
+    pub fn name_from_off(path: &impl AsRef<Path>) -> Option<Name<Con>> {
+        use std::io::{BufRead, BufReader};
+
+        let file = BufReader::new(fs::File::open(path).ok()?);
+        let first_line = file.lines().next()?.ok()?;
+
+        Self::name_from_src(&first_line)
+    }
+
     /// Builds a polytope from the string representation of an OFF file.
     pub fn from_off(src: String) -> io::Result<Self> {
         // Reads name.
-        let mut name = None;
-        if let Some(mut first_line) = src.lines().next().map(|line| line.chars()) {
-            if first_line.next() == Some('#') {
-                println!("Comment detected");
-
-                if let Ok(new_name) = ron::from_str(&first_line.collect::<String>()) {
-                    name = Some(new_name);
-                }
-            }
-        }
+        let name = src
+            .lines()
+            .next()
+            .map(|first_line| Self::name_from_src(first_line))
+            .flatten();
 
         let mut toks = data_tokens(&src);
         let rank = {
