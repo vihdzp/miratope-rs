@@ -433,7 +433,21 @@ pub fn ui(
                         *p = Concrete::star_polygon(n, d);
                     }
                 }
-                SpecialLibrary::Temp => todo!(),
+                SpecialLibrary::Simplex(rank) => {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        *p = Concrete::simplex(rank);
+                    }
+                }
+                SpecialLibrary::Hypercube(rank) => {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        *p = Concrete::hypercube(rank);
+                    }
+                }
+                SpecialLibrary::Orthoplex(rank) => {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        *p = Concrete::orthoplex(rank);
+                    }
+                }
             },
         }
     });
