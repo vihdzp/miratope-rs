@@ -19,6 +19,8 @@ use bevy_egui::{egui, EguiContext, EguiSettings};
 use rfd::FileDialog;
 use strum::IntoEnumIterator;
 
+use self::library::{ShowResult, SpecialLibrary};
+
 /// Guarantees that file dialogs will be opened on the main thread, used to
 /// circumvent a MacOS limitation that all GUI operations must be done on the
 /// main thread.
@@ -409,16 +411,27 @@ pub fn ui(
     });
 
     egui::SidePanel::left("side_panel", 300.0).show(ctx, |ui| {
-        if let Some(file) = library.show(ui, *selected_language) {
-            if let Some(mut p) = query.iter_mut().next() {
-                if let Ok(q) = Concrete::from_path(&file) {
-                    *p = q;
+        match library.show_root(ui, *selected_language) {
+            ShowResult::None => {}
+            ShowResult::Load(file) => {
+                if let Some(mut p) = query.iter_mut().next() {
+                    if let Ok(q) = Concrete::from_path(&file) {
+                        *p = q;
 
-                    section_state.reset();
-                } else {
-                    println!("File open failed!");
+                        section_state.reset();
+                    } else {
+                        println!("File open failed!");
+                    }
                 }
             }
+            ShowResult::Special(special) => match special {
+                SpecialLibrary::Polygon(n, d) => {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        *p = Concrete::star_polygon(n, d);
+                    }
+                }
+                SpecialLibrary::Temp => todo!(),
+            },
         }
     });
 }

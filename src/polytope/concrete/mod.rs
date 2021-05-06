@@ -414,8 +414,16 @@ impl Concrete {
     /// Generates the vertices for either a tegum or a pyramid product with two
     /// given vertex sets and a given height.
     fn duopyramid_vertices(p: &[Point], q: &[Point], height: Float, tegum: bool) -> Vec<Point> {
-        let p_dim = p[0].len();
-        let q_dim = q[0].len();
+        let p_dim = if let Some(p0) = p.get(0) {
+            p0.len()
+        } else {
+            return vec![vec![].into()];
+        };
+        let q_dim = if let Some(q0) = q.get(0) {
+            q0.len()
+        } else {
+            return vec![vec![].into()];
+        };
 
         let dim = p_dim + q_dim + tegum as usize;
 

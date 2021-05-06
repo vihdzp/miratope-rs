@@ -349,11 +349,11 @@ impl<T: NameType> Name<T> {
     pub fn is_valid(&self) -> bool {
         match self {
             Self::Polygon { regular, n } => {
-                if regular.satisfies(|r| r.is_yes()) {
-                    *n >= 5
-                } else {
-                    *n >= 4
-                }
+               if regular.satisfies(|r| r.is_yes()) {
+                        *n >= 5|| *n == 2
+                    } else {
+                        *n >= 4|| *n == 2
+                    }
             }
             Self::Simplex { regular: _, rank }
             | Self::Hyperblock { regular: _, rank }
@@ -696,10 +696,10 @@ impl<T: NameType> Name<T> {
                 if regular.satisfies(|r| r.is_yes()) {
                     Self::Square
                 } else {
-                    Self::Generic { n, rank: 2 }
+                    Self::Polygon { regular, n }
                 }
             }
-            _ => Self::Generic { n, rank: 2 },
+            _ => Self::Polygon { regular, n },
         }
     }
 
