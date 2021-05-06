@@ -246,6 +246,15 @@ pub enum Name<T: NameType> {
     /// and **at most 20.**
     Generic { n: usize, rank: usize },
 
+    /// A smaller variant of a polytope.
+    Small(Box<Name<T>>),
+
+    /// A greater variant of a polytope.
+    Great(Box<Name<T>>),
+
+    /// A stellation of a polytope.
+    Stellated(Box<Name<T>>),
+
     /// A compound of some polytopes.
     Compound(Vec<(usize, Name<T>)>),
 }
@@ -277,20 +286,35 @@ impl<T: NameType> Name<T> {
     /// to figure out a rank.
     pub fn rank(&self) -> isize {
         match self {
+            // Basic shapes:
             Name::Nullitope => -1,
             Name::Point => 0,
             Name::Dyad => 1,
+
+            // 2D shapes:
             Name::Triangle { regular: _ }
             | Name::Square
             | Name::Rectangle
             | Name::Orthodiagonal
             | Name::Polygon { regular: _, n: _ } => 2,
+
+            // Regular families:
             Name::Simplex { regular: _, rank }
             | Name::Hyperblock { regular: _, rank }
             | Name::Orthoplex { regular: _, rank } => *rank as isize,
-            Name::Dual { base, center: _ } => base.rank(),
+
+            // Modifiers that don't change rank.
+            Name::Dual { base, center: _ }
+            | Name::Great(base)
+            | Name::Small(base)
+            | Name::Stellated(base) => base.rank(),
+
             Name::Generic { n: _, rank } => *rank as isize,
+
+            // Modifiers:
             Name::Pyramid(base) | Name::Prism(base) | Name::Tegum(base) => base.rank() + 1,
+
+            // Multimodifiers:
             Name::Multipyramid(_)
             | Name::Multiprism(_)
             | Name::Multitegum(_)
@@ -307,15 +331,27 @@ impl<T: NameType> Name<T> {
     /// to figure out a facet count.
     pub fn facet_count(&self) -> Option<usize> {
         Some(match self {
+            // Basic shapes:
             Name::Nullitope => 0,
             Name::Point => 1,
             Name::Dyad => 2,
+
+            // 2D shapes:
             Name::Triangle { regular: _ } => 3,
             Name::Square | Name::Rectangle | Name::Orthodiagonal => 4,
+
+            // Regular families:
             Name::Polygon { regular: _, n } | Name::Generic { n, rank: _ } => *n,
             Name::Simplex { regular: _, rank } => *rank + 1,
             Name::Hyperblock { regular: _, rank } => *rank * 2,
             Name::Orthoplex { regular: _, rank } => 2u32.pow(*rank as u32) as usize,
+
+            // Modifiers:
+            Name::Pyramid(base) => base.facet_count()? + 1,
+            Name::Prism(base) => 2 * (base.facet_count()? + 1),
+            Name::Tegum(base) => 2 * base.facet_count()?,
+
+            // Multimodifiers:
             Name::Multipyramid(bases) | Name::Multitegum(bases) => {
                 let mut facet_count = 1;
                 for base in bases {
@@ -330,9 +366,6 @@ impl<T: NameType> Name<T> {
                 }
                 facet_count
             }
-            Name::Pyramid(base) => base.facet_count()? + 1,
-            Name::Prism(base) => 2 * (base.facet_count()? + 1),
-            Name::Tegum(base) => 2 * base.facet_count()?,
             Name::Compound(components) => {
                 let mut facet_count = 0;
                 for (rep, name) in components.iter() {
@@ -340,7 +373,12 @@ impl<T: NameType> Name<T> {
                 }
                 facet_count
             }
-            Name::Dual { base: _, center: _ } => return None,
+
+            // We can't really tell here, so we need to add more metadata.
+            Name::Dual { base: _, center: _ }
+            | Name::Great(_)
+            | Name::Small(_)
+            | Name::Stellated(_) => return None,
         })
     }
 
@@ -349,11 +387,11 @@ impl<T: NameType> Name<T> {
     pub fn is_valid(&self) -> bool {
         match self {
             Self::Polygon { regular, n } => {
-               if regular.satisfies(|r| r.is_yes()) {
-                        *n >= 5|| *n == 2
-                    } else {
-                        *n >= 4|| *n == 2
-                    }
+                if regular.satisfies(|r| r.is_yes()) {
+                    *n >= 5 || *n == 2
+                } else {
+                    *n >= 4 || *n == 2
+                }
             }
             Self::Simplex { regular: _, rank }
             | Self::Hyperblock { regular: _, rank }

@@ -1,1 +1,1 @@
-[File(file_name:"Cube.off",name:Abstract(Hyperblock(regular:(Yes(center:(data:[0,0,0],nrows:3,ncols:()))),rank:3))),File(file_name:"Dodecahedron.off",name:Literal("Dodecahedron")),File(file_name:"Icosahedron.off",name:Literal("Icosahedron")),File(file_name:"Octahedron.off",name:Abstract(Orthoplex(regular:(Yes(center:(data:[0,0,0],nrows:3,ncols:()))),rank:3))),File(file_name:"Tetrahedron.off",name:Literal("Tetrahedron"))]
+[UnloadedFolder(folder_name:"convex",name:Literal("Platonic Solids")),UnloadedFolder(folder_name:"nonconvex",name:Literal("Kepler–Poinsot Solids"))]

@@ -377,6 +377,8 @@ pub fn ui(
         {
             ui.label("Cross section settings:");
 
+            ui.spacing_mut().slider_width = ui.available_width() / 2.0;
+
             // Sets the slider range to the range of x coordinates in the polytope.
             let mut new_hyperplane_pos = hyperplane_pos;
             ui.add(
@@ -384,7 +386,8 @@ pub fn ui(
                     &mut new_hyperplane_pos,
                     (minmax.0 + 0.00001)..=(minmax.1 - 0.00001),
                 )
-                .text("Slice depth"),
+                .text("Slice depth")
+                .prefix("x: "),
             );
 
             // Updates the slicing depth.
@@ -410,7 +413,7 @@ pub fn ui(
         }
     });
 
-    egui::SidePanel::left("side_panel", 300.0).show(ctx, |ui| {
+    egui::SidePanel::left("side_panel", 350.0).show(ctx, |ui| {
         match library.show_root(ui, *selected_language) {
             ShowResult::None => {}
             ShowResult::Load(file) => {

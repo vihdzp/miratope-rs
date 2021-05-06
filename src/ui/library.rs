@@ -62,7 +62,7 @@ impl SpecialLibrary {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Name {
     /// A name in its language-independent representation.
-    Abstract(LangName<Con>),
+    Name(LangName<Con>),
 
     /// A literal string name.
     Literal(String),
@@ -73,7 +73,7 @@ impl Name {
     /// do some sort of cacheing in the future?
     pub fn parse(&self, selected_language: SelectedLanguage) -> String {
         match self {
-            Self::Abstract(name) => selected_language.parse_uppercase(name, Default::default()),
+            Self::Name(name) => selected_language.parse_uppercase(name, Default::default()),
             Self::Literal(name) => name.clone(),
         }
     }
@@ -145,7 +145,7 @@ impl Library {
     pub fn new_file(path: &impl AsRef<OsStr>) -> Self {
         let path = PathBuf::from(&path);
         let name = if let Some(name) = Concrete::name_from_off(&path) {
-            Name::Abstract(name)
+            Name::Name(name)
         } else {
             Name::Literal(String::from(
                 path.file_stem().map(|f| f.to_str()).flatten().unwrap_or(""),

@@ -399,22 +399,19 @@ pub trait Language: Prefix {
         debug_assert!(name.is_valid(), "Invalid name {:?}.", name);
 
         match name {
+            // Basic shapes
             Name::Nullitope => Self::nullitope(options),
             Name::Point => Self::point(options),
             Name::Dyad => Self::dyad(options),
+
+            // 2D shapes
             Name::Triangle { regular: _ } => Self::triangle(options),
             Name::Square => Self::square(options),
             Name::Rectangle => Self::rectangle(options),
             Name::Orthodiagonal => Self::generic(4, 2, options),
             Name::Polygon { regular: _, n } => Self::generic(*n, 2, options),
-            Name::Generic { n, rank } => Self::generic(*n, *rank, options),
-            Name::Pyramid(base) => Self::pyramid_of(base, options),
-            Name::Prism(base) => Self::prism_of(base, options),
-            Name::Tegum(base) => Self::tegum_of(base, options),
-            Name::Multipyramid(_)
-            | Name::Multiprism(_)
-            | Name::Multitegum(_)
-            | Name::Multicomb(_) => Self::multiproduct(name, options),
+
+            // Regular families
             Name::Simplex { regular: _, rank } => Self::simplex(*rank, options),
             Name::Hyperblock { regular, rank } => {
                 if regular.satisfies(|r| r.is_yes()) {
@@ -424,6 +421,24 @@ pub trait Language: Prefix {
                 }
             }
             Name::Orthoplex { regular: _, rank } => Self::orthoplex(*rank, options),
+
+            // Modifiers
+            Name::Pyramid(base) => Self::pyramid_of(base, options),
+            Name::Prism(base) => Self::prism_of(base, options),
+            Name::Tegum(base) => Self::tegum_of(base, options),
+
+            // Multimodifiers
+            Name::Multipyramid(_)
+            | Name::Multiprism(_)
+            | Name::Multitegum(_)
+            | Name::Multicomb(_) => Self::multiproduct(name, options),
+
+            // Single adjectives
+            Name::Small(base) => Self::small_of(base, options),
+            Name::Great(base) => Self::great_of(base, options),
+            Name::Stellated(base) => Self::stellated_of(base, options),
+
+            Name::Generic { n, rank } => Self::generic(*n, *rank, options),
             Name::Dual { base, center: _ } => Self::dual_of(base, options),
             Name::Compound(components) => Self::compound(components, options),
         }
@@ -603,6 +618,30 @@ pub trait Language: Prefix {
     /// The name for an orthoplex with a given rank.
     fn orthoplex(rank: usize, options: Options) -> String {
         Self::generic(2u32.pow(rank as u32) as usize, rank, options)
+    }
+
+    fn great(_options: Options) -> String {
+        String::from("great")
+    }
+
+    fn great_of<T: NameType>(base: &Name<T>, options: Options) -> String {
+        Self::combine(Self::great(options), Self::base(base, options))
+    }
+
+    fn small(_options: Options) -> String {
+        String::from("small")
+    }
+
+    fn small_of<T: NameType>(base: &Name<T>, options: Options) -> String {
+        Self::combine(Self::small(options), Self::base(base, options))
+    }
+
+    fn stellated(_options: Options) -> String {
+        String::from("stellated")
+    }
+
+    fn stellated_of<T: NameType>(base: &Name<T>, options: Options) -> String {
+        Self::combine(Self::stellated(options), Self::base(base, options))
     }
 
     /// The name for the dual of another polytope.
