@@ -4,7 +4,7 @@ use bevy_egui::egui::Ui;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    lang::{name::Con, En, Language, Name as LangName},
+    lang::{name::Con, Name as LangName, SelectedLanguage},
     polytope::concrete::Concrete,
 };
 
@@ -23,9 +23,10 @@ pub enum Name {
 }
 
 impl Name {
-    pub fn parse(&self) -> String {
+    /// This is running at 60 FPS but name parsing isn't blazing fast.
+    pub fn parse(&self, selected_language: SelectedLanguage) -> String {
         match self {
-            Self::Abstract(name) => En::parse_uppercase(name, Default::default()),
+            Self::Abstract(name) => selected_language.parse_uppercase(name, Default::default()),
             Self::Literal(name) => name.clone(),
         }
     }
@@ -138,7 +139,7 @@ impl Library {
     }
 
     /// Shows the library.
-    pub fn show(&mut self, ui: &mut Ui) -> Option<PathBuf> {
+    pub fn show(&mut self, ui: &mut Ui, selected_language: SelectedLanguage) -> Option<PathBuf> {
         match self {
             // Shows a collapsing drop-down, and loads the folder in case it's clicked.
             Self::UnloadedFolder { path, name } => {
@@ -148,12 +149,12 @@ impl Library {
 
                 let mut res = None;
 
-                ui.collapsing(name.parse(), |ui| {
+                ui.collapsing(name.parse(selected_language), |ui| {
                     let mut contents = Self::folder_contents(&path).unwrap();
 
                     // Contents of drop down.
                     for lib in contents.iter_mut() {
-                        if let Some(file) = lib.show(ui) {
+                        if let Some(file) = lib.show(ui, selected_language) {
                             res = Some(file);
                         }
                     }
@@ -167,9 +168,9 @@ impl Library {
             // Shows a drop-down with all of the files and folders.
             Self::LoadedFolder { name, contents } => {
                 let mut res = None;
-                ui.collapsing(name.parse(), |ui| {
+                ui.collapsing(name.parse(selected_language), |ui| {
                     for lib in contents.iter_mut() {
-                        if let Some(file) = lib.show(ui) {
+                        if let Some(file) = lib.show(ui, selected_language) {
                             res = Some(file);
                         }
                     }
@@ -179,7 +180,7 @@ impl Library {
             }
             // Shows a button that loads the file if clicked.
             Self::File { path, name } => {
-                if ui.button(name.parse()).clicked() {
+                if ui.button(name.parse(selected_language)).clicked() {
                     Some(path.clone())
                 } else {
                     None

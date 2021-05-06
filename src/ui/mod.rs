@@ -409,7 +409,7 @@ pub fn ui(
     });
 
     egui::SidePanel::left("side_panel", 300.0).show(ctx, |ui| {
-        if let Some(file) = library.show(ui) {
+        if let Some(file) = library.show(ui, *selected_language) {
             if let Some(mut p) = query.iter_mut().next() {
                 if let Ok(q) = Concrete::from_path(&file) {
                     *p = q;
@@ -530,7 +530,7 @@ pub fn update_language(
             windows
                 .get_primary_mut()
                 .unwrap()
-                .set_title(selected_language.parse(poly.name(), Options::default()));
+                .set_title(selected_language.parse_uppercase(poly.name(), Options::default()));
         }
     }
 }
