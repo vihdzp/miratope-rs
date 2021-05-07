@@ -59,7 +59,11 @@ impl Hypersphere {
             return Err(());
         }
 
+        // Rescales q.
         q /= s;
+        q *= self.radius;
+        q *= self.radius;
+
         q += &self.center;
         *p = q;
 
@@ -69,11 +73,7 @@ impl Hypersphere {
     /// Reciprocates a point.
     pub fn reciprocate(&self, p: &Point) -> Option<Point> {
         let mut clone = p.clone();
-        if self.reciprocate_mut(&mut clone).is_ok() {
-            Some(clone)
-        } else {
-            None
-        }
+        self.reciprocate_mut(&mut clone).ok().map(|_| clone)
     }
 
     pub fn random(dim: usize) -> Self {

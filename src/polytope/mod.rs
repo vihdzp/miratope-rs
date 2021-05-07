@@ -84,13 +84,23 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// with a given number of sides.
     fn polygon(n: usize) -> Self;
 
-    /// Returns the dual of a polytope.
-    fn _dual(&self) -> Option<Self>;
+    /// Returns the dual of a polytope. Never fails for an abstract polytope. In
+    /// case of failing on a concrete polytope, returns the index of a facet
+    /// through the inversion center.
+    fn try_dual(&self) -> Result<Self, usize>;
+
+    fn dual(&self) -> Self {
+        self.try_dual().unwrap()
+    }
 
     /// Builds the dual of a polytope in place. Never fails for an abstract
     /// polytope. In case of failing on a concrete polytope, returns the index
-    /// of the facet through the inversion center.
-    fn _dual_mut(&mut self) -> Result<(), usize>;
+    /// of a facet through the inversion center and does nothing.
+    fn try_dual_mut(&mut self) -> Result<(), usize>;
+
+    fn dual_mut(&mut self) {
+        self.try_dual_mut().unwrap();
+    }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks.
@@ -101,13 +111,9 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Gets the element figure with a given rank and index as a polytope.
     fn element_fig(&self, rank: isize, idx: usize) -> Option<Self> {
-        let mut element_fig = self._dual()?.element(self.rank() - rank - 1, idx)?;
+        let mut element_fig = self.try_dual().ok()?.element(self.rank() - rank - 1, idx)?;
 
-        if element_fig._dual_mut().is_ok() {
-            Some(element_fig)
-        } else {
-            None
-        }
+        element_fig.try_dual_mut().ok().map(|_| element_fig)
     }
 
     /// Gets the section defined by two elements with given ranks and indices as
@@ -206,7 +212,11 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope.
-    fn antiprism(&self) -> Self;
+    fn try_antiprism(&self) -> Option<Self>;
+
+    fn antiprism(&self) -> Self {
+        self.try_antiprism().unwrap()
+    }
 
     /// Determines whether a given polytope is
     /// [orientable](https://polytope.miraheze.org/wiki/Orientability).

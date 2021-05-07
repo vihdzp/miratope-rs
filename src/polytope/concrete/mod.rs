@@ -87,35 +87,34 @@ impl Concrete {
         Some(self.vertices.get(0)?.len())
     }
 
-    /// Builds the Grünbaumian star polygon `{n / d}`, rotated by an angle.
+    /// Builds the Grünbaumian star polygon `{n / d}` with unit circumradius,
+    /// rotated by an angle.
     fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: Float) -> Self {
         assert!(n >= 2);
         assert!(d >= 1);
 
-        // Scaling factor for unit edge length.
         let angle = Float::TAU * d as Float / n as Float;
-        let radius = (2.0 - 2.0 * angle.cos()).sqrt();
 
         Self::new(
             (0..n)
                 .into_iter()
                 .map(|k| {
                     let (sin, cos) = (k as Float * angle + rot).sin_cos();
-                    vec![sin / radius, cos / radius].into()
+                    vec![sin, cos].into()
                 })
                 .collect(),
             Abstract::polygon(n),
         )
     }
 
-    /// Builds the Grünbaumian star polygon `{n / d}`. If `n` and `d` have a
-    /// common factor, the result is a multiply-wound polygon.
+    /// Builds the Grünbaumian star polygon `{n / d}` with unit circumradius. If
+    /// `n` and `d` have a common factor, the result is a multiply-wound polygon.
     pub fn grunbaum_star_polygon(n: usize, d: usize) -> Self {
         Self::grunbaum_star_polygon_with_rot(n, d, 0.0)
     }
 
-    /// Builds the star polygon `{n / d}`. If `n` and `d` have a common factor,
-    /// the result is a compound.
+    /// Builds the star polygon `{n / d}`. with unit circumradius. If `n` and `d`
+    /// have a common factor, the result is a compound.
     pub fn star_polygon(n: usize, d: usize) -> Self {
         use gcd::Gcd;
 
@@ -308,31 +307,22 @@ impl Concrete {
         (&vertices[sub0] + &vertices[sub1]).norm() / 2.0
     }
 
-    pub fn dual(&self) -> Option<Self> {
-        self._dual()
-    }
-
     /// Returns the dual of a polytope with a given reciprocation sphere, or
     /// `None` if any facets pass through the reciprocation center.
-    pub fn dual_with_sphere(&self, sphere: &Hypersphere) -> Option<Self> {
+    pub fn try_dual_with_sphere(&self, sphere: &Hypersphere) -> Result<Self, usize> {
         let mut clone = self.clone();
-
-        if clone.dual_mut_with_sphere(sphere).is_ok() {
-            Some(clone)
-        } else {
-            None
-        }
+        clone.try_dual_mut_with_sphere(sphere).map(|_| clone)
     }
 
-    pub fn dual_mut(&mut self) -> Result<(), usize> {
-        self._dual_mut()
+    pub fn dual_with_sphere(&self, sphere: &Hypersphere) -> Self {
+        self.try_dual_with_sphere(sphere).unwrap()
     }
 
     /// Builds the dual of a polytope with a given reciprocation sphere in
     /// place, or does nothing in case any facets go through the reciprocation
     /// center. In case of failure, returns the index of the facet through the
     /// projection center.
-    pub fn dual_mut_with_sphere(&mut self, sphere: &Hypersphere) -> Result<(), usize> {
+    pub fn try_dual_mut_with_sphere(&mut self, sphere: &Hypersphere) -> Result<(), usize> {
         // If we're dealing with a nullitope, the dual is itself.
         let rank = self.rank();
         if rank == -1 {
@@ -341,9 +331,7 @@ impl Concrete {
         // In the case of points, we reciprocate them.
         else if rank == 0 {
             for (idx, v) in self.vertices.iter_mut().enumerate() {
-                if sphere.reciprocate_mut(v).is_err() {
-                    return Err(idx);
-                }
+                sphere.reciprocate_mut(v).map_err(|_| idx)?;
             }
         }
 
@@ -373,9 +361,7 @@ impl Concrete {
 
         // Reciprocates the projected points.
         for (idx, v) in projections.iter_mut().enumerate() {
-            if sphere.reciprocate_mut(v).is_err() {
-                return Err(idx);
-            }
+            sphere.reciprocate_mut(v).map_err(|_| idx)?;
         }
 
         self.vertices = projections;
@@ -390,8 +376,46 @@ impl Concrete {
         Ok(())
     }
 
-    pub fn uniform_antiprism(_n: usize, _d: usize) -> Self {
-        todo!()
+    pub fn dual_mut_with_sphere(&mut self, sphere: &Hypersphere) {
+        self.try_dual_mut_with_sphere(sphere).unwrap()
+    }
+
+    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
+    /// based on a given polytope.
+    fn try_antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Option<Self> {
+        let (abs, vertex_indices, dual_vertex_indices) = self.abs.antiprism_and_vertices();
+        let vertex_count = abs.vertex_count();
+        let mut new_vertices = Vec::with_capacity(vertex_count);
+        new_vertices.resize(vertex_count, vec![].into());
+
+        let vertices = &self.vertices;
+        let dual_vertices = &self.try_dual_with_sphere(sphere).ok()?.vertices;
+
+        for (idx, v) in vertices.iter().enumerate() {
+            new_vertices[vertex_indices[idx]] = v.push(height / 2.0);
+        }
+        for (idx, v) in dual_vertices.iter().enumerate() {
+            new_vertices[dual_vertex_indices[idx]] = v.push(-height / 2.0);
+        }
+
+        Some(Self::new(new_vertices, abs))
+    }
+
+    fn antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Self {
+        self.try_antiprism_with(sphere, height).unwrap()
+    }
+
+    pub fn uniform_antiprism(n: usize) -> Self {
+        Concrete::uniform_star_antiprism(n, 1)
+    }
+
+    pub fn uniform_star_antiprism(n: usize, d: usize) -> Self {
+        let angle = Float::PI * d as Float / n as Float;
+        let cos = angle.cos();
+        let radius = cos.sqrt();
+        let height = ((cos - (2.0 * angle).cos()) * 2.0).sqrt();
+
+        Concrete::star_polygon(n, d).antiprism_with(&Hypersphere::with_radius(2, radius), height)
     }
 
     /// Gets the references to the (geometric) vertices of an element on the
@@ -933,16 +957,16 @@ impl Polytope<Con> for Concrete {
 
     /// Returns the dual of a polytope, or `None` if any facets pass through the
     /// origin.
-    fn _dual(&self) -> Option<Self> {
+    fn try_dual(&self) -> Result<Self, usize> {
         let mut clone = self.clone();
-        clone.dual_mut().ok().map(|_| clone)
+        clone.try_dual_mut().map(|_| clone)
     }
 
     /// Builds the dual of a polytope in place, or does nothing in case any
     /// facets go through the origin. Returns the dual if successful, and `None`
     /// otherwise.
-    fn _dual_mut(&mut self) -> Result<(), usize> {
-        self.dual_mut_with_sphere(&Hypersphere::unit(self.dim().unwrap_or(1)))
+    fn try_dual_mut(&mut self) -> Result<(), usize> {
+        self.try_dual_mut_with_sphere(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
@@ -1045,25 +1069,8 @@ impl Polytope<Con> for Concrete {
         self.abs.hosotope_mut();
     }
 
-    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
-    /// based on a given polytope.
-    fn antiprism(&self) -> Self {
-        let (abs, vertex_indices, dual_vertex_indices) = self.abs.antiprism_and_vertices();
-        let vertex_count = abs.vertex_count();
-        let mut new_vertices = Vec::with_capacity(vertex_count);
-        new_vertices.resize(vertex_count, vec![].into());
-
-        let vertices = &self.vertices;
-        let dual_vertices = &self.dual().unwrap().vertices;
-
-        for (idx, v) in vertices.iter().enumerate() {
-            new_vertices[vertex_indices[idx]] = v.push(0.5);
-        }
-        for (idx, v) in dual_vertices.iter().enumerate() {
-            new_vertices[dual_vertex_indices[idx]] = v.push(-0.5);
-        }
-
-        Self::new(new_vertices, abs)
+    fn try_antiprism(&self) -> Option<Self> {
+        Self::try_antiprism_with(&self, &Hypersphere::unit(self.dim().unwrap_or(1)), 1.0)
     }
 
     /// Determines whether a given polytope is

@@ -66,6 +66,7 @@ use no_cull_pipeline::PbrNoBackfaceBundle;
 
 #[allow(unused_imports)]
 use lang::{name::Con, Language, Name, Options};
+#[allow(unused_imports)]
 use polytope::{
     concrete::{off::*, Concrete},
     Polytope, *,
@@ -150,7 +151,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::polygon(5).antiprism();
+    let poly = Concrete::uniform_antiprism(5);
 
     // Disables backface culling.
     pipelines.set_untracked(

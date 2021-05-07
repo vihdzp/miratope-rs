@@ -199,7 +199,7 @@ pub fn ui(
                     // Converts the active polytope into its dual.
                     if ui.button("Dual").clicked() {
                         for mut p in query.iter_mut() {
-                            match p.dual_mut() {
+                            match p.try_dual_mut() {
                                 Ok(_) => println!("Dual succeeded."),
                                 Err(idx) => println!(
                                     "Dual failed: Facet {} passes through inversion center.",
@@ -447,7 +447,7 @@ pub fn ui(
                 }
                 SpecialLibrary::Antiprism(n, d) => {
                     if let Some(mut p) = query.iter_mut().next() {
-                        *p = Concrete::uniform_antiprism(n, d);
+                        *p = Concrete::uniform_star_antiprism(n, d);
                     }
                 }
                 SpecialLibrary::Simplex(rank) => {

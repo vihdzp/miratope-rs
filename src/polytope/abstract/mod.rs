@@ -171,11 +171,11 @@ impl Abstract {
     }
 
     pub fn dual(&self) -> Self {
-        self._dual().unwrap()
+        self.try_dual().unwrap()
     }
 
     pub fn dual_mut(&mut self) {
-        self._dual_mut().unwrap();
+        self.try_dual_mut().unwrap();
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
@@ -184,12 +184,17 @@ impl Abstract {
     pub fn antiprism_and_vertices(&self) -> (Self, Vec<usize>, Vec<usize>) {
         let rank = self.rank();
         let mut section_hash = SectionHash::singletons(self);
+
+        // We actually build the elements backwards, which is as awkward as it
+        // seems. Maybe we should fix that in the future?
         let mut backwards_abs = RankVec::with_capacity(rank + 1);
         backwards_abs.push(ElementList::max(section_hash.len));
 
+        // Indices of base.
         let vertex_count = self.vertex_count();
         let mut vertices = Vec::with_capacity(vertex_count);
 
+        // Indices of dual base.
         let facet_count = self.facet_count();
         let mut dual_vertices = Vec::with_capacity(facet_count);
 
@@ -203,8 +208,9 @@ impl Abstract {
             }
 
             // Goes over all sections of the previous height, and builds the
-            // sections of the current height by changing the upper element into
-            // one of its superelements.
+            // sections of the current height by either changing the upper
+            // element into one of its superelements, or changing the lower
+            // element into one of its subelements.
             for (rank_lo, map) in section_hash.rank_vec.iter().enumerate() {
                 // The lower and higher ranks of our OLD sections.
                 let rank_lo = rank_lo as isize - 1;
@@ -213,6 +219,21 @@ impl Abstract {
                 // The indices for the bottom and top elements and the index in
                 // the antiprism of the old section.
                 for (indices, &idx) in map.iter() {
+                    // Finds all of the subelements of our old section's
+                    // lowest element.
+                    for &idx_lo in self.element_ref(rank_lo, indices.0).unwrap().subs.iter() {
+                        // Adds the new sections of the current height, gets
+                        // their index, uses that to build the ElementList.
+                        let sub = new_section_hash.get(Section {
+                            rank_lo: rank_lo - 1,
+                            idx_lo,
+                            rank_hi,
+                            idx_hi: indices.1,
+                        });
+
+                        elements[idx].subs.push(sub);
+                    }
+
                     // Finds all of the superelements of our old section's
                     // highest element.
                     for &idx_hi in self.element_ref(rank_hi, indices.1).unwrap().sups.iter() {
@@ -227,25 +248,13 @@ impl Abstract {
 
                         elements[idx].subs.push(sub);
                     }
-
-                    // Finds all of the subelements of our old section's
-                    // highest element.
-                    for &idx_lo in self.element_ref(rank_lo, indices.0).unwrap().subs.iter() {
-                        // Adds the new sections of the current height, gets
-                        // their index, uses that to build the ElementList.
-                        let sub = new_section_hash.get(Section {
-                            rank_lo: rank_lo - 1,
-                            idx_lo,
-                            rank_hi,
-                            idx_hi: indices.1,
-                        });
-
-                        elements[idx].subs.push(sub);
-                    }
                 }
             }
 
+            // We figure out where the vertices of the base and the dual base
+            // were sent.
             if height == rank - 1 {
+                // We create a map from the base's vertices to the new vertices.
                 for v in 0..vertex_count {
                     vertices.push(new_section_hash.get(Section {
                         rank_lo: 0,
@@ -255,6 +264,7 @@ impl Abstract {
                     }));
                 }
 
+                // We create a map from the dual base's vertices to the new vertices.
                 for f in 0..facet_count {
                     dual_vertices.push(new_section_hash.get(Section {
                         rank_lo: -1,
@@ -600,14 +610,14 @@ impl Polytope<Abs> for Abstract {
     }
 
     /// Converts a polytope into its dual.
-    fn _dual(&self) -> Option<Self> {
+    fn try_dual(&self) -> Result<Self, usize> {
         let mut clone = self.clone();
         clone.dual_mut();
-        Some(clone)
+        Ok(clone)
     }
 
     /// Converts a polytope into its dual in place.
-    fn _dual_mut(&mut self) -> Result<(), usize> {
+    fn try_dual_mut(&mut self) -> Result<(), usize> {
         for elements in self.ranks.iter_mut() {
             for el in elements.iter_mut() {
                 el.swap_mut();
@@ -618,6 +628,12 @@ impl Polytope<Abs> for Abstract {
         self.name = self.name.clone().dual(AbsData::default());
 
         Ok(())
+    }
+
+    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
+    /// based on a given polytope. Use antiprism instead.
+    fn try_antiprism(&self) -> Option<Self> {
+        Some(self.antiprism_and_vertices().0)
     }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
@@ -728,12 +744,6 @@ impl Polytope<Abs> for Abstract {
 
         self[-1].push(min);
         self.ranks.insert(-1, ElementList::max(2));
-    }
-
-    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
-    /// based on a given polytope.
-    fn antiprism(&self) -> Self {
-        self.antiprism_and_vertices().0
     }
 
     /// Determines whether a given polytope is
