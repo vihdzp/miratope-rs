@@ -4,16 +4,17 @@ use std::{
     fmt::Debug,
 };
 
-use super::Concrete;
 use crate::{
-    geometry::Point,
-    geometry::Subspace,
+    geometry::{Point,
+    Subspace},
     polytope::{
-        r#abstract::elements::Element,
-        r#abstract::elements::Subsupelements,
-        r#abstract::{elements::ElementList, Abstract},
+        concrete::Concrete,
+        r#abstract::{
+            elements::{Element, ElementList, Subelements, Subsupelements},
+            rank::Rank,
+            Abstract,
+        },
     },
-    r#abstract::elements::Subelements,
     Consts, Float,
 };
 
@@ -264,8 +265,8 @@ fn common(el0: &[usize], el1: &[usize]) -> Subelements {
 }
 
 /// Checks whether a given vertex set actually generates a valid d-polytope.
-fn check_subelement(vertices: &[Point], el: &Subelements, rank: isize) -> bool {
-    let rank = rank as usize;
+fn check_subelement(vertices: &[Point], el: &Subelements, rank: Rank) -> bool {
+    let rank = rank . usize();
 
     // A d-element must have at least d + 1 vertices.
     if el.len() < rank + 1 {
@@ -296,7 +297,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
     let dim = vertices[0].len();
 
     // Initializes the abstract polytope.
-    let mut abs = Abstract::with_capacity(dim as isize);
+    let mut abs = Abstract::with_capacity(Rank::new(dim as isize));
     abs.push_single();
     for _ in 0..(dim as isize) {
         abs.push_subs(ElementList::new());
@@ -305,7 +306,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
     // Adds everything else.
     let mut els_verts = facets;
 
-    for r in (2..(dim as isize)).rev() {
+    for r in Rank::range_iter(Rank::new(2),Rank::new(dim as isize)).rev() {
         let mut subs_map = HashMap::new();
         let len = els_verts.len();
 
@@ -325,7 +326,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
                 let el = common(&els_verts[i].subs.0, &els_verts[j].subs.0);
 
                 // Checks that el actually has the correct rank.
-                if !check_subelement(&vertices, &el, r - 1) {
+                if !check_subelement(&vertices, &el, r - Rank::new(1)) {
                     continue;
                 }
 
@@ -363,10 +364,10 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
 
     // At this point, els_verts contains, for each edge, the indices of its
     // vertices, which are precisely the rank 1 elements of the polytope.
-    abs[1] = els_verts;
+    abs[Rank::new(1)] = els_verts;
 
     // Adds the vertices and the maximal element.
-    abs[0] = ElementList::vertices(vertices.len());
+    abs[Rank::new(0)] = ElementList::vertices(vertices.len());
     abs.push_max();
 
     Concrete::new(vertices, abs)

@@ -1,6 +1,6 @@
 use std::io::{self, Read};
 
-use crate::{geometry::Point, polytope::Polytope, Concrete};
+use crate::{Concrete, geometry::Point, polytope::{Polytope, r#abstract::rank::Rank}};
 
 use xml::{
     attribute::OwnedAttribute,
@@ -175,7 +175,7 @@ fn parse_xml(xml: String) -> io::Result<Concrete> {
                 Err(_) => return GgbErrors::InvalidXml.to_err(),
             },
             // The file has finished being read. Time for processing!
-            None => return Ok(Concrete::hypercube(3)),
+            None => return Ok(Concrete::hypercube(Rank::new(3))),
         }
     }
 }

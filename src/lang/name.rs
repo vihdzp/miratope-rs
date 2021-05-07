@@ -2,7 +2,7 @@
 
 use std::{fmt::Debug, marker::PhantomData};
 
-use crate::{geometry::Point, Consts, Float};
+use crate::{geometry::Point, polytope::r#abstract::rank::Rank, Consts, Float};
 
 use serde::{Deserialize, Serialize};
 
@@ -223,28 +223,19 @@ pub enum Name<T: NameType> {
     },
 
     /// A simplex of a given dimension, **at least 3.**
-    Simplex {
-        regular: T::DataRegular,
-        rank: usize,
-    },
+    Simplex { regular: T::DataRegular, rank: Rank },
 
     /// A hyperblock of a given rank, **at least 3.**
-    Hyperblock {
-        regular: T::DataRegular,
-        rank: usize,
-    },
+    Hyperblock { regular: T::DataRegular, rank: Rank },
 
     /// An orthoplex (polytope whose opposite vertices form an orthogonal basis)
     /// of a given dimension, **at least 3.**
-    Orthoplex {
-        regular: T::DataRegular,
-        rank: usize,
-    },
+    Orthoplex { regular: T::DataRegular, rank: Rank },
 
     /// A polytope with a given facet count and rank, in that order. The facet
     /// count must be **at least 2,** and the dimension must be **at least 3**
     /// and **at most 20.**
-    Generic { n: usize, rank: usize },
+    Generic { n: usize, rank: Rank },
 
     /// A smaller variant of a polytope.
     Small(Box<Name<T>>),
@@ -261,19 +252,19 @@ pub enum Name<T: NameType> {
 
 impl<T: NameType> Name<T> {
     /// Auxiliary function to get the rank of a multiproduct.
-    fn rank_product(&self) -> isize {
+    fn rank_product(&self) -> Rank {
         // The bases of the product, and the difference between the rank of a
         // product of two polytopes and the sum of their ranks.
         let (bases, offset) = match self {
-            Self::Multipyramid(bases) => (bases, 1),
-            Self::Multiprism(bases) | Self::Multitegum(bases) => (bases, 0),
-            Self::Multicomb(bases) => (bases, -1),
+            Self::Multipyramid(bases) => (bases, Rank::new(-1)),
+            Self::Multiprism(bases) | Self::Multitegum(bases) => (bases, Rank::new(0)),
+            Self::Multicomb(bases) => (bases, Rank::new(1)),
             _ => panic!("rank_product called on something that wasn't a multiproduct!"),
         };
 
-        let mut rank = -offset;
+        let mut rank = offset;
         for base in bases.iter() {
-            rank += base.rank() + offset;
+            rank += base.rank() - offset;
         }
         rank
     }
@@ -284,24 +275,24 @@ impl<T: NameType> Name<T> {
     /// # Todo
     /// We need to embed enough metadata in the name for this to always be able
     /// to figure out a rank.
-    pub fn rank(&self) -> isize {
+    pub fn rank(&self) -> Rank {
         match self {
             // Basic shapes:
-            Name::Nullitope => -1,
-            Name::Point => 0,
-            Name::Dyad => 1,
+            Name::Nullitope => Rank::new(-1),
+            Name::Point => Rank::new(0),
+            Name::Dyad => Rank::new(1),
 
             // 2D shapes:
             Name::Triangle { regular: _ }
             | Name::Square
             | Name::Rectangle
             | Name::Orthodiagonal
-            | Name::Polygon { regular: _, n: _ } => 2,
+            | Name::Polygon { regular: _, n: _ } => Rank::new(2),
 
             // Regular families:
             Name::Simplex { regular: _, rank }
             | Name::Hyperblock { regular: _, rank }
-            | Name::Orthoplex { regular: _, rank } => *rank as isize,
+            | Name::Orthoplex { regular: _, rank } => *rank,
 
             // Modifiers that don't change rank.
             Name::Dual { base, center: _ }
@@ -309,10 +300,12 @@ impl<T: NameType> Name<T> {
             | Name::Small(base)
             | Name::Stellated(base) => base.rank(),
 
-            Name::Generic { n: _, rank } => *rank as isize,
+            Name::Generic { n: _, rank } => *rank,
 
             // Modifiers:
-            Name::Pyramid(base) | Name::Prism(base) | Name::Tegum(base) => base.rank() + 1,
+            Name::Pyramid(base) | Name::Prism(base) | Name::Tegum(base) => {
+                base.rank() + Rank::new(1)
+            }
 
             // Multimodifiers:
             Name::Multipyramid(_)
@@ -342,9 +335,9 @@ impl<T: NameType> Name<T> {
 
             // Regular families:
             Name::Polygon { regular: _, n } | Name::Generic { n, rank: _ } => *n,
-            Name::Simplex { regular: _, rank } => *rank + 1,
-            Name::Hyperblock { regular: _, rank } => *rank * 2,
-            Name::Orthoplex { regular: _, rank } => 2u32.pow(*rank as u32) as usize,
+            Name::Simplex { regular: _, rank } => rank.0,
+            Name::Hyperblock { regular: _, rank } => rank.usize() * 2,
+            Name::Orthoplex { regular: _, rank } => 2u32.pow(rank.u32()) as usize,
 
             // Modifiers:
             Name::Pyramid(base) => base.facet_count()? + 1,
@@ -395,7 +388,7 @@ impl<T: NameType> Name<T> {
             }
             Self::Simplex { regular: _, rank }
             | Self::Hyperblock { regular: _, rank }
-            | Self::Orthoplex { regular: _, rank } => *rank >= 3,
+            | Self::Orthoplex { regular: _, rank } => *rank >= Rank::new(3),
             Self::Multipyramid(bases)
             | Self::Multiprism(bases)
             | Self::Multitegum(bases)
@@ -416,13 +409,13 @@ impl<T: NameType> Name<T> {
 
                 true
             }
-            Self::Generic { n, rank } => *n >= 2 && *rank >= 3 && *rank <= 20,
+            Self::Generic { n, rank } => *n >= 2 && *rank >= Rank::new(3) && *rank <= Rank::new(20),
             _ => true,
         }
     }
 
-    pub fn generic(n: usize, d: isize) -> Self {
-        match d {
+    pub fn generic(n: usize, rank: Rank) -> Self {
+        match rank.isize() {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
@@ -445,10 +438,7 @@ impl<T: NameType> Name<T> {
                     n,
                 },
             },
-            _ => Self::Generic {
-                n,
-                rank: d as usize,
-            },
+            _ => Self::Generic { n, rank },
         }
     }
 
@@ -462,7 +452,10 @@ impl<T: NameType> Name<T> {
             },
             Self::Triangle { regular } => {
                 if T::is_abstract() || regular.contains(&Regular::No) {
-                    Self::Simplex { regular, rank: 3 }
+                    Self::Simplex {
+                        regular,
+                        rank: Rank::new(3),
+                    }
                 } else {
                     Self::Pyramid(Box::new(Self::Triangle { regular }))
                 }
@@ -471,7 +464,7 @@ impl<T: NameType> Name<T> {
                 if T::is_abstract() || regular.contains(&Regular::No) {
                     Self::Simplex {
                         regular,
-                        rank: rank + 1,
+                        rank: rank + Rank::new(1),
                     }
                 } else {
                     Self::Pyramid(Box::new(Self::Simplex { regular, rank }))
@@ -494,13 +487,13 @@ impl<T: NameType> Name<T> {
             Self::Dyad => Self::rectangle(),
             Self::Rectangle => Self::Hyperblock {
                 regular: T::DataRegular::new(Regular::No),
-                rank: 3,
+                rank: Rank::new(3),
             },
             Self::Hyperblock { regular, rank } => {
                 if T::is_abstract() || regular.contains(&Regular::No) {
                     Self::Hyperblock {
                         regular,
-                        rank: rank + 1,
+                        rank: rank + Rank::new(1),
                     }
                 } else {
                     Self::Prism(Box::new(Self::Hyperblock { regular, rank }))
@@ -523,13 +516,13 @@ impl<T: NameType> Name<T> {
             Self::Dyad => Self::orthodiagonal(),
             Self::Orthodiagonal => Self::Orthoplex {
                 regular: T::DataRegular::new(Regular::No),
-                rank: 3,
+                rank: Rank::new(3),
             },
             Self::Orthoplex { regular, rank } => {
                 if T::is_abstract() || regular.contains(&Regular::No) {
                     Self::Orthoplex {
                         regular,
-                        rank: rank + 1,
+                        rank: rank + Rank::new(1),
                     }
                 } else {
                     Self::Tegum(Box::new(Self::Orthoplex { regular, rank }))
@@ -622,7 +615,7 @@ impl<T: NameType> Name<T> {
                 } else {
                     Self::Generic {
                         n: base.facet_count().unwrap(),
-                        rank: base.rank() as usize,
+                        rank: base.rank(),
                     }
                 }
             }
@@ -673,22 +666,19 @@ impl<T: NameType> Name<T> {
     }
 
     /// The name for an *n*-simplex, regular or not.
-    pub fn simplex(regular: T::DataRegular, rank: isize) -> Self {
-        match rank {
+    pub fn simplex(regular: T::DataRegular, rank: Rank) -> Self {
+        match rank.isize() {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
             2 => Self::Triangle { regular },
-            _ => Self::Simplex {
-                regular,
-                rank: rank as usize,
-            },
+            _ => Self::Simplex { regular, rank },
         }
     }
 
     /// The name for an *n*-block, regular or not.
-    pub fn hyperblock(regular: T::DataRegular, rank: isize) -> Self {
-        match rank {
+    pub fn hyperblock(regular: T::DataRegular, rank: Rank) -> Self {
+        match rank.isize() {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
@@ -699,16 +689,13 @@ impl<T: NameType> Name<T> {
                     Self::Rectangle
                 }
             }
-            _ => Self::Hyperblock {
-                regular,
-                rank: rank as usize,
-            },
+            _ => Self::Hyperblock { regular, rank },
         }
     }
 
     /// The name for an *n*-orthoplex.
-    pub fn orthoplex(regular: T::DataRegular, rank: isize) -> Self {
-        match rank {
+    pub fn orthoplex(regular: T::DataRegular, rank: Rank) -> Self {
+        match rank.isize() {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
@@ -719,10 +706,7 @@ impl<T: NameType> Name<T> {
                     Self::Orthodiagonal
                 }
             }
-            _ => Self::Orthoplex {
-                regular,
-                rank: rank as usize,
-            },
+            _ => Self::Orthoplex { regular, rank },
         }
     }
 
@@ -773,17 +757,17 @@ impl<T: NameType> Name<T> {
 
     pub fn multipyramid(bases: Vec<Name<T>>) -> Self {
         let mut new_bases = Vec::new();
-        let mut pyramid_count = 0;
+        let mut pyramid_count = Rank::new(0);
 
         // Figures out which bases of the multipyramid are multipyramids
         // themselves, and accounts for them accordingly.
         for base in bases.into_iter() {
             match base {
                 Self::Nullitope => {}
-                Self::Point => pyramid_count += 1,
-                Self::Dyad => pyramid_count += 2,
-                Self::Triangle { regular: _ } => pyramid_count += 2,
-                Self::Simplex { regular: _, rank } => pyramid_count += rank + 1,
+                Self::Point => pyramid_count += Rank::new(1),
+                Self::Dyad => pyramid_count += Rank::new(2),
+                Self::Triangle { regular: _ } => pyramid_count += Rank::new(2),
+                Self::Simplex { regular: _, rank } => pyramid_count += rank + Rank::new(1),
                 Self::Multipyramid(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
             }
@@ -791,10 +775,10 @@ impl<T: NameType> Name<T> {
 
         // If we're taking more than one pyramid, we combine all of them into a
         // single simplex.
-        if pyramid_count >= 2 {
+        if pyramid_count >= Rank::new(2) {
             new_bases.push(Name::simplex(
                 T::DataRegular::new(Regular::No),
-                pyramid_count as isize - 1,
+                pyramid_count - Rank::new(1),
             ));
         }
 
@@ -808,7 +792,7 @@ impl<T: NameType> Name<T> {
         };
 
         // If we take exactly one pyramid, we apply it at the end.
-        if pyramid_count == 1 {
+        if pyramid_count == Rank::new(1) {
             Self::Pyramid(Box::new(multipyramid))
         }
         // Otherwise, we already combined them.
@@ -819,7 +803,7 @@ impl<T: NameType> Name<T> {
 
     pub fn multiprism(bases: Vec<Name<T>>) -> Self {
         let mut new_bases = Vec::new();
-        let mut prism_count = 0;
+        let mut prism_count = Rank::new(0);
 
         // Figures out which bases of the multipyramid are multipyramids
         // themselves, and accounts for them accordingly.
@@ -829,8 +813,8 @@ impl<T: NameType> Name<T> {
                     return Self::Nullitope;
                 }
                 Self::Point => {}
-                Self::Dyad => prism_count += 1,
-                Self::Square | Self::Rectangle => prism_count += 2,
+                Self::Dyad => prism_count += Rank::new(1),
+                Self::Square | Self::Rectangle => prism_count += Rank::new(2),
                 Self::Hyperblock { regular: _, rank } => prism_count += rank,
                 Self::Multiprism(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
@@ -839,10 +823,10 @@ impl<T: NameType> Name<T> {
 
         // If we're taking more than one prism, we combine all of them into a
         // single hyperblock.
-        if prism_count >= 2 {
+        if prism_count >= Rank::new(2) {
             new_bases.push(Name::hyperblock(
                 T::DataRegular::new(Regular::No),
-                prism_count as isize,
+                prism_count,
             ));
         }
 
@@ -856,7 +840,7 @@ impl<T: NameType> Name<T> {
         };
 
         // If we take exactly one prism, we apply it at the end.
-        if prism_count == 1 {
+        if prism_count == Rank::new(1) {
             Self::Prism(Box::new(multiprism))
         }
         // Otherwise, we already combined them.
@@ -867,7 +851,7 @@ impl<T: NameType> Name<T> {
 
     pub fn multitegum(bases: Vec<Name<T>>) -> Self {
         let mut new_bases = Vec::new();
-        let mut tegum_count = 0;
+        let mut tegum_count = Rank::new(0);
 
         // Figures out which bases of the multipyramid are multipyramids
         // themselves, and accounts for them accordingly.
@@ -877,8 +861,8 @@ impl<T: NameType> Name<T> {
                     return Self::Nullitope;
                 }
                 Self::Point => {}
-                Self::Dyad => tegum_count += 1,
-                Self::Square | Self::Orthodiagonal => tegum_count += 2,
+                Self::Dyad => tegum_count += Rank::new(1),
+                Self::Square | Self::Orthodiagonal => tegum_count += Rank::new(2),
                 Self::Orthoplex { regular: _, rank } => tegum_count += rank,
                 Self::Multitegum(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
@@ -887,10 +871,10 @@ impl<T: NameType> Name<T> {
 
         // If we're taking more than one tegum, we combine all of them into a
         // single orthoplex.
-        if tegum_count >= 2 {
+        if tegum_count >= Rank::new(2) {
             new_bases.push(Self::orthoplex(
                 T::DataRegular::new(Regular::No),
-                tegum_count as isize,
+                tegum_count,
             ));
         }
 
@@ -904,7 +888,7 @@ impl<T: NameType> Name<T> {
         };
 
         // If we take exactly one tegum, we apply it at the end.
-        if tegum_count == 1 {
+        if tegum_count == Rank::new(1) {
             Self::Tegum(Box::new(multitegum))
         }
         // Otherwise, we already combined them.

@@ -10,7 +10,7 @@ use strum_macros::Display;
 
 use crate::{
     lang::{name::Con, Name as LangName, SelectedLanguage},
-    polytope::concrete::Concrete,
+    polytope::{concrete::Concrete, r#abstract::rank::Rank},
 };
 
 /// Represents any of the special polytopes in Miratope's library, namely those
@@ -25,13 +25,13 @@ pub enum SpecialLibrary {
     Antiprism(usize, usize),
 
     /// Allows one to select a simplex.
-    Simplex(isize),
+    Simplex(Rank),
 
     /// Allows one to select a hypercube.
-    Hypercube(isize),
+    Hypercube(Rank),
 
     /// Allows one to select an orthoplex.
-    Orthoplex(isize),
+    Orthoplex(Rank),
 }
 
 impl SpecialLibrary {

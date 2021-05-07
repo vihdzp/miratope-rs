@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use super::Concrete;
 use crate::{
     geometry::{Point, Subspace},
-    polytope::{r#abstract::elements::ElementList, r#abstract::elements::Subsupelements},
+    polytope::r#abstract::{
+        elements::{ElementList, Subsupelements},
+        rank::Rank,
+    },
     ui::camera::ProjectionType,
     Float,
 };
@@ -229,8 +232,18 @@ impl<'a> MeshBuilder<'a> {
         self.triangles = Vec::new();
 
         let empty_els = ElementList::new();
-        let edges = self.concrete.abs.ranks.get(1).unwrap_or(&empty_els);
-        let faces = self.concrete.abs.ranks.get(2).unwrap_or(&empty_els);
+        let edges = self
+            .concrete
+            .abs
+            .ranks
+            .get(Rank::new(1))
+            .unwrap_or(&empty_els);
+        let faces = self
+            .concrete
+            .abs
+            .ranks
+            .get(Rank::new(2))
+            .unwrap_or(&empty_els);
 
         // We render each face separately.
         for face in faces.iter() {
@@ -375,7 +388,7 @@ impl<'a> MeshBuilder<'a> {
     /// Generates the wireframe for a polytope.
     pub fn get_wireframe(&self, projection_type: ProjectionType) -> Mesh {
         let empty_els = ElementList::new();
-        let edges = self.concrete.abs.ranks.get(1).unwrap_or(&empty_els);
+        let edges = self.concrete.abs.ranks.get(Rank::new(1)).unwrap_or(&empty_els);
         let vertices = self.get_vertex_coords(projection_type);
         let mut indices = Vec::with_capacity(edges.len() * 2);
 

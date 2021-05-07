@@ -80,7 +80,7 @@ pub use ja::Ja;
 pub use name::Name;
 pub use pii::Pii;
 
-use crate::lang::name::NameData;
+use crate::{lang::name::NameData, polytope::r#abstract::rank::Rank};
 
 use self::name::NameType;
 
@@ -408,8 +408,8 @@ pub trait Language: Prefix {
             Name::Triangle { regular: _ } => Self::triangle(options),
             Name::Square => Self::square(options),
             Name::Rectangle => Self::rectangle(options),
-            Name::Orthodiagonal => Self::generic(4, 2, options),
-            Name::Polygon { regular: _, n } => Self::generic(*n, 2, options),
+            Name::Orthodiagonal => Self::generic(4, Rank::new(2), options),
+            Name::Polygon { regular: _, n } => Self::generic(*n, Rank::new(2), options),
 
             // Regular families
             Name::Simplex { regular: _, rank } => Self::simplex(*rank, options),
@@ -456,7 +456,7 @@ pub trait Language: Prefix {
 
     /// Returns the suffix for a d-polytope. Only needs to work up to d = 20, we
     /// won't offer support any higher than that.
-    fn suffix(d: usize, options: Options) -> String {
+    fn suffix(rank: Rank, options: Options) -> String {
         const SUFFIXES: [&str; 25] = [
             "mon", "tel", "gon", "hedr", "chor", "ter", "pet", "ex", "zett", "yott", "xenn", "dak",
             "hend", "dok", "tradak", "tedak", "pedak", "exdak", "zedak", "yodak", "nedak", "ik",
@@ -465,10 +465,10 @@ pub trait Language: Prefix {
 
         format!(
             "{}{}",
-            SUFFIXES[d],
-            if d == 2 {
+            SUFFIXES[rank.usize()],
+            if rank == Rank::new(2) {
                 options.three("", "s", "al")
-            } else if d == 3 {
+            } else if rank == Rank::new(3) {
                 options.three("on", "a", "al")
             } else {
                 options.three("on", "a", "ic")
@@ -507,7 +507,7 @@ pub trait Language: Prefix {
     }
 
     /// The generic name for a polytope with `n` facets with a given rank.
-    fn generic(n: usize, rank: usize, options: Options) -> String {
+    fn generic(n: usize, rank: Rank, options: Options) -> String {
         format!("{}{}", Self::prefix(n), Self::suffix(rank, options))
     }
 
@@ -579,27 +579,27 @@ pub trait Language: Prefix {
     }
 
     /// The name for a simplex with a given rank.
-    fn simplex(rank: usize, options: Options) -> String {
-        Self::generic(rank + 1, rank, options)
+    fn simplex(rank: Rank, options: Options) -> String {
+        Self::generic(rank.0, rank, options)
     }
 
     /// The name for a hyperblock with a given rank.
-    fn hyperblock(rank: usize, options: Options) -> String {
-        match rank {
+    fn hyperblock(rank: Rank, options: Options) -> String {
+        match rank.usize() {
             3 => format!("cuboid{}", options.three("", "s", "al")),
-            _ => {
-                format!("{}block{}", Self::prefix(rank), options.two("", "s"))
+            n => {
+                format!("{}block{}", Self::prefix(n), options.two("", "s"))
             }
         }
     }
 
     /// The name for a hypercube with a given rank.
-    fn hypercube(rank: usize, options: Options) -> String {
-        match rank {
+    fn hypercube(rank: Rank, options: Options) -> String {
+        match rank.usize() {
             3 => format!("cub{}", options.three("e", "s", "ic")),
             4 => format!("tesseract{}", options.three("", "s", "ic")),
-            _ => {
-                let prefix = Self::prefix(rank).chars().collect::<Vec<_>>();
+            n => {
+                let prefix = Self::prefix(n).chars().collect::<Vec<_>>();
 
                 // Penta -> Pente, or Deca -> Deke
                 let (_, str0) = prefix.split_last().unwrap();
@@ -616,8 +616,8 @@ pub trait Language: Prefix {
     }
 
     /// The name for an orthoplex with a given rank.
-    fn orthoplex(rank: usize, options: Options) -> String {
-        Self::generic(2u32.pow(rank as u32) as usize, rank, options)
+    fn orthoplex(rank: Rank, options: Options) -> String {
+        Self::generic(2u32.pow(rank.u32()) as usize, rank, options)
     }
 
     fn great(_options: Options) -> String {

@@ -7,7 +7,7 @@ pub mod concrete;
 
 use self::r#abstract::{
     flag::{Flag, FlagEvent, FlagIter},
-    rank::RankVec,
+    rank::{Rank, RankVec},
 };
 use crate::lang::{
     self,
@@ -26,7 +26,7 @@ const COMPONENTS: &str = "Components";
 /// The trait for methods common to all polytopes.
 pub trait Polytope<T: NameType>: Sized + Clone {
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
-    fn rank(&self) -> isize;
+    fn rank(&self) -> Rank;
 
     /// The name of the polytope in its language-independent representation.
     fn name(&self) -> &Name<T>;
@@ -50,19 +50,19 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     }
 
     /// The number of elements of a given rank.
-    fn el_count(&self, rank: isize) -> usize;
+    fn el_count(&self, rank: Rank) -> usize;
 
     /// The element counts of the polytope.
     fn el_counts(&self) -> RankVec<usize>;
 
     /// The number of vertices on the polytope.
     fn vertex_count(&self) -> usize {
-        self.el_count(0)
+        self.el_count(Rank::new(0))
     }
 
     /// The number of facets on the polytope.
     fn facet_count(&self) -> usize {
-        self.el_count(self.rank() - 1)
+        self.el_count(self.rank() - Rank::new(1))
     }
 
     /// Returns an instance of the
@@ -107,36 +107,32 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     fn append(&mut self, p: Self) -> Result<(), ()>;
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
-    fn element(&self, rank: isize, idx: usize) -> Option<Self>;
+    fn element(&self, rank: Rank, idx: usize) -> Option<Self>;
 
     /// Gets the element figure with a given rank and index as a polytope.
-    fn element_fig(&self, rank: isize, idx: usize) -> Option<Self> {
-        let mut element_fig = self.try_dual().ok()?.element(self.rank() - rank - 1, idx)?;
-
+    fn element_fig(&self, rank: Rank, idx: usize) -> Option<Self> {
+        let mut element_fig = self
+            .try_dual()
+            .ok()?
+            .element(self.rank() - rank - Rank::new(1), idx)?;
         element_fig.try_dual_mut().ok().map(|_| element_fig)
     }
 
     /// Gets the section defined by two elements with given ranks and indices as
     /// a polytope, or returns `None` in case no section is defined by these
     /// elements.
-    fn section(
-        &self,
-        rank_lo: isize,
-        idx_lo: usize,
-        rank_hi: isize,
-        idx_hi: usize,
-    ) -> Option<Self> {
+    fn section(&self, rank_lo: Rank, idx_lo: usize, rank_hi: Rank, idx_hi: usize) -> Option<Self> {
         self.element(rank_hi, idx_hi)?.element_fig(rank_lo, idx_lo)
     }
 
     /// Gets the facet associated to the element of a given index as a polytope.
     fn facet(&self, idx: usize) -> Option<Self> {
-        self.element(self.rank() - 1, idx)
+        self.element(self.rank() - Rank::new(1), idx)
     }
 
     /// Gets the verf associated to the element of a given index as a polytope.
     fn verf(&self, idx: usize) -> Option<Self> {
-        self.element_fig(0, idx)
+        self.element_fig(Rank::new(0), idx)
     }
 
     /// Builds a compound polytope from a set of components.
@@ -309,13 +305,13 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
     /// given rank.
-    fn simplex(rank: isize) -> Self {
-        if rank == -1 {
+    fn simplex(rank: Rank) -> Self {
+        if rank == Rank::new(-1) {
             Self::nullitope()
         } else {
-            Self::multipyramid(&vec![&Self::point(); (rank + 1) as usize]).with_name(Name::simplex(
+            Self::multipyramid(&vec![&Self::point(); rank.0]).with_name(Name::simplex(
                 T::DataRegular::new(Regular::Yes {
-                    center: vec![0.0; rank as usize].into(),
+                    center: vec![0.0; rank.usize()].into(),
                 }),
                 rank,
             ))
@@ -324,13 +320,15 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Builds a [hypercube](https://polytope.miraheze.org/wiki/Hypercube) with
     /// a given rank.
-    fn hypercube(rank: isize) -> Self {
-        if rank == -1 {
+    fn hypercube(rank: Rank) -> Self {
+        if rank == Rank::new(-1) {
             Self::nullitope()
         } else {
-            Self::multiprism(&vec![&Self::dyad(); rank as usize]).with_name(Name::hyperblock(
+            let rank_u = rank.usize();
+
+            Self::multiprism(&vec![&Self::dyad(); rank_u]).with_name(Name::hyperblock(
                 T::DataRegular::new(Regular::Yes {
-                    center: vec![0.0; rank as usize].into(),
+                    center: vec![0.0; rank_u].into(),
                 }),
                 rank,
             ))
@@ -339,13 +337,15 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Builds an [orthoplex](https://polytope.miraheze.org/wiki/Orthoplex) with
     /// a given rank.
-    fn orthoplex(rank: isize) -> Self {
-        if rank == -1 {
+    fn orthoplex(rank: Rank) -> Self {
+        if rank == Rank::new(-1) {
             Self::nullitope()
         } else {
-            Self::multitegum(&vec![&Self::dyad(); rank as usize]).with_name(Name::orthoplex(
+            let rank_u = rank.usize();
+
+            Self::multitegum(&vec![&Self::dyad(); rank_u]).with_name(Name::orthoplex(
                 T::DataRegular::new(Regular::Yes {
-                    center: vec![0.0; rank as usize].into(),
+                    center: vec![0.0; rank_u].into(),
                 }),
                 rank,
             ))

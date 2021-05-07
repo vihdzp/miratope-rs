@@ -1,6 +1,7 @@
 //! Credits to Nayuta Ito
 
 use super::{Language, Options, Prefix};
+use crate::polytope::r#abstract::rank::Rank;
 
 pub struct Ja;
 
@@ -36,8 +37,8 @@ impl Language for Ja {
         String::from("線分")
     }
 
-    fn generic(n: usize, rank: usize, _options: Options) -> String {
-        match rank {
+    fn generic(n: usize, rank: Rank, _options: Options) -> String {
+        match rank.usize() {
             2 => format!("{}形", Self::prefix(n)),
             3 => format!("{}面体", Self::prefix(n)),
             4 => format!("{}胞体", Self::prefix(n)),
@@ -52,7 +53,7 @@ impl Language for Ja {
     }
 
     fn triangle(options: Options) -> String {
-        Self::generic(3, 2, options)
+        Self::generic(3, Rank::new(2), options)
     }
 
     fn rectangle(_options: Options) -> String {

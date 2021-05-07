@@ -3,14 +3,17 @@ use std::{collections::HashMap, fs, io, path::Path, str::FromStr};
 use super::{Abstract, Concrete, Element, ElementList, Point, Polytope, RankVec, Subelements};
 use crate::{
     lang::{name::Con, Name},
-    polytope::{r#abstract::elements::Subsupelements, COMPONENTS, ELEMENT_NAMES},
+    polytope::{
+        r#abstract::{elements::Subsupelements, rank::Rank},
+        COMPONENTS, ELEMENT_NAMES,
+    },
 };
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 
 /// Gets the name for an element with a given rank.
-fn element_name(rank: isize) -> String {
-    match ELEMENT_NAMES.get(rank as usize) {
+fn element_name(rank: Rank) -> String {
+    match ELEMENT_NAMES.get(rank.usize()) {
         Some(&name) => String::from(name),
         None => rank.to_string() + "-elements",
     }
@@ -47,8 +50,8 @@ where
 /// Gets the number of elements from the OFF file.
 /// This includes components iff dim ≤ 2, as this makes things easier down the
 /// line.
-fn get_el_nums<'a>(rank: isize, toks: &mut impl Iterator<Item = &'a str>) -> Vec<usize> {
-    let rank = rank as usize;
+fn get_el_nums<'a>(rank: Rank, toks: &mut impl Iterator<Item = &'a str>) -> Vec<usize> {
+    let rank = rank.usize();
     let mut el_nums = Vec::with_capacity(rank);
 
     // Reads entries one by one.
@@ -104,7 +107,7 @@ fn parse_vertices<'a>(
 /// Since the OFF file doesn't store edges explicitly, this is harder than reading
 /// general elements.
 fn parse_edges_and_faces<'a>(
-    rank: isize,
+    rank: Rank,
     num_edges: usize,
     num_faces: usize,
     toks: &mut impl Iterator<Item = &'a str>,
@@ -144,13 +147,13 @@ fn parse_edges_and_faces<'a>(
         }
 
         // If these are truly faces and not just components, we add them.
-        if rank != 2 {
+        if rank != Rank::new(2) {
             faces.push(face);
         }
     }
 
     // If this is a polygon, we add a single maximal element as a face.
-    if rank == 2 {
+    if rank == Rank::new(2) {
         faces = ElementList::max(edges.len());
     }
 
@@ -222,24 +225,26 @@ impl Concrete {
             let rank = first.strip_suffix("OFF").expect("no \"OFF\" detected");
 
             if rank.is_empty() {
-                3
+                Rank::new(3)
             } else {
-                rank.parse()
-                    .expect("could not parse dimension as an integer")
+                Rank::new(
+                    rank.parse()
+                        .expect("could not parse dimension as an integer"),
+                )
             }
         };
 
         // Deals with dumb degenerate cases.
-        if rank == -1 {
+        if rank == Rank::new(-1) {
             return Ok(Concrete::nullitope());
-        } else if rank == 0 {
+        } else if rank == Rank::new(0) {
             return Ok(Concrete::point());
-        } else if rank == 1 {
+        } else if rank == Rank::new(1) {
             return Ok(Concrete::dyad());
         }
 
         let num_elems = get_el_nums(rank, &mut toks);
-        let vertices = parse_vertices(num_elems[0], rank as usize, &mut toks);
+        let vertices = parse_vertices(num_elems[0], rank.usize(), &mut toks);
         let mut abs = Abstract::with_capacity(rank);
 
         // Adds nullitope and vertices.
@@ -247,19 +252,19 @@ impl Concrete {
         abs.push_vertices(vertices.len());
 
         // Reads edges and faces.
-        if rank >= 2 {
+        if rank >= Rank::new(2) {
             let (edges, faces) = parse_edges_and_faces(rank, num_elems[1], num_elems[2], &mut toks);
             abs.push_subs(edges);
             abs.push_subs(faces);
         }
 
         // Adds all higher elements.
-        for &num_el in num_elems.iter().take(rank as usize).skip(3) {
+        for &num_el in num_elems.iter().take(rank.usize()).skip(3) {
             abs.push_subs(parse_els(num_el, &mut toks));
         }
 
         // Caps the abstract polytope, returns the concrete one.
-        if rank != 2 {
+        if rank != Rank::new(2) {
             abs.push_max();
         }
 
@@ -294,9 +299,9 @@ fn write_el_counts(off: &mut String, opt: &OffOptions, mut el_counts: RankVec<us
     if opt.comments {
         off.push_str("\n# Vertices");
 
-        let mut element_names = Vec::with_capacity((rank - 1) as usize);
+        let mut element_names = Vec::with_capacity(rank.usize() - 1);
 
-        for r in 1..rank {
+        for r in Rank::range_iter(Rank::new(1), rank) {
             element_names.push(element_name(r));
         }
 
@@ -313,11 +318,11 @@ fn write_el_counts(off: &mut String, opt: &OffOptions, mut el_counts: RankVec<us
     }
 
     // Swaps edges and faces, because OFF format bad.
-    if rank >= 3 {
-        el_counts.swap(1, 2);
+    if rank >= Rank::new(3) {
+        el_counts.swap(Rank::new(1), Rank::new(2));
     }
 
-    for r in 0..rank {
+    for r in Rank::range_iter(Rank::new(0), rank) {
         off.push_str(&el_counts[r].to_string());
         off.push(' ');
     }
@@ -330,7 +335,7 @@ fn write_vertices(off: &mut String, opt: &OffOptions, vertices: &[Point]) {
     // # Vertices
     if opt.comments {
         off.push_str("\n# ");
-        off.push_str(&element_name(0));
+        off.push_str(&element_name(Rank::new( 0)));
         off.push('\n');
     }
 
@@ -355,7 +360,7 @@ fn write_faces(
     // # Faces
     if opt.comments {
         let el_name = if rank > 2 {
-            element_name(2)
+            element_name(Rank::new( 2))
         } else {
             COMPONENTS.to_string()
         };
@@ -421,7 +426,7 @@ fn write_faces(
 }
 
 /// Writes the n-elements of a polytope into an OFF file.
-fn write_els(off: &mut String, opt: &OffOptions, rank: isize, els: &ElementList) {
+fn write_els(off: &mut String, opt: &OffOptions, rank: Rank, els: &ElementList) {
     // # n-elements
     if opt.comments {
         off.push_str("\n# ");
@@ -464,13 +469,13 @@ impl Concrete {
         }
 
         // Writes header.
-        if rank != 3 {
+        if rank != Rank::new( 3) {
             off += &rank.to_string();
         }
         off += "OFF\n";
 
         // If we have a nullitope or point on our hands, that is all.
-        if rank < 1 {
+        if rank < Rank::new( 1) {
             return off;
         }
 
@@ -481,12 +486,12 @@ impl Concrete {
         write_vertices(&mut off, &opt, vertices);
 
         // Adds faces.
-        if rank >= 2 {
-            write_faces(&mut off, &opt, rank as usize, &abs[1], &abs[2]);
+        if rank >= Rank::new( 2) {
+            write_faces(&mut off, &opt, rank . usize(), &abs[Rank::new( 1)], &abs[Rank::new( 2)]);
         }
 
         // Adds the rest of the elements.
-        for r in 3..rank {
+        for r in Rank::range_iter(Rank::new(3),rank) {
             write_els(&mut off, &opt, r, &abs[r]);
         }
 

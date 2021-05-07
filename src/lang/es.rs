@@ -1,4 +1,7 @@
-use crate::lang::{name::NameType, Gender, Name};
+use crate::{
+    lang::{name::NameType, Gender, Name},
+    polytope::r#abstract::rank::Rank,
+};
 
 use super::{GreekPrefix, Language, Options, Prefix};
 
@@ -59,14 +62,18 @@ fn last_vowel_tilde(prefix: String) -> String {
 impl Language for Es {
     /// Returns the suffix for a d-polytope. Only needs to work up to d = 20, we
     /// won't offer support any higher than that.
-    fn suffix(d: usize, options: Options) -> String {
+    fn suffix(d: Rank, options: Options) -> String {
         const SUFFIXES: [&str; 21] = [
             "mon", "tel", "gon", "edr", "cor", "ter", "pet", "ex", "zet", "yot", "xen", "dac",
             "hendac", "doc", "tradac", "teradac", "petadac", "exdac", "zetadac", "yotadac",
             "xendac",
         ];
 
-        format!("{}{}", SUFFIXES[d], options.four("o", "os", "al", "ales"))
+        format!(
+            "{}{}",
+            SUFFIXES[d.usize()],
+            options.four("o", "os", "al", "ales")
+        )
     }
 
     /// The name of a nullitope.
@@ -119,10 +126,10 @@ impl Language for Es {
     }
 
     /// The generic name for a polytope with `n` facets in `d` dimensions.
-    fn generic(n: usize, d: usize, options: Options) -> String {
+    fn generic(n: usize, d: Rank, options: Options) -> String {
         let mut prefix = Self::prefix(n);
 
-        if d == 2 && !options.adjective {
+        if d == Rank::new(2) && !options.adjective {
             prefix = last_vowel_tilde(prefix);
         }
 
@@ -233,14 +240,14 @@ impl Language for Es {
         format!("{} {}", kind, str_bases)
     }
 
-    fn hyperblock(rank: usize, options: Options) -> String {
-        match rank {
+    fn hyperblock(rank: Rank, options: Options) -> String {
+        match rank.usize() {
             3 => format!("cuboid{}", options.four("e", "es", "al", "ales")),
-            _ => {
+            n => {
                 format!(
                     "{} {}bloque{}",
                     if options.adjective { "de" } else { "" },
-                    Self::prefix(rank),
+                    Self::prefix(n),
                     options.two("", "s")
                 )
             }
@@ -248,8 +255,8 @@ impl Language for Es {
     }
 
     /// The name for a hypercube with a given rank.
-    fn hypercube(rank: usize, options: Options) -> String {
-        match rank {
+    fn hypercube(rank: Rank, options: Options) -> String {
+        match rank.usize() {
             3 => format!(
                 "c{}",
                 options.six("ubo", "ubos", "úbico", "úbicos", "úbica", "úbicas")
@@ -258,8 +265,8 @@ impl Language for Es {
                 "teser{}",
                 options.six("acto", "actos", "áctico", "ácticoa", "áctica", "ácticas")
             ),
-            _ => {
-                let prefix = Self::prefix(rank).chars().collect::<Vec<_>>();
+            n => {
+                let prefix = Self::prefix(n).chars().collect::<Vec<_>>();
 
                 // Penta -> Pente, or Deca -> Deque
                 // Penta -> Pente, or Deca -> Deke
@@ -277,8 +284,8 @@ impl Language for Es {
     }
 
     /// The name for an orthoplex with a given rank.
-    fn orthoplex(rank: usize, options: Options) -> String {
-        Self::generic(2u32.pow(rank as u32) as usize, rank, options)
+    fn orthoplex(rank: Rank, options: Options) -> String {
+        Self::generic(2u32.pow(rank.u32()) as usize, rank, options)
     }
 
     fn compound<T: NameType>(components: &[(usize, Name<T>)], options: Options) -> String {

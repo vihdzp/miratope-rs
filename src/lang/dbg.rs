@@ -1,16 +1,15 @@
 //! A language we can use for debugging.
 
-use crate::lang::name::NameType;
-
 use super::{Language, Name, Options, Prefix};
+use crate::{lang::name::NameType, polytope::r#abstract::rank::Rank};
 
 pub struct Dbg;
 
 impl Prefix for Dbg {}
 
 impl Language for Dbg {
-    fn suffix(d: usize, _options: Options) -> String {
-        format!("({}D)", d)
+    fn suffix(rank: Rank, _options: Options) -> String {
+        format!("({}D)", rank)
     }
 
     fn pyramid_of<T: NameType>(base: &Name<T>, _options: Options) -> String {
@@ -25,19 +24,19 @@ impl Language for Dbg {
         format!("({}) tegum", Self::parse(base, Options::default()))
     }
 
-    fn simplex(rank: usize, _options: Options) -> String {
+    fn simplex(rank: Rank, _options: Options) -> String {
         format!("{}-simplex", rank)
     }
 
-    fn hyperblock(rank: usize, _options: Options) -> String {
+    fn hyperblock(rank: Rank, _options: Options) -> String {
         format!("{}-hyperblock", rank)
     }
 
-    fn hypercube(rank: usize, _options: Options) -> String {
+    fn hypercube(rank: Rank, _options: Options) -> String {
         format!("{}-hypercube", rank)
     }
 
-    fn orthoplex(rank: usize, _options: Options) -> String {
+    fn orthoplex(rank: Rank, _options: Options) -> String {
         format!("{}-orthoplex", rank)
     }
 

@@ -12,9 +12,8 @@ use self::{group::OrdPoint, mesh_builder::MeshBuilder};
 use super::{
     r#abstract::{
         elements::{Element, ElementList, Subelements, Subsupelements},
-        flag::FlagEvent,
-        flag::FlagIter,
-        rank::RankVec,
+        flag::{FlagEvent, FlagIter},
+        rank::{Rank, RankVec},
         Abstract,
     },
     Polytope,
@@ -57,7 +56,7 @@ impl Concrete {
     /// underlying abstract polytope. Does some debug assertions on the input.
     pub fn new(vertices: Vec<Point>, abs: Abstract) -> Self {
         // There must be as many abstract vertices as concrete ones.
-        debug_assert_eq!(vertices.len(), abs.el_count(0));
+        debug_assert_eq!(vertices.len(), abs.el_count(Rank::new(0)));
 
         // All vertices must have the same dimension.
         if let Some(vertex0) = vertices.get(0) {
@@ -68,16 +67,16 @@ impl Concrete {
 
         // With no further info, we create a generic name for the polytope.
         let n = abs.facet_count();
-        let d = abs.rank();
+        let rank = abs.rank();
         Self {
             vertices,
             abs,
-            name: Name::generic(n, d),
+            name: Name::generic(n, rank),
         }
     }
 
     /// Returns the rank of the polytope.
-    pub fn rank(&self) -> isize {
+    pub fn rank(&self) -> Rank {
         self.abs.rank()
     }
 
@@ -252,7 +251,7 @@ impl Concrete {
         let mut edge_lengths = Vec::new();
 
         // If there are no edges, we just return the empty vector.
-        if let Some(edges) = self.abs.ranks.get(1) {
+        if let Some(edges) = self.abs.ranks.get(Rank::new(1)) {
             edge_lengths.reserve_exact(edges.len());
 
             for edge in edges.iter() {
@@ -283,7 +282,7 @@ impl Concrete {
 
     /// Checks whether a polytope is equilateral to a fixed precision.
     pub fn is_equilateral(&self) -> bool {
-        if let Some(vertices) = self.element_vertices_ref(1, 0) {
+        if let Some(vertices) = self.element_vertices_ref(Rank::new(1), 0) {
             let (v0, v1) = (vertices[0], vertices[1]);
 
             return self.is_equilateral_with_len((v0 - v1).norm());
@@ -298,7 +297,7 @@ impl Concrete {
     /// Maybe make this work in the general case?
     pub fn midradius(&self) -> Float {
         let vertices = &self.vertices;
-        let edges = &self[0];
+        let edges = &self[Rank::new(0)];
         let edge = &edges[0];
 
         let sub0 = edge.subs[0];
@@ -325,11 +324,11 @@ impl Concrete {
     pub fn try_dual_mut_with_sphere(&mut self, sphere: &Hypersphere) -> Result<(), usize> {
         // If we're dealing with a nullitope, the dual is itself.
         let rank = self.rank();
-        if rank == -1 {
+        if rank == Rank::new(-1) {
             return Ok(());
         }
         // In the case of points, we reciprocate them.
-        else if rank == 0 {
+        else if rank == Rank::new(0) {
             for (idx, v) in self.vertices.iter_mut().enumerate() {
                 sphere.reciprocate_mut(v).map_err(|_| idx)?;
             }
@@ -343,13 +342,13 @@ impl Concrete {
         let mut projections;
 
         // We project our inversion center onto each of the facets.
-        if rank >= 2 {
-            let facet_count = self.el_count(rank - 1);
+        if rank >= Rank::new(2) {
+            let facet_count = self.el_count(rank - Rank::new(1));
             projections = Vec::with_capacity(facet_count);
 
             for idx in 0..facet_count {
                 projections.push(
-                    Subspace::from_point_refs(&self.element_vertices_ref(rank - 1, idx).unwrap())
+                    Subspace::from_point_refs(&self.element_vertices_ref(rank - Rank::new(1), idx).unwrap())
                         .project(&o),
                 );
             }
@@ -453,7 +452,7 @@ impl Concrete {
 
     /// Gets the references to the (geometric) vertices of an element on the
     /// polytope.
-    pub fn element_vertices_ref(&self, rank: isize, idx: usize) -> Option<Vec<&Point>> {
+    pub fn element_vertices_ref(&self, rank: Rank, idx: usize) -> Option<Vec<&Point>> {
         Some(
             self.abs
                 .element_vertices(rank, idx)?
@@ -464,7 +463,7 @@ impl Concrete {
     }
 
     /// Gets the (geometric) vertices of an element on the polytope.
-    pub fn element_vertices(&self, rank: isize, idx: usize) -> Option<Vec<Point>> {
+    pub fn element_vertices(&self, rank: Rank, idx: usize) -> Option<Vec<Point>> {
         Some(
             self.element_vertices_ref(rank, idx)?
                 .into_iter()
@@ -569,7 +568,7 @@ impl Concrete {
         let rank = self.rank();
 
         // We leave the nullitope's volume undefined.
-        if rank == -1 {
+        if rank == Rank::new(-1) {
             return None;
         }
 
@@ -577,7 +576,7 @@ impl Concrete {
         let flat_vertices = self.flat_vertices();
         let flat_vertices = flat_vertices.as_ref().unwrap_or(&self.vertices);
 
-        if flat_vertices.get(0)?.len() != rank as usize {
+        if flat_vertices.get(0)?.len() != rank . usize (){
             return None;
         }
 
@@ -586,17 +585,17 @@ impl Concrete {
 
         // Vertices map to themselves.
         let mut vertex_list = Vec::new();
-        for v in 0..self[0].len() {
+        for v in 0..self[Rank::new(0)].len() {
             vertex_list.push(v);
         }
         vertex_map.push(vertex_list);
 
         // Every other element maps to the vertex of any subelement.
-        for r in 1..=self.rank() {
+        for r in Rank::range_inclusive_iter(Rank::new(1),self.rank()) {
             let mut element_list = Vec::new();
 
             for el in self[r].iter() {
-                element_list.push(vertex_map[r as usize - 1][el.subs[0]]);
+                element_list.push(vertex_map[r.usize()-1][el.subs[0]]);
             }
 
             vertex_map.push(element_list);
@@ -611,8 +610,8 @@ impl Concrete {
             if let FlagEvent::Flag(flag) = flag_event {
                 volume += flag.orientation.sign()
                     * Matrix::from_iterator(
-                        rank as usize,
-                        rank as usize,
+                        rank . usize(),
+                        rank . usize(),
                         flag.elements
                             .into_iter()
                             .enumerate()
@@ -626,7 +625,7 @@ impl Concrete {
             }
         }
 
-        Some(volume.abs() / (rank as usize).factorial() as Float)
+        Some(volume.abs() / (rank . usize()).factorial() as Float)
     }
 
     pub fn flat_vertices(&self) -> Option<Vec<Point>> {
@@ -674,7 +673,7 @@ impl Concrete {
         let mut hash_element = HashMap::new();
 
         // Determines the vertices of the cross-section.
-        for (idx, edge) in self[1].iter().enumerate() {
+        for (idx, edge) in self[Rank::new(1)].iter().enumerate() {
             let segment = Segment(
                 self.vertices[edge.subs[0]].clone(),
                 self.vertices[edge.subs[1]].clone(),
@@ -698,7 +697,7 @@ impl Concrete {
         abs.push(ElementList::vertices(vertex_count));
 
         // Takes care of building everything else.
-        for r in 2..self.rank() {
+        for r in Rank::range_iter(Rank::new(2),self.rank()) {
             let mut new_hash_element = HashMap::new();
             let mut new_els = ElementList::new();
 
@@ -726,11 +725,11 @@ impl Concrete {
         abs.push(ElementList::max(facet_count));
 
         // Splits compounds of dyads.
-        if let Some(mut faces) = abs.ranks.get(2).cloned() {
-            let mut i = abs[1].len();
+        if let Some(mut faces) = abs.ranks.get(Rank::new(2)).cloned() {
+            let mut i = abs[Rank::new(1)].len();
             let mut new_edges = ElementList::new();
 
-            for (idx, edge) in abs[1].0.iter_mut().enumerate() {
+            for (idx, edge) in abs[Rank::new(1)].0.iter_mut().enumerate() {
                 let edge_sub = &mut edge.subs;
                 let comps = edge_sub.len() / 2;
 
@@ -756,8 +755,8 @@ impl Concrete {
                 *edge = Element::from_subs(new_subs);
             }
 
-            abs[1].append(&mut new_edges);
-            abs[2] = faces;
+            abs[Rank::new(1)].append(&mut new_edges);
+            abs[Rank::new(2)] = faces;
 
             let mut abs2 = Abstract::new();
             for r in abs {
@@ -822,7 +821,7 @@ impl Concrete {
         // There's only one type of point.
         types.push(Vec::new());
         output.push(vec![ElementType {
-            multiplicity: el_counts[0],
+            multiplicity: el_counts[Rank::new(0)],
             facet_count: 1,
             volume: Some(1.0),
         }]);
@@ -834,25 +833,25 @@ impl Concrete {
                 .iter()
                 .position(|&x| abs_diff_eq!(x, length, epsilon = Float::EPS))
             {
-                element_types[1].push(index);
+                element_types[Rank::new(1)].push(index);
             } else {
-                element_types[1].push(edge_types.len());
+                element_types[Rank::new(1)].push(edge_types.len());
                 edge_types.push(length);
             }
         }
         types.push(edge_types);
 
-        let mut edge_types = Vec::with_capacity(types[1].len());
-        for (idx, &edge_type) in types[1].iter().enumerate() {
+        let mut edge_types = Vec::with_capacity(types[Rank::new(1)].len());
+        for (idx, &edge_type) in types[Rank::new(1)].iter().enumerate() {
             edge_types.push(ElementType {
-                multiplicity: element_types[1].iter().filter(|&x| *x == idx).count(),
+                multiplicity: element_types[Rank::new(1)].iter().filter(|&x| *x == idx).count(),
                 facet_count: 2,
                 volume: Some(edge_type),
             })
         }
         output.push(edge_types);
 
-        for d in 2..=rank {
+        for d in Rank::range_inclusive_iter(Rank::new(2),rank) {
             types.push(Vec::new());
             for el in self.abs.ranks[d].iter() {
                 let count = el.subs.len();
@@ -892,17 +891,17 @@ impl Concrete {
             "xennon", "dakon",
         ]);
 
-        output.push_str(&el_names[0].to_string());
+        output.push_str(&el_names[Rank::new(0)].to_string());
         output.push('\n');
-        for t in &types[0] {
+        for t in &types[Rank::new(0)] {
             output.push_str(&t.multiplicity.to_string());
             output.push('\n');
         }
         output.push('\n');
 
-        output.push_str(&el_names[1].to_string());
+        output.push_str(&el_names[Rank::new(1)].to_string());
         output.push('\n');
-        for t in &types[1] {
+        for t in &types[Rank::new(1)] {
             output.push_str(&format!(
                 "{} of length {}\n",
                 t.multiplicity,
@@ -911,7 +910,7 @@ impl Concrete {
         }
         output.push('\n');
 
-        for d in 2..self.rank() {
+        for d in Rank::range_iter(Rank::new(2),self.rank()) {
             output.push_str(&el_names[d].to_string());
             output.push('\n');
             for t in &types[d] {
@@ -939,7 +938,7 @@ impl Concrete {
 
 impl Polytope<Con> for Concrete {
     /// Returns the rank of the polytope.
-    fn rank(&self) -> isize {
+    fn rank(&self) -> Rank {
         self.abs.rank()
     }
 
@@ -952,7 +951,7 @@ impl Polytope<Con> for Concrete {
     }
 
     /// Gets the number of elements of a given rank.
-    fn el_count(&self, rank: isize) -> usize {
+    fn el_count(&self, rank: Rank) -> usize {
         self.abs.el_count(rank)
     }
 
@@ -1013,7 +1012,7 @@ impl Polytope<Con> for Concrete {
         Ok(())
     }
 
-    fn element(&self, rank: isize, idx: usize) -> Option<Self> {
+    fn element(&self, rank: Rank, idx: usize) -> Option<Self> {
         let (vertices, abs) = self.abs.element_and_vertices(rank, idx)?;
 
         Some(Self::new(
@@ -1049,9 +1048,9 @@ impl Polytope<Con> for Concrete {
     /// from two polytopes.
     fn duotegum(p: &Self, q: &Self) -> Self {
         // Point-polytope duotegums are special cases.
-        if p.rank() == 0 {
+        if p.rank() == Rank::new(0) {
             q.clone()
-        } else if q.rank() == 0 {
+        } else if q.rank() == Rank::new(0) {
             p.clone()
         } else {
             Self::new(
@@ -1112,11 +1111,11 @@ impl Polytope<Con> for Concrete {
 
     /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
     /// given rank.
-    fn simplex(rank: isize) -> Self {
-        if rank == -1 {
+    fn simplex(rank: Rank) -> Self {
+        if rank == Rank::new(-1) {
             Self::nullitope()
         } else {
-            let dim = rank as usize;
+            let dim = rank . usize();
             let mut vertices = Vec::with_capacity(dim + 1);
 
             // Adds all points with a single entry equal to √2/2, and all others
@@ -1139,18 +1138,18 @@ impl Polytope<Con> for Concrete {
     }
 }
 
-impl std::ops::Index<isize> for Concrete {
+impl std::ops::Index<Rank> for Concrete {
     type Output = ElementList;
 
     /// Gets the list of elements with a given rank.
-    fn index(&self, rank: isize) -> &Self::Output {
+    fn index(&self, rank: Rank) -> &Self::Output {
         &self.abs[rank]
     }
 }
 
-impl std::ops::IndexMut<isize> for Concrete {
+impl std::ops::IndexMut<Rank> for Concrete {
     /// Gets the list of elements with a given rank.
-    fn index_mut(&mut self, rank: isize) -> &mut Self::Output {
+    fn index_mut(&mut self, rank: Rank) -> &mut Self::Output {
         &mut self.abs[rank]
     }
 }

@@ -4,7 +4,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use super::Abstract;
+use super::{rank::Rank, Abstract};
 use crate::Float;
 
 /// The parity of a flag, which flips on any flag change.
@@ -105,40 +105,48 @@ impl Flag {
 
     /// Gets the index of the element stored at a given rank, whilst pretending
     /// that the flag contains a minimal and maximal element.
-    pub fn get(&self, rank: isize) -> Option<&usize> {
-        if rank == -1 || rank == self.elements.len() as isize {
+    pub fn get(&self, rank: Rank) -> Option<&usize> {
+        if rank == Rank::new(-1) || rank == Rank::new(self.elements.len() as isize) {
             Some(&0)
         } else {
-            self.elements.get(rank as usize)
+            self.elements.get(rank.usize())
         }
     }
 
     /// Applies a specified flag change to the flag in place.
     pub fn change_mut(&mut self, polytope: &Abstract, r: usize) {
         let rank = polytope.rank();
-        assert_ne!(rank, -1, "Can't iterate over flags of the nullitope.");
+        assert_ne!(
+            rank,
+            Rank::new(-1),
+            "Can't iterate over flags of the nullitope."
+        );
 
         // A flag change is a no-op in a point.
-        if rank == 0 {
+        if rank == Rank::new(0) {
             return;
         }
 
-        let r = r as isize;
+        let r = Rank::new(r as isize);
 
         // Determines the common elements between the subelements of the element
         // above and the superelements of the element below.
-        let below = polytope.element_ref(r - 1, self[r - 1]).unwrap();
-        let above = polytope.element_ref(r + 1, self[r + 1]).unwrap();
+        let below = polytope
+            .element_ref(r - Rank::new(1), self[r - Rank::new(1)])
+            .unwrap();
+        let above = polytope
+            .element_ref(r + Rank::new(1), self[r + Rank::new(1)])
+            .unwrap();
         let common = common(&below.sups.0, &above.subs.0);
 
         assert_eq!(
             common.len(),
             2,
             "Diamond property fails between rank {}, index {}, and rank {}, index {}.",
-            r - 1,
-            self[r - 1],
-            r + 1,
-            self[r + 1]
+            r - Rank::new(1),
+            self[r - Rank::new(1)],
+            r + Rank::new(1),
+            self[r + Rank::new(1)]
         );
 
         // Changes the element at idx to the other element in the section
@@ -160,17 +168,17 @@ impl Flag {
     }
 }
 
-impl std::ops::Index<isize> for Flag {
+impl std::ops::Index<Rank> for Flag {
     type Output = usize;
 
-    fn index(&self, index: isize) -> &Self::Output {
+    fn index(&self, index: Rank) -> &Self::Output {
         self.get(index).unwrap()
     }
 }
 
-impl std::ops::IndexMut<isize> for Flag {
-    fn index_mut(&mut self, index: isize) -> &mut Self::Output {
-        &mut self.elements[index as usize]
+impl std::ops::IndexMut<Rank> for Flag {
+    fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
+        self.elements.get_mut(index.usize()).unwrap()
     }
 }
 
@@ -236,13 +244,13 @@ impl FlagIter {
         let mut found = HashMap::new();
         let mut queue = VecDeque::new();
 
-        if polytope.rank() != -1 {
+        if polytope.rank() != Rank::new(-1) {
             // Initializes with any flag from the polytope.
-            let mut flag = Flag::with_capacity(rank as usize);
+            let mut flag = Flag::with_capacity(rank . usize());
             let mut idx = 0;
             flag.elements.push(0);
-            for r in 1..rank {
-                idx = polytope.element_ref(r - 1, idx).unwrap().sups[0];
+            for r in Rank::range_iter(Rank::new(1),rank) {
+                idx = polytope.element_ref(r - Rank::new(1), idx).unwrap().sups[0];
                 flag.elements.push(idx);
             }
 
@@ -263,7 +271,7 @@ impl FlagIter {
 
     /// Attempts to get the next flag.
     pub fn try_next(&mut self) -> IterResult {
-        let rank = self.polytope.rank() as usize;
+        let rank = self.polytope.rank() . usize();
         let new_flag;
 
         if let Some(current) = self.queue.front() {
@@ -351,11 +359,11 @@ impl Iterator for FlagIter {
         let rank = self.polytope.rank();
 
         // A nullitope has no flags.
-        if rank == -1 {
+        if rank == Rank::new(-1 ){
             None
         }
         // A point has a single flag.
-        else if rank == 0 {
+        else if rank == Rank::new(0) {
             self.queue.pop_front().map(FlagEvent::Flag)
         } else {
             loop {
