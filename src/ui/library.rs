@@ -40,7 +40,7 @@ impl SpecialLibrary {
         let text = self.to_string();
 
         match self {
-            Self::Polygon(n, d) | Self::Antiprism(n, d) => {
+            Self::Polygon(n, d) => {
                 let mut clicked = false;
 
                 ui.horizontal(|ui| {
@@ -59,7 +59,36 @@ impl SpecialLibrary {
                     ui.add(
                         egui::DragValue::new(d)
                             .speed(0.25)
-                            .clamp_range(1..=usize::MAX),
+                            .clamp_range(1..=(*n - 1)),
+                    );
+                });
+
+                if clicked {
+                    ShowResult::Special(self.clone())
+                } else {
+                    ShowResult::None
+                }
+            }
+            Self::Antiprism(n, d) => {
+                let mut clicked = false;
+
+                ui.horizontal(|ui| {
+                    clicked = ui.button(text).clicked();
+
+                    // Number of sides.
+                    ui.label("n:");
+                    ui.add(
+                        egui::DragValue::new(n)
+                            .speed(0.25)
+                            .clamp_range(2..=usize::MAX),
+                    );
+
+                    // Turning number.
+                    ui.label("d:");
+                    ui.add(
+                        egui::DragValue::new(d)
+                            .speed(0.25)
+                            .clamp_range(1..=(*n * 2 / 3)),
                     );
                 });
 

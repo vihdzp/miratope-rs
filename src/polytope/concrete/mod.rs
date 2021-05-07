@@ -380,29 +380,47 @@ impl Concrete {
         self.try_dual_mut_with_sphere(sphere).unwrap()
     }
 
-    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
-    /// based on a given polytope.
-    fn try_antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Option<Self> {
+    fn try_antiprism_with_vertices<T: Iterator<Item = Point>, U: Iterator<Item = Point>>(
+        &self,
+        vertices: T,
+        dual_vertices: U,
+    ) -> Option<Self> {
         let (abs, vertex_indices, dual_vertex_indices) = self.abs.antiprism_and_vertices();
         let vertex_count = abs.vertex_count();
         let mut new_vertices = Vec::with_capacity(vertex_count);
         new_vertices.resize(vertex_count, vec![].into());
 
-        let vertices = &self.vertices;
-        let dual_vertices = &self.try_dual_with_sphere(sphere).ok()?.vertices;
-
-        for (idx, v) in vertices.iter().enumerate() {
-            new_vertices[vertex_indices[idx]] = v.push(height / 2.0);
+        for (idx, v) in vertices.enumerate() {
+            new_vertices[vertex_indices[idx]] = v;
         }
-        for (idx, v) in dual_vertices.iter().enumerate() {
-            new_vertices[dual_vertex_indices[idx]] = v.push(-height / 2.0);
+        for (idx, v) in dual_vertices.enumerate() {
+            new_vertices[dual_vertex_indices[idx]] = v;
         }
 
         Some(Self::new(new_vertices, abs))
     }
 
+    fn antiprism_with_vertices<T: Iterator<Item = Point>, U: Iterator<Item = Point>>(
+        &self,
+        vertices: T,
+        dual_vertices: U,
+    ) -> Self {
+        self.try_antiprism_with_vertices(vertices, dual_vertices)
+            .unwrap()
+    }
+
+    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
+    /// based on a given polytope.
+    fn try_antiprism_with_sphere(&self, sphere: &Hypersphere, height: Float) -> Option<Self> {
+        let vertices = self.vertices.iter().map(|v| v.push(height / 2.0));
+        let dual = self.try_dual_with_sphere(sphere).ok()?;
+        let dual_vertices = dual.vertices.iter().map(|v| v.push(-height / 2.0));
+
+        self.try_antiprism_with_vertices(vertices, dual_vertices)
+    }
+
     fn antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Self {
-        self.try_antiprism_with(sphere, height).unwrap()
+        self.try_antiprism_with_sphere(sphere, height).unwrap()
     }
 
     pub fn uniform_antiprism(n: usize) -> Self {
@@ -410,12 +428,27 @@ impl Concrete {
     }
 
     pub fn uniform_star_antiprism(n: usize, d: usize) -> Self {
-        let angle = Float::PI * d as Float / n as Float;
-        let cos = angle.cos();
-        let height = ((cos - (2.0 * angle).cos()) * 2.0).sqrt();
+        let polygon = Concrete::star_polygon(n, d);
 
-        Concrete::star_polygon(n, d)
-            .antiprism_with(&Hypersphere::with_squared_radius(2, cos), height)
+        // Appropriately scaled antiprism.
+        if n != 2 * d {
+            let angle = Float::PI * d as Float / n as Float;
+            let cos = angle.cos();
+            let height = ((cos - (2.0 * angle).cos()) * 2.0).sqrt();
+
+            polygon.antiprism_with(&Hypersphere::with_squared_radius(2, cos), height)
+        }
+        // Digon compounds are a special case.
+        else {
+            let height = Float::SQRT_2;
+            let vertices = polygon.vertices.iter().map(|v| v.push(height / 2.0));
+            let dual_vertices = polygon
+                .vertices
+                .iter()
+                .map(|v| vec![v[1], -v[0], -height / 2.0].into());
+
+            polygon.antiprism_with_vertices(vertices, dual_vertices)
+        }
     }
 
     /// Gets the references to the (geometric) vertices of an element on the
@@ -1070,7 +1103,7 @@ impl Polytope<Con> for Concrete {
     }
 
     fn try_antiprism(&self) -> Option<Self> {
-        Self::try_antiprism_with(&self, &Hypersphere::unit(self.dim().unwrap_or(1)), 1.0)
+        Self::try_antiprism_with_sphere(&self, &Hypersphere::unit(self.dim().unwrap_or(1)), 1.0)
     }
 
     /// Determines whether a given polytope is
