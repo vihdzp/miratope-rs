@@ -184,7 +184,7 @@ impl Concrete {
         }
 
         Some(Hypersphere {
-            radius: (&o - v0).norm(),
+            squared_radius: (&o - v0).norm(),
             center: o,
         })
     }
@@ -412,10 +412,10 @@ impl Concrete {
     pub fn uniform_star_antiprism(n: usize, d: usize) -> Self {
         let angle = Float::PI * d as Float / n as Float;
         let cos = angle.cos();
-        let radius = cos.sqrt();
         let height = ((cos - (2.0 * angle).cos()) * 2.0).sqrt();
 
-        Concrete::star_polygon(n, d).antiprism_with(&Hypersphere::with_radius(2, radius), height)
+        Concrete::star_polygon(n, d)
+            .antiprism_with(&Hypersphere::with_squared_radius(2, cos), height)
     }
 
     /// Gets the references to the (geometric) vertices of an element on the

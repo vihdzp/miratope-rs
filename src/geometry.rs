@@ -10,8 +10,6 @@ pub type Vector = Point;
 /// An *n* by *n* matrix.
 pub type Matrix = nalgebra::DMatrix<Float>;
 
-use std::fmt;
-
 use crate::{Consts, Float};
 
 use approx::abs_diff_eq;
@@ -22,29 +20,24 @@ pub struct Hypersphere {
     /// The center of the hypersphere.
     pub center: Point,
 
-    /// The radius of the hypersphere.
-    pub radius: Float,
-}
-
-impl fmt::Display for Hypersphere {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{center: {}\nradius: {}}}", self.center, self.radius)
-    }
+    /// The squared radius of the hypersphere. We allow negative numbers as a
+    /// convenient way to dual + reflect a polytope.
+    pub squared_radius: Float,
 }
 
 impl Hypersphere {
-    /// Constructs a hypersphere with a given dimension and radius, centered at
-    /// the origin.
-    pub fn with_radius(dim: usize, radius: Float) -> Hypersphere {
+    /// Constructs a hypersphere with a given dimension and squared radius,
+    /// centered at the origin.
+    pub fn with_squared_radius(dim: usize, squared_radius: Float) -> Hypersphere {
         Hypersphere {
             center: vec![0.0; dim].into(),
-            radius,
+            squared_radius,
         }
     }
 
     /// Represents the unit hypersphere in a certain number of dimensions.
     pub fn unit(dim: usize) -> Hypersphere {
-        Hypersphere::with_radius(dim, 1.0)
+        Hypersphere::with_squared_radius(dim, 1.0)
     }
 
     /// Reciprocates a point in place. If it's too close to the sphere's center,
@@ -61,8 +54,7 @@ impl Hypersphere {
 
         // Rescales q.
         q /= s;
-        q *= self.radius;
-        q *= self.radius;
+        q *= self.squared_radius;
 
         q += &self.center;
         *p = q;
@@ -86,7 +78,7 @@ impl Hypersphere {
         }
 
         Hypersphere {
-            radius: rand.gen_range(0.0..=1.0),
+            squared_radius: rand.gen_range(0.0..=1.0),
             center,
         }
     }
@@ -95,7 +87,7 @@ impl Hypersphere {
     /// Used for testing.
     pub fn approx(&self, sphere: &Hypersphere) -> bool {
         (&self.center - &sphere.center).norm() < Float::EPS
-            && self.radius - sphere.radius < Float::EPS
+            && self.squared_radius - sphere.squared_radius < Float::EPS
     }
 }
 
