@@ -348,8 +348,10 @@ impl Concrete {
 
             for idx in 0..facet_count {
                 projections.push(
-                    Subspace::from_point_refs(&self.element_vertices_ref(rank - Rank::new(1), idx).unwrap())
-                        .project(&o),
+                    Subspace::from_point_refs(
+                        &self.element_vertices_ref(rank - Rank::new(1), idx).unwrap(),
+                    )
+                    .project(&o),
                 );
             }
         }
@@ -576,7 +578,7 @@ impl Concrete {
         let flat_vertices = self.flat_vertices();
         let flat_vertices = flat_vertices.as_ref().unwrap_or(&self.vertices);
 
-        if flat_vertices.get(0)?.len() != rank . usize (){
+        if flat_vertices.get(0)?.len() != rank.usize() {
             return None;
         }
 
@@ -591,11 +593,11 @@ impl Concrete {
         vertex_map.push(vertex_list);
 
         // Every other element maps to the vertex of any subelement.
-        for r in Rank::range_inclusive_iter(Rank::new(1),self.rank()) {
+        for r in Rank::range_inclusive_iter(Rank::new(1), self.rank()) {
             let mut element_list = Vec::new();
 
             for el in self[r].iter() {
-                element_list.push(vertex_map[r.usize()-1][el.subs[0]]);
+                element_list.push(vertex_map[r.usize() - 1][el.subs[0]]);
             }
 
             vertex_map.push(element_list);
@@ -610,8 +612,8 @@ impl Concrete {
             if let FlagEvent::Flag(flag) = flag_event {
                 volume += flag.orientation.sign()
                     * Matrix::from_iterator(
-                        rank . usize(),
-                        rank . usize(),
+                        rank.usize(),
+                        rank.usize(),
                         flag.elements
                             .into_iter()
                             .enumerate()
@@ -625,7 +627,7 @@ impl Concrete {
             }
         }
 
-        Some(volume.abs() / (rank . usize()).factorial() as Float)
+        Some(volume.abs() / (rank.usize()).factorial() as Float)
     }
 
     pub fn flat_vertices(&self) -> Option<Vec<Point>> {
@@ -697,7 +699,7 @@ impl Concrete {
         abs.push(ElementList::vertices(vertex_count));
 
         // Takes care of building everything else.
-        for r in Rank::range_iter(Rank::new(2),self.rank()) {
+        for r in Rank::range_iter(Rank::new(2), self.rank()) {
             let mut new_hash_element = HashMap::new();
             let mut new_els = ElementList::new();
 
@@ -844,14 +846,17 @@ impl Concrete {
         let mut edge_types = Vec::with_capacity(types[Rank::new(1)].len());
         for (idx, &edge_type) in types[Rank::new(1)].iter().enumerate() {
             edge_types.push(ElementType {
-                multiplicity: element_types[Rank::new(1)].iter().filter(|&x| *x == idx).count(),
+                multiplicity: element_types[Rank::new(1)]
+                    .iter()
+                    .filter(|&x| *x == idx)
+                    .count(),
                 facet_count: 2,
                 volume: Some(edge_type),
             })
         }
         output.push(edge_types);
 
-        for d in Rank::range_inclusive_iter(Rank::new(2),rank) {
+        for d in Rank::range_inclusive_iter(Rank::new(2), rank) {
             types.push(Vec::new());
             for el in self.abs.ranks[d].iter() {
                 let count = el.subs.len();
@@ -910,7 +915,7 @@ impl Concrete {
         }
         output.push('\n');
 
-        for d in Rank::range_iter(Rank::new(2),self.rank()) {
+        for d in Rank::range_iter(Rank::new(2), self.rank()) {
             output.push_str(&el_names[d].to_string());
             output.push('\n');
             for t in &types[d] {
@@ -1115,7 +1120,7 @@ impl Polytope<Con> for Concrete {
         if rank == Rank::new(-1) {
             Self::nullitope()
         } else {
-            let dim = rank . usize();
+            let dim = rank.usize();
             let mut vertices = Vec::with_capacity(dim + 1);
 
             // Adds all points with a single entry equal to √2/2, and all others

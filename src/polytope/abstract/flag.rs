@@ -246,10 +246,10 @@ impl FlagIter {
 
         if polytope.rank() != Rank::new(-1) {
             // Initializes with any flag from the polytope.
-            let mut flag = Flag::with_capacity(rank . usize());
+            let mut flag = Flag::with_capacity(rank.usize());
             let mut idx = 0;
             flag.elements.push(0);
-            for r in Rank::range_iter(Rank::new(1),rank) {
+            for r in Rank::range_iter(Rank::new(1), rank) {
                 idx = polytope.element_ref(r - Rank::new(1), idx).unwrap().sups[0];
                 flag.elements.push(idx);
             }
@@ -271,7 +271,7 @@ impl FlagIter {
 
     /// Attempts to get the next flag.
     pub fn try_next(&mut self) -> IterResult {
-        let rank = self.polytope.rank() . usize();
+        let rank = self.polytope.rank().usize();
         let new_flag;
 
         if let Some(current) = self.queue.front() {
@@ -359,7 +359,7 @@ impl Iterator for FlagIter {
         let rank = self.polytope.rank();
 
         // A nullitope has no flags.
-        if rank == Rank::new(-1 ){
+        if rank == Rank::new(-1) {
             None
         }
         // A point has a single flag.

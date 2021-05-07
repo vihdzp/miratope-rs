@@ -318,13 +318,13 @@ impl Abstract {
             return false;
         }
 
-        for r in -1..=rank.isize() {
-            let r = Rank::new(r);
-
+        for r in Rank::range_inclusive_iter(Rank::new(-1), rank) {
             for (idx, el) in self[r].iter().enumerate() {
                 for &sub in el.subs.iter() {
-                    if !self[r - Rank::new(-1)][sub].sups.contains(&idx) {
-                        return false;
+                    if let Some(r_minus_one) = r.try_sub(Rank::new(1)) {
+                        if !self[r_minus_one][sub].sups.contains(&idx) {
+                            return false;
+                        }
                     }
                 }
             }

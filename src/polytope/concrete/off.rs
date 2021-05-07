@@ -335,7 +335,7 @@ fn write_vertices(off: &mut String, opt: &OffOptions, vertices: &[Point]) {
     // # Vertices
     if opt.comments {
         off.push_str("\n# ");
-        off.push_str(&element_name(Rank::new( 0)));
+        off.push_str(&element_name(Rank::new(0)));
         off.push('\n');
     }
 
@@ -360,7 +360,7 @@ fn write_faces(
     // # Faces
     if opt.comments {
         let el_name = if rank > 2 {
-            element_name(Rank::new( 2))
+            element_name(Rank::new(2))
         } else {
             COMPONENTS.to_string()
         };
@@ -469,13 +469,13 @@ impl Concrete {
         }
 
         // Writes header.
-        if rank != Rank::new( 3) {
+        if rank != Rank::new(3) {
             off += &rank.to_string();
         }
         off += "OFF\n";
 
         // If we have a nullitope or point on our hands, that is all.
-        if rank < Rank::new( 1) {
+        if rank < Rank::new(1) {
             return off;
         }
 
@@ -486,12 +486,18 @@ impl Concrete {
         write_vertices(&mut off, &opt, vertices);
 
         // Adds faces.
-        if rank >= Rank::new( 2) {
-            write_faces(&mut off, &opt, rank . usize(), &abs[Rank::new( 1)], &abs[Rank::new( 2)]);
+        if rank >= Rank::new(2) {
+            write_faces(
+                &mut off,
+                &opt,
+                rank.usize(),
+                &abs[Rank::new(1)],
+                &abs[Rank::new(2)],
+            );
         }
 
         // Adds the rest of the elements.
-        for r in Rank::range_iter(Rank::new(3),rank) {
+        for r in Rank::range_iter(Rank::new(3), rank) {
             write_els(&mut off, &opt, r, &abs[r]);
         }
 

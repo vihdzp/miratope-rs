@@ -1,6 +1,10 @@
 use std::io::{self, Read};
 
-use crate::{Concrete, geometry::Point, polytope::{Polytope, r#abstract::rank::Rank}};
+use crate::{
+    geometry::Point,
+    polytope::{r#abstract::rank::Rank, Polytope},
+    Concrete,
+};
 
 use xml::{
     attribute::OwnedAttribute,

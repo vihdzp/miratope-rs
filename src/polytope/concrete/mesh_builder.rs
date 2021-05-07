@@ -388,7 +388,12 @@ impl<'a> MeshBuilder<'a> {
     /// Generates the wireframe for a polytope.
     pub fn get_wireframe(&self, projection_type: ProjectionType) -> Mesh {
         let empty_els = ElementList::new();
-        let edges = self.concrete.abs.ranks.get(Rank::new(1)).unwrap_or(&empty_els);
+        let edges = self
+            .concrete
+            .abs
+            .ranks
+            .get(Rank::new(1))
+            .unwrap_or(&empty_els);
         let vertices = self.get_vertex_coords(projection_type);
         let mut indices = Vec::with_capacity(edges.len() * 2);
 

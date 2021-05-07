@@ -5,8 +5,7 @@ use std::{
 };
 
 use crate::{
-    geometry::{Point,
-    Subspace},
+    geometry::{Point, Subspace},
     polytope::{
         concrete::Concrete,
         r#abstract::{
@@ -266,7 +265,7 @@ fn common(el0: &[usize], el1: &[usize]) -> Subelements {
 
 /// Checks whether a given vertex set actually generates a valid d-polytope.
 fn check_subelement(vertices: &[Point], el: &Subelements, rank: Rank) -> bool {
-    let rank = rank . usize();
+    let rank = rank.usize();
 
     // A d-element must have at least d + 1 vertices.
     if el.len() < rank + 1 {
@@ -306,7 +305,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
     // Adds everything else.
     let mut els_verts = facets;
 
-    for r in Rank::range_iter(Rank::new(2),Rank::new(dim as isize)).rev() {
+    for r in Rank::range_iter(Rank::new(2), Rank::new(dim as isize)).rev() {
         let mut subs_map = HashMap::new();
         let len = els_verts.len();
 
