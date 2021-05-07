@@ -127,8 +127,8 @@ impl Flag {
 
         // Determines the common elements between the subelements of the element
         // above and the superelements of the element below.
-        let below = polytope.get_element(r - 1, self[r - 1]).unwrap();
-        let above = polytope.get_element(r + 1, self[r + 1]).unwrap();
+        let below = polytope.element_ref(r - 1, self[r - 1]).unwrap();
+        let above = polytope.element_ref(r + 1, self[r + 1]).unwrap();
         let common = common(&below.sups.0, &above.subs.0);
 
         assert_eq!(
@@ -242,7 +242,7 @@ impl FlagIter {
             let mut idx = 0;
             flag.elements.push(0);
             for r in 1..rank {
-                idx = polytope.get_element(r - 1, idx).unwrap().sups[0];
+                idx = polytope.element_ref(r - 1, idx).unwrap().sups[0];
                 flag.elements.push(idx);
             }
 

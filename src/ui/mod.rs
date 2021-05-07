@@ -238,6 +238,13 @@ pub fn ui(
                         }
                     }
 
+                    // Makes an antiprism out of the current polytope.
+                    if ui.button("Antiprism").clicked() {
+                        for mut p in query.iter_mut() {
+                            *p = p.antiprism();
+                        }
+                    }
+
                     ui.separator();
 
                     // Recenters a polytope.
@@ -436,6 +443,11 @@ pub fn ui(
                 SpecialLibrary::Polygon(n, d) => {
                     if let Some(mut p) = query.iter_mut().next() {
                         *p = Concrete::star_polygon(n, d);
+                    }
+                }
+                SpecialLibrary::Antiprism(n, d) => {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        *p = Concrete::uniform_antiprism(n, d);
                     }
                 }
                 SpecialLibrary::Simplex(rank) => {

@@ -21,6 +21,9 @@ pub enum SpecialLibrary {
     #[strum(serialize = "Regular polygon")]
     Polygon(usize, usize),
 
+    /// Allows one to select a (uniform 3D) antiprism.
+    Antiprism(usize, usize),
+
     /// Allows one to select a simplex.
     Simplex(isize),
 
@@ -37,7 +40,7 @@ impl SpecialLibrary {
         let text = self.to_string();
 
         match self {
-            Self::Polygon(n, d) => {
+            Self::Polygon(n, d) | Self::Antiprism(n, d) => {
                 let mut clicked = false;
 
                 ui.horizontal(|ui| {

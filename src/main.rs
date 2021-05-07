@@ -150,7 +150,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::orthoplex(3);
+    let poly = Concrete::polygon(5).antiprism();
 
     // Disables backface culling.
     pipelines.set_untracked(

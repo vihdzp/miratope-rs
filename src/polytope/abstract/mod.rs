@@ -5,7 +5,9 @@ pub mod rank;
 use std::collections::HashMap;
 
 use self::{
-    elements::{Element, ElementHash, ElementList, Subelements, Subsupelements},
+    elements::{
+        Element, ElementHash, ElementList, Section, SectionHash, Subelements, Subsupelements,
+    },
     flag::{FlagEvent, FlagIter},
     rank::RankVec,
 };
@@ -144,7 +146,7 @@ impl Abstract {
 
     /// Returns a reference to an element of the polytope. To actually get the
     /// entire polytope it defines, use [`element`](Self::element).
-    pub fn get_element(&self, rank: isize, idx: usize) -> Option<&Element> {
+    pub fn element_ref(&self, rank: isize, idx: usize) -> Option<&Element> {
         self.ranks.get(rank)?.get(idx)
     }
 
@@ -154,7 +156,7 @@ impl Abstract {
         Some(ElementHash::from_element(self, rank, idx)?.to_elements(0))
     }
 
-    /// Gets both element with a given rank and index as a polytope and the
+    /// Gets both elements with a given rank and index as a polytope and the
     /// indices of its vertices on the original polytope, if it exists.
     pub fn element_and_vertices(&self, rank: isize, idx: usize) -> Option<(Vec<usize>, Self)> {
         let element_hash = ElementHash::from_element(self, rank, idx)?;
@@ -174,6 +176,108 @@ impl Abstract {
 
     pub fn dual_mut(&mut self) {
         self._dual_mut().unwrap();
+    }
+
+    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
+    /// based on a given polytope. Also returns the indices of the vertices that
+    /// form the base and the dual base, in that order.
+    pub fn antiprism_and_vertices(&self) -> (Self, Vec<usize>, Vec<usize>) {
+        let rank = self.rank();
+        let mut section_hash = SectionHash::singletons(self);
+        let mut backwards_abs = RankVec::with_capacity(rank + 1);
+        backwards_abs.push(ElementList::max(section_hash.len));
+
+        let vertex_count = self.vertex_count();
+        let mut vertices = Vec::with_capacity(vertex_count);
+
+        let facet_count = self.facet_count();
+        let mut dual_vertices = Vec::with_capacity(facet_count);
+
+        // Adds all elements corresponding to sections of a given height.
+        for height in 0..=(rank + 1) {
+            let mut new_section_hash = SectionHash::new(rank, height);
+            let mut elements = ElementList::with_capacity(section_hash.len);
+
+            for _ in 0..section_hash.len {
+                elements.push(Element::new());
+            }
+
+            // Goes over all sections of the previous height, and builds the
+            // sections of the current height by changing the upper element into
+            // one of its superelements.
+            for (rank_lo, map) in section_hash.rank_vec.iter().enumerate() {
+                // The lower and higher ranks of our OLD sections.
+                let rank_lo = rank_lo as isize - 1;
+                let rank_hi = rank_lo + height;
+
+                // The indices for the bottom and top elements and the index in
+                // the antiprism of the old section.
+                for (indices, &idx) in map.iter() {
+                    // Finds all of the superelements of our old section's
+                    // highest element.
+                    for &idx_hi in self.element_ref(rank_hi, indices.1).unwrap().sups.iter() {
+                        // Adds the new sections of the current height, gets
+                        // their index, uses that to build the ElementList.
+                        let sub = new_section_hash.get(Section {
+                            rank_lo,
+                            idx_lo: indices.0,
+                            rank_hi: rank_hi + 1,
+                            idx_hi,
+                        });
+
+                        elements[idx].subs.push(sub);
+                    }
+
+                    // Finds all of the subelements of our old section's
+                    // highest element.
+                    for &idx_lo in self.element_ref(rank_lo, indices.0).unwrap().subs.iter() {
+                        // Adds the new sections of the current height, gets
+                        // their index, uses that to build the ElementList.
+                        let sub = new_section_hash.get(Section {
+                            rank_lo: rank_lo - 1,
+                            idx_lo,
+                            rank_hi,
+                            idx_hi: indices.1,
+                        });
+
+                        elements[idx].subs.push(sub);
+                    }
+                }
+            }
+
+            if height == rank - 1 {
+                for v in 0..vertex_count {
+                    vertices.push(new_section_hash.get(Section {
+                        rank_lo: 0,
+                        idx_lo: v,
+                        rank_hi: rank,
+                        idx_hi: 0,
+                    }));
+                }
+
+                for f in 0..facet_count {
+                    dual_vertices.push(new_section_hash.get(Section {
+                        rank_lo: -1,
+                        idx_lo: 0,
+                        rank_hi: rank - 1,
+                        idx_hi: f,
+                    }));
+                }
+            }
+
+            backwards_abs.push(elements);
+            section_hash = new_section_hash;
+        }
+
+        // We built this backwards, so let's fix it.
+        backwards_abs.reverse();
+        let mut abs = Abstract::with_capacity(backwards_abs.rank());
+
+        for elements in backwards_abs {
+            abs.push_subs(elements);
+        }
+
+        (abs, vertices, dual_vertices)
     }
 
     /// Determines whether the polytope is bounded, i.e. whether it has a single
@@ -629,7 +733,7 @@ impl Polytope<Abs> for Abstract {
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope.
     fn antiprism(&self) -> Self {
-        todo!()
+        self.antiprism_and_vertices().0
     }
 
     /// Determines whether a given polytope is

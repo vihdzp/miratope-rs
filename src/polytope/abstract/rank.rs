@@ -84,13 +84,25 @@ impl<T> std::ops::Index<isize> for RankVec<T> {
     type Output = T;
 
     fn index(&self, index: isize) -> &Self::Output {
-        &self.0[(index + 1) as usize]
+        let rank = self.rank();
+        self.0.get((index + 1) as usize).unwrap_or_else(|| {
+            panic!(
+                "index out of bounds: the rank is {} but the index is {}",
+                rank, index
+            )
+        })
     }
 }
 
 impl<T> std::ops::IndexMut<isize> for RankVec<T> {
     fn index_mut(&mut self, index: isize) -> &mut Self::Output {
-        &mut self.0[(index + 1) as usize]
+        let rank = self.rank();
+        self.0.get_mut((index + 1) as usize).unwrap_or_else(|| {
+            panic!(
+                "index out of bounds: the rank is {} but the index is {}",
+                rank, index
+            )
+        })
     }
 }
 

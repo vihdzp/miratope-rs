@@ -12,8 +12,10 @@ use self::{group::OrdPoint, mesh_builder::MeshBuilder};
 use super::{
     r#abstract::{
         elements::{Element, ElementList, Subelements, Subsupelements},
+        flag::FlagEvent,
         flag::FlagIter,
         rank::RankVec,
+        Abstract,
     },
     Polytope,
 };
@@ -23,7 +25,6 @@ use crate::{
         name::{Con, ConData, NameData, Regular},
         Name,
     },
-    r#abstract::{flag::FlagEvent, Abstract},
     ui::camera::ProjectionType,
     Consts, Float,
 };
@@ -387,6 +388,10 @@ impl Concrete {
             .dual(ConData::new(sphere.center.clone()));
 
         Ok(())
+    }
+
+    pub fn uniform_antiprism(_n: usize, _d: usize) -> Self {
+        todo!()
     }
 
     /// Gets the references to the (geometric) vertices of an element on the
@@ -930,12 +935,7 @@ impl Polytope<Con> for Concrete {
     /// origin.
     fn _dual(&self) -> Option<Self> {
         let mut clone = self.clone();
-
-        if clone.dual_mut().is_ok() {
-            Some(clone)
-        } else {
-            None
-        }
+        clone.dual_mut().ok().map(|_| clone)
     }
 
     /// Builds the dual of a polytope in place, or does nothing in case any
@@ -1048,7 +1048,22 @@ impl Polytope<Con> for Concrete {
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope.
     fn antiprism(&self) -> Self {
-        todo!()
+        let (abs, vertex_indices, dual_vertex_indices) = self.abs.antiprism_and_vertices();
+        let vertex_count = abs.vertex_count();
+        let mut new_vertices = Vec::with_capacity(vertex_count);
+        new_vertices.resize(vertex_count, vec![].into());
+
+        let vertices = &self.vertices;
+        let dual_vertices = &self.dual().unwrap().vertices;
+
+        for (idx, v) in vertices.iter().enumerate() {
+            new_vertices[vertex_indices[idx]] = v.push(0.5);
+        }
+        for (idx, v) in dual_vertices.iter().enumerate() {
+            new_vertices[dual_vertex_indices[idx]] = v.push(-0.5);
+        }
+
+        Self::new(new_vertices, abs)
     }
 
     /// Determines whether a given polytope is
