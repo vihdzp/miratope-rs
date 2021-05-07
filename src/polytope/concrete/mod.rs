@@ -400,7 +400,11 @@ impl Concrete {
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope.
-    fn try_antiprism_with_sphere(&self, sphere: &Hypersphere, height: Float) -> Result<Self,usize> {
+    fn try_antiprism_with_sphere(
+        &self,
+        sphere: &Hypersphere,
+        height: Float,
+    ) -> Result<Self, usize> {
         let vertices = self.vertices.iter().map(|v| v.push(height / 2.0));
         let dual = self.try_dual_with_sphere(sphere)?;
         let dual_vertices = dual.vertices.iter().map(|v| v.push(-height / 2.0));
@@ -1092,7 +1096,7 @@ impl Polytope<Con> for Concrete {
         self.abs.hosotope_mut();
     }
 
-    fn try_antiprism(&self) -> Result<Self,usize> {
+    fn try_antiprism(&self) -> Result<Self, usize> {
         Self::try_antiprism_with_sphere(&self, &Hypersphere::unit(self.dim().unwrap_or(1)), 1.0)
     }
 

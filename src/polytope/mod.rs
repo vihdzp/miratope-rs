@@ -211,7 +211,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope.
-    fn try_antiprism(&self) -> Result<Self,usize>;
+    fn try_antiprism(&self) -> Result<Self, usize>;
 
     fn antiprism(&self) -> Self {
         self.try_antiprism().unwrap()

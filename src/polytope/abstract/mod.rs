@@ -662,7 +662,7 @@ impl Polytope<Abs> for Abstract {
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope. Use [`Self::antiprism`] instead.
-    fn try_antiprism(&self) -> Result<Self,usize> {
+    fn try_antiprism(&self) -> Result<Self, usize> {
         Ok(self.antiprism_and_vertices().0)
     }
 
