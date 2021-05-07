@@ -774,13 +774,11 @@ impl Concrete {
     pub fn from_path(fp: &impl AsRef<std::path::Path>) -> std::io::Result<Self> {
         use std::{ffi::OsStr, fs, io};
 
-        let off = OsStr::new("off");
-        let ggb = OsStr::new("ggb");
         let ext = fp.as_ref().extension();
 
-        if ext == Some(off) {
+        if ext == Some(OsStr::new("off")) {
             Self::from_off(String::from_utf8(fs::read(fp)?).unwrap())
-        } else if ext == Some(ggb) {
+        } else if ext == Some(OsStr::new("ggb")) {
             Self::from_ggb(zip::read::ZipArchive::new(&mut fs::File::open(fp)?)?)
         } else {
             Err(io::Error::new(
@@ -1124,13 +1122,14 @@ impl Polytope<Con> for Concrete {
             // Adds all points with a single entry equal to √2/2, and all others
             // equal to 0.
             for i in 0..dim {
-                let mut v = vec![0.0; dim];
+                let mut v = Point::zeros(dim);
                 v[i] = Float::SQRT_2 / 2.0;
-                vertices.push(v.into());
+                vertices.push(v);
             }
 
             // Adds the remaining vertex, all of whose coordinates are equal.
-            let a = (1.0 - ((dim + 1) as Float).sqrt()) * Float::SQRT_2 / (2.0 * dim as Float);
+            let dim_f = dim as Float;
+            let a = (1.0 - (dim_f + 1.0).sqrt()) * Float::SQRT_2 / (2.0 * dim_f);
             vertices.push(vec![a; dim].into());
 
             let mut simplex = Concrete::new(vertices, Abstract::simplex(rank));

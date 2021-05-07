@@ -211,9 +211,8 @@ impl Abstract {
             // sections of the current height by either changing the upper
             // element into one of its superelements, or changing the lower
             // element into one of its subelements.
-            for (rank_lo, map) in section_hash.rank_vec.iter().enumerate() {
+            for (rank_lo, map) in section_hash.rank_vec.iter().rank_enumerate() {
                 // The lower and higher ranks of our OLD sections.
-                let rank_lo = rank_lo as isize - 1;
                 let rank_hi = rank_lo + height;
 
                 // The indices for the bottom and top elements and the index in

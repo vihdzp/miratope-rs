@@ -1,4 +1,4 @@
-//! Contains the basic code that configures the UI.
+//! All of the code that configures the UI.
 
 pub mod camera;
 pub mod library;
@@ -12,72 +12,12 @@ use crate::{
     Float, OffOptions,
 };
 use camera::ProjectionType;
-use library::Library;
+use library::{Library, ShowResult, SpecialLibrary};
 
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiSettings};
 use rfd::FileDialog;
 use strum::IntoEnumIterator;
-
-use self::library::{ShowResult, SpecialLibrary};
-
-/// Guarantees that file dialogs will be opened on the main thread, used to
-/// circumvent a MacOS limitation that all GUI operations must be done on the
-/// main thread.
-pub struct MainThreadToken(PhantomData<*const ()>);
-
-impl MainThreadToken {
-    /// Initializes a new token.
-    pub fn new() -> Self {
-        Self(Default::default())
-    }
-
-    /// Auxiliary function to create a new file dialog.
-    fn new_file_dialog() -> FileDialog {
-        FileDialog::new()
-            .add_filter("OFF File", &["off"])
-            .add_filter("GGB file", &["ggb"])
-    }
-
-    /// Returns the path given by an open file dialog.
-    fn pick_file(&self) -> Option<PathBuf> {
-        Self::new_file_dialog().pick_file()
-    }
-
-    /// Returns the path given by a save file dialog.
-    fn save_file(&self, name: &str) -> Option<PathBuf> {
-        Self::new_file_dialog().set_file_name(name).save_file()
-    }
-}
-
-enum FileDialogMode {
-    Disabled,
-    Open,
-    Save,
-}
-
-impl Default for FileDialogMode {
-    fn default() -> Self {
-        Self::Disabled
-    }
-}
-
-#[derive(Default)]
-pub struct FileDialogState {
-    mode: FileDialogMode,
-    name: Option<String>,
-}
-
-impl FileDialogState {
-    pub fn open(&mut self) {
-        self.mode = FileDialogMode::Open;
-    }
-
-    pub fn save(&mut self, name: String) {
-        self.mode = FileDialogMode::Save;
-        self.name = Some(name);
-    }
-}
 
 /// Stores the state of the cross-section view.
 pub enum SectionState {
@@ -101,10 +41,12 @@ pub enum SectionState {
 }
 
 impl SectionState {
+    /// Makes the view inactive.
     pub fn reset(&mut self) {
         *self = Self::Inactive;
     }
 
+    /// Sets the position of the hyperplane.
     pub fn set_pos(&mut self, pos: Float) {
         if let Self::Active {
             original_polytope: _,
@@ -117,6 +59,7 @@ impl SectionState {
         }
     }
 
+    /// Sets the flattening setting.
     pub fn set_flat(&mut self, flat: bool) {
         if let Self::Active {
             original_polytope: _,
@@ -136,7 +79,8 @@ impl Default for SectionState {
     }
 }
 
-/// The system in charge of the UI.
+/// The system in charge of the UI. Loads every single thing on screen save for
+/// the polytope itself.
 pub fn ui(
     egui_ctx: ResMut<EguiContext>,
     mut query: Query<&mut Concrete>,
@@ -213,37 +157,29 @@ pub fn ui(
 
                     ui.separator();
 
-                    // Makes a pyramid out of the current polytope.
-                    if ui.button("Pyramid").clicked() {
-                        for mut p in query.iter_mut() {
-                            *p = p.pyramid();
-                        }
+                    macro_rules! operation {
+                        ($name:expr, $operation:ident) => {
+                            if ui.button($name).clicked() {
+                                for mut p in query.iter_mut() {
+                                    *p = p.$operation();
+                                }
 
-                        section_state.reset();
+                                section_state.reset();
+                            }
+                        };
                     }
+
+                    // Makes a pyramid out of the current polytope.
+                    operation!("Pyramid", pyramid);
 
                     // Makes a prism out of the current polytope.
-                    if ui.button("Prism").clicked() {
-                        for mut p in query.iter_mut() {
-                            *p = p.prism();
-                        }
-
-                        section_state.reset();
-                    }
+                    operation!("Prism", prism);
 
                     // Makes a tegum out of the current polytope.
-                    if ui.button("Tegum").clicked() {
-                        for mut p in query.iter_mut() {
-                            *p = p.tegum();
-                        }
-                    }
+                    operation!("Tegum", tegum);
 
                     // Makes an antiprism out of the current polytope.
-                    if ui.button("Antiprism").clicked() {
-                        for mut p in query.iter_mut() {
-                            *p = p.antiprism();
-                        }
-                    }
+                    operation!("Antiprism", antiprism);
 
                     ui.separator();
 
@@ -282,6 +218,7 @@ pub fn ui(
                     }
                 });
 
+                // Operates on the elements of the loaded polytope.
                 ui.collapsing("Elements", |ui| {
                     // Converts the active polytope into any of its facets.
                     if ui.button("Facet").clicked() {
@@ -322,6 +259,7 @@ pub fn ui(
                     }
                 });
 
+                // Prints out properties about the loaded polytope.
                 ui.collapsing("Properties", |ui| {
                     // Determines whether the polytope is orientable.
                     if ui.button("Orientability").clicked() {
@@ -420,6 +358,7 @@ pub fn ui(
         }
     });
 
+    // Shows the polytope library.
     egui::SidePanel::left("side_panel", 350.0).show(ctx, |ui| {
         match library.show_root(ui, *selected_language) {
             // No action needs to be taken.
@@ -470,6 +409,80 @@ pub fn ui(
     });
 }
 
+/// Contains all operations that manipulate file dialogs concretely.
+///
+/// Guarantees that file dialogs will be opened on the main thread, so as to
+/// circumvent a MacOS limitation that all GUI operations must be done on the
+/// main thread.
+pub struct MainThreadToken(PhantomData<*const ()>);
+
+impl MainThreadToken {
+    /// Initializes a new token.
+    pub fn new() -> Self {
+        Self(Default::default())
+    }
+
+    /// Auxiliary function to create a new file dialog.
+    fn new_file_dialog() -> FileDialog {
+        FileDialog::new()
+            .add_filter("OFF File", &["off"])
+            .add_filter("GGB file", &["ggb"])
+    }
+
+    /// Returns the path given by an open file dialog.
+    fn pick_file(&self) -> Option<PathBuf> {
+        Self::new_file_dialog().pick_file()
+    }
+
+    /// Returns the path given by a save file dialog.
+    fn save_file(&self, name: &str) -> Option<PathBuf> {
+        Self::new_file_dialog().set_file_name(name).save_file()
+    }
+}
+
+/// The type of file dialog we're showing.
+enum FileDialogMode {
+    /// We're not currently showing any file dialog.
+    Disabled,
+
+    /// We're showing a file dialog to open a file.
+    Open,
+
+    /// We're showing a file dialog to save a file.
+    Save,
+}
+
+impl Default for FileDialogMode {
+    fn default() -> Self {
+        Self::Disabled
+    }
+}
+
+/// The state the file dialog is in.
+#[derive(Default)]
+pub struct FileDialogState {
+    /// The file dialog mode.
+    mode: FileDialogMode,
+
+    /// The name of the file to load or save, if any.
+    name: Option<String>,
+}
+
+impl FileDialogState {
+    /// Changes the file dialog mode to [`FileDialogMode::Open`].
+    pub fn open(&mut self) {
+        self.mode = FileDialogMode::Open;
+    }
+
+    /// Changes the file dialog mode to [`FileDialogMode::Save`], and loads the
+    /// name of the file.
+    pub fn save(&mut self, name: String) {
+        self.mode = FileDialogMode::Save;
+        self.name = Some(name);
+    }
+}
+
+/// The system in charge of showing the file dialog.
 pub fn file_dialog(
     mut query: Query<&mut Concrete>,
     file_dialog_state: ResMut<FileDialogState>,
@@ -478,6 +491,7 @@ pub fn file_dialog(
 ) {
     if file_dialog_state.is_changed() {
         match file_dialog_state.mode {
+            // We want to save a file.
             FileDialogMode::Save => {
                 if let Some(path) = token.save_file(file_dialog_state.name.as_ref().unwrap()) {
                     for p in query.iter_mut() {
@@ -485,6 +499,7 @@ pub fn file_dialog(
                     }
                 }
             }
+            // We want to open a file.
             FileDialogMode::Open => {
                 if let Some(path) = token.pick_file() {
                     for mut p in query.iter_mut() {
@@ -495,7 +510,7 @@ pub fn file_dialog(
                     section_state.reset();
                 }
             }
-            _ => {}
+            FileDialogMode::Disabled => {}
         }
     }
 }
@@ -567,6 +582,7 @@ pub fn update_cross_section(mut query: Query<&mut Concrete>, state: Res<SectionS
     }
 }
 
+/// Updates the selected language.
 pub fn update_language(
     mut polies: Query<&Concrete>,
     mut windows: ResMut<Windows>,

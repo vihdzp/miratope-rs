@@ -220,6 +220,9 @@ impl Element {
 
 /// A list of [`Elements`](Element) of the same
 /// [rank](https://polytope.miraheze.org/wiki/Rank).
+///
+/// # How to use?
+///
 #[derive(Debug, Clone)]
 pub struct ElementList(pub Vec<Element>);
 
@@ -298,10 +301,6 @@ impl ElementList {
 
     pub fn push(&mut self, value: Element) {
         self.0.push(value)
-    }
-
-    pub fn into_iter(self) -> std::vec::IntoIter<Element> {
-        self.0.into_iter()
     }
 }
 

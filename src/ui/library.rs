@@ -40,6 +40,7 @@ impl SpecialLibrary {
         let text = self.to_string();
 
         match self {
+            // An {n/d} regular polygon.
             Self::Polygon(n, d) => {
                 let mut clicked = false;
 

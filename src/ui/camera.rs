@@ -1,7 +1,5 @@
 //! Contains the methods to setup the camera.
 
-use std::borrow::BorrowMut;
-
 use bevy::{
     input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
     prelude::*,
@@ -257,11 +255,7 @@ fn update_cameras_and_anchors(
                 unsafe { q.get_component_unchecked_mut::<Transform>(parent.0) }
             {
                 for event in events.iter() {
-                    event.update_camera_and_anchor(
-                        anchor_tf.borrow_mut(),
-                        cam_tf.borrow_mut(),
-                        cam_gtf,
-                    );
+                    event.update_camera_and_anchor(&mut anchor_tf, &mut cam_tf, cam_gtf);
                 }
             }
         }
