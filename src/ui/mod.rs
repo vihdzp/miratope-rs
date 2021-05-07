@@ -178,8 +178,20 @@ pub fn ui(
                     // Makes a tegum out of the current polytope.
                     operation!("Tegum", tegum);
 
-                    // Makes an antiprism out of the current polytope.
-                    operation!("Antiprism", antiprism);
+                    // Converts the active polytope into its antiprism.
+                    if ui.button("Antiprism").clicked() {
+                        for mut p in query.iter_mut() {
+                            match p.try_antiprism() {
+                                Ok(q) => *p = q,
+                                Err(idx) => println!(
+                                    "Dual failed: Facet {} passes through inversion center.",
+                                    idx
+                                ),
+                            }
+
+                            section_state.reset();
+                        }
+                    }
 
                     ui.separator();
 

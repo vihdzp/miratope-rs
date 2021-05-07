@@ -60,11 +60,7 @@ impl SpecialLibrary {
 
                     // Turning number.
                     ui.label("d:");
-                    ui.add(
-                        egui::DragValue::new(d)
-                            .speed(0.25)
-                            .clamp_range(1..=(*n - 1)),
-                    );
+                    ui.add(egui::DragValue::new(d).speed(0.25).clamp_range(1..=*n / 2));
                 });
 
                 if clicked {

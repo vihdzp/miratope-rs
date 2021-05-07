@@ -378,11 +378,11 @@ impl Concrete {
         self.try_dual_mut_with_sphere(sphere).unwrap()
     }
 
-    fn try_antiprism_with_vertices<T: Iterator<Item = Point>, U: Iterator<Item = Point>>(
+    fn antiprism_with_vertices<T: Iterator<Item = Point>, U: Iterator<Item = Point>>(
         &self,
         vertices: T,
         dual_vertices: U,
-    ) -> Option<Self> {
+    ) -> Self {
         let (abs, vertex_indices, dual_vertex_indices) = self.abs.antiprism_and_vertices();
         let vertex_count = abs.vertex_count();
         let mut new_vertices = Vec::with_capacity(vertex_count);
@@ -395,26 +395,17 @@ impl Concrete {
             new_vertices[dual_vertex_indices[idx]] = v;
         }
 
-        Some(Self::new(new_vertices, abs))
-    }
-
-    fn antiprism_with_vertices<T: Iterator<Item = Point>, U: Iterator<Item = Point>>(
-        &self,
-        vertices: T,
-        dual_vertices: U,
-    ) -> Self {
-        self.try_antiprism_with_vertices(vertices, dual_vertices)
-            .unwrap()
+        Self::new(new_vertices, abs)
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope.
-    fn try_antiprism_with_sphere(&self, sphere: &Hypersphere, height: Float) -> Option<Self> {
+    fn try_antiprism_with_sphere(&self, sphere: &Hypersphere, height: Float) -> Result<Self,usize> {
         let vertices = self.vertices.iter().map(|v| v.push(height / 2.0));
-        let dual = self.try_dual_with_sphere(sphere).ok()?;
+        let dual = self.try_dual_with_sphere(sphere)?;
         let dual_vertices = dual.vertices.iter().map(|v| v.push(-height / 2.0));
 
-        self.try_antiprism_with_vertices(vertices, dual_vertices)
+        Ok(self.antiprism_with_vertices(vertices, dual_vertices))
     }
 
     fn antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Self {
@@ -1101,7 +1092,7 @@ impl Polytope<Con> for Concrete {
         self.abs.hosotope_mut();
     }
 
-    fn try_antiprism(&self) -> Option<Self> {
+    fn try_antiprism(&self) -> Result<Self,usize> {
         Self::try_antiprism_with_sphere(&self, &Hypersphere::unit(self.dim().unwrap_or(1)), 1.0)
     }
 

@@ -661,9 +661,9 @@ impl Polytope<Abs> for Abstract {
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
-    /// based on a given polytope. Use antiprism instead.
-    fn try_antiprism(&self) -> Option<Self> {
-        Some(self.antiprism_and_vertices().0)
+    /// based on a given polytope. Use [`Self::antiprism`] instead.
+    fn try_antiprism(&self) -> Result<Self,usize> {
+        Ok(self.antiprism_and_vertices().0)
     }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
