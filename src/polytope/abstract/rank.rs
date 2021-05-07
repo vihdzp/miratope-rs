@@ -96,6 +96,12 @@ impl std::ops::Sub for Rank {
     }
 }
 
+impl From<usize> for Rank {
+    fn from(rank: usize) -> Self {
+        Self(rank + 1)
+    }
+}
+
 impl Display for Rank {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.isize().fmt(f)

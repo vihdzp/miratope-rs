@@ -106,7 +106,7 @@ impl Flag {
     /// Gets the index of the element stored at a given rank, whilst pretending
     /// that the flag contains a minimal and maximal element.
     pub fn get(&self, rank: Rank) -> Option<&usize> {
-        if rank == Rank::new(-1) || rank == Rank::new(self.elements.len() as isize) {
+        if rank == Rank::new(-1) || rank == Rank::from(self.elements.len()) {
             Some(&0)
         } else {
             self.elements.get(rank.usize())
@@ -127,7 +127,7 @@ impl Flag {
             return;
         }
 
-        let r = Rank::new(r as isize);
+        let r = Rank::from(r);
 
         // Determines the common elements between the subelements of the element
         // above and the superelements of the element below.
