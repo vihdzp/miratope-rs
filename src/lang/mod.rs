@@ -77,12 +77,12 @@ pub use en::En;
 pub use es::Es;
 pub use fr::Fr;
 pub use ja::Ja;
-pub use name::Name;
 pub use pii::Pii;
 
-use crate::{lang::name::NameData, polytope::r#abstract::rank::Rank};
-
-use self::name::NameType;
+use crate::{
+    lang::name::{Name, NameData, NameType},
+    polytope::r#abstract::rank::Rank,
+};
 
 use strum_macros::EnumIter;
 

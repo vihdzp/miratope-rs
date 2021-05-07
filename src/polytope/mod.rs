@@ -11,8 +11,8 @@ use self::r#abstract::{
 };
 use crate::lang::{
     self,
-    name::{NameData, NameType, Regular},
-    Language, Name,
+    name::{Name, NameData, NameType, Regular},
+    Language,
 };
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
@@ -62,7 +62,10 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// The number of facets on the polytope.
     fn facet_count(&self) -> usize {
-        self.el_count(self.rank() - Rank::new(1))
+        self.rank()
+            .try_sub(Rank::new(1))
+            .map(|r| self.el_count(r))
+            .unwrap_or(0)
     }
 
     /// Returns an instance of the

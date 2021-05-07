@@ -80,7 +80,7 @@ use lang::SelectedLanguage;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
 #[allow(unused_imports)]
-use lang::{name::Con, Language, Name, Options};
+use lang::{name::Con, name::Name, Language, Options};
 #[allow(unused_imports)]
 use polytope::{
     concrete::{off::*, Concrete},

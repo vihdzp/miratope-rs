@@ -1,5 +1,8 @@
 use crate::{
-    lang::{name::NameType, Gender, Name},
+    lang::{
+        name::{Name, NameType},
+        Gender,
+    },
     polytope::r#abstract::rank::Rank,
 };
 

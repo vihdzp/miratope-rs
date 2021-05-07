@@ -102,6 +102,7 @@ impl Display for Rank {
     }
 }
 
+/// Allows for `Rank` to be used in sliders.
 impl bevy_egui::egui::emath::Numeric for Rank {
     const INTEGRAL: bool = true;
 

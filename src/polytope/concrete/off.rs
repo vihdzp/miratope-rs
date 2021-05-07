@@ -2,7 +2,7 @@ use std::{collections::HashMap, fs, io, path::Path, str::FromStr};
 
 use super::{Abstract, Concrete, Element, ElementList, Point, Polytope, RankVec, Subelements};
 use crate::{
-    lang::{name::Con, Name},
+    lang::name::{Con, Name},
     polytope::{
         r#abstract::{elements::Subsupelements, rank::Rank},
         COMPONENTS, ELEMENT_NAMES,

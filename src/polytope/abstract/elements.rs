@@ -483,10 +483,8 @@ impl SectionHash {
     /// in a polytope with a given rank.
     pub fn new(rank: Rank, height: Rank) -> Self {
         let mut rank_vec = RankVec::new();
-        if let Some(max_rank) = rank.try_sub(height + Rank::new(1)) {
-            for _ in Rank::range_inclusive_iter(Rank::new(-1), max_rank) {
-                rank_vec.push(HashMap::new());
-            }
+        for _ in Rank::range_iter(Rank::new(-1), rank - height) {
+            rank_vec.push(HashMap::new());
         }
 
         Self { rank_vec, len: 0 }

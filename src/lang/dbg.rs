@@ -1,7 +1,10 @@
 //! A language we can use for debugging.
 
-use super::{Language, Name, Options, Prefix};
-use crate::{lang::name::NameType, polytope::r#abstract::rank::Rank};
+use super::{
+    name::{Name, NameType},
+    Language, Options, Prefix,
+};
+use crate::polytope::r#abstract::rank::Rank;
 
 pub struct Dbg;
 

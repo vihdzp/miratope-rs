@@ -9,7 +9,10 @@ use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 
 use crate::{
-    lang::{name::Con, Name as LangName, SelectedLanguage},
+    lang::{
+        name::{Con, Name as LangName},
+        SelectedLanguage,
+    },
     polytope::{concrete::Concrete, r#abstract::rank::Rank},
 };
 

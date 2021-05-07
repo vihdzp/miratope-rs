@@ -20,10 +20,7 @@ use super::{
 };
 use crate::{
     geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace},
-    lang::{
-        name::{Con, ConData, NameData, Regular},
-        Name,
-    },
+    lang::name::{Con, ConData, Name, NameData, Regular},
     ui::camera::ProjectionType,
     Consts, Float,
 };

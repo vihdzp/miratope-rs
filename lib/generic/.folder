@@ -1,1 +1,1 @@
-[Special(Simplex(3)),Special(Hypercube(3)),Special(Orthoplex(3))]
+[Special(Simplex(Rank(4))),Special(Hypercube(Rank(4))),Special(Orthoplex(Rank(4)))]

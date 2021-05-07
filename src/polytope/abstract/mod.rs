@@ -12,10 +12,7 @@ use self::{
     rank::{Rank, RankVec},
 };
 use super::Polytope;
-use crate::lang::{
-    name::{Abs, AbsData},
-    Name,
-};
+use crate::lang::name::{Abs, AbsData, Name};
 
 /// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
 /// to an [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
