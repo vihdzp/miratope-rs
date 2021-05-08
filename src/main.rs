@@ -28,8 +28,8 @@
 //! Miratope's user interface is still a work in progress, so you'll have to
 //! download the source code to do much of anything. Miratope is written in the
 //! latest version of Rust. Download instructions can be found here:
-//! [https://www.rust-lang.org/tools/install]. **You may have to restart your
-//! computer for Rust to fully install**.
+//! [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install).
+//! **You may have to restart your computer for Rust to fully install**.
 //!
 //! 1. Once you have Rust set up, click the green button here on Github that
 //!    says "Code".
