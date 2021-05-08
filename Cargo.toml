@@ -1,6 +1,9 @@
 [package]
 name = "miratope"
+description = "A polytope renderer and builder."
+license = "MIT"
 version = "0.1.0"
+repository = "https://github.com/OfficialURL/miratope-rs"
 authors = ["Violeta Hernández <vi.hdz.p@gmail.com>", "Grayson Burton <ocornoc@protonmail.com>", "Roman Salinas <ultraroman01@gmail.com>"]
 edition = "2018"
 
