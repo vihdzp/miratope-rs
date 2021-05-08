@@ -83,6 +83,14 @@ impl Concrete {
         Some(self.vertices.get(0)?.len())
     }
 
+    pub fn dyad_with(height: Float) -> Self {
+        Self::new(
+            vec![vec![-height / 2.0].into(), vec![height / 2.0].into()],
+            Abstract::dyad(),
+        )
+        .with_name(Name::Dyad)
+    }
+
     /// Builds the Grünbaumian star polygon `{n / d}` with unit circumradius,
     /// rotated by an angle.
     fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: Float) -> Self {
@@ -305,20 +313,20 @@ impl Concrete {
 
     /// Returns the dual of a polytope with a given reciprocation sphere, or
     /// `None` if any facets pass through the reciprocation center.
-    pub fn try_dual_with_sphere(&self, sphere: &Hypersphere) -> Result<Self, usize> {
+    pub fn try_dual_with(&self, sphere: &Hypersphere) -> Result<Self, usize> {
         let mut clone = self.clone();
-        clone.try_dual_mut_with_sphere(sphere).map(|_| clone)
+        clone.try_dual_mut_with(sphere).map(|_| clone)
     }
 
-    pub fn dual_with_sphere(&self, sphere: &Hypersphere) -> Self {
-        self.try_dual_with_sphere(sphere).unwrap()
+    pub fn dual_with(&self, sphere: &Hypersphere) -> Self {
+        self.try_dual_with(sphere).unwrap()
     }
 
     /// Builds the dual of a polytope with a given reciprocation sphere in
     /// place, or does nothing in case any facets go through the reciprocation
     /// center. In case of failure, returns the index of the facet through the
     /// projection center.
-    pub fn try_dual_mut_with_sphere(&mut self, sphere: &Hypersphere) -> Result<(), usize> {
+    pub fn try_dual_mut_with(&mut self, sphere: &Hypersphere) -> Result<(), usize> {
         // If we're dealing with a nullitope, the dual is itself.
         let rank = self.rank();
         if rank == Rank::new(-1) {
@@ -340,13 +348,13 @@ impl Concrete {
 
         // We project our inversion center onto each of the facets.
         if rank >= Rank::new(2) {
-            let facet_count = self.el_count(rank - Rank::new(1));
+            let facet_count = self.el_count(rank.minus_one());
             projections = Vec::with_capacity(facet_count);
 
             for idx in 0..facet_count {
                 projections.push(
                     Subspace::from_point_refs(
-                        &self.element_vertices_ref(rank - Rank::new(1), idx).unwrap(),
+                        &self.element_vertices_ref(rank.minus_one(), idx).unwrap(),
                     )
                     .project(&o),
                 );
@@ -374,8 +382,16 @@ impl Concrete {
         Ok(())
     }
 
-    pub fn dual_mut_with_sphere(&mut self, sphere: &Hypersphere) {
-        self.try_dual_mut_with_sphere(sphere).unwrap()
+    pub fn dual_mut_with(&mut self, sphere: &Hypersphere) {
+        self.try_dual_mut_with(sphere).unwrap()
+    }
+
+    pub fn prism_with(&self, height: Float) -> Self {
+        Self::duoprism(self, &Self::dyad_with(height)).with_name(Name::prism(self.name().clone()))
+    }
+
+    pub fn uniform_prism(n: usize, d: usize) -> Self {
+        Concrete::star_polygon(n, d).prism_with(2.0 * (Float::PI * d as Float / n as Float).sin())
     }
 
     fn antiprism_with_vertices<T: Iterator<Item = Point>, U: Iterator<Item = Point>>(
@@ -400,27 +416,19 @@ impl Concrete {
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope.
-    fn try_antiprism_with_sphere(
-        &self,
-        sphere: &Hypersphere,
-        height: Float,
-    ) -> Result<Self, usize> {
+    fn try_antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Result<Self, usize> {
         let vertices = self.vertices.iter().map(|v| v.push(height / 2.0));
-        let dual = self.try_dual_with_sphere(sphere)?;
+        let dual = self.try_dual_with(sphere)?;
         let dual_vertices = dual.vertices.iter().map(|v| v.push(-height / 2.0));
 
         Ok(self.antiprism_with_vertices(vertices, dual_vertices))
     }
 
     fn antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Self {
-        self.try_antiprism_with_sphere(sphere, height).unwrap()
+        self.try_antiprism_with(sphere, height).unwrap()
     }
 
-    pub fn uniform_antiprism(n: usize) -> Self {
-        Concrete::uniform_star_antiprism(n, 1)
-    }
-
-    pub fn uniform_star_antiprism(n: usize, d: usize) -> Self {
+    pub fn uniform_antiprism(n: usize, d: usize) -> Self {
         let polygon = Concrete::star_polygon(n, d);
 
         // Appropriately scaled antiprism.
@@ -697,7 +705,7 @@ impl Concrete {
 
             for (idx, el) in self[r].iter().enumerate() {
                 let mut new_subs = Subelements::new();
-                for sub in el.subs.iter() {
+                for sub in &el.subs {
                     if let Some(&v) = hash_element.get(sub) {
                         new_subs.push(v);
                     }
@@ -969,7 +977,7 @@ impl Polytope<Con> for Concrete {
 
     /// Builds a dyad with unit edge length.
     fn dyad() -> Self {
-        Self::new(vec![vec![-0.5].into(), vec![0.5].into()], Abstract::dyad()).with_name(Name::Dyad)
+        Self::dyad_with(1.0)
     }
 
     /// Builds a convex regular polygon with `n` sides and unit edge length.
@@ -993,7 +1001,7 @@ impl Polytope<Con> for Concrete {
     /// facets go through the origin. Returns the dual if successful, and `None`
     /// otherwise.
     fn try_dual_mut(&mut self) -> Result<(), usize> {
-        self.try_dual_mut_with_sphere(&Hypersphere::unit(self.dim().unwrap_or(1)))
+        self.try_dual_mut_with(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
@@ -1097,7 +1105,7 @@ impl Polytope<Con> for Concrete {
     }
 
     fn try_antiprism(&self) -> Result<Self, usize> {
-        Self::try_antiprism_with_sphere(&self, &Hypersphere::unit(self.dim().unwrap_or(1)), 1.0)
+        Self::try_antiprism_with(&self, &Hypersphere::unit(self.dim().unwrap_or(1)), 1.0)
     }
 
     /// Determines whether a given polytope is

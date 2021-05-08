@@ -128,25 +128,25 @@ impl Flag {
         }
 
         let r = Rank::from(r);
+        let r_minus_one = r.minus_one();
+        let r_plus_one = r.plus_one();
 
         // Determines the common elements between the subelements of the element
         // above and the superelements of the element below.
         let below = polytope
-            .element_ref(r - Rank::new(1), self[r - Rank::new(1)])
+            .element_ref(r_minus_one, self[r_minus_one])
             .unwrap();
-        let above = polytope
-            .element_ref(r + Rank::new(1), self[r + Rank::new(1)])
-            .unwrap();
+        let above = polytope.element_ref(r_plus_one, self[r_plus_one]).unwrap();
         let common = common(&below.sups.0, &above.subs.0);
 
         assert_eq!(
             common.len(),
             2,
             "Diamond property fails between rank {}, index {}, and rank {}, index {}.",
-            r - Rank::new(1),
-            self[r - Rank::new(1)],
-            r + Rank::new(1),
-            self[r + Rank::new(1)]
+            r_minus_one,
+            self[r_minus_one],
+            r_plus_one,
+            self[r_plus_one]
         );
 
         // Changes the element at idx to the other element in the section
@@ -250,7 +250,7 @@ impl FlagIter {
             let mut idx = 0;
             flag.elements.push(0);
             for r in Rank::range_iter(Rank::new(1), rank) {
-                idx = polytope.element_ref(r - Rank::new(1), idx).unwrap().sups[0];
+                idx = polytope.element_ref(r.minus_one(), idx).unwrap().sups[0];
                 flag.elements.push(idx);
             }
 

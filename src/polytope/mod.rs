@@ -23,6 +23,10 @@ const ELEMENT_NAMES: [&str; 11] = [
 /// The word "Components".
 const COMPONENTS: &str = "Components";
 
+/// The result of taking a dual: can either be a success value of `T`, or the
+/// index of a facet through the inversion center.
+type DualResult<T> = Result<T, usize>;
+
 /// The trait for methods common to all polytopes.
 pub trait Polytope<T: NameType>: Sized + Clone {
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
@@ -90,7 +94,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// Returns the dual of a polytope. Never fails for an abstract polytope. In
     /// case of failing on a concrete polytope, returns the index of a facet
     /// through the inversion center.
-    fn try_dual(&self) -> Result<Self, usize>;
+    fn try_dual(&self) -> DualResult<Self>;
 
     fn dual(&self) -> Self {
         self.try_dual().unwrap()
@@ -99,7 +103,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// Builds the dual of a polytope in place. Never fails for an abstract
     /// polytope. In case of failing on a concrete polytope, returns the index
     /// of a facet through the inversion center and does nothing.
-    fn try_dual_mut(&mut self) -> Result<(), usize>;
+    fn try_dual_mut(&mut self) -> DualResult<()>;
 
     fn dual_mut(&mut self) {
         self.try_dual_mut().unwrap();
@@ -113,28 +117,44 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     fn element(&self, rank: Rank, idx: usize) -> Option<Self>;
 
     /// Gets the element figure with a given rank and index as a polytope.
-    fn element_fig(&self, rank: Rank, idx: usize) -> Option<Self> {
-        let mut element_fig = self
-            .try_dual()
-            .ok()?
-            .element(self.rank() - rank - Rank::new(1), idx)?;
-        element_fig.try_dual_mut().ok().map(|_| element_fig)
+    fn element_fig(&self, rank: Rank, idx: usize) -> DualResult<Option<Self>> {
+        Ok(
+            if let Some(mut element_fig) = self
+                .try_dual()?
+                .element(self.rank().minus_one() - rank, idx)
+            {
+                element_fig.try_dual_mut()?;
+                Some(element_fig)
+            } else {
+                None
+            },
+        )
     }
 
     /// Gets the section defined by two elements with given ranks and indices as
     /// a polytope, or returns `None` in case no section is defined by these
     /// elements.
-    fn section(&self, rank_lo: Rank, idx_lo: usize, rank_hi: Rank, idx_hi: usize) -> Option<Self> {
-        self.element(rank_hi, idx_hi)?.element_fig(rank_lo, idx_lo)
+    fn section(
+        &self,
+        rank_lo: Rank,
+        idx_lo: usize,
+        rank_hi: Rank,
+        idx_hi: usize,
+    ) -> DualResult<Option<Self>> {
+        Ok(if let Some(el) = self.element(rank_hi, idx_hi) {
+            el.element_fig(rank_lo, idx_lo)?
+        } else {
+            None
+        })
     }
 
     /// Gets the facet associated to the element of a given index as a polytope.
     fn facet(&self, idx: usize) -> Option<Self> {
-        self.element(self.rank() - Rank::new(1), idx)
+        self.element(self.rank().minus_one(), idx)
     }
 
     /// Gets the verf associated to the element of a given index as a polytope.
-    fn verf(&self, idx: usize) -> Option<Self> {
+    fn verf(&self, idx: usize) -> Result<Option<Self>, usize> {
         self.element_fig(Rank::new(0), idx)
     }
 

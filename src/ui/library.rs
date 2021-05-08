@@ -24,6 +24,9 @@ pub enum SpecialLibrary {
     #[strum(serialize = "Regular polygon")]
     Polygon(usize, usize),
 
+    /// Allows one to select a (uniform 3D) prism.
+    Prism(usize, usize),
+
     /// Allows one to select a (uniform 3D) antiprism.
     Antiprism(usize, usize),
 
@@ -43,8 +46,8 @@ impl SpecialLibrary {
         let text = self.to_string();
 
         match self {
-            // An {n/d} regular polygon.
-            Self::Polygon(n, d) => {
+            // An {n/d} regular polygon or uniform polygonal prism.
+            Self::Polygon(n, d) | Self::Prism(n, d) => {
                 let mut clicked = false;
 
                 ui.horizontal(|ui| {

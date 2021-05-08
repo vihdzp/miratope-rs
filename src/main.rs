@@ -79,17 +79,15 @@ use bevy_egui::EguiPlugin;
 use lang::SelectedLanguage;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
-#[allow(unused_imports)]
-use lang::{name::Con, name::Name, Language, Options};
-#[allow(unused_imports)]
 use polytope::{
-    concrete::{off::*, Concrete},
-    Polytope, *,
+    concrete::{off::OffOptions, Concrete},
+    r#abstract::rank::Rank,
+    Polytope,
 };
 use ui::{
     camera::{CameraInputEvent, ProjectionType},
     library::Library,
-    *,
+    FileDialogState, SectionState,
 };
 
 mod geometry;
@@ -166,7 +164,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::dyad();
+    let poly = Concrete::hypercube(Rank::new(3));
 
     // Disables backface culling.
     pipelines.set_untracked(

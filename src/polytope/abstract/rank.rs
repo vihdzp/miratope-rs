@@ -46,6 +46,18 @@ impl Rank {
         self.isize() as f64
     }
 
+    /// Adds one to the rank.
+    pub const fn plus_one(&self) -> Self {
+        Self(self.0 + 1)
+    }
+
+    /// Subtracts one from the rank.
+    pub const fn minus_one(&self) -> Self {
+        Self(self.0 - 1)
+    }
+
+    /// Returns an iterator over `lo..hi`. A workaround until `Step` is
+    /// stabilized.
     pub fn range_iter(
         lo: Rank,
         hi: Rank,
@@ -53,6 +65,8 @@ impl Rank {
         (lo.0..hi.0).into_iter().map(Rank)
     }
 
+    /// Returns an iterator over `lo..=hi`. A workaround until `Step` is
+    /// stabilized.
     pub fn range_inclusive_iter(
         lo: Rank,
         hi: Rank,
@@ -61,7 +75,7 @@ impl Rank {
     }
 
     /// Subtraction with bounds checking.
-    pub fn try_sub(&self, rhs: Self) -> Option<Self> {
+    pub const fn try_sub(&self, rhs: Self) -> Option<Self> {
         let lhs = self.0 + 1;
         let rhs = rhs.0;
 
@@ -73,6 +87,7 @@ impl Rank {
     }
 }
 
+/// Adds two ranks.
 impl std::ops::Add for Rank {
     type Output = Self;
 
@@ -81,6 +96,7 @@ impl std::ops::Add for Rank {
     }
 }
 
+/// Adds a rank to another.
 impl std::ops::AddAssign for Rank {
     fn add_assign(&mut self, rhs: Self) {
         self.0 += rhs.0;
@@ -88,6 +104,7 @@ impl std::ops::AddAssign for Rank {
     }
 }
 
+/// Subtracts two ranks.
 impl std::ops::Sub for Rank {
     type Output = Self;
 
@@ -96,12 +113,14 @@ impl std::ops::Sub for Rank {
     }
 }
 
+/// Converts a `usize` into a `Rank`.
 impl From<usize> for Rank {
     fn from(rank: usize) -> Self {
         Self(rank + 1)
     }
 }
 
+/// Displays a rank as its `isize` value.
 impl Display for Rank {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.isize().fmt(f)
@@ -136,6 +155,7 @@ impl<T> RankVec<T> {
         RankVec(Vec::new())
     }
 
+    /// Determines if the `RankVec<T>` is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -145,16 +165,15 @@ impl<T> RankVec<T> {
         RankVec(Vec::with_capacity(rank.0 + 1))
     }
 
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Returns the greatest rank stored in the array. Panics if the `RankVec`
-    /// is empty.
+    /// Returns the greatest rank stored in the array.
+    ///
+    /// # Panics
+    /// Panics if the `RankVec<T>` is empty.
     pub fn rank(&self) -> Rank {
-        Rank(self.len() - 1)
+        Rank(self.0.len() - 1)
     }
 
+    /// Pushes a value onto the `RankVec<T>`.
     pub fn push(&mut self, value: T) {
         self.0.push(value)
     }
@@ -171,18 +190,22 @@ impl<T> RankVec<T> {
         self.0.get_mut(index.0)
     }
 
+    /// Returns the last element of the `RankVec<T>`, or `None` if it is empty.
     pub fn last(&self) -> Option<&T> {
         self.0.last()
     }
 
+    /// Returns an iterator over the `RankVec<T>`.
     pub fn iter(&self) -> Iter<T> {
         Iter(self.0.iter())
     }
 
+    /// Returns an iterator that allows modifying each value.
     pub fn iter_mut(&mut self) -> IterMut<T> {
         IterMut(self.0.iter_mut())
     }
 
+    /// Reverses the order of elements in the `RankVec<T>`, in place.
     pub fn reverse(&mut self) {
         self.0.reverse()
     }
@@ -192,7 +215,7 @@ impl<T> RankVec<T> {
         self.0.split_at_mut(mid.0)
     }
 
-    /// Swaps two elements in the vector.
+    /// Swaps two elements in the `RankVec<T>`.
     pub fn swap(&mut self, a: Rank, b: Rank) {
         self.0.swap(a.0, b.0);
     }
@@ -204,6 +227,7 @@ impl<T> RankVec<T> {
     }
 }
 
+/// Allows indexing a `RankVec<T>` by a `Rank`.
 impl<T> std::ops::Index<Rank> for RankVec<T> {
     type Output = T;
 
@@ -218,6 +242,7 @@ impl<T> std::ops::Index<Rank> for RankVec<T> {
     }
 }
 
+/// Allows mutably indexing a `RankVec<T>` by a `Rank`.
 impl<T> std::ops::IndexMut<Rank> for RankVec<T> {
     fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
         let rank = self.rank();
@@ -309,5 +334,20 @@ impl<T> IntoIter<T> {
         impl FnMut((usize, T)) -> (Rank, T),
     > {
         self.0.enumerate().map(|(idx, t)| (Rank(idx), t))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    /// Checks that rank arithmetic is in order.
+    fn rank() {
+        assert_eq!(Rank::new(2) + Rank::new(3), Rank::new(5));
+        assert_eq!(Rank::new(7) - Rank::new(4), Rank::new(3));
+        assert_eq!(Rank::new(-1).try_sub(Rank::new(1)), None);
+        assert_eq!(Rank::new(6).plus_one(), Rank::new(7));
+        assert_eq!(Rank::new(0).minus_one(), Rank::new(-1));
     }
 }

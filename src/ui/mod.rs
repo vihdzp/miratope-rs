@@ -243,7 +243,7 @@ pub fn ui(
                                 *p = facet;
                                 println!("Facet succeeded.")
                             } else {
-                                println!("Facet failed.")
+                                println!("Facet failed: no facets.")
                             }
                         }
                     }
@@ -253,14 +253,21 @@ pub fn ui(
                         for mut p in query.iter_mut() {
                             println!("Verf");
 
-                            if let Some(mut verf) = p.verf(0) {
-                                verf.flatten();
-                                verf.recenter();
-                                *p = verf;
+                            match p.verf(0) {
+                                Ok(Some(mut verf)) => {
+                                    verf.flatten();
+                                    verf.recenter();
+                                    *p = verf;
 
-                                println!("Verf succeeded.")
-                            } else {
-                                println!("Verf failed.")
+                                    println!("Verf succeeded.")
+                                }
+                                Ok(None) => {
+                                    println!("Verf failed: no vertices.")
+                                }
+                                Err(idx) => println!(
+                                    "Verf failed: facet {} passes through inversion center.",
+                                    idx
+                                ),
                             }
                         }
                     }
@@ -389,9 +396,14 @@ pub fn ui(
                         *p = Concrete::star_polygon(n, d);
                     }
                 }
+                SpecialLibrary::Prism(n, d) => {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        *p = Concrete::uniform_prism(n, d);
+                    }
+                }
                 SpecialLibrary::Antiprism(n, d) => {
                     if let Some(mut p) = query.iter_mut().next() {
-                        *p = Concrete::uniform_star_antiprism(n, d);
+                        *p = Concrete::uniform_antiprism(n, d);
                     }
                 }
                 SpecialLibrary::Simplex(rank) => {

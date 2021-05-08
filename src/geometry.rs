@@ -70,8 +70,7 @@ impl Hypersphere {
         q *= self.squared_radius;
 
         // Recenters q.
-        q += &self.center;
-        *p = q;
+        *p = q + &self.center;
 
         Ok(())
     }
@@ -351,32 +350,36 @@ mod tests {
     /// Reciprocates points about spheres.
     pub fn reciprocate() {
         assert_abs_diff_eq!(
-            Hypersphere::unit(2)
+            (Hypersphere::unit(2)
                 .reciprocate(&vec![3.0, 4.0].into())
-                .unwrap(),
-            vec![0.12, 0.16].into(),
+                .unwrap()
+                - Point::from(vec![0.12, 0.16]))
+            .norm(),
+            0.0,
             epsilon = Float::EPS
         );
 
         assert_abs_diff_eq!(
-            Hypersphere::with_radius(3, 13.0)
+            (Hypersphere::with_radius(3, 13.0)
                 .reciprocate(&vec![3.0, 4.0, 12.0].into())
-                .unwrap(),
-            vec![3.0, 4.0, 12.0].into(),
+                .unwrap()
+                - Point::from(vec![3.0, 4.0, 12.0]))
+            .norm(),
+            0.0,
             epsilon = Float::EPS
         );
 
-        /*
         assert_abs_diff_eq!(
-            Hypersphere {
-                squared_radius: -2.0,
+            (Hypersphere {
+                squared_radius: -4.0,
                 center: vec![1.0; 4].into()
             }
             .reciprocate(&vec![-2.0; 4].into())
-            .unwrap(),
-            vec![5.0 / 3.0; 4].into(),
+            .unwrap()
+                - Point::from(vec![4.0 / 3.0; 4]))
+            .norm(),
+            0.0,
             epsilon = Float::EPS
         );
-        */
     }
 }

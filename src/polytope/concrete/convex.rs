@@ -325,7 +325,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
                 let el = common(&els_verts[i].subs.0, &els_verts[j].subs.0);
 
                 // Checks that el actually has the correct rank.
-                if !check_subelement(&vertices, &el, r - Rank::new(1)) {
+                if !check_subelement(&vertices, &el, r.minus_one()) {
                     continue;
                 }
 
@@ -355,7 +355,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
         els_verts.resize(subs_map.len(), Element::new());
 
         for (subs, idx) in subs_map {
-            els_verts[idx] = Element::from_subs(subs);
+            els_verts[idx].subs = subs;
         }
 
         abs[r] = els_subs;

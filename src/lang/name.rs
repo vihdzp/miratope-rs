@@ -303,9 +303,7 @@ impl<T: NameType> Name<T> {
             Name::Generic { n: _, rank } => *rank,
 
             // Modifiers:
-            Name::Pyramid(base) | Name::Prism(base) | Name::Tegum(base) => {
-                base.rank() + Rank::new(1)
-            }
+            Name::Pyramid(base) | Name::Prism(base) | Name::Tegum(base) => base.rank().plus_one(),
 
             // Multimodifiers:
             Name::Multipyramid(_)
@@ -464,7 +462,7 @@ impl<T: NameType> Name<T> {
                 if T::is_abstract() || regular.contains(&Regular::No) {
                     Self::Simplex {
                         regular,
-                        rank: rank + Rank::new(1),
+                        rank: rank.plus_one(),
                     }
                 } else {
                     Self::Pyramid(Box::new(Self::Simplex { regular, rank }))
@@ -493,7 +491,7 @@ impl<T: NameType> Name<T> {
                 if T::is_abstract() || regular.contains(&Regular::No) {
                     Self::Hyperblock {
                         regular,
-                        rank: rank + Rank::new(1),
+                        rank: rank.plus_one(),
                     }
                 } else {
                     Self::Prism(Box::new(Self::Hyperblock { regular, rank }))
@@ -522,7 +520,7 @@ impl<T: NameType> Name<T> {
                 if T::is_abstract() || regular.contains(&Regular::No) {
                     Self::Orthoplex {
                         regular,
-                        rank: rank + Rank::new(1),
+                        rank: rank.plus_one(),
                     }
                 } else {
                     Self::Tegum(Box::new(Self::Orthoplex { regular, rank }))
@@ -778,7 +776,7 @@ impl<T: NameType> Name<T> {
         if pyramid_count >= Rank::new(2) {
             new_bases.push(Name::simplex(
                 T::DataRegular::new(Regular::No),
-                pyramid_count - Rank::new(1),
+                pyramid_count.minus_one(),
             ));
         }
 

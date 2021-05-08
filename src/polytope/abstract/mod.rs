@@ -51,7 +51,7 @@ impl Abstract {
     pub fn from_vec(ranks: RankVec<ElementList>) -> Self {
         let name = if ranks.0.len() >= 2 {
             let rank = ranks.rank();
-            let n = ranks[rank - Rank::new(1)].len();
+            let n = ranks[rank.minus_one()].len();
             Name::generic(n, rank)
         } else {
             Name::Nullitope
@@ -93,9 +93,9 @@ impl Abstract {
         let i = self[rank].len();
 
         if rank != Rank::new(-1) {
-            if let Some(lower_rank) = self.ranks.get_mut(rank - Rank::new(1)) {
+            if let Some(lower_rank) = self.ranks.get_mut(rank.minus_one()) {
                 // Updates superelements of the lower rank.
-                for &sub in el.subs.iter() {
+                for &sub in &el.subs {
                     lower_rank[sub].sups.push(i);
                 }
             }
@@ -195,7 +195,7 @@ impl Abstract {
 
         // We actually build the elements backwards, which is as awkward as it
         // seems. Maybe we should fix that in the future?
-        let mut backwards_abs = RankVec::with_capacity(rank + Rank::new(1));
+        let mut backwards_abs = RankVec::with_capacity(rank.plus_one());
         backwards_abs.push(ElementList::max(section_hash.len));
 
         // Indices of base.
@@ -226,14 +226,14 @@ impl Abstract {
 
                 // The indices for the bottom and top elements and the index in
                 // the antiprism of the old section.
-                for (indices, &idx) in map.iter() {
+                for (indices, &idx) in map {
                     // Finds all of the subelements of our old section's
                     // lowest element.
-                    for &idx_lo in self.element_ref(rank_lo, indices.0).unwrap().subs.iter() {
+                    for &idx_lo in &self.element_ref(rank_lo, indices.0).unwrap().subs {
                         // Adds the new sections of the current height, gets
                         // their index, uses that to build the ElementList.
                         let sub = new_section_hash.get(Section {
-                            rank_lo: rank_lo - Rank::new(1),
+                            rank_lo: rank_lo.minus_one(),
                             idx_lo,
                             rank_hi,
                             idx_hi: indices.1,
@@ -250,7 +250,7 @@ impl Abstract {
                         let sub = new_section_hash.get(Section {
                             rank_lo,
                             idx_lo: indices.0,
-                            rank_hi: rank_hi + Rank::new(1),
+                            rank_hi: rank_hi.plus_one(),
                             idx_hi,
                         });
 
@@ -261,7 +261,7 @@ impl Abstract {
 
             // We figure out where the vertices of the base and the dual base
             // were sent.
-            if height == rank - Rank::new(1) {
+            if height == rank.minus_one() {
                 // We create a map from the base's vertices to the new vertices.
                 for v in 0..vertex_count {
                     vertices.push(new_section_hash.get(Section {
@@ -277,7 +277,7 @@ impl Abstract {
                     dual_vertices.push(new_section_hash.get(Section {
                         rank_lo: Rank::new(-1),
                         idx_lo: 0,
-                        rank_hi: rank - Rank::new(1),
+                        rank_hi: rank.minus_one(),
                         idx_hi: f,
                     }));
                 }
@@ -317,7 +317,7 @@ impl Abstract {
 
         for r in Rank::range_inclusive_iter(Rank::new(-1), rank) {
             for (idx, el) in self[r].iter().enumerate() {
-                for &sub in el.subs.iter() {
+                for &sub in &el.subs {
                     if let Some(r_minus_one) = r.try_sub(Rank::new(1)) {
                         if !self[r_minus_one][sub].sups.contains(&idx) {
                             return false;
@@ -347,10 +347,10 @@ impl Abstract {
             for el in self[r].iter() {
                 let mut hash_sub_subs = HashMap::new();
 
-                for &sub in el.subs.iter() {
-                    let sub_el = &self[r - Rank::new(1)][sub];
+                for &sub in &el.subs {
+                    let sub_el = &self[r.minus_one()][sub];
 
-                    for &sub_sub in sub_el.subs.iter() {
+                    for &sub_sub in &sub_el.subs {
                         match hash_sub_subs.get(&sub_sub) {
                             // Found for the first time.
                             None => hash_sub_subs.insert(sub_sub, Count::Once),
@@ -410,8 +410,7 @@ impl Abstract {
         let q_hi = q_rank - Rank::new(!max as isize);
 
         // The rank of the product.
-        let rank =
-            p_rank + q_rank + Rank::new(1) - Rank::new(!min as isize) - Rank::new(!max as isize);
+        let rank = p_rank + q_rank.plus_one() - Rank::new(!min as isize) - Rank::new(!max as isize);
 
         // Initializes the element lists. These will only contain the
         // subelements as they're generated. When they're complete, we'll call
@@ -434,8 +433,8 @@ impl Abstract {
                     if p_rank == p_low || q_rank == q_hi {
                         0
                     } else {
-                        offset_memo[(p_rank - p_low - Rank::new(1)).usize()]
-                            [(q_rank - q_low + Rank::new(1)).usize()]
+                        offset_memo[(p_rank.minus_one() - p_low).usize()]
+                            [(q_rank.plus_one() - q_low).usize()]
                     } + p.el_count(p_rank) * q.el_count(q_rank),
                 );
             }
@@ -462,9 +461,9 @@ impl Abstract {
         // Every element of the product is in one to one correspondence with
         // a pair of an element from p and an element from q. This function
         // finds the position we placed it in.
-        let get_element_index = |p_rank: Rank, p_idx, q_rank, q_idx| -> _ {
+        let get_element_index = |p_rank: Rank, p_idx, q_rank: Rank, q_idx| -> _ {
             if let Some(p_rank_minus_one) = p_rank.try_sub(Rank::new(1)) {
-                offset(p_rank_minus_one, q_rank + Rank::new(1)) + p_idx * q.el_count(q_rank) + q_idx
+                offset(p_rank_minus_one, q_rank.plus_one()) + p_idx * q.el_count(q_rank) + q_idx
             } else {
                 q_idx
             }
@@ -487,9 +486,9 @@ impl Abstract {
 
                             // Products of p's subelements with q.
                             if p_els_rank != Rank::new(0) || min {
-                                for &s in p_el.subs.iter() {
+                                for &s in &p_el.subs {
                                     subs.push(get_element_index(
-                                        p_els_rank - Rank::new(1),
+                                        p_els_rank.minus_one(),
                                         s,
                                         q_els_rank,
                                         q_idx,
@@ -499,11 +498,11 @@ impl Abstract {
 
                             // Products of q's subelements with p.
                             if q_els_rank != Rank::new(0) || min {
-                                for &s in q_el.subs.iter() {
+                                for &s in &q_el.subs {
                                     subs.push(get_element_index(
                                         p_els_rank,
                                         p_idx,
-                                        q_els_rank - Rank::new(1),
+                                        q_els_rank.minus_one(),
                                         s,
                                     ))
                                 }
@@ -525,7 +524,7 @@ impl Abstract {
 
         // If !max, we have to set a maximal element manually.
         if !max {
-            element_lists[rank] = ElementList::max(element_lists[rank - Rank::new(1)].len());
+            element_lists[rank] = ElementList::max(element_lists[rank.minus_one()].len());
         }
 
         // Uses push_subs to add all of the element lists into a new polytope.
@@ -683,8 +682,8 @@ impl Polytope<Abs> for Abstract {
                 continue;
             }
 
-            let sub_offset = el_counts[r - Rank::new(1)];
-            let sup_offset = el_counts[r + Rank::new(1)];
+            let sub_offset = el_counts[r.minus_one()];
+            let sup_offset = el_counts[r.plus_one()];
 
             for mut el in elements.into_iter() {
                 if r != Rank::new(0) {
@@ -693,7 +692,7 @@ impl Polytope<Abs> for Abstract {
                     }
                 }
 
-                if r != rank - Rank::new(1) {
+                if r != rank.minus_one() {
                     for sup in el.sups.iter_mut() {
                         *sup += sup_offset;
                     }
