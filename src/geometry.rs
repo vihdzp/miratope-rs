@@ -1,5 +1,4 @@
-//! Contains a few structs and methods to faciliate geometry in *n*-dimensional
-//! space.
+//! Contains structs and methods to faciliate geometry in *n*-dimensional space.
 
 /// A point in *n*-dimensional space.
 pub type Point = nalgebra::DVector<Float>;
@@ -16,6 +15,11 @@ use approx::abs_diff_eq;
 
 #[derive(Debug)]
 /// A hypersphere with a certain center and radius.
+///
+/// This is mostly used for [duals](crate::polytope::concrete::Concrete::dual_with_sphere),
+/// where the hypersphere is used to reciprocate polytopes. For convenience, we
+/// allow the hypersphere to have a negative squared radius, which results in
+/// the dualized polytope being reflected about its center.
 pub struct Hypersphere {
     /// The center of the hypersphere.
     pub center: Point,
@@ -26,6 +30,15 @@ pub struct Hypersphere {
 }
 
 impl Hypersphere {
+    /// Constructs a hypersphere with a given dimension and radius,
+    /// centered at the origin.
+    pub fn with_radius(dim: usize, radius: Float) -> Hypersphere {
+        Hypersphere {
+            center: vec![0.0; dim].into(),
+            squared_radius: radius * radius,
+        }
+    }
+
     /// Constructs a hypersphere with a given dimension and squared radius,
     /// centered at the origin.
     pub fn with_squared_radius(dim: usize, squared_radius: Float) -> Hypersphere {
@@ -56,6 +69,7 @@ impl Hypersphere {
         q /= s;
         q *= self.squared_radius;
 
+        // Recenters q.
         q += &self.center;
         *p = q;
 
@@ -324,5 +338,45 @@ impl Segment {
     /// Returns the midpoint of the segment.
     pub fn midpoint(&self) -> Point {
         self.at(0.5)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use approx::assert_abs_diff_eq;
+
+    #[test]
+    /// Reciprocates points about spheres.
+    pub fn reciprocate() {
+        assert_abs_diff_eq!(
+            Hypersphere::unit(2)
+                .reciprocate(&vec![3.0, 4.0].into())
+                .unwrap(),
+            vec![0.12, 0.16].into(),
+            epsilon = Float::EPS
+        );
+
+        assert_abs_diff_eq!(
+            Hypersphere::with_radius(3, 13.0)
+                .reciprocate(&vec![3.0, 4.0, 12.0].into())
+                .unwrap(),
+            vec![3.0, 4.0, 12.0].into(),
+            epsilon = Float::EPS
+        );
+
+        /*
+        assert_abs_diff_eq!(
+            Hypersphere {
+                squared_radius: -2.0,
+                center: vec![1.0; 4].into()
+            }
+            .reciprocate(&vec![-2.0; 4].into())
+            .unwrap(),
+            vec![5.0 / 3.0; 4].into(),
+            epsilon = Float::EPS
+        );
+        */
     }
 }

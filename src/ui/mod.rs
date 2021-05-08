@@ -150,8 +150,6 @@ pub fn ui(
                                     idx
                                 ),
                             }
-
-                            section_state.reset();
                         }
                     }
 
@@ -163,8 +161,6 @@ pub fn ui(
                                 for mut p in query.iter_mut() {
                                     *p = p.$operation();
                                 }
-
-                                section_state.reset();
                             }
                         };
                     }
@@ -188,8 +184,6 @@ pub fn ui(
                                     idx
                                 ),
                             }
-
-                            section_state.reset();
                         }
                     }
 
@@ -200,27 +194,32 @@ pub fn ui(
                         for mut p in query.iter_mut() {
                             p.recenter();
                         }
-
-                        section_state.reset();
                     }
 
                     ui.separator();
 
                     // Toggles cross-section mode.
                     if ui.button("Cross-section").clicked() {
-                        *section_state = match *section_state {
+                        *section_state = match &mut *section_state {
+                            // The view is active, but will be inactivated.
                             SectionState::Active {
-                                original_polytope: _,
+                                original_polytope,
                                 minmax: _,
                                 hyperplane_pos: _,
                                 flatten: _,
-                            } => SectionState::Inactive,
+                            } => {
+                                *query.iter_mut().next().unwrap() = original_polytope.clone();
+                                SectionState::Inactive
+                            }
+
+                            // The view is inactive, but will be activated.
                             SectionState::Inactive => {
                                 let p = query.iter_mut().next().unwrap();
                                 let minmax = p.x_minmax().unwrap_or((-1.0, 1.0));
+                                let original_polytope = p.clone();
 
                                 SectionState::Active {
-                                    original_polytope: p.clone(),
+                                    original_polytope,
                                     minmax,
                                     hyperplane_pos: (minmax.0 + minmax.1) / 2.0,
                                     flatten: false,
@@ -246,8 +245,6 @@ pub fn ui(
                             } else {
                                 println!("Facet failed.")
                             }
-
-                            section_state.reset();
                         }
                     }
 
@@ -265,8 +262,6 @@ pub fn ui(
                             } else {
                                 println!("Verf failed.")
                             }
-
-                            section_state.reset();
                         }
                     }
                 });
@@ -381,8 +376,6 @@ pub fn ui(
                 if let Some(mut p) = query.iter_mut().next() {
                     if let Ok(q) = Concrete::from_path(&file) {
                         *p = q;
-
-                        section_state.reset();
                     } else {
                         println!("File open failed!");
                     }
@@ -498,7 +491,6 @@ impl FileDialogState {
 pub fn file_dialog(
     mut query: Query<&mut Concrete>,
     file_dialog_state: ResMut<FileDialogState>,
-    mut section_state: ResMut<SectionState>,
     token: NonSend<MainThreadToken>,
 ) {
     if file_dialog_state.is_changed() {
@@ -518,8 +510,6 @@ pub fn file_dialog(
                         *p = Concrete::from_path(&path).unwrap();
                         p.recenter();
                     }
-
-                    section_state.reset();
                 }
             }
             FileDialogMode::Disabled => {}
@@ -540,6 +530,7 @@ pub fn update_changed_polytopes(
     polies: Query<(&Concrete, &Handle<Mesh>, &Children), Changed<Concrete>>,
     wfs: Query<&Handle<Mesh>, Without<Concrete>>,
     mut windows: ResMut<Windows>,
+    mut section_state: ResMut<SectionState>,
     selected_language: Res<SelectedLanguage>,
     orthogonal: Res<ProjectionType>,
 ) {
@@ -559,18 +550,22 @@ pub fn update_changed_polytopes(
                 break;
             }
         }
+
+        if !section_state.is_changed() {
+            section_state.reset();
+        }
     }
 }
 
 /// Updates the cross-section shown.
-pub fn update_cross_section(mut query: Query<&mut Concrete>, state: Res<SectionState>) {
-    if state.is_changed() {
+pub fn update_cross_section(mut query: Query<&mut Concrete>, section_state: Res<SectionState>) {
+    if section_state.is_changed() {
         if let SectionState::Active {
             original_polytope,
             hyperplane_pos,
             minmax: _,
             flatten,
-        } = &*state
+        } = &*section_state
         {
             for mut p in query.iter_mut() {
                 let r = original_polytope.clone();
