@@ -38,7 +38,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// A mutable reference to the name of the polytope.
     fn name_mut(&mut self) -> &mut Name<T>;
 
-    /// Gets the wiki link to the polytope, based on its name.
+    /// Gets the wiki link to the polytope, based on its English name.
     fn wiki_link(&self) -> String {
         format!(
             "{}{}",

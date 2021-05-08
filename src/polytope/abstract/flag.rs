@@ -187,8 +187,8 @@ impl std::ops::IndexMut<Rank> for Flag {
 /// non-orientable.
 ///
 /// The reason we don't iterate over flags directly is that sometimes, we
-/// realize a polytope is non-orientable only after checking every single one of
-/// its flags. Hence, we can't bundle the information that the polytope is
+/// realize a polytope is non-orientable only after traversing every single one
+/// of its flags. Hence, we can't bundle the information that the polytope is
 /// non-orientable with the flags.
 pub struct FlagIter {
     /// The polytope whose flags are iterated. We must sort all of its elements

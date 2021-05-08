@@ -712,6 +712,8 @@ impl Polytope<Abs> for Abstract {
         Some(ElementHash::from_element(self, rank, idx)?.to_polytope(self))
     }
 
+    /// Returns an iterator over the "flag events" of a polytope. See
+    /// [`FlagIter`] for more info.
     fn flag_events(&self) -> FlagIter {
         FlagIter::new(&self)
     }

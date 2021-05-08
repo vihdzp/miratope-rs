@@ -117,6 +117,32 @@ pub struct Subspace {
     pub offset: Point,
 }
 
+/// Builds convenience functions like [`Subspace::x`] and [`Hyperplane::x`].
+macro_rules! axis_with_name {
+    ($x: ident, $coord_name: expr, $name: expr, $axis: expr) => {
+        /// Returns a
+        #[doc = $name]
+        /// defined by all points with a given
+        #[doc = $coord_name]
+        /// coordinate.
+        pub fn $x(rank: usize, $x: Float) -> Self {
+            Self::axis(rank, $axis, $x)
+        }
+    };
+}
+
+/// Builds convenience functions for all named axes using [`axis_with_name`].
+macro_rules! all_axes_names {
+    ($name: expr) => {
+        axis_with_name!(x, "`x`", $name, 0);
+        axis_with_name!(y, "`y`", $name, 1);
+        axis_with_name!(z, "`z`", $name, 2);
+        axis_with_name!(w, "`w`", $name, 3);
+        axis_with_name!(a, "`a`", $name, 4);
+        axis_with_name!(b, "`b`", $name, 5);
+    };
+}
+
 impl Subspace {
     /// Generates a trivial subspace passing through a given point.
     pub fn new(p: Point) -> Self {
@@ -225,23 +251,29 @@ impl Subspace {
         Point::from_iterator(self.rank(), self.basis.iter().map(|b| p.dot(b)))
     }
 
-    /// Returns a subspace defined by all points with a given x coordinate.
-    pub fn x(rank: usize, x: Float) -> Self {
+    /// Returns a subspace defined by all points with a given coordinate at a
+    /// given coordinate axis.
+    pub fn axis(rank: usize, axis: usize, pos: Float) -> Self {
         // The basis is just all elementary unit vectors save for the
-        // (1, 0, ..., 0) one.
+        // (0, ..., 1, ..., 0) one, where the 1 is at position axis.
         let mut basis = Vec::new();
-        for i in 1..rank {
-            let mut p = Point::zeros(rank);
-            p[i] = 1.0;
-            basis.push(p);
+        for i in 0..rank {
+            if i != axis {
+                let mut p = Point::zeros(rank);
+                p[i] = 1.0;
+                basis.push(p);
+            }
         }
 
-        // The offset is the point (x, 0, ..., 0).
+        // The offset is the point (0, ..., pos, ..., 0), where pos is at
+        // position axis.
         let mut offset = Point::zeros(rank);
-        offset[0] = x;
+        offset[axis] = pos;
 
         Self { basis, offset }
     }
+
+    all_axes_names!("subspace");
 
     /// Computes a set of independent vectors that span the orthogonal
     /// complement of the subspace.
@@ -311,17 +343,19 @@ impl Hyperplane {
         }
     }
 
-    // Returns a hyperplane defined by all points with a given x coordinate.
-    pub fn x(rank: usize, x: Float) -> Self {
-        // The normal is the vector (1, 0, ..., 0).
+    pub fn axis(rank: usize, axis: usize, pos: Float) -> Self {
+        // The normal is the vector (0, ..., 1, ..., 0), where the 1 is at
+        // position axis.
         let mut normal = Vector::zeros(rank);
-        normal[0] = 1.0;
+        normal[axis] = 1.0;
 
         Self {
-            subspace: Subspace::x(rank, x),
+            subspace: Subspace::axis(rank, axis, pos),
             normal,
         }
     }
+
+    all_axes_names!("hyperplane");
 }
 
 /// Represents a line segment between two points.

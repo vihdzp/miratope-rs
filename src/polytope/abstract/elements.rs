@@ -102,7 +102,7 @@ pub trait Subsupelements: Sized + Index<usize> + IndexMut<usize> + IntoIterator 
 
 /// Implements all remaining common code between `Subelements` and `Superelements`.
 macro_rules! impl_sub_sups {
-    ($T:ident, $name:expr) => {
+    ($T: ident, $name: expr) => {
         /// The indices of the
         #[doc = $name]
         /// of a polytope, which make up the entries of an [`Element`].

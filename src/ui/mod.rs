@@ -431,14 +431,10 @@ pub fn ui(
 /// Guarantees that file dialogs will be opened on the main thread, so as to
 /// circumvent a MacOS limitation that all GUI operations must be done on the
 /// main thread.
+#[derive(Default)]
 pub struct MainThreadToken(PhantomData<*const ()>);
 
 impl MainThreadToken {
-    /// Initializes a new token.
-    pub fn new() -> Self {
-        Self(Default::default())
-    }
-
     /// Auxiliary function to create a new file dialog.
     fn new_file_dialog() -> FileDialog {
         FileDialog::new()
@@ -469,6 +465,7 @@ enum FileDialogMode {
     Save,
 }
 
+/// The file dialog is disabled by default.
 impl Default for FileDialogMode {
     fn default() -> Self {
         Self::Disabled
@@ -546,14 +543,17 @@ pub fn update_changed_polytopes(
     selected_language: Res<SelectedLanguage>,
     orthogonal: Res<ProjectionType>,
 ) {
-    for (poly, mesh_handle, children) in polies.iter() {
-        *meshes.get_mut(mesh_handle).unwrap() = poly.get_mesh(*orthogonal);
+    for (poly, _mesh_handle, children) in polies.iter() {
+        // The mesh is currently hidden, so we don't bother updating it.
+        // *meshes.get_mut(_mesh_handle).unwrap() = poly.get_mesh(*orthogonal);
 
+        // Sets the window's name to the polytope's name.
         windows
             .get_primary_mut()
             .unwrap()
             .set_title(selected_language.parse_uppercase(poly.name(), Options::default()));
 
+        // Updates all wireframes.
         for child in children.iter() {
             if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {
                 let wf: &mut Mesh = meshes.get_mut(wf_handle).unwrap();
@@ -563,6 +563,7 @@ pub fn update_changed_polytopes(
             }
         }
 
+        // We reset the cross-section view if we didn't use it to change the polytope.
         if !section_state.is_changed() {
             section_state.reset();
         }
@@ -585,7 +586,7 @@ pub fn update_cross_section(mut query: Query<&mut Concrete>, section_state: Res<
 
                 if let Some(dim) = r.dim() {
                     let hyperplane = Hyperplane::x(dim, hyp_pos);
-                    let mut slice = r.slice(&hyperplane);
+                    let mut slice = r.cross_section(&hyperplane);
 
                     if *flatten {
                         slice.flatten_into(&hyperplane.subspace);

@@ -79,6 +79,7 @@ use bevy_egui::EguiPlugin;
 use lang::SelectedLanguage;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
+use geometry::Hypersphere;
 use polytope::{
     concrete::{off::OffOptions, Concrete},
     r#abstract::rank::Rank,
@@ -96,7 +97,7 @@ mod no_cull_pipeline;
 mod polytope;
 mod ui;
 
-/// The wiki link.
+/// The link to the [Polytope Wiki](https://polytope.miraheze.org/wiki/).
 const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
 
 /// A trait containing the constants associated to each floating point type.
@@ -108,15 +109,6 @@ trait Consts {
     const SQRT_2: Self::T;
 }
 
-/// Constants for `f64`.
-impl Consts for f64 {
-    type T = f64;
-    const EPS: f64 = 1e-9;
-    const PI: f64 = std::f64::consts::PI;
-    const TAU: f64 = std::f64::consts::TAU;
-    const SQRT_2: f64 = std::f64::consts::SQRT_2;
-}
-
 /// Constants for `f32`.
 impl Consts for f32 {
     type T = f32;
@@ -124,6 +116,15 @@ impl Consts for f32 {
     const PI: f32 = std::f32::consts::PI;
     const TAU: f32 = std::f32::consts::TAU;
     const SQRT_2: f32 = std::f32::consts::SQRT_2;
+}
+
+/// Constants for `f64`.
+impl Consts for f64 {
+    type T = f64;
+    const EPS: f64 = 1e-9;
+    const PI: f64 = std::f64::consts::PI;
+    const TAU: f64 = std::f64::consts::TAU;
+    const SQRT_2: f64 = std::f64::consts::SQRT_2;
 }
 
 /// The floating point type used for all calculations.
@@ -140,7 +141,7 @@ fn main() {
         .insert_resource(ProjectionType::Perspective)
         .insert_resource(Library::new_folder(&"./lib/"))
         .insert_resource(SelectedLanguage::default())
-        .insert_non_send_resource(ui::MainThreadToken::new())
+        .insert_non_send_resource(ui::MainThreadToken::default())
         // Adds plugins.
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
@@ -165,6 +166,8 @@ fn setup(
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
     let poly = Concrete::hypercube(Rank::new(3));
+    let r = poly.midradius();
+    let poly = poly.antiprism_with(&Hypersphere::with_squared_radius(3, -r * r), 1.0);
 
     // Disables backface culling.
     pipelines.set_untracked(

@@ -157,14 +157,14 @@ fn cam_events_from_kb(
 
     for keycode in keyboard.get_pressed() {
         cam_inputs.send(match keycode {
-            KeyCode::W | KeyCode::Up | KeyCode::Numpad8 => -scale * fb,
-            KeyCode::S | KeyCode::Down | KeyCode::Numpad2 => scale * fb,
-            KeyCode::D | KeyCode::Right | KeyCode::Numpad6 => scale * lr,
-            KeyCode::A | KeyCode::Left | KeyCode::Numpad4 => -scale * lr,
+            KeyCode::W | KeyCode::Up => -scale * fb,
+            KeyCode::S | KeyCode::Down => scale * fb,
+            KeyCode::D | KeyCode::Right => scale * lr,
+            KeyCode::A | KeyCode::Left => -scale * lr,
             KeyCode::Space => scale * ud,
             KeyCode::LShift | KeyCode::RShift => -scale * ud,
-            KeyCode::Q | KeyCode::Numpad7 => real_scale * ROLL,
-            KeyCode::E | KeyCode::Numpad9 => -real_scale * ROLL,
+            KeyCode::Q => real_scale * ROLL,
+            KeyCode::E => -real_scale * ROLL,
             KeyCode::R => CameraInputEvent::Reset,
             _ => continue,
         })

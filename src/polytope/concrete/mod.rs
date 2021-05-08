@@ -302,7 +302,7 @@ impl Concrete {
     /// Maybe make this work in the general case?
     pub fn midradius(&self) -> Float {
         let vertices = &self.vertices;
-        let edges = &self[Rank::new(0)];
+        let edges = &self[Rank::new(1)];
         let edge = &edges[0];
 
         let sub0 = edge.subs[0];
@@ -416,7 +416,7 @@ impl Concrete {
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope.
-    fn try_antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Result<Self, usize> {
+    pub fn try_antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Result<Self, usize> {
         let vertices = self.vertices.iter().map(|v| v.push(height / 2.0));
         let dual = self.try_dual_with(sphere)?;
         let dual_vertices = dual.vertices.iter().map(|v| v.push(-height / 2.0));
@@ -424,7 +424,7 @@ impl Concrete {
         Ok(self.antiprism_with_vertices(vertices, dual_vertices))
     }
 
-    fn antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Self {
+    pub fn antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Self {
         self.try_antiprism_with(sphere, height).unwrap()
     }
 
@@ -664,7 +664,7 @@ impl Concrete {
     ///
     /// # Todo
     /// We should make this function take a general [`Subspace`] instead.
-    pub fn slice(&self, slice: &Hyperplane) -> Self {
+    pub fn cross_section(&self, slice: &Hyperplane) -> Self {
         let mut vertices = Vec::new();
 
         let mut abs = Abstract::new();
