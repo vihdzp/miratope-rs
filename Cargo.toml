@@ -4,6 +4,7 @@ description = "A polytope renderer and builder."
 license = "MIT"
 version = "0.1.0"
 repository = "https://github.com/OfficialURL/miratope-rs"
+keywords = ["polytope", "dimension", "geometry"]
 authors = ["Violeta Hernández <vi.hdz.p@gmail.com>", "Grayson Burton <ocornoc@protonmail.com>", "Roman Salinas <ultraroman01@gmail.com>"]
 edition = "2018"
 
@@ -19,7 +20,6 @@ lyon = "0.17"
 nalgebra = {version = "0.26", features = ["serde-serialize", "rand"]}
 petgraph = "0.5"
 rand = "0.8"
-regex = "1.4"
 rfd = "0.3"
 ron = "0.6"
 scapegoat = "1.0"

@@ -111,7 +111,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks.
-    fn append(&mut self, p: Self) -> Result<(), ()>;
+    fn append(&mut self, p: Self);
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
     fn element(&self, rank: Rank, idx: usize) -> Option<Self>;
@@ -164,18 +164,16 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     }
 
     /// Builds a compound polytope from an iterator over components.
-    fn compound_iter<U: Iterator<Item = Self>>(mut components: U) -> Option<Self> {
-        Some(if let Some(mut p) = components.next() {
+    fn compound_iter<U: Iterator<Item = Self>>(mut components: U) -> Self {
+        if let Some(mut p) = components.next() {
             for q in components {
-                if p.append(q).is_err() {
-                    return None;
-                }
+                p.append(q);
             }
 
             p
         } else {
             Self::nullitope()
-        })
+        }
     }
 
     /// Returns an iterator over all "flag events" of a polytope. For more info,

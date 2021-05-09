@@ -1006,15 +1006,10 @@ impl Polytope<Con> for Concrete {
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks.
-    fn append(&mut self, mut p: Self) -> Result<(), ()> {
-        if self.abs.append(p.abs).is_err() {
-            return Err(());
-        }
-
+    fn append(&mut self, mut p: Self) {
+        self.abs.append(p.abs);
         self.vertices.append(&mut p.vertices);
         self.name = Name::compound(vec![(1, self.name().clone()), (1, p.name)]);
-
-        Ok(())
     }
 
     fn element(&self, rank: Rank, idx: usize) -> Option<Self> {

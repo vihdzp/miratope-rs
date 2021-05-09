@@ -667,13 +667,11 @@ impl Polytope<Abs> for Abstract {
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks.
-    fn append(&mut self, p: Self) -> Result<(), ()> {
+    fn append(&mut self, p: Self) {
         let rank = self.rank();
 
         // The polytopes must have the same ranks.
-        if rank != p.rank() {
-            return Err(());
-        }
+        assert_eq!(rank, p.rank());
 
         let el_counts = self.el_counts();
 
