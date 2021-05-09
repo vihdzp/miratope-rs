@@ -187,6 +187,16 @@ pub fn ui(
                         }
                     }
 
+                    // Converts the active polytope into its Petrial.
+                    if ui.button("Petrial").clicked() {
+                        for mut p in query.iter_mut() {
+                            match p.petrial_mut() {
+                                Ok(_) => println!("Petrial succeeded."),
+                                Err(_) => println!("Petrial failed."),
+                            }
+                        }
+                    }
+
                     ui.separator();
 
                     // Recenters a polytope.
@@ -546,6 +556,8 @@ pub fn update_changed_polytopes(
     for (poly, _mesh_handle, children) in polies.iter() {
         // The mesh is currently hidden, so we don't bother updating it.
         // *meshes.get_mut(_mesh_handle).unwrap() = poly.get_mesh(*orthogonal);
+
+        debug_assert!(poly.abs.is_valid());
 
         // Sets the window's name to the polytope's name.
         windows

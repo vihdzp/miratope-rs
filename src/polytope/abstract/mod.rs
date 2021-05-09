@@ -159,6 +159,14 @@ impl Abstract {
         self.ranks.pop()
     }
 
+    pub fn sort(&mut self) {
+        for elements in self.ranks.iter_mut() {
+            for el in elements.iter_mut() {
+                el.sort();
+            }
+        }
+    }
+
     /// Returns a reference to an element of the polytope. To actually get the
     /// entire polytope it defines, use [`element`](Self::element).
     pub fn element_ref(&self, rank: Rank, idx: usize) -> Option<&Element> {
@@ -182,8 +190,9 @@ impl Abstract {
         ))
     }
 
-    /// Checks whether the polytope is bounded
-    pub fn full_check(&self) -> bool {
+    /// Checks whether the polytope is valid, i.e. whether the polytope is
+    /// bounded, dyadic, and all of its indices refer to valid elements.
+    pub fn is_valid(&self) -> bool {
         self.is_bounded() && self.check_incidences() && self.is_dyadic()
         // && self.is_strongly_connected()
     }
@@ -312,13 +321,16 @@ impl Abstract {
     /// then either the polytope hasn't fully built up, or there's something
     /// seriously wrong.
     pub fn check_incidences(&self) -> bool {
-        let rank = self.rank();
-        if !self[rank][0].sups.is_empty() {
+        // Superelements of the maximal element should be empty.
+        if !self.max().sups.is_empty() {
             return false;
         }
 
-        for r in Rank::range_inclusive_iter(Rank::new(-1), rank) {
-            for (idx, el) in self[r].iter().enumerate() {
+        // Iterates over elements of every rank.
+        for (r, elements) in self.ranks.iter().rank_enumerate() {
+            // Iterates over all such elements.
+            for (idx, el) in elements.iter().enumerate() {
+                // Iterates over the element's subelements.
                 for &sub in &el.subs {
                     if let Some(r_minus_one) = r.try_sub(Rank::new(1)) {
                         if !self[r_minus_one][sub].sups.contains(&idx) {
@@ -662,20 +674,30 @@ impl Polytope<Abs> for Abstract {
         Ok(())
     }
 
+    /// Builds the [Petrial](https://polytope.miraheze.org/wiki/Petrial) of a
+    /// polyhedron in place.
     fn petrial_mut(&mut self) -> Result<(), ()> {
         // Petrials only really make sense for polyhedra.
         if self.rank() != Rank::new(3) {
             return Err(());
         }
 
+        // We're using flags, so we gotta sort our polytope's element lists.
+        self.sort();
+
         // Consider a flag in a polytope. It has an associated edge. It turns
         // out that if we repeatedly apply a vertex-change, an edge-change, and
-        // a face-change, we get the edges that form the petrial face.
+        // a face-change, we get the edges that form the Petrial face.
+        //
+        // We go through all flags in the polytope. As we build one Petrial
+        // face, we mark any other flag that gives the same face as "traversed".
+        // Once we've traversed all flags, we got our Petrial's faces.
         let mut traversed_flags = BTreeSet::new();
         let mut faces = ElementList::new();
 
         for mut flag in self.flags() {
-            if flag.orientation != flag::Parity::Even || !traversed_flags.insert(flag.clone()) {
+            // If we've found the face associated to this flag before, we skip.
+            if !traversed_flags.insert(flag.clone()) {
                 continue;
             }
 
@@ -683,6 +705,9 @@ impl Polytope<Abs> for Abstract {
             let mut edge = flag[1];
             let mut loop_continue = true;
 
+            // We apply our flag changes and mark our flags until we reach the
+            // original edge. We then intentionally overshoot and do it one more
+            // time.
             while loop_continue {
                 loop_continue = face.insert(edge);
 
@@ -695,6 +720,9 @@ impl Polytope<Abs> for Abstract {
                 edge = flag[1];
             }
 
+            // If the edge we found after we returned to the original edge was
+            // not already in the face, this means that the Petrial loop
+            // self-intersects, and hence the Petrial is not a valid polytope.
             if !face.contains(&edge) {
                 return Err(());
             }
@@ -702,13 +730,16 @@ impl Polytope<Abs> for Abstract {
             faces.push(Element::from_subs(Subelements(face.into_iter().collect())));
         }
 
+        // Removes the faces and maximal polytope from self.
         self.pop();
         self.pop();
 
+        // Clears the current edges' superelements.
         for edge in self[Rank::new(1)].iter_mut() {
             edge.sups = Superelements::new();
         }
 
+        // Pushes the new faces and a new maximal element.
         self.push_subs(faces);
         self.push_max();
 
@@ -908,7 +939,7 @@ mod tests {
             vec![1],
             "Nullitope element counts don't match expected value."
         );
-        assert!(nullitope.full_check(), "Nullitope is invalid.");
+        assert!(nullitope.is_valid(), "Nullitope is invalid.");
     }
 
     #[test]
@@ -921,7 +952,7 @@ mod tests {
             vec![1, 1],
             "Point element counts don't match expected value."
         );
-        assert!(point.full_check(), "Point is invalid.");
+        assert!(point.is_valid(), "Point is invalid.");
     }
 
     #[test]
@@ -934,7 +965,7 @@ mod tests {
             vec![1, 2, 1],
             "Dyad element counts don't match expected value."
         );
-        assert!(dyad.full_check(), "Dyad is invalid.");
+        assert!(dyad.is_valid(), "Dyad is invalid.");
     }
 
     #[test]
@@ -949,7 +980,7 @@ mod tests {
                 "{}-gon element counts don't match expected value.",
                 n
             );
-            assert!(polygon.full_check(), "{}-gon is invalid.", n);
+            assert!(polygon.is_valid(), "{}-gon is invalid.", n);
         }
     }
 
@@ -980,12 +1011,7 @@ mod tests {
                     m,
                     n
                 );
-                assert!(
-                    duopyramid.full_check(),
-                    "{}-{} duopyramid is invalid.",
-                    m,
-                    n
-                );
+                assert!(duopyramid.is_valid(), "{}-{} duopyramid is invalid.", m, n);
             }
         }
     }
@@ -1009,7 +1035,7 @@ mod tests {
                     m,
                     n
                 );
-                assert!(duoprism.full_check(), "{}-{} duoprism is invalid.", m, n);
+                assert!(duoprism.is_valid(), "{}-{} duoprism is invalid.", m, n);
             }
         }
     }
@@ -1033,7 +1059,7 @@ mod tests {
                     m,
                     n
                 );
-                assert!(duotegum.full_check(), "{}-{} duotegum is invalid.", m, n);
+                assert!(duotegum.is_valid(), "{}-{} duotegum is invalid.", m, n);
             }
         }
     }
@@ -1057,7 +1083,7 @@ mod tests {
                     m,
                     n
                 );
-                assert!(duocomb.full_check(), "{}-{} duocomb is invalid.", m, n);
+                assert!(duocomb.is_valid(), "{}-{} duocomb is invalid.", m, n);
             }
         }
     }
@@ -1090,7 +1116,7 @@ mod tests {
                 );
             }
 
-            assert!(simplex.full_check(), "{}-simplex is invalid.", n)
+            assert!(simplex.is_valid(), "{}-simplex is invalid.", n)
         }
     }
 
@@ -1110,7 +1136,7 @@ mod tests {
                 );
             }
 
-            assert!(hypercube.full_check(), "{}-hypercube is invalid.", n)
+            assert!(hypercube.is_valid(), "{}-hypercube is invalid.", n)
         }
     }
 
@@ -1130,7 +1156,7 @@ mod tests {
                 );
             }
 
-            assert!(orthoplex.full_check(), "{}-orthoplex is invalid.", n)
+            assert!(orthoplex.is_valid(), "{}-orthoplex is invalid.", n)
         }
     }
 
@@ -1155,7 +1181,7 @@ mod tests {
                 En::parse(poly.name(), Default::default())
             );
             assert!(
-                poly.full_check(),
+                poly.is_valid(),
                 "Dual of polytope {} is invalid.",
                 En::parse(poly.name(), Default::default())
             );

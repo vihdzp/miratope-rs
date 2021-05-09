@@ -164,8 +164,7 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let mut poly = Concrete::hypercube(Rank::new(3));
-    poly.petrial_mut().unwrap();
+    let poly = Concrete::hypercube(Rank::new(3));
 
     // Disables backface culling.
     pipelines.set_untracked(

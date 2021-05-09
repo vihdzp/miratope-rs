@@ -1003,7 +1003,7 @@ impl Polytope<Con> for Concrete {
         self.try_dual_mut_with(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
-     fn petrial_mut(&mut self) -> Result<(), ()> {
+    fn petrial_mut(&mut self) -> Result<(), ()> {
         self.abs.petrial_mut()
     }
 
