@@ -1,3 +1,6 @@
+//! Helpful methods and structs for operating on the [flags](https://polytope.miraheze.org/wiki/Flag)
+//! of a polytope.
+
 use std::{
     cmp::Ordering,
     collections::{hash_map::Entry, HashMap, VecDeque},
@@ -8,7 +11,7 @@ use super::{rank::Rank, Abstract};
 use crate::Float;
 
 /// The parity of a flag, which flips on any flag change.
-#[derive(Clone, Copy, Debug, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum Parity {
     /// A flag of even parity.
     Even,
@@ -68,7 +71,39 @@ impl PartialEq for Flag {
     }
 }
 
+impl PartialOrd for Flag {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.elements.partial_cmp(&other.elements)
+    }
+}
+
+impl Ord for Flag {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.elements.cmp(&other.elements)
+    }
+}
+
 impl Eq for Flag {}
+
+impl std::ops::Index<usize> for Flag {
+    type Output = usize;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.elements[index]
+    }
+}
+
+impl std::ops::IndexMut<usize> for Flag {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.elements[index]
+    }
+}
+
+impl Flag {
+    pub fn push(&mut self, value: usize) {
+        self.elements.push(value);
+    }
+}
 
 /// Gets the common elements of two **sorted** lists.
 fn common(vec0: &[usize], vec1: &[usize]) -> Vec<usize> {
@@ -344,12 +379,6 @@ pub enum FlagEvent {
 
     /// We just realized the polytope is non-orientable.
     NonOrientable,
-}
-
-impl FlagEvent {
-    pub fn is_flag(&self) -> bool {
-        matches!(self, FlagEvent::Flag(_))
-    }
 }
 
 impl Iterator for FlagIter {

@@ -79,7 +79,6 @@ use bevy_egui::EguiPlugin;
 use lang::SelectedLanguage;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
-use geometry::Hypersphere;
 use polytope::{
     concrete::{off::OffOptions, Concrete},
     r#abstract::rank::Rank,
@@ -165,9 +164,8 @@ fn setup(
     mut shaders: ResMut<Assets<Shader>>,
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
-    let poly = Concrete::hypercube(Rank::new(3));
-    let r = poly.midradius();
-    let poly = poly.antiprism_with(&Hypersphere::with_squared_radius(3, -r * r), 1.0);
+    let mut poly = Concrete::hypercube(Rank::new(3));
+    poly.petrial_mut().unwrap();
 
     // Disables backface culling.
     pipelines.set_untracked(

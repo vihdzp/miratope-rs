@@ -130,7 +130,6 @@ impl Concrete {
                 Self::grunbaum_star_polygon_with_rot(n / gcd, d / gcd, k as Float * angle)
             }),
         )
-        .unwrap()
     }
 
     /// Scales a polytope by a given factor.
@@ -1004,6 +1003,10 @@ impl Polytope<Con> for Concrete {
         self.try_dual_mut_with(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
+     fn petrial_mut(&mut self) -> Result<(), ()> {
+        self.abs.petrial_mut()
+    }
+
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks.
     fn append(&mut self, mut p: Self) {
@@ -1012,6 +1015,8 @@ impl Polytope<Con> for Concrete {
         self.name = Name::compound(vec![(1, self.name().clone()), (1, p.name)]);
     }
 
+    /// Gets the element with a given rank and index as a polytope, or returns
+    /// `None` if such an element doesn't exist.
     fn element(&self, rank: Rank, idx: usize) -> Option<Self> {
         let (vertices, abs) = self.abs.element_and_vertices(rank, idx)?;
 

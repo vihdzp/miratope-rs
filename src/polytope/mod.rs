@@ -96,6 +96,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// through the inversion center.
     fn try_dual(&self) -> DualResult<Self>;
 
+    /// Calls [`try_dual`] and unwraps the result.
     fn dual(&self) -> Self {
         self.try_dual().unwrap()
     }
@@ -105,6 +106,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// of a facet through the inversion center and does nothing.
     fn try_dual_mut(&mut self) -> DualResult<()>;
 
+    /// Calls [`try_dual_mut`] and unwraps the result.
     fn dual_mut(&mut self) {
         self.try_dual_mut().unwrap();
     }
@@ -159,7 +161,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     }
 
     /// Builds a compound polytope from a set of components.
-    fn compound(components: Vec<Self>) -> Option<Self> {
+    fn compound(components: Vec<Self>) -> Self {
         Self::compound_iter(components.into_iter())
     }
 
@@ -176,23 +178,26 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         }
     }
 
+    fn petrial_mut(&mut self) -> Result<(), ()>;
+
+    fn petrial(&self) -> Option<Self> {
+        let mut clone = self.clone();
+        clone.petrial_mut().ok().map(|_| clone)
+    }
+
     /// Returns an iterator over all "flag events" of a polytope. For more info,
     /// see [`FlagIter`].
     fn flag_events(&self) -> FlagIter;
 
     /// Returns an iterator over all flags of a polytope.
-    fn flags(&self) -> Box<dyn Iterator<Item = Flag>> {
-        Box::new(
-            self.flag_events()
-                .filter(|event| event.is_flag())
-                .map(|event| {
-                    if let FlagEvent::Flag(flag) = event {
-                        flag
-                    } else {
-                        panic!("Non-flag somehow slipped through!")
-                    }
-                }),
-        )
+    fn flags(&self) -> std::iter::FilterMap<FlagIter, &dyn Fn(FlagEvent) -> Option<Flag>> {
+        self.flag_events().filter_map(&|flag_event| {
+            if let FlagEvent::Flag(flag) = flag_event {
+                Some(flag)
+            } else {
+                None
+            }
+        })
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)

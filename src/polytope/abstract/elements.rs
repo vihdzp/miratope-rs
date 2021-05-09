@@ -428,10 +428,12 @@ impl ElementHash {
                 let mut new_el = Element::new();
 
                 // Gets the subelements.
-                if let Some(prev_hash) = self.get(r.minus_one()) {
-                    for sub in &el.subs {
-                        if let Some(&new_sub) = prev_hash.get(sub) {
-                            new_el.subs.push(new_sub);
+                if let Some(r_minus_one) = r.try_minus_one() {
+                    if let Some(prev_hash) = self.get(r_minus_one) {
+                        for sub in &el.subs {
+                            if let Some(&new_sub) = prev_hash.get(sub) {
+                                new_el.subs.push(new_sub);
+                            }
                         }
                     }
                 }

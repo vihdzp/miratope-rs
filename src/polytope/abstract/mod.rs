@@ -2,11 +2,12 @@ pub mod elements;
 pub mod flag;
 pub mod rank;
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use self::{
     elements::{
         Element, ElementHash, ElementList, Section, SectionHash, Subelements, Subsupelements,
+        Superelements,
     },
     flag::{FlagEvent, FlagIter},
     rank::{Rank, RankVec},
@@ -142,12 +143,20 @@ impl Abstract {
         self.push_subs(ElementList::vertices(vertex_count))
     }
 
+    pub fn push_min(&mut self, vertex_count: usize) {
+        self.push(ElementList::min(vertex_count));
+    }
+
     /// Pushes a maximal element into the polytope, with the facets as
     /// subelements. To be used in circumstances where the elements are built up
     /// in layers.
     pub fn push_max(&mut self) {
         let facet_count = self.el_count(self.rank());
         self.push_subs(ElementList::max(facet_count));
+    }
+
+    pub fn pop(&mut self) -> Option<ElementList> {
+        self.ranks.pop()
     }
 
     /// Returns a reference to an element of the polytope. To actually get the
@@ -166,6 +175,7 @@ impl Abstract {
     /// indices of its vertices on the original polytope, if it exists.
     pub fn element_and_vertices(&self, rank: Rank, idx: usize) -> Option<(Vec<usize>, Self)> {
         let element_hash = ElementHash::from_element(self, rank, idx)?;
+
         Some((
             element_hash.to_elements(Rank::new(0)),
             element_hash.to_polytope(self),
@@ -176,14 +186,6 @@ impl Abstract {
     pub fn full_check(&self) -> bool {
         self.is_bounded() && self.check_incidences() && self.is_dyadic()
         // && self.is_strongly_connected()
-    }
-
-    pub fn dual(&self) -> Self {
-        self.try_dual().unwrap()
-    }
-
-    pub fn dual_mut(&mut self) {
-        self.try_dual_mut().unwrap();
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
@@ -554,10 +556,12 @@ impl Polytope<Abs> for Abstract {
         self.ranks.rank()
     }
 
+    /// Returns a reference to the [`Name`] of the polytope.
     fn name(&self) -> &Name<Abs> {
         &self.name
     }
 
+    /// Returns a mutable reference to the [`Name`] of the polytope.
     fn name_mut(&mut self) -> &mut Name<Abs> {
         &mut self.name
     }
@@ -619,10 +623,7 @@ impl Polytope<Abs> for Abstract {
     fn polygon(n: usize) -> Self {
         assert!(n >= 2, "A polygon must have at least 2 sides.");
 
-        let nullitope = ElementList::min(n);
-        let vertices = ElementList::vertices(n);
         let mut edges = ElementList::with_capacity(n);
-        let maximal = ElementList::max(n);
 
         for i in 0..n {
             edges.push(Element::from_subs(Subelements(vec![i % n, (i + 1) % n])));
@@ -630,22 +631,24 @@ impl Polytope<Abs> for Abstract {
 
         let mut poly = Abstract::with_capacity(Rank::new(2));
 
-        poly.push(nullitope);
-        poly.push(vertices);
+        poly.push_single();
+        poly.push_vertices(n);
         poly.push_subs(edges);
-        poly.push_subs(maximal);
+        poly.push_max();
 
         poly.with_name(Name::polygon(AbsData::default(), n))
     }
 
-    /// Converts a polytope into its dual.
+    /// Converts a polytope into its dual. Use [`dual`] instead, as this method
+    /// can never fail.
     fn try_dual(&self) -> Result<Self, usize> {
         let mut clone = self.clone();
         clone.dual_mut();
         Ok(clone)
     }
 
-    /// Converts a polytope into its dual in place.
+    /// Converts a polytope into its dual in place. Use [`dual_mut`] instead, as
+    /// this method can never fail.
     fn try_dual_mut(&mut self) -> Result<(), usize> {
         for elements in self.ranks.iter_mut() {
             for el in elements.iter_mut() {
@@ -659,8 +662,62 @@ impl Polytope<Abs> for Abstract {
         Ok(())
     }
 
+    fn petrial_mut(&mut self) -> Result<(), ()> {
+        // Petrials only really make sense for polyhedra.
+        if self.rank() != Rank::new(3) {
+            return Err(());
+        }
+
+        // Consider a flag in a polytope. It has an associated edge. It turns
+        // out that if we repeatedly apply a vertex-change, an edge-change, and
+        // a face-change, we get the edges that form the petrial face.
+        let mut traversed_flags = BTreeSet::new();
+        let mut faces = ElementList::new();
+
+        for mut flag in self.flags() {
+            if flag.orientation != flag::Parity::Even || !traversed_flags.insert(flag.clone()) {
+                continue;
+            }
+
+            let mut face = BTreeSet::new();
+            let mut edge = flag[1];
+            let mut loop_continue = true;
+
+            while loop_continue {
+                loop_continue = face.insert(edge);
+
+                flag.change_mut(&self, 0);
+                traversed_flags.insert(flag.change(&self, 2));
+                flag.change_mut(&self, 1);
+                flag.change_mut(&self, 2);
+                traversed_flags.insert(flag.clone());
+
+                edge = flag[1];
+            }
+
+            if !face.contains(&edge) {
+                return Err(());
+            }
+
+            faces.push(Element::from_subs(Subelements(face.into_iter().collect())));
+        }
+
+        self.pop();
+        self.pop();
+
+        for edge in self[Rank::new(1)].iter_mut() {
+            edge.sups = Superelements::new();
+        }
+
+        self.push_subs(faces);
+        self.push_max();
+
+        Ok(())
+    }
+
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
-    /// based on a given polytope. Use [`Self::antiprism`] instead.
+    /// based on a given polytope. Use [`antiprism`] instead, as this method can
+    /// never fail.
     fn try_antiprism(&self) -> Result<Self, usize> {
         Ok(self.antiprism_and_vertices().0)
     }
@@ -701,8 +758,6 @@ impl Polytope<Abs> for Abstract {
         }
 
         self.name = Name::compound(vec![(1, self.name().clone()), (1, p.name)]);
-
-        Ok(())
     }
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
@@ -755,7 +810,7 @@ impl Polytope<Abs> for Abstract {
         let max = self.max().clone();
 
         self.push_subs_at(rank, max);
-        self.push_subs(ElementList::max(2));
+        self.push_max();
     }
 
     /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
@@ -787,6 +842,7 @@ impl Polytope<Abs> for Abstract {
     }
 }
 
+/// Permits indexing an abstract polytope by rank.
 impl std::ops::Index<Rank> for Abstract {
     type Output = ElementList;
 
@@ -795,6 +851,7 @@ impl std::ops::Index<Rank> for Abstract {
     }
 }
 
+/// Permits mutably indexing an abstract polytope by rank.
 impl std::ops::IndexMut<Rank> for Abstract {
     fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
         &mut self.ranks[index]
@@ -1080,9 +1137,9 @@ mod tests {
     #[test]
     /// Checks that duals are generated correctly.
     fn dual_check() {
-        let mut polytopes = test_polytopes();
+        use crate::lang::{En, Language};
 
-        for (idx, poly) in polytopes.iter_mut().enumerate() {
+        for poly in test_polytopes().iter_mut() {
             let el_counts = poly.el_counts();
 
             poly.dual_mut();
@@ -1092,14 +1149,15 @@ mod tests {
             let mut du_el_counts_rev = poly.el_counts();
             du_el_counts_rev.reverse();
             assert_eq!(
-                el_counts.0, du_el_counts_rev.0,
-                "Dual element counts of test polytope #{} don't match expected value.",
-                idx
+                el_counts.0,
+                du_el_counts_rev.0,
+                "Dual element counts of {} don't match expected value.",
+                En::parse(poly.name(), Default::default())
             );
             assert!(
                 poly.full_check(),
-                "Dual of test polytope #{} is invalid.",
-                idx
+                "Dual of polytope {} is invalid.",
+                En::parse(poly.name(), Default::default())
             );
         }
     }

@@ -56,6 +56,14 @@ impl Rank {
         Self(self.0 - 1)
     }
 
+    pub const fn try_minus_one(&self) -> Option<Self> {
+        if self.0 == 0 {
+            None
+        } else {
+            Some(Self(self.0 - 1))
+        }
+    }
+
     /// Returns an iterator over `lo..hi`. A workaround until `Step` is
     /// stabilized.
     pub fn range_iter(
@@ -176,6 +184,10 @@ impl<T> RankVec<T> {
     /// Pushes a value onto the `RankVec<T>`.
     pub fn push(&mut self, value: T) {
         self.0.push(value)
+    }
+
+    pub fn pop(&mut self) -> Option<T> {
+        self.0.pop()
     }
 
     /// Returns a reference to the element at a given position or `None` if out
