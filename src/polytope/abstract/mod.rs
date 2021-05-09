@@ -743,7 +743,12 @@ impl Polytope<Abs> for Abstract {
         self.push_subs(faces);
         self.push_max();
 
-        Ok(())
+        // Checks for dyadicity, since sometimes that fails.
+        if self.is_dyadic() {
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
