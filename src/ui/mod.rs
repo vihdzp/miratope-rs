@@ -224,7 +224,9 @@ pub fn ui(
 
                             // The view is inactive, but will be activated.
                             SectionState::Inactive => {
-                                let p = query.iter_mut().next().unwrap();
+                                let mut p = query.iter_mut().next().unwrap();
+                                p.flatten();
+
                                 let minmax = p.x_minmax().unwrap_or((-1.0, 1.0));
                                 let original_polytope = p.clone();
 

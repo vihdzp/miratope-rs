@@ -764,7 +764,7 @@ impl<T: NameType> Name<T> {
                 Self::Nullitope => {}
                 Self::Point => pyramid_count += Rank::new(1),
                 Self::Dyad => pyramid_count += Rank::new(2),
-                Self::Triangle { regular: _ } => pyramid_count += Rank::new(2),
+                Self::Triangle { regular: _ } => pyramid_count += Rank::new(3),
                 Self::Simplex { regular: _, rank } => pyramid_count += rank + Rank::new(1),
                 Self::Multipyramid(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
