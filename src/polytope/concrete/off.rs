@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs, io, path::Path, str::FromStr};
 
-use super::{ Concrete, ElementList, Point, Polytope, RankVec, Subelements};
+use super::{Concrete, ElementList, Point, Polytope, RankVec, Subelements};
 use crate::{
     lang::name::{Con, Name},
     polytope::{

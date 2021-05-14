@@ -124,7 +124,8 @@ impl Abstract {
     /// subelements. To be used in circumstances where the elements are built up
     /// in layers.
     pub fn push_max(&mut self) {
-        self.push_subs(SubelementList::max(self.facet_count()));
+        let facet_count = self.el_count(self.rank());
+        self.push_subs(SubelementList::max(facet_count));
     }
 
     /// Pops the element list of the largest rank.

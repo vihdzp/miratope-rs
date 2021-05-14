@@ -9,11 +9,10 @@ use crate::{
     polytope::{
         concrete::Concrete,
         r#abstract::{
-            elements::{
-                 Element, ElementList, SubelementList, Subelements, Subsupelements,
-            },
-            rank::Rank,Abstract
-        }
+            elements::{Element, ElementList, SubelementList, Subelements, Subsupelements},
+            rank::Rank,
+            Abstract,
+        },
     },
     Consts, Float,
 };

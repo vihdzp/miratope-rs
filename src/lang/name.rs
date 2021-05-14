@@ -314,14 +314,66 @@ impl<T: NameType> Name<T> {
         }
     }
 
+    pub fn vertex_count(&self) -> usize {
+        match self {
+            // Basic shapes:
+            Name::Nullitope => 0,
+            Name::Point => 1,
+            Name::Dyad => 2,
+
+            // 2D shapes:
+            Name::Triangle { regular: _ } => 3,
+            Name::Square | Name::Rectangle | Name::Orthodiagonal => 4,
+
+            // Regular families:
+            Name::Polygon { regular: _, n } | Name::Generic { n, rank: _ } => *n,
+            Name::Simplex { regular: _, rank } => rank.0,
+            Name::Hyperblock { regular: _, rank } => 2u32.pow(rank.u32()) as usize,
+            Name::Orthoplex { regular: _, rank } => rank.usize() * 2,
+
+            // Modifiers:
+            Name::Pyramid(base) => base.vertex_count() + 1,
+            Name::Prism(base) => 2 * base.vertex_count(),
+            Name::Tegum(base) => base.vertex_count() + 2,
+
+            // Multimodifiers:
+            Name::Multipyramid(bases) | Name::Multiprism(bases) => {
+                let mut vertex_count = 1;
+                for base in bases {
+                    vertex_count *= base.vertex_count();
+                }
+                vertex_count
+            }
+            Name::Multitegum(bases) | Name::Multicomb(bases) => {
+                let mut vertex_count = 0;
+                for base in bases {
+                    vertex_count += base.vertex_count();
+                }
+                vertex_count
+            }
+            Name::Compound(components) => {
+                let mut vertex_count = 0;
+                for (rep, name) in components.iter() {
+                    vertex_count += rep * name.vertex_count();
+                }
+                vertex_count
+            }
+
+            Name::Dual { base, center: _ } => base.facet_count(),
+
+            // We can't really tell here, so we need to add more metadata.
+            Name::Great(_) | Name::Small(_) | Name::Stellated(_) => todo!(),
+        }
+    }
+
     /// Returns the number of facets of the polytope that the name describes, or
     /// `None` if it's unable to figure it out.
     ///
     /// # Todo
     /// We need to embed enough metadata in the name for this to always be able
     /// to figure out a facet count.
-    pub fn facet_count(&self) -> Option<usize> {
-        Some(match self {
+    pub fn facet_count(&self) -> usize {
+        match self {
             // Basic shapes:
             Name::Nullitope => 0,
             Name::Point => 1,
@@ -338,39 +390,38 @@ impl<T: NameType> Name<T> {
             Name::Orthoplex { regular: _, rank } => 2u32.pow(rank.u32()) as usize,
 
             // Modifiers:
-            Name::Pyramid(base) => base.facet_count()? + 1,
-            Name::Prism(base) => 2 * (base.facet_count()? + 1),
-            Name::Tegum(base) => 2 * base.facet_count()?,
+            Name::Pyramid(base) => base.facet_count() + 1,
+            Name::Prism(base) => 2 * (base.facet_count() + 1),
+            Name::Tegum(base) => 2 * base.facet_count(),
 
             // Multimodifiers:
             Name::Multipyramid(bases) | Name::Multitegum(bases) => {
                 let mut facet_count = 1;
                 for base in bases {
-                    facet_count *= base.facet_count()?;
+                    facet_count *= base.facet_count();
                 }
                 facet_count
             }
             Name::Multiprism(bases) | Name::Multicomb(bases) => {
                 let mut facet_count = 0;
                 for base in bases {
-                    facet_count += base.facet_count()?;
+                    facet_count += base.facet_count();
                 }
                 facet_count
             }
             Name::Compound(components) => {
                 let mut facet_count = 0;
                 for (rep, name) in components.iter() {
-                    facet_count += rep * name.facet_count()?;
+                    facet_count += rep * name.facet_count();
                 }
                 facet_count
             }
 
+            Name::Dual { base, center: _ } => base.vertex_count(),
+
             // We can't really tell here, so we need to add more metadata.
-            Name::Dual { base: _, center: _ }
-            | Name::Great(_)
-            | Name::Small(_)
-            | Name::Stellated(_) => return None,
-        })
+            Name::Great(_) | Name::Small(_) | Name::Stellated(_) => todo!(),
+        }
     }
 
     /// Determines whether a `Name` is valid, that is, all of the conditions
@@ -612,7 +663,7 @@ impl<T: NameType> Name<T> {
                     *base
                 } else {
                     Self::Generic {
-                        n: base.facet_count().unwrap(),
+                        n: base.facet_count(),
                         rank: base.rank(),
                     }
                 }
@@ -744,10 +795,7 @@ impl<T: NameType> Name<T> {
 
         // If we know the facet count of the names, a name with less facets
         // compares as less to one with more facets.
-        return_if_ne!(base0
-            .facet_count()
-            .unwrap_or(0)
-            .cmp(&base1.facet_count().unwrap_or(0)));
+        return_if_ne!(base0.facet_count().cmp(&base1.facet_count()));
 
         // The names are equal for all we care about.
         Ordering::Equal
