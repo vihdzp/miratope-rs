@@ -191,6 +191,8 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Returns an iterator over all flags of a polytope.
     fn flags(&self) -> std::iter::FilterMap<FlagIter, &dyn Fn(FlagEvent) -> Option<Flag>> {
+        // Debug assert that all elements are sorted!
+
         self.flag_events().filter_map(&|flag_event| {
             if let FlagEvent::Flag(flag) = flag_event {
                 Some(flag)
@@ -199,6 +201,8 @@ pub trait Polytope<T: NameType>: Sized + Clone {
             }
         })
     }
+
+    fn flag_omnitruncate(&self) -> Self;
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.

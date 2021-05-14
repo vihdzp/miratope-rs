@@ -234,7 +234,7 @@ pub fn ui(
                                     original_polytope,
                                     minmax,
                                     hyperplane_pos: (minmax.0 + minmax.1) / 2.0,
-                                    flatten: false,
+                                    flatten: true,
                                 }
                             }
                         };

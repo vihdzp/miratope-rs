@@ -8,7 +8,7 @@ pub mod off;
 
 use std::collections::HashMap;
 
-use self::{group::OrdPoint, mesh_builder::MeshBuilder};
+use self::mesh_builder::MeshBuilder;
 use super::{
     r#abstract::{
         elements::{Element, ElementList, Subelements, Subsupelements},
@@ -19,7 +19,7 @@ use super::{
     Polytope,
 };
 use crate::{
-    geometry::{Hyperplane, Hypersphere, Matrix, Point, Segment, Subspace},
+    geometry::{Hyperplane, Hypersphere, Matrix, OrdPoint, Point, Segment, Subspace},
     lang::name::{Con, ConData, Name, NameData, Regular},
     ui::camera::ProjectionType,
     Consts, Float,
@@ -694,7 +694,7 @@ impl Concrete {
             return Self::nullitope();
         }
 
-        abs.push(ElementList::single());
+        abs.push(ElementList::empty());
         abs.push(ElementList::vertices(vertex_count));
 
         // Takes care of building everything else.
@@ -756,6 +756,8 @@ impl Concrete {
                 *edge = Element::from_subs(new_subs);
             }
 
+            // This can definitely be optimized: we don't need to copy
+            // everything into a new polytope.
             abs[Rank::new(1)].append(&mut new_edges);
             abs[Rank::new(2)] = faces;
 
@@ -1031,6 +1033,12 @@ impl Polytope<Con> for Concrete {
 
     fn flag_events(&self) -> FlagIter {
         self.abs.flag_events()
+    }
+
+    fn flag_omnitruncate(&self) -> Self {
+        // let rank = self.rank();
+
+        todo!()
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)

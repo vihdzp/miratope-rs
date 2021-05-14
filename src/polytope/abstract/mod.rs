@@ -1,3 +1,4 @@
+mod builder;
 pub mod elements;
 pub mod flag;
 pub mod rank;
@@ -13,7 +14,10 @@ use self::{
     rank::{Rank, RankVec},
 };
 use super::Polytope;
-use crate::lang::name::{Abs, AbsData, Name};
+use crate::{
+    lang::name::{Abs, AbsData, Name},
+    polytope::r#abstract::builder::AbstractBuilder,
+};
 
 /// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
 /// to an [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
@@ -123,17 +127,15 @@ impl Abstract {
         }
     }
 
-    /// Pushes an element list with a single empty element into the polytope. To
-    /// be used in circumstances where the elements are built up in layers, as
-    /// the base element.
-    pub fn push_single(&mut self) {
+    /// Pushes an element list with a single empty element into the polytope.
+    pub fn push_empty(&mut self) {
         // If you're using this method, the polytope should be empty.
         debug_assert!(self.ranks.is_empty());
 
-        self.push_subs(ElementList::single());
+        self.push_subs(ElementList::empty());
     }
 
-    /// Pushes a minimal element with no superelements into the polytope. To be
+    ///  To be
     /// used in circumstances where the elements are built up in layers.
     pub fn push_vertices(&mut self, vertex_count: usize) {
         // If you're using this method, the polytope should consist of a single
@@ -141,10 +143,6 @@ impl Abstract {
         debug_assert_eq!(self.rank(), Rank::new(-1));
 
         self.push_subs(ElementList::vertices(vertex_count))
-    }
-
-    pub fn push_min(&mut self, vertex_count: usize) {
-        self.push(ElementList::min(vertex_count));
     }
 
     /// Pushes a maximal element into the polytope, with the facets as
@@ -532,7 +530,7 @@ impl Abstract {
         // If !min, we have to set a minimal element manually.
         if !min {
             let vertex_count = p.vertex_count() * q.vertex_count();
-            element_lists[Rank::new(-1)] = ElementList::single();
+            element_lists[Rank::new(-1)] = ElementList::empty();
             element_lists[Rank::new(0)] = ElementList::vertices(vertex_count);
         }
 
@@ -542,15 +540,15 @@ impl Abstract {
         }
 
         // Uses push_subs to add all of the element lists into a new polytope.
-        let mut product = Self::with_capacity(element_lists.rank());
+        let mut product = AbstractBuilder::with_capacity(element_lists.rank());
         for elements in element_lists.into_iter() {
-            product.push_subs(elements);
+            product.push(elements);
         }
 
         // Sets the name of the polytope.
         let bases = vec![p.name().clone(), q.name().clone()];
 
-        product.with_name(if min && max {
+        product.build().with_name(if min && max {
             Name::multipyramid(bases)
         } else if !min && max {
             Name::multiprism(bases)
@@ -641,14 +639,14 @@ impl Polytope<Abs> for Abstract {
             edges.push(Element::from_subs(Subelements(vec![i % n, (i + 1) % n])));
         }
 
-        let mut poly = Abstract::with_capacity(Rank::new(2));
+        let mut poly = AbstractBuilder::with_capacity(Rank::new(2));
 
         poly.push_single();
         poly.push_vertices(n);
-        poly.push_subs(edges);
+        poly.push(edges);
         poly.push_max();
 
-        poly.with_name(Name::polygon(AbsData::default(), n))
+        poly.build().with_name(Name::polygon(AbsData::default(), n))
     }
 
     /// Converts a polytope into its dual. Use [`dual`] instead, as this method
@@ -681,9 +679,6 @@ impl Polytope<Abs> for Abstract {
         if self.rank() != Rank::new(3) {
             return Err(());
         }
-
-        // We're using flags, so we gotta sort our polytope's element lists.
-        self.sort();
 
         // Consider a flag in a polytope. It has an associated edge. It turns
         // out that if we repeatedly apply a vertex-change, an edge-change, and
@@ -756,6 +751,10 @@ impl Polytope<Abs> for Abstract {
     /// never fail.
     fn try_antiprism(&self) -> Result<Self, usize> {
         Ok(self.antiprism_and_vertices().0)
+    }
+
+    fn flag_omnitruncate(&self) -> Self {
+        todo!()
     }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails

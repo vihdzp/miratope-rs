@@ -297,7 +297,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
 
     // Initializes the abstract polytope.
     let mut abs = Abstract::with_capacity(Rank::new(dim as isize));
-    abs.push_single();
+    abs.push_empty();
     for _ in 0..(dim as isize) {
         abs.push_subs(ElementList::new());
     }

@@ -6,11 +6,11 @@ use super::{convex, cox::CoxMatrix, Concrete};
 
 #[allow(unused_imports)] // Circumvents rust-analyzer bug.
 use crate::cox;
-use crate::geometry::{Matrix, Point, Vector};
+use crate::geometry::{Matrix, OrdMatrix, OrdPoint, Point, Vector};
 use crate::{Consts, Float};
 
 use approx::{abs_diff_ne, relative_eq};
-use nalgebra::{storage::Storage, Dim, Dynamic, Quaternion, VecStorage, U1};
+use nalgebra::{Dynamic, Quaternion, VecStorage};
 
 /// Converts a 3D rotation matrix into a quaternion. Uses the code from
 /// [Day (2015)](https://d3cw3dd2w32x2b.cloudfront.net/wp-content/uploads/2015/01/matrix-to-quat.pdf).
@@ -145,7 +145,7 @@ impl Group {
         self.collect()
     }
 
-    /// Gets the number of elements of the group. Consumes the iterators.
+    /// Gets the number of elements of the group. Consumes the iterator.
     pub fn order(self) -> usize {
         self.count()
     }
@@ -412,83 +412,6 @@ pub enum GroupNext {
     /// We found a new element.
     New(Matrix),
 }
-
-#[allow(clippy::upper_case_acronyms)]
-type MatrixMN<R, C> = nalgebra::Matrix<Float, R, C, VecStorage<Float, R, C>>;
-
-/// A matrix ordered by fuzzy lexicographic ordering. Used to quickly
-/// determine whether an element in a [`GenIter`](GenIter) is a
-/// duplicate.
-#[derive(Clone, Debug)]
-#[allow(clippy::upper_case_acronyms)]
-pub struct OrdMatrixMN<R: Dim, C: Dim>(pub MatrixMN<R, C>)
-where
-    VecStorage<Float, R, C>: Storage<Float, R, C>;
-
-impl<R: Dim, C: Dim> PartialEq for OrdMatrixMN<R, C>
-where
-    VecStorage<Float, R, C>: Storage<Float, R, C>,
-{
-    fn eq(&self, other: &Self) -> bool {
-        let mut other = other.iter();
-
-        for x in self.iter() {
-            let y = other.next().unwrap();
-
-            if abs_diff_ne!(x, y, epsilon = Float::EPS) {
-                return false;
-            }
-        }
-
-        true
-    }
-}
-
-impl<R: Dim, C: Dim> Eq for OrdMatrixMN<R, C> where VecStorage<Float, R, C>: Storage<Float, R, C> {}
-
-impl<R: Dim, C: Dim> PartialOrd for OrdMatrixMN<R, C>
-where
-    VecStorage<Float, R, C>: Storage<Float, R, C>,
-{
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let mut other = other.iter();
-
-        for x in self.iter() {
-            let y = other.next().unwrap();
-
-            if abs_diff_ne!(x, y, epsilon = Float::EPS) {
-                return x.partial_cmp(y);
-            }
-        }
-
-        Some(std::cmp::Ordering::Equal)
-    }
-}
-
-impl<R: Dim, C: Dim> Ord for OrdMatrixMN<R, C>
-where
-    VecStorage<Float, R, C>: Storage<Float, R, C>,
-{
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
-    }
-}
-
-impl<R: Dim, C: Dim> OrdMatrixMN<R, C>
-where
-    VecStorage<Float, R, C>: Storage<Float, R, C>,
-{
-    pub fn new(mat: MatrixMN<R, C>) -> Self {
-        Self(mat)
-    }
-
-    pub fn iter(&self) -> nalgebra::iter::MatrixIter<Float, R, C, VecStorage<Float, R, C>> {
-        self.0.iter()
-    }
-}
-
-type OrdMatrix = OrdMatrixMN<Dynamic, Dynamic>;
-pub type OrdPoint = OrdMatrixMN<Dynamic, U1>;
 
 /// An iterator for a `Group` [generated](https://en.wikipedia.org/wiki/Generator_(mathematics))
 /// by a set of floating point matrices. Its elements are built in a BFS order.

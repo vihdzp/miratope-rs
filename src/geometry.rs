@@ -11,7 +11,8 @@ pub type Matrix = nalgebra::DMatrix<Float>;
 
 use crate::{Consts, Float};
 
-use approx::abs_diff_eq;
+use approx::{abs_diff_eq, abs_diff_ne};
+use nalgebra::{storage::Storage, Dim, Dynamic, VecStorage, U1};
 
 #[derive(Debug)]
 /// A hypersphere with a certain center and radius.
@@ -373,6 +374,79 @@ impl Segment {
         self.at(0.5)
     }
 }
+
+type MatrixMxN<R, C> = nalgebra::Matrix<Float, R, C, VecStorage<Float, R, C>>;
+
+/// A matrix ordered by fuzzy lexicographic ordering.
+#[derive(Clone, Debug)]
+pub struct OrdMatrixMxN<R: Dim, C: Dim>(pub MatrixMxN<R, C>)
+where
+    VecStorage<Float, R, C>: Storage<Float, R, C>;
+
+impl<R: Dim, C: Dim> PartialEq for OrdMatrixMxN<R, C>
+where
+    VecStorage<Float, R, C>: Storage<Float, R, C>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        let mut other = other.iter();
+
+        for x in self.iter() {
+            let y = other.next().unwrap();
+
+            if abs_diff_ne!(x, y, epsilon = Float::EPS) {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+impl<R: Dim, C: Dim> Eq for OrdMatrixMxN<R, C> where VecStorage<Float, R, C>: Storage<Float, R, C> {}
+
+impl<R: Dim, C: Dim> PartialOrd for OrdMatrixMxN<R, C>
+where
+    VecStorage<Float, R, C>: Storage<Float, R, C>,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let mut other = other.iter();
+
+        for x in self.iter() {
+            let y = other.next().unwrap();
+
+            if abs_diff_ne!(x, y, epsilon = Float::EPS) {
+                return x.partial_cmp(y);
+            }
+        }
+
+        Some(std::cmp::Ordering::Equal)
+    }
+}
+
+impl<R: Dim, C: Dim> Ord for OrdMatrixMxN<R, C>
+where
+    VecStorage<Float, R, C>: Storage<Float, R, C>,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+impl<R: Dim, C: Dim> OrdMatrixMxN<R, C>
+where
+    VecStorage<Float, R, C>: Storage<Float, R, C>,
+{
+    pub fn new(mat: MatrixMxN<R, C>) -> Self {
+        Self(mat)
+    }
+
+    pub fn iter(&self) -> nalgebra::iter::MatrixIter<Float, R, C, VecStorage<Float, R, C>> {
+        self.0.iter()
+    }
+}
+
+pub type OrdMatrix = OrdMatrixMxN<Dynamic, Dynamic>;
+pub type OrdPoint = OrdMatrixMxN<Dynamic, U1>;
 
 #[cfg(test)]
 mod tests {

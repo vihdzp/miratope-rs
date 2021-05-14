@@ -291,7 +291,7 @@ impl ElementList {
 
     /// Returns an element list with a single, empty element. Often used as the
     /// element list for the nullitopes when a polytope is built in layers.
-    pub fn single() -> Self {
+    pub fn empty() -> Self {
         Self(vec![Element::new()])
     }
 
@@ -356,6 +356,7 @@ impl IndexMut<usize> for ElementList {
 pub struct ElementHash(RankVec<HashMap<usize, usize>>);
 
 impl ElementHash {
+    /// Gets the hashmap corresponding to elements of a given rank.
     pub fn get(&self, idx: Rank) -> Option<&HashMap<usize, usize>> {
         self.0.get(idx)
     }

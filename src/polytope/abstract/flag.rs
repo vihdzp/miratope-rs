@@ -105,8 +105,13 @@ impl Flag {
     }
 }
 
-/// Gets the common elements of two **sorted** lists.
+/// Gets the common elements of two lists. There's definitely a better way.
 fn common(vec0: &[usize], vec1: &[usize]) -> Vec<usize> {
+    let mut vec0 = vec0.to_owned();
+    vec0.sort_unstable();
+    let mut vec1 = vec1.to_owned();
+    vec1.sort_unstable();
+
     let mut common = Vec::new();
     let mut i = 0;
     let mut j = 0;
@@ -225,13 +230,15 @@ impl std::ops::IndexMut<Rank> for Flag {
 /// realize a polytope is non-orientable only after traversing every single one
 /// of its flags. Hence, we can't bundle the information that the polytope is
 /// non-orientable with the flags.
-pub struct FlagIter {
+pub struct FlagIter<'a> {
     /// The polytope whose flags are iterated. We must sort all of its elements
     /// before using it for the algorithm to work.
-    polytope: Abstract,
+    polytope: &'a Abstract,
 
     /// The flags whose adjacencies are being searched.
     queue: VecDeque<Flag>,
+
+    flag_changes: Vec<usize>,
 
     /// The flag index we need to check next.
     flag_idx: usize,
@@ -260,48 +267,54 @@ pub enum IterResult {
     None,
 }
 
-impl FlagIter {
+impl<'a> FlagIter<'a> {
     /// Initializes a new iterator over the flag events of a polytope.
-    pub fn new(polytope: &Abstract) -> Self {
-        assert!(polytope.is_bounded(), "Polytope is not bounded.");
+    pub fn new(polytope: &'a Abstract) -> Self {
         let rank = polytope.rank();
 
-        // The polytope's elements must be sorted! We thus clone the polytope
-        // and sort its elements.
-        let mut polytope = polytope.clone();
-        for elements in polytope.ranks.iter_mut() {
-            for el in elements.iter_mut() {
-                el.sort();
-            }
+        // Initializes with any flag from the polytope.
+        let mut first_flag = Flag::with_capacity(rank.usize());
+        let mut idx = 0;
+        first_flag.elements.push(0);
+
+        for r in Rank::range_iter(Rank::new(1), rank) {
+            idx = polytope.element_ref(r.minus_one(), idx).unwrap().sups[0];
+            first_flag.elements.push(idx);
         }
+
+        // All flag changes.
+        let flag_changes = (0..rank.usize()).collect();
+
+        Self::with_flags(polytope, flag_changes, first_flag)
+    }
+
+    pub fn with_flags(polytope: &'a Abstract, flag_changes: Vec<usize>, first_flag: Flag) -> Self {
+        assert!(polytope.is_bounded(), "Polytope is not bounded.");
+        let rank = polytope.rank();
 
         // Initializes found flags.
         let mut found = HashMap::new();
         let mut queue = VecDeque::new();
 
-        if polytope.rank() != Rank::new(-1) {
-            // Initializes with any flag from the polytope.
-            let mut flag = Flag::with_capacity(rank.usize());
-            let mut idx = 0;
-            flag.elements.push(0);
-            for r in Rank::range_iter(Rank::new(1), rank) {
-                idx = polytope.element_ref(r.minus_one(), idx).unwrap().sups[0];
-                flag.elements.push(idx);
-            }
-
-            found.insert(flag.clone(), 0);
+        if rank != Rank::new(-1) {
+            found.insert(first_flag.clone(), 0);
 
             // Initializes queue.
-            queue.push_back(flag);
+            queue.push_back(first_flag);
         }
 
         Self {
             polytope,
             queue,
+            flag_changes,
             flag_idx: 0,
             found,
             orientable: true,
         }
+    }
+
+    pub fn flag_change(&self) -> usize {
+        self.flag_changes[self.flag_idx]
     }
 
     /// Attempts to get the next flag.
@@ -310,10 +323,10 @@ impl FlagIter {
         let new_flag;
 
         if let Some(current) = self.queue.front() {
-            new_flag = current.change(&self.polytope, self.flag_idx);
+            new_flag = current.change(&self.polytope, self.flag_change());
 
             // Increments flag_idx.
-            self.flag_idx = if self.flag_idx + 1 == rank {
+            self.flag_idx = if self.flag_idx + 1 == self.flag_changes.len() {
                 self.queue.pop_front();
                 0
             } else {
@@ -381,7 +394,7 @@ pub enum FlagEvent {
     NonOrientable,
 }
 
-impl Iterator for FlagIter {
+impl<'a> Iterator for FlagIter<'a> {
     type Item = FlagEvent;
 
     fn next(&mut self) -> Option<Self::Item> {
