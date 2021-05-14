@@ -1,4 +1,9 @@
-use super::{elements::ElementList, rank::Rank, Abstract};
+use super::{
+    elements::{SubelementList, SuperelementList},
+    rank::Rank,
+    Abstract,
+};
+use crate::polytope::r#abstract::Subelements;
 use crate::polytope::Polytope;
 
 /// Builds a polytope from the bottom up.
@@ -13,8 +18,8 @@ impl AbstractBuilder {
         Self(Abstract::with_capacity(rank))
     }
 
-    pub fn push(&mut self, elements: ElementList) {
-        self.0.push_subs(elements)
+    pub fn push(&mut self, subelements: SubelementList) {
+        self.0.push_subs(subelements)
     }
 
     pub fn push_single(&mut self) {
@@ -47,12 +52,14 @@ impl AbstractBuilderRev {
         Self(Abstract::with_capacity(rank))
     }
 
-    pub fn push(&mut self,mut elements: ElementList) {
-        for el in elements.iter_mut() {
-            el.swap_mut();
+    pub fn push(&mut self, superelements: SuperelementList) {
+        let mut subelements = SubelementList::with_capacity(superelements.len());
+
+        for sup_el in superelements {
+            subelements.push(Subelements(sup_el.0));
         }
 
-        self.0.push_subs(elements)
+        self.0.push_subs(subelements)
     }
 
     pub fn push_max(&mut self) {

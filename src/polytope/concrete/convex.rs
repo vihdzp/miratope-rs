@@ -8,6 +8,7 @@ use crate::{
     geometry::{Point, Subspace},
     polytope::{
         concrete::Concrete,
+        r#abstract::elements::SubelementList,
         r#abstract::{
             elements::{Element, ElementList, Subelements, Subsupelements},
             rank::Rank,
@@ -299,7 +300,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
     let mut abs = Abstract::with_capacity(Rank::new(dim as isize));
     abs.push_empty();
     for _ in 0..(dim as isize) {
-        abs.push_subs(ElementList::new());
+        abs.push_subs(SubelementList::new());
     }
 
     // Adds everything else.
@@ -365,8 +366,8 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
     // vertices, which are precisely the rank 1 elements of the polytope.
     abs[Rank::new(1)] = els_verts;
 
-    // Adds the vertices and the maximal element.
-    abs[Rank::new(0)] = ElementList::vertices(vertices.len());
+    // Adds the vertices and the maximal element. THIS LINE DOES NOT WORK!
+    // abs[Rank::new(0)] = ElementList::vertices(vertices.len());
     abs.push_max();
 
     Concrete::new(vertices, abs)

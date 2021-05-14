@@ -1,4 +1,4 @@
-mod builder;
+pub mod builder;
 pub mod elements;
 pub mod flag;
 pub mod rank;
@@ -7,8 +7,8 @@ use std::collections::{BTreeSet, HashMap};
 
 use self::{
     elements::{
-        Element, ElementHash, ElementList, Section, SectionHash, Subelements, Subsupelements,
-        Superelements,
+        Element, ElementHash, ElementList, Section, SectionHash, SubelementList, Subelements,
+        Subsupelements, Superelements,
     },
     flag::{FlagEvent, FlagIter},
     rank::{Rank, RankVec},
@@ -27,7 +27,7 @@ use crate::{
 /// # How to use?
 /// The fact that we store both subelements and superelements is quite useful
 /// for many algorithms. However, it becomes inconvenient when actually building
-/// a polytope, since most of the time, we can only easily generate subelements.
+/// a polytope, since most of the time, we can only easily generate one of them.
 ///
 /// To get around this, we provide a [`push_subs`](Abstract::push_subs) method.
 /// Instead of manually having to set the superelements in the polytope, one can
@@ -109,21 +109,14 @@ impl Abstract {
         self.push_at(rank, el);
     }
 
-    /// Pushes a new element list, assuming that the superelements of the
-    /// maximal rank **haven't** already been set. If they have already been
-    /// set, use [`push`](Self::push) instead.    
-    pub fn push_subs(&mut self, elements: ElementList) {
-        // We assume the superelements of the maximal rank haven't been set.
-        if !self.ranks.is_empty() {
-            for el in self[self.rank()].iter() {
-                debug_assert!(el.sups.is_empty(), "The method push_subs can only be used when the superelements of the elements of the maximal rank haven't already been set.");
-            }
-        }
+    /// Pushes a new element list without superelements, assuming that the
+    /// superelements of the maximal rank **haven't** already been set. If they
+    /// have already been set, use [`push`](Self::push) instead.
+    pub fn push_subs(&mut self, subelements: SubelementList) {
+        self.push(ElementList::with_capacity(subelements.len()));
 
-        self.push(ElementList::with_capacity(elements.len()));
-
-        for el in elements.into_iter() {
-            self.push_subs_at(self.rank(), el);
+        for sub_el in subelements.into_iter() {
+            self.push_subs_at(self.rank(), Element::from_subs(sub_el));
         }
     }
 
@@ -132,7 +125,7 @@ impl Abstract {
         // If you're using this method, the polytope should be empty.
         debug_assert!(self.ranks.is_empty());
 
-        self.push_subs(ElementList::empty());
+        self.push_subs(SubelementList::empty());
     }
 
     ///  To be
@@ -142,7 +135,7 @@ impl Abstract {
         // minimal element.
         debug_assert_eq!(self.rank(), Rank::new(-1));
 
-        self.push_subs(ElementList::vertices(vertex_count))
+        self.push_subs(SubelementList::vertices(vertex_count))
     }
 
     /// Pushes a maximal element into the polytope, with the facets as
@@ -150,7 +143,7 @@ impl Abstract {
     /// in layers.
     pub fn push_max(&mut self) {
         let facet_count = self.el_count(self.rank());
-        self.push_subs(ElementList::max(facet_count));
+        self.push_subs(SubelementList::max(facet_count));
     }
 
     pub fn pop(&mut self) -> Option<ElementList> {
@@ -205,7 +198,7 @@ impl Abstract {
         // We actually build the elements backwards, which is as awkward as it
         // seems. Maybe we should fix that in the future?
         let mut backwards_abs = RankVec::with_capacity(rank.plus_one());
-        backwards_abs.push(ElementList::max(section_hash.len));
+        backwards_abs.push(SubelementList::max(section_hash.len));
 
         // Indices of base.
         let vertex_count = self.vertex_count();
@@ -219,10 +212,10 @@ impl Abstract {
         for height in 0..=rank.isize() + 1 {
             let height = Rank::new(height);
             let mut new_section_hash = SectionHash::new(rank, height);
-            let mut elements = ElementList::with_capacity(section_hash.len);
+            let mut elements = SubelementList::with_capacity(section_hash.len);
 
             for _ in 0..section_hash.len {
-                elements.push(Element::new());
+                elements.push(Subelements::new());
             }
 
             // Goes over all sections of the previous height, and builds the
@@ -248,7 +241,7 @@ impl Abstract {
                             idx_hi: indices.1,
                         });
 
-                        elements[idx].subs.push(sub);
+                        elements[idx].push(sub);
                     }
 
                     // Finds all of the superelements of our old section's
@@ -263,7 +256,7 @@ impl Abstract {
                             idx_hi,
                         });
 
-                        elements[idx].subs.push(sub);
+                        elements[idx].push(sub);
                     }
                 }
             }
@@ -429,7 +422,7 @@ impl Abstract {
         // push_subs for each of them into a new Abstract.
         let mut element_lists = RankVec::with_capacity(rank);
         for _ in Rank::range_inclusive_iter(Rank::new(-1), rank) {
-            element_lists.push(ElementList::new());
+            element_lists.push(SubelementList::new());
         }
 
         // We add the elements of a given rank in lexicographic order of the
@@ -520,7 +513,7 @@ impl Abstract {
                                 }
                             }
 
-                            element_lists[prod_rank].push(Element::from_subs(subs))
+                            element_lists[prod_rank].push(subs)
                         }
                     }
                 }
@@ -530,13 +523,13 @@ impl Abstract {
         // If !min, we have to set a minimal element manually.
         if !min {
             let vertex_count = p.vertex_count() * q.vertex_count();
-            element_lists[Rank::new(-1)] = ElementList::empty();
-            element_lists[Rank::new(0)] = ElementList::vertices(vertex_count);
+            element_lists[Rank::new(-1)] = SubelementList::empty();
+            element_lists[Rank::new(0)] = SubelementList::vertices(vertex_count);
         }
 
         // If !max, we have to set a maximal element manually.
         if !max {
-            element_lists[rank] = ElementList::max(element_lists[rank.minus_one()].len());
+            element_lists[rank] = SubelementList::max(element_lists[rank.minus_one()].len());
         }
 
         // Uses push_subs to add all of the element lists into a new polytope.
@@ -619,13 +612,13 @@ impl Polytope<Abs> for Abstract {
     /// [dyad](https://polytope.miraheze.org/wiki/Dyad), the unique polytope of
     /// rank 1.
     fn dyad() -> Self {
-        let mut abs = Abstract::with_capacity(Rank::new(1));
+        let mut abs = AbstractBuilder::with_capacity(Rank::new(1));
 
-        abs.push(ElementList::min(2));
-        abs.push(ElementList::vertices(2));
-        abs.push_subs(ElementList::max(2));
+        abs.push_single();
+        abs.push_vertices(2);
+        abs.push_max();
 
-        abs.with_name(Name::Dyad)
+        abs.build().with_name(Name::Dyad)
     }
 
     /// Returns an instance of a [polygon](https://polytope.miraheze.org/wiki/Polygon)
@@ -633,10 +626,10 @@ impl Polytope<Abs> for Abstract {
     fn polygon(n: usize) -> Self {
         assert!(n >= 2, "A polygon must have at least 2 sides.");
 
-        let mut edges = ElementList::with_capacity(n);
+        let mut edges = SubelementList::with_capacity(n);
 
         for i in 0..n {
-            edges.push(Element::from_subs(Subelements(vec![i % n, (i + 1) % n])));
+            edges.push(Subelements(vec![i % n, (i + 1) % n]));
         }
 
         let mut poly = AbstractBuilder::with_capacity(Rank::new(2));
@@ -688,7 +681,7 @@ impl Polytope<Abs> for Abstract {
         // face, we mark any other flag that gives the same face as "traversed".
         // Once we've traversed all flags, we got our Petrial's faces.
         let mut traversed_flags = BTreeSet::new();
-        let mut faces = ElementList::new();
+        let mut faces = SubelementList::new();
 
         for mut flag in self.flags() {
             // If we've found the face associated to this flag before, we skip.
@@ -722,7 +715,7 @@ impl Polytope<Abs> for Abstract {
                 return Err(());
             }
 
-            faces.push(Element::from_subs(Subelements(face.into_iter().collect())));
+            faces.push(Subelements(face.into_iter().collect()));
         }
 
         // Removes the faces and maximal polytope from self.

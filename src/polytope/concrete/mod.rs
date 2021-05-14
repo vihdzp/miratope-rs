@@ -6,12 +6,13 @@ pub mod group;
 pub mod mesh_builder;
 pub mod off;
 
+use crate::polytope::r#abstract::builder::AbstractBuilder;
 use std::collections::HashMap;
 
 use self::mesh_builder::MeshBuilder;
 use super::{
     r#abstract::{
-        elements::{Element, ElementList, Subelements, Subsupelements},
+        elements::{Element, ElementList, SubelementList, Subelements, Subsupelements},
         flag::{FlagEvent, FlagIter},
         rank::{Rank, RankVec},
         Abstract,
@@ -666,7 +667,7 @@ impl Concrete {
     pub fn cross_section(&self, slice: &Hyperplane) -> Self {
         let mut vertices = Vec::new();
 
-        let mut abs = Abstract::new();
+        let mut abs = AbstractBuilder::new();
 
         // We map all indices of k-elements in the original polytope to the
         // indices of the new (k-1)-elements resulting from taking their
@@ -694,13 +695,13 @@ impl Concrete {
             return Self::nullitope();
         }
 
-        abs.push(ElementList::empty());
-        abs.push(ElementList::vertices(vertex_count));
+        abs.push(SubelementList::empty());
+        abs.push(SubelementList::vertices(vertex_count));
 
         // Takes care of building everything else.
         for r in Rank::range_iter(Rank::new(2), self.rank()) {
             let mut new_hash_element = HashMap::new();
-            let mut new_els = ElementList::new();
+            let mut new_els = SubelementList::new();
 
             for (idx, el) in self[r].iter().enumerate() {
                 let mut new_subs = Subelements::new();
@@ -713,7 +714,7 @@ impl Concrete {
                 // If we got ourselves a new edge:
                 if !new_subs.is_empty() {
                     new_hash_element.insert(idx, new_els.len());
-                    new_els.push(Element::from_subs(new_subs));
+                    new_els.push(new_subs);
                 }
             }
 
@@ -722,8 +723,10 @@ impl Concrete {
         }
 
         // Adds a maximal element manually.
-        let facet_count = abs.ranks.last().unwrap().len();
-        abs.push(ElementList::max(facet_count));
+        abs.push_max();
+
+        // There's a better way, too lazy rn tho
+        let mut abs = abs.build();
 
         // Splits compounds of dyads.
         if let Some(mut faces) = abs.ranks.get(Rank::new(2)).cloned() {
@@ -762,8 +765,8 @@ impl Concrete {
             abs[Rank::new(2)] = faces;
 
             let mut abs2 = Abstract::new();
-            for r in abs {
-                abs2.push_subs(r);
+            for elements in abs {
+                abs2.push_subs(elements.subelements());
             }
 
             Self::new(vertices, abs2)

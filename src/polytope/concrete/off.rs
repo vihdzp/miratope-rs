@@ -1,9 +1,10 @@
 use std::{collections::HashMap, fs, io, path::Path, str::FromStr};
 
-use super::{Abstract, Concrete, Element, ElementList, Point, Polytope, RankVec, Subelements};
+use super::{Abstract, Concrete, ElementList, Point, Polytope, RankVec, Subelements};
 use crate::{
     lang::name::{Con, Name},
     polytope::{
+        r#abstract::elements::SubelementList,
         r#abstract::{elements::Subsupelements, rank::Rank},
         COMPONENTS, ELEMENT_NAMES,
     },
@@ -111,9 +112,9 @@ fn parse_edges_and_faces<'a>(
     num_edges: usize,
     num_faces: usize,
     toks: &mut impl Iterator<Item = &'a str>,
-) -> (ElementList, ElementList) {
-    let mut edges = ElementList::with_capacity(num_edges);
-    let mut faces = ElementList::with_capacity(num_faces);
+) -> (SubelementList, SubelementList) {
+    let mut edges = SubelementList::with_capacity(num_edges);
+    let mut faces = SubelementList::with_capacity(num_faces);
 
     let mut hash_edges = HashMap::new();
 
@@ -121,7 +122,7 @@ fn parse_edges_and_faces<'a>(
     for _ in 0..num_faces {
         let face_sub_num = next_tok(toks);
 
-        let mut face = Element::new();
+        let mut face = Subelements::new();
         let mut face_verts = Vec::with_capacity(face_sub_num);
 
         // Reads all vertices of the face.
@@ -131,17 +132,14 @@ fn parse_edges_and_faces<'a>(
 
         // Gets all edges of the face.
         for i in 0..face_sub_num {
-            let mut edge = Element::from_subs(Subelements(vec![
-                face_verts[i],
-                face_verts[(i + 1) % face_sub_num],
-            ]));
-            edge.subs.sort();
+            let mut edge = Subelements(vec![face_verts[i], face_verts[(i + 1) % face_sub_num]]);
+            edge.sort();
 
             if let Some(idx) = hash_edges.get(&edge) {
-                face.subs.push(*idx);
+                face.push(*idx);
             } else {
                 hash_edges.insert(edge.clone(), edges.len());
-                face.subs.push(edges.len());
+                face.push(edges.len());
                 edges.push(edge);
             }
         }
@@ -154,19 +152,19 @@ fn parse_edges_and_faces<'a>(
 
     // If this is a polygon, we add a single maximal element as a face.
     if rank == Rank::new(2) {
-        faces = ElementList::max(edges.len());
+        faces = SubelementList::max(edges.len());
     }
 
     // The number of edges in the file should match the number of read edges, though this isn't obligatory.
     if edges.len() != num_edges {
-        println!("Edge count doesn't match expected edge count!");
+        println!("WARNING: Edge count doesn't match expected edge count!");
     }
 
     (edges, faces)
 }
 
-fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> ElementList {
-    let mut els_subs = ElementList::with_capacity(num_el);
+fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> SubelementList {
+    let mut els_subs = SubelementList::with_capacity(num_el);
 
     // Adds every d-element to the element list.
     for _ in 0..num_el {
@@ -179,7 +177,7 @@ fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> Ele
             subs.push(el_sub.parse().expect("Integer parsing failed!"));
         }
 
-        els_subs.push(Element::from_subs(subs));
+        els_subs.push(subs);
     }
 
     els_subs

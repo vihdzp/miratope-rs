@@ -289,12 +289,6 @@ impl ElementList {
         self.0.resize(new_len, value)
     }
 
-    /// Returns an element list with a single, empty element. Often used as the
-    /// element list for the nullitopes when a polytope is built in layers.
-    pub fn empty() -> Self {
-        Self(vec![Element::new()])
-    }
-
     /// Returns the element list for the nullitope in a polytope with a given
     /// vertex count.
     pub fn min(vertex_count: usize) -> Self {
@@ -307,21 +301,19 @@ impl ElementList {
         Self(vec![Element::max(facet_count)])
     }
 
-    /// Returns the element list for a set number of vertices in a polytope.
-    /// **Does not include any superelements.**
-    pub fn vertices(vertex_count: usize) -> Self {
-        let mut els = ElementList::with_capacity(vertex_count);
-
-        for _ in 0..vertex_count {
-            els.push(Element::from_subs(Subelements(vec![0])));
-        }
-
-        els
-    }
-
     /// Pushes a value into the element list.
     pub fn push(&mut self, value: Element) {
         self.0.push(value)
+    }
+
+    pub fn subelements(&self) -> SubelementList {
+        let mut subelements = SubelementList::with_capacity(self.len());
+
+        for el in self.iter() {
+            subelements.push(el.subs.clone());
+        }
+
+        subelements
     }
 }
 
@@ -344,6 +336,119 @@ impl Index<usize> for ElementList {
 }
 
 impl IndexMut<usize> for ElementList {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
+
+/// A list of subelements in a polytope.
+pub struct SubelementList(Vec<Subelements>);
+
+impl SubelementList {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
+    pub fn push(&mut self, value: Subelements) {
+        self.0.push(value);
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns an element list with a single, empty element. Often used as the
+    /// element list for the nullitopes when a polytope is built in layers.
+    pub fn empty() -> Self {
+        Self(vec![Subelements::new()])
+    }
+
+    /// Returns the element list for a set number of vertices in a polytope.
+    /// **Does not include any superelements.**
+    pub fn vertices(vertex_count: usize) -> Self {
+        let mut els = SubelementList::with_capacity(vertex_count);
+
+        for _ in 0..vertex_count {
+            els.push(Subelements(vec![0]));
+        }
+
+        els
+    }
+
+    /// Returns the element list for the maximal element in a polytope with a
+    /// given facet count.
+    pub fn max(facet_count: usize) -> Self {
+        Self(vec![Subelements::count(facet_count)])
+    }
+}
+
+impl IntoIterator for SubelementList {
+    type Item = Subelements;
+
+    type IntoIter = std::vec::IntoIter<Subelements>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl Index<usize> for SubelementList {
+    type Output = Subelements;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl IndexMut<usize> for SubelementList {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
+
+pub struct SuperelementList(Vec<Superelements>);
+
+impl SuperelementList {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
+    pub fn push(&mut self, value: Superelements) {
+        self.0.push(value);
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl IntoIterator for SuperelementList {
+    type Item = Superelements;
+
+    type IntoIter = std::vec::IntoIter<Superelements>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl Index<usize> for SuperelementList {
+    type Output = Superelements;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl IndexMut<usize> for SuperelementList {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.0[index]
     }
