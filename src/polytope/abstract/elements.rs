@@ -235,8 +235,8 @@ impl Element {
 /// A list of [`Elements`](Element) of the same
 /// [rank](https://polytope.miraheze.org/wiki/Rank).
 ///
-/// If you only want to deal with the subelements or superelements of a
-/// polytope, use [`SubelementList`] or [`SuperelementList`] instead.
+/// If you only want to deal with the subelements of a
+/// polytope, use [`SubelementList`] instead.
 #[derive(Debug, Clone)]
 pub struct ElementList(pub Vec<Element>);
 
@@ -410,54 +410,6 @@ impl IndexMut<usize> for SubelementList {
     }
 }
 
-pub struct SuperelementList(Vec<Superelements>);
-
-impl SuperelementList {
-    pub fn new() -> Self {
-        Self(Vec::new())
-    }
-
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self(Vec::with_capacity(capacity))
-    }
-
-    pub fn push(&mut self, value: Superelements) {
-        self.0.push(value);
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn max() -> Self {
-        Self(vec![Superelements::new()])
-    }
-}
-
-impl IntoIterator for SuperelementList {
-    type Item = Superelements;
-
-    type IntoIter = std::vec::IntoIter<Superelements>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl Index<usize> for SuperelementList {
-    type Output = Superelements;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
-    }
-}
-
-impl IndexMut<usize> for SuperelementList {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.0[index]
-    }
-}
-
 /// Builds a polytope from the bottom up.
 pub struct AbstractBuilder(Abstract);
 
@@ -474,12 +426,22 @@ impl AbstractBuilder {
         self.0.push_subs(subelements)
     }
 
+    /// Pushes an element list with a single empty element into the polytope.
     pub fn push_min(&mut self) {
-        self.0.push_min();
+        // If you're using this method, the polytope should be empty.
+        debug_assert!(self.0.ranks.is_empty());
+
+        self.push(SubelementList::min());
     }
 
+    ///  To be
+    /// used in circumstances where the elements are built up in layers.
     pub fn push_vertices(&mut self, vertex_count: usize) {
-        self.0.push_vertices(vertex_count);
+        // If you're using this method, the polytope should consist of a single
+        // minimal element.
+        debug_assert_eq!(self.0.rank(), Rank::new(-1));
+
+        self.push(SubelementList::vertices(vertex_count))
     }
 
     pub fn push_max(&mut self) {

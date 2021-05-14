@@ -1,7 +1,6 @@
 use petgraph::graph::NodeIndex;
 use petgraph::{graph::Graph, Undirected};
-use std::f64;
-use std::{fmt::Display, str::Chars};
+use std::{f64, fmt::Display, str::Chars};
 
 /// Possible types of CD
 struct Cd(

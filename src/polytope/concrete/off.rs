@@ -1,11 +1,13 @@
 use std::{collections::HashMap, fs, io, path::Path, str::FromStr};
 
-use super::{Abstract, Concrete, ElementList, Point, Polytope, RankVec, Subelements};
+use super::{ Concrete, ElementList, Point, Polytope, RankVec, Subelements};
 use crate::{
     lang::name::{Con, Name},
     polytope::{
-        r#abstract::elements::SubelementList,
-        r#abstract::{elements::Subsupelements, rank::Rank},
+        r#abstract::{
+            elements::{AbstractBuilder, SubelementList, Subsupelements},
+            rank::Rank,
+        },
         COMPONENTS, ELEMENT_NAMES,
     },
 };
@@ -243,7 +245,7 @@ impl Concrete {
 
         let num_elems = get_el_nums(rank, &mut toks);
         let vertices = parse_vertices(num_elems[0], rank.usize(), &mut toks);
-        let mut abs = Abstract::with_capacity(rank);
+        let mut abs = AbstractBuilder::with_capacity(rank);
 
         // Adds nullitope and vertices.
         abs.push_min();
@@ -252,13 +254,13 @@ impl Concrete {
         // Reads edges and faces.
         if rank >= Rank::new(2) {
             let (edges, faces) = parse_edges_and_faces(rank, num_elems[1], num_elems[2], &mut toks);
-            abs.push_subs(edges);
-            abs.push_subs(faces);
+            abs.push(edges);
+            abs.push(faces);
         }
 
         // Adds all higher elements.
         for &num_el in num_elems.iter().take(rank.usize()).skip(3) {
-            abs.push_subs(parse_els(num_el, &mut toks));
+            abs.push(parse_els(num_el, &mut toks));
         }
 
         // Caps the abstract polytope, returns the concrete one.
@@ -266,7 +268,7 @@ impl Concrete {
             abs.push_max();
         }
 
-        let poly = Self::new(vertices, abs);
+        let poly = Self::new(vertices, abs.build());
 
         Ok(if let Some(name) = name {
             poly.with_name(name)

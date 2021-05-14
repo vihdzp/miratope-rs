@@ -186,6 +186,7 @@ impl<T> RankVec<T> {
         self.0.push(value)
     }
 
+    /// Pops a value from the `RankVec<T>`.
     pub fn pop(&mut self) -> Option<T> {
         self.0.pop()
     }

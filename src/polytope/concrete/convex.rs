@@ -8,12 +8,12 @@ use crate::{
     geometry::{Point, Subspace},
     polytope::{
         concrete::Concrete,
-        r#abstract::elements::SubelementList,
         r#abstract::{
-            elements::{Element, ElementList, Subelements, Subsupelements},
-            rank::Rank,
-            Abstract,
-        },
+            elements::{
+                 Element, ElementList, SubelementList, Subelements, Subsupelements,
+            },
+            rank::Rank,Abstract
+        }
     },
     Consts, Float,
 };
@@ -298,7 +298,7 @@ fn get_polytope_from_facets(vertices: Vec<Point>, facets: ElementList) -> Concre
 
     // Initializes the abstract polytope.
     let mut abs = Abstract::with_capacity(Rank::new(dim as isize));
-    abs.push_min();
+    abs.push_subs(SubelementList::min());
     for _ in 0..(dim as isize) {
         abs.push_subs(SubelementList::new());
     }

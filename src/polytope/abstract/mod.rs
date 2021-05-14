@@ -25,11 +25,15 @@ use crate::lang::name::{Abs, AbsData, Name};
 /// for many algorithms. However, it becomes inconvenient when actually building
 /// a polytope, since most of the time, we can only easily generate one of them.
 ///
-/// To get around this, we provide a [`push_subs`](Abstract::push_subs) method.
-/// Instead of manually having to set the superelements in the polytope, one can
-/// instead provide an [`ElementList`] whose elements have their superelements
-/// set to empty vectors. This method will automatically set the superelements
-/// of the elements of the previous rank.
+/// To get around this, we provide an [`AbstractBuilder`] struct. Instead of
+/// manually setting the superelements in the polytope, one can provide a
+/// [`SubelementList`]. The associated methods to the struct will automatically
+/// set the superelements of the polytope.
+///
+/// If you wish to only set some of the subelements, we provide a
+/// [`Abstract::push_subs`] method, which will push a list of subelements and
+/// automatically set the superelements of the previous rank, under the
+/// assumption that they're empty.
 #[derive(Debug, Clone)]
 pub struct Abstract {
     pub ranks: RankVec<ElementList>,
@@ -77,8 +81,8 @@ impl Abstract {
     }
 
     /// Pushes a new element list, assuming that the superelements of the
-    /// maximal rank **have** already been set. If they haven't already been
-    /// set, use [`push_subs`](Self::push_subs) instead.    
+    /// maximal rank **have** already been correctly set. If they haven't
+    /// already been set, use [`push_subs`](Self::push_subs) instead.
     pub fn push(&mut self, elements: ElementList) {
         self.ranks.push(elements);
     }
@@ -116,36 +120,19 @@ impl Abstract {
         }
     }
 
-    /// Pushes an element list with a single empty element into the polytope.
-    pub fn push_min(&mut self) {
-        // If you're using this method, the polytope should be empty.
-        debug_assert!(self.ranks.is_empty());
-
-        self.push_subs(SubelementList::min());
-    }
-
-    ///  To be
-    /// used in circumstances where the elements are built up in layers.
-    pub fn push_vertices(&mut self, vertex_count: usize) {
-        // If you're using this method, the polytope should consist of a single
-        // minimal element.
-        debug_assert_eq!(self.rank(), Rank::new(-1));
-
-        self.push_subs(SubelementList::vertices(vertex_count))
-    }
-
     /// Pushes a maximal element into the polytope, with the facets as
     /// subelements. To be used in circumstances where the elements are built up
     /// in layers.
     pub fn push_max(&mut self) {
-        let facet_count = self.el_count(self.rank());
-        self.push_subs(SubelementList::max(facet_count));
+        self.push_subs(SubelementList::max(self.facet_count()));
     }
 
+    /// Pops the element list of the largest rank.
     pub fn pop(&mut self) -> Option<ElementList> {
         self.ranks.pop()
     }
 
+    /// Sorts the subelements and superelements of the entire polytope.
     pub fn sort(&mut self) {
         for elements in self.ranks.iter_mut() {
             for el in elements.iter_mut() {
