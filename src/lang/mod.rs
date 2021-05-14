@@ -426,6 +426,14 @@ pub trait Language: Prefix {
             Name::Pyramid(base) => Self::pyramid_of(base, options),
             Name::Prism(base) => Self::prism_of(base, options),
             Name::Tegum(base) => Self::tegum_of(base, options),
+            Name::Antiprism {
+                base,
+                facet_count: _,
+            } => Self::antiprism_of(base, options),
+            Name::Petrial {
+                base,
+                facet_count: _,
+            } => Self::petrial_of(base, options),
 
             // Multimodifiers
             Name::Multipyramid(_)
@@ -546,6 +554,32 @@ pub trait Language: Prefix {
     /// The name for a tegum with a given base.
     fn tegum_of<T: NameType>(base: &Name<T>, options: Options) -> String {
         Self::combine(Self::base_adj(base, options), Self::tegum(options))
+    }
+
+    /// The name for an antiprism.
+    fn antiprism(options: Options) -> String {
+        format!("antiprism{}", options.three("", "s", "atic"))
+    }
+
+    /// The name for an antiprism with a given base.
+    fn antiprism_of<T: NameType>(base: &Name<T>, options: Options) -> String {
+        Self::combine(Self::base_adj(base, options), Self::antiprism(options))
+    }
+
+    /// The name for a Petrial.
+    fn petrial(options: Options) -> String {
+        format!("Petrial{}", options.three("", "s", ""))
+    }
+
+    /// The name for a Petrial with a given base.
+    fn petrial_of<T: NameType>(base: &Name<T>, options: Options) -> String {
+        Self::combine(
+            Self::petrial(Options {
+                adjective: true,
+                ..options
+            }),
+            Self::parse(base, options),
+        )
     }
 
     fn multiproduct<T: NameType>(name: &Name<T>, options: Options) -> String {

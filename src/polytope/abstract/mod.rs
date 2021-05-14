@@ -280,7 +280,12 @@ impl Abstract {
             abs.push(subelements);
         }
 
-        (abs.build(), vertices, dual_vertices)
+        // Sets name.
+        let mut abs = abs.build();
+        let facet_count = abs.facet_count();
+        abs = abs.with_name(Name::antiprism(self.name().clone(), facet_count));
+
+        (abs, vertices, dual_vertices)
     }
 
     /// Determines whether the polytope is bounded, i.e. whether it has a single
@@ -713,6 +718,12 @@ impl Polytope<Abs> for Abstract {
         // Pushes the new faces and a new maximal element.
         self.push_subs(faces);
         self.push_max();
+
+        // Builds name.
+        *self.name_mut() = Name::Petrial {
+            base: Box::new(self.name().clone()),
+            facet_count: self.facet_count(),
+        };
 
         // Checks for dyadicity, since sometimes that fails.
         if self.is_dyadic() {

@@ -157,13 +157,13 @@ impl Regular {
 }
 
 /// A language-independent representation of a polytope name, in a syntax
-/// tree-like structure structure.
+/// tree-like structure.
 ///
 /// Many of the variants are subject to complicated invariants which help keep
 /// the translation code more modular by separation of concerns. If you
 /// instanciate a `Name` directly, **you ought to guarantee that these
-/// invariants hold.** Convenience methods are provided, which will guarantee these
-/// invariants for you.
+/// invariants hold.** Convenience methods are provided, which will guarantee
+/// these invariants for you.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Name<T: NameType> {
     /// A nullitope.
@@ -215,6 +215,18 @@ pub enum Name<T: NameType> {
 
     /// A multicomb based on a list of polytopes.
     Multicomb(Vec<Name<T>>),
+
+    /// An antiprism based on a polytope.
+    Antiprism {
+        base: Box<Name<T>>,
+        facet_count: usize,
+    },
+
+    /// The Petrial of a polyhedron.
+    Petrial {
+        base: Box<Name<T>>,
+        facet_count: usize,
+    },
 
     /// The dual of a specified polytope.
     Dual {
@@ -269,12 +281,7 @@ impl<T: NameType> Name<T> {
         rank
     }
 
-    /// Returns the rank of the polytope that the name describes, or `None` if
-    /// it's unable to figure it out.
-    ///
-    /// # Todo
-    /// We need to embed enough metadata in the name for this to always be able
-    /// to figure out a rank.
+    /// Returns the rank of the polytope that the name describes.
     pub fn rank(&self) -> Rank {
         match self {
             // Basic shapes:
@@ -288,6 +295,12 @@ impl<T: NameType> Name<T> {
             | Name::Rectangle
             | Name::Orthodiagonal
             | Name::Polygon { regular: _, n: _ } => Rank::new(2),
+
+            // Petrials are always 3D:
+            Name::Petrial {
+                base: _,
+                facet_count: _,
+            } => Rank::new(3),
 
             // Regular families:
             Name::Simplex { regular: _, rank }
@@ -303,7 +316,13 @@ impl<T: NameType> Name<T> {
             Name::Generic { n: _, rank } => *rank,
 
             // Modifiers:
-            Name::Pyramid(base) | Name::Prism(base) | Name::Tegum(base) => base.rank().plus_one(),
+            Name::Pyramid(base)
+            | Name::Prism(base)
+            | Name::Tegum(base)
+            | Name::Antiprism {
+                base,
+                facet_count: _,
+            } => base.rank().plus_one(),
 
             // Multimodifiers:
             Name::Multipyramid(_)
@@ -314,6 +333,7 @@ impl<T: NameType> Name<T> {
         }
     }
 
+    /// Returns the vertex count of the polytope that the name describes.
     pub fn vertex_count(&self) -> usize {
         match self {
             // Basic shapes:
@@ -335,6 +355,14 @@ impl<T: NameType> Name<T> {
             Name::Pyramid(base) => base.vertex_count() + 1,
             Name::Prism(base) => 2 * base.vertex_count(),
             Name::Tegum(base) => base.vertex_count() + 2,
+            Name::Antiprism {
+                base,
+                facet_count: _,
+            } => base.vertex_count() + base.facet_count(),
+            Name::Petrial {
+                base,
+                facet_count: _,
+            } => base.vertex_count(),
 
             // Multimodifiers:
             Name::Multipyramid(bases) | Name::Multiprism(bases) => {
@@ -366,12 +394,7 @@ impl<T: NameType> Name<T> {
         }
     }
 
-    /// Returns the number of facets of the polytope that the name describes, or
-    /// `None` if it's unable to figure it out.
-    ///
-    /// # Todo
-    /// We need to embed enough metadata in the name for this to always be able
-    /// to figure out a facet count.
+    /// Returns the facet count of the polytope that the name describes.
     pub fn facet_count(&self) -> usize {
         match self {
             // Basic shapes:
@@ -393,6 +416,14 @@ impl<T: NameType> Name<T> {
             Name::Pyramid(base) => base.facet_count() + 1,
             Name::Prism(base) => 2 * (base.facet_count() + 1),
             Name::Tegum(base) => 2 * base.facet_count(),
+            Name::Antiprism {
+                base: _,
+                facet_count,
+            } => *facet_count,
+            Name::Petrial {
+                base: _,
+                facet_count,
+            } => *facet_count,
 
             // Multimodifiers:
             Name::Multipyramid(bases) | Name::Multitegum(bases) => {
@@ -429,12 +460,23 @@ impl<T: NameType> Name<T> {
     pub fn is_valid(&self) -> bool {
         match self {
             Self::Polygon { regular, n } => {
+                if *n == 2 {
+                    return true;
+                }
+
                 if regular.satisfies(|r| r.is_yes()) {
-                    *n >= 5 || *n == 2
+                    *n >= 5
                 } else {
-                    *n >= 4 || *n == 2
+                    *n >= 4
                 }
             }
+
+            // Petrials must always be 3D.
+            Self::Petrial {
+                base,
+                facet_count: _,
+            } => base.rank() == Rank::new(3),
+
             Self::Simplex { regular: _, rank }
             | Self::Hyperblock { regular: _, rank }
             | Self::Orthoplex { regular: _, rank } => *rank >= Rank::new(3),
@@ -454,7 +496,12 @@ impl<T: NameType> Name<T> {
                     }
                 }
 
-                // We should check that the bases are sorted somehow.
+                // We check that the bases are sorted.
+                let mut bases_sorted = bases.clone();
+                bases_sorted.sort_by(&Self::base_cmp);
+                if &bases_sorted != bases {
+                    return false;
+                }
 
                 true
             }
@@ -583,6 +630,23 @@ impl<T: NameType> Name<T> {
                 Self::multitegum(bases)
             }
             _ => Self::Tegum(Box::new(self)),
+        }
+    }
+
+    /// Builds an antiprism name from a given name.
+    pub fn antiprism(self, facet_count: usize) -> Self {
+        match self {
+            Self::Nullitope => Self::Point,
+            Self::Point => Self::Dyad,
+            Self::Dyad => Self::Orthodiagonal,
+            Self::Simplex { rank, regular: _ } => Self::Orthoplex {
+                rank: rank.plus_one(),
+                regular: T::DataRegular::new(Regular::No),
+            },
+            _ => Self::Antiprism {
+                base: Box::new(self),
+                facet_count,
+            },
         }
     }
 

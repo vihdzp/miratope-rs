@@ -412,7 +412,9 @@ impl Concrete {
             new_vertices[dual_vertex_indices[idx]] = v;
         }
 
-        Self::new(new_vertices, abs)
+        let antiprism = Self::new(new_vertices, abs);
+        let facet_count = antiprism.facet_count();
+        antiprism.with_name(Name::antiprism(self.name().clone(), facet_count))
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
@@ -1009,7 +1011,16 @@ impl Polytope<Con> for Concrete {
     }
 
     fn petrial_mut(&mut self) -> Result<(), ()> {
-        self.abs.petrial_mut()
+        let res = self.abs.petrial_mut();
+
+        if res.is_ok() {
+            *self.name_mut() = Name::Petrial {
+                base: Box::new(self.name().clone()),
+                facet_count: self.facet_count(),
+            }
+        }
+
+        res
     }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
