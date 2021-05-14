@@ -6,13 +6,14 @@ pub mod group;
 pub mod mesh_builder;
 pub mod off;
 
-use crate::polytope::r#abstract::builder::AbstractBuilder;
 use std::collections::HashMap;
 
 use self::mesh_builder::MeshBuilder;
 use super::{
     r#abstract::{
-        elements::{Element, ElementList, SubelementList, Subelements, Subsupelements},
+        elements::{
+            AbstractBuilder, Element, ElementList, SubelementList, Subelements, Subsupelements,
+        },
         flag::{FlagEvent, FlagIter},
         rank::{Rank, RankVec},
         Abstract,
@@ -666,7 +667,6 @@ impl Concrete {
     /// We should make this function take a general [`Subspace`] instead.
     pub fn cross_section(&self, slice: &Hyperplane) -> Self {
         let mut vertices = Vec::new();
-
         let mut abs = AbstractBuilder::new();
 
         // We map all indices of k-elements in the original polytope to the
@@ -695,7 +695,7 @@ impl Concrete {
             return Self::nullitope();
         }
 
-        abs.push(SubelementList::empty());
+        abs.push(SubelementList::min());
         abs.push(SubelementList::vertices(vertex_count));
 
         // Takes care of building everything else.

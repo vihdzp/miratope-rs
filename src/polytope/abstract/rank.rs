@@ -337,6 +337,12 @@ impl<T> Iterator for IntoIter<T> {
     }
 }
 
+impl<T> DoubleEndedIterator for IntoIter<T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back()
+    }
+}
+
 impl<T> IntoIter<T> {
     /// Wraps around the usual `enumerate` method, offsetting the first entry by 1.
     pub fn rank_enumerate(

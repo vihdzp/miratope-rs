@@ -1,4 +1,3 @@
-pub mod builder;
 pub mod elements;
 pub mod flag;
 pub mod rank;
@@ -7,17 +6,14 @@ use std::collections::{BTreeSet, HashMap};
 
 use self::{
     elements::{
-        Element, ElementHash, ElementList, Section, SectionHash, SubelementList, Subelements,
-        Subsupelements, Superelements,
+        AbstractBuilder, Element, ElementHash, ElementList, Section, SectionHash, SubelementList,
+        Subelements, Subsupelements, Superelements,
     },
     flag::{FlagEvent, FlagIter},
     rank::{Rank, RankVec},
 };
 use super::Polytope;
-use crate::{
-    lang::name::{Abs, AbsData, Name},
-    polytope::r#abstract::builder::AbstractBuilder,
-};
+use crate::lang::name::{Abs, AbsData, Name};
 
 /// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
 /// to an [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
@@ -94,19 +90,19 @@ impl Abstract {
 
     /// Pushes a given element into the vector of elements of a given rank.
     /// Updates the superelements of its subelements automatically.
-    pub fn push_subs_at(&mut self, rank: Rank, el: Element) {
+    pub fn push_subs_at(&mut self, rank: Rank, sub_el: Subelements) {
         let i = self[rank].len();
 
         if rank != Rank::new(-1) {
             if let Some(lower_rank) = self.ranks.get_mut(rank.minus_one()) {
                 // Updates superelements of the lower rank.
-                for &sub in &el.subs {
+                for &sub in &sub_el {
                     lower_rank[sub].sups.push(i);
                 }
             }
         }
 
-        self.push_at(rank, el);
+        self.push_at(rank, Element::from_subs(sub_el));
     }
 
     /// Pushes a new element list without superelements, assuming that the
@@ -116,16 +112,16 @@ impl Abstract {
         self.push(ElementList::with_capacity(subelements.len()));
 
         for sub_el in subelements.into_iter() {
-            self.push_subs_at(self.rank(), Element::from_subs(sub_el));
+            self.push_subs_at(self.rank(), sub_el);
         }
     }
 
     /// Pushes an element list with a single empty element into the polytope.
-    pub fn push_empty(&mut self) {
+    pub fn push_min(&mut self) {
         // If you're using this method, the polytope should be empty.
         debug_assert!(self.ranks.is_empty());
 
-        self.push_subs(SubelementList::empty());
+        self.push_subs(SubelementList::min());
     }
 
     ///  To be
@@ -290,14 +286,13 @@ impl Abstract {
         }
 
         // We built this backwards, so let's fix it.
-        backwards_abs.reverse();
-        let mut abs = Abstract::with_capacity(backwards_abs.rank());
+        let mut abs = AbstractBuilder::with_capacity(backwards_abs.rank());
 
-        for elements in backwards_abs {
-            abs.push_subs(elements);
+        for subelements in backwards_abs.into_iter().rev() {
+            abs.push(subelements);
         }
 
-        (abs, vertices, dual_vertices)
+        (abs.build(), vertices, dual_vertices)
     }
 
     /// Determines whether the polytope is bounded, i.e. whether it has a single
@@ -523,7 +518,7 @@ impl Abstract {
         // If !min, we have to set a minimal element manually.
         if !min {
             let vertex_count = p.vertex_count() * q.vertex_count();
-            element_lists[Rank::new(-1)] = SubelementList::empty();
+            element_lists[Rank::new(-1)] = SubelementList::min();
             element_lists[Rank::new(0)] = SubelementList::vertices(vertex_count);
         }
 
@@ -614,7 +609,7 @@ impl Polytope<Abs> for Abstract {
     fn dyad() -> Self {
         let mut abs = AbstractBuilder::with_capacity(Rank::new(1));
 
-        abs.push_single();
+        abs.push_min();
         abs.push_vertices(2);
         abs.push_max();
 
@@ -634,7 +629,7 @@ impl Polytope<Abs> for Abstract {
 
         let mut poly = AbstractBuilder::with_capacity(Rank::new(2));
 
-        poly.push_single();
+        poly.push_min();
         poly.push_vertices(n);
         poly.push(edges);
         poly.push_max();
@@ -835,9 +830,7 @@ impl Polytope<Abs> for Abstract {
     /// polytope in place.
     fn ditope_mut(&mut self) {
         let rank = self.rank();
-        let max = self.max().clone();
-
-        self.push_subs_at(rank, max);
+        self.push_subs_at(rank, self.max().subs.clone());
         self.push_max();
     }
 

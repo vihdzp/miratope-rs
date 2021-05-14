@@ -246,7 +246,7 @@ impl Concrete {
         let mut abs = Abstract::with_capacity(rank);
 
         // Adds nullitope and vertices.
-        abs.push_empty();
+        abs.push_min();
         abs.push_vertices(vertices.len());
 
         // Reads edges and faces.

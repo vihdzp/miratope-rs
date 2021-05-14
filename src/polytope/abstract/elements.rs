@@ -235,10 +235,8 @@ impl Element {
 /// A list of [`Elements`](Element) of the same
 /// [rank](https://polytope.miraheze.org/wiki/Rank).
 ///
-/// In most cases, you'll only want to deal with the subelements of a polytope.
-/// Hence, some convenience methods are provided which generate **only the
-/// subelements,** leaving the superelements of each element empty. Be aware of
-/// which one you actually mean to use!
+/// If you only want to deal with the subelements or superelements of a
+/// polytope, use [`SubelementList`] or [`SuperelementList`] instead.
 #[derive(Debug, Clone)]
 pub struct ElementList(pub Vec<Element>);
 
@@ -345,30 +343,32 @@ impl IndexMut<usize> for ElementList {
 pub struct SubelementList(Vec<Subelements>);
 
 impl SubelementList {
+    /// Initializes an empty subelement list.
     pub fn new() -> Self {
         Self(Vec::new())
     }
 
+    /// Initializes an empty subelement list with a given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
         Self(Vec::with_capacity(capacity))
     }
 
+    /// Pushes a value into the subelement list.
     pub fn push(&mut self, value: Subelements) {
         self.0.push(value);
     }
 
+    /// Returns the number of elements in the subelement list.
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
-    /// Returns an element list with a single, empty element. Often used as the
-    /// element list for the nullitopes when a polytope is built in layers.
-    pub fn empty() -> Self {
+    /// Returns the subelement list for the minimal element in a polytope.
+    pub fn min() -> Self {
         Self(vec![Subelements::new()])
     }
 
-    /// Returns the element list for a set number of vertices in a polytope.
-    /// **Does not include any superelements.**
+    /// Returns the subelement list for a set number of vertices in a polytope.
     pub fn vertices(vertex_count: usize) -> Self {
         let mut els = SubelementList::with_capacity(vertex_count);
 
@@ -379,7 +379,7 @@ impl SubelementList {
         els
     }
 
-    /// Returns the element list for the maximal element in a polytope with a
+    /// Returns the subelement list for the maximal element in a polytope with a
     /// given facet count.
     pub fn max(facet_count: usize) -> Self {
         Self(vec![Subelements::count(facet_count)])
@@ -428,6 +428,10 @@ impl SuperelementList {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
+    pub fn max() -> Self {
+        Self(vec![Superelements::new()])
+    }
 }
 
 impl IntoIterator for SuperelementList {
@@ -451,6 +455,39 @@ impl Index<usize> for SuperelementList {
 impl IndexMut<usize> for SuperelementList {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.0[index]
+    }
+}
+
+/// Builds a polytope from the bottom up.
+pub struct AbstractBuilder(Abstract);
+
+impl AbstractBuilder {
+    pub fn new() -> Self {
+        Self(Abstract::new())
+    }
+
+    pub fn with_capacity(rank: Rank) -> Self {
+        Self(Abstract::with_capacity(rank))
+    }
+
+    pub fn push(&mut self, subelements: SubelementList) {
+        self.0.push_subs(subelements)
+    }
+
+    pub fn push_min(&mut self) {
+        self.0.push_min();
+    }
+
+    pub fn push_vertices(&mut self, vertex_count: usize) {
+        self.0.push_vertices(vertex_count);
+    }
+
+    pub fn push_max(&mut self) {
+        self.0.push_max();
+    }
+
+    pub fn build(self) -> Abstract {
+        self.0
     }
 }
 
