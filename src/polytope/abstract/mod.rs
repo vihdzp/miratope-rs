@@ -2,7 +2,10 @@ pub mod elements;
 pub mod flag;
 pub mod rank;
 
-use std::collections::{BTreeSet, HashMap};
+use std::{
+    collections::{BTreeSet, HashMap},
+    mem,
+};
 
 use self::{
     elements::{
@@ -283,7 +286,7 @@ impl Abstract {
         // Sets name.
         let mut abs = abs.build();
         let facet_count = abs.facet_count();
-        abs = abs.with_name(Name::antiprism(self.name().clone(), facet_count));
+        abs = abs.with_name(Name::antiprism(self.name.clone(), facet_count));
 
         (abs, vertices, dual_vertices)
     }
@@ -527,7 +530,7 @@ impl Abstract {
         }
 
         // Sets the name of the polytope.
-        let bases = vec![p.name().clone(), q.name().clone()];
+        let bases = vec![p.name.clone(), q.name.clone()];
 
         product.build().with_name(if min && max {
             Name::multipyramid(bases)
@@ -720,7 +723,8 @@ impl Polytope<Abs> for Abstract {
         self.push_max();
 
         // Builds name.
-        *self.name_mut() = self.name().clone().petrial(self.facet_count());
+        let name = mem::replace(&mut self.name, Name::Nullitope);
+        self.name = name.petrial(self.facet_count());
 
         // Checks for dyadicity, since sometimes that fails.
         if self.is_dyadic() {
@@ -776,7 +780,8 @@ impl Polytope<Abs> for Abstract {
             }
         }
 
-        self.name = Name::compound(vec![(1, self.name().clone()), (1, p.name)]);
+        let name = mem::replace(&mut self.name, Name::Nullitope);
+        self.name = Name::compound(vec![(1, name), (1, p.name)]);
     }
 
     /// Gets the element with a given rank and index as a polytope, if it exists.

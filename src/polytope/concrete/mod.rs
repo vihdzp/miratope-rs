@@ -6,7 +6,7 @@ pub mod group;
 pub mod mesh_builder;
 pub mod off;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, mem};
 
 use self::mesh_builder::MeshBuilder;
 use super::{
@@ -388,7 +388,7 @@ impl Concrete {
     }
 
     pub fn prism_with(&self, height: Float) -> Self {
-        Self::duoprism(self, &Self::dyad_with(height)).with_name(Name::prism(self.name().clone()))
+        Self::duoprism(self, &Self::dyad_with(height)).with_name(Name::prism(self.name.clone()))
     }
 
     pub fn uniform_prism(n: usize, d: usize) -> Self {
@@ -414,7 +414,7 @@ impl Concrete {
 
         let antiprism = Self::new(new_vertices, abs);
         let facet_count = antiprism.facet_count();
-        antiprism.with_name(Name::antiprism(self.name().clone(), facet_count))
+        antiprism.with_name(Name::antiprism(self.name.clone(), facet_count))
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
@@ -564,7 +564,7 @@ impl Concrete {
             Self::duopyramid_vertices(&p.vertices, &q.vertices, height, false),
             Abstract::duopyramid(&p.abs, &q.abs),
         )
-        .with_name(Name::Multipyramid(vec![p.name().clone(), q.name().clone()]))
+        .with_name(Name::Multipyramid(vec![p.name.clone(), q.name.clone()]))
     }
 
     pub fn volume(&self) -> Option<Float> {
@@ -1014,7 +1014,8 @@ impl Polytope<Con> for Concrete {
         let res = self.abs.petrial_mut();
 
         if res.is_ok() {
-            *self.name_mut() = self.name().clone().petrial(self.facet_count());
+            let name = mem::replace(&mut self.name, Name::Nullitope);
+            self.name = name.petrial(self.facet_count());
         }
 
         res
@@ -1025,7 +1026,9 @@ impl Polytope<Con> for Concrete {
     fn append(&mut self, mut p: Self) {
         self.abs.append(p.abs);
         self.vertices.append(&mut p.vertices);
-        self.name = Name::compound(vec![(1, self.name().clone()), (1, p.name)]);
+
+        let name = mem::replace(&mut self.name, Name::Nullitope);
+        self.name = Name::compound(vec![(1, name), (1, p.name)]);
     }
 
     /// Gets the element with a given rank and index as a polytope, or returns
@@ -1065,7 +1068,7 @@ impl Polytope<Con> for Concrete {
             Self::duoprism_vertices(&p.vertices, &q.vertices),
             Abstract::duoprism(&p.abs, &q.abs),
         )
-        .with_name(Name::Multiprism(vec![p.name().clone(), q.name().clone()]))
+        .with_name(Name::Multiprism(vec![p.name.clone(), q.name.clone()]))
     }
 
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
@@ -1081,7 +1084,7 @@ impl Polytope<Con> for Concrete {
                 Self::duopyramid_vertices(&p.vertices, &q.vertices, 0.0, true),
                 Abstract::duotegum(&p.abs, &q.abs),
             )
-            .with_name(Name::Multitegum(vec![p.name().clone(), q.name().clone()]))
+            .with_name(Name::Multitegum(vec![p.name.clone(), q.name.clone()]))
         }
     }
 
@@ -1092,7 +1095,7 @@ impl Polytope<Con> for Concrete {
             Self::duoprism_vertices(&p.vertices, &q.vertices),
             Abstract::duocomb(&p.abs, &q.abs),
         )
-        .with_name(Name::Multicomb(vec![p.name().clone(), q.name().clone()]))
+        .with_name(Name::Multicomb(vec![p.name.clone(), q.name.clone()]))
     }
 
     /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
