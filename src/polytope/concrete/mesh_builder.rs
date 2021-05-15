@@ -398,6 +398,13 @@ impl<'a> MeshBuilder<'a> {
         let mut indices = Vec::with_capacity(edges.len() * 2);
 
         for edge in edges.iter() {
+            debug_assert_eq!(
+                edge.subs.len(),
+                2,
+                "Edge must have exactly 2 elements, found {}.",
+                edge.subs.len()
+            );
+
             indices.push(edge.subs[0] as u16);
             indices.push(edge.subs[1] as u16);
         }

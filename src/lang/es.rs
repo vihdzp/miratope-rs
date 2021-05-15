@@ -6,7 +6,7 @@ use crate::{
     polytope::r#abstract::rank::Rank,
 };
 
-use super::{GreekPrefix, Language, Options, Prefix};
+use super::{GreekPrefix, Language, Options, Position, Prefix};
 
 /// The Spanish language.
 pub struct Es;
@@ -63,6 +63,11 @@ fn last_vowel_tilde(prefix: String) -> String {
 }
 
 impl Language for Es {
+    /// The usual position for adjectives.
+    fn adj_pos() -> Position {
+        Position::After
+    }
+
     /// Returns the suffix for a d-polytope. Only needs to work up to d = 20, we
     /// won't offer support any higher than that.
     fn suffix(d: Rank, options: Options) -> String {

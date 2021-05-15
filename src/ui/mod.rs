@@ -251,12 +251,10 @@ pub fn ui(
                                 let mut p = query.iter_mut().next().unwrap();
                                 p.flatten();
 
-                                let mut direction;
-                                if let Some(dim) = p.dim() {
-                                    direction = Vector::zeros(dim);
+                                let dim = p.dim().unwrap_or(0);
+                                let mut direction = Vector::zeros(dim);
+                                if dim > 0 {
                                     direction[dim - 1] = 1.0;
-                                } else {
-                                    direction = Vector::zeros(0);
                                 }
 
                                 let minmax = p.minmax(&direction).unwrap_or((-1.0, 1.0));
