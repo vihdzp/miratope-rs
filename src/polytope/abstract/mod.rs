@@ -720,10 +720,7 @@ impl Polytope<Abs> for Abstract {
         self.push_max();
 
         // Builds name.
-        *self.name_mut() = Name::Petrial {
-            base: Box::new(self.name().clone()),
-            facet_count: self.facet_count(),
-        };
+        *self.name_mut() = self.name().clone().petrial(self.facet_count());
 
         // Checks for dyadicity, since sometimes that fails.
         if self.is_dyadic() {

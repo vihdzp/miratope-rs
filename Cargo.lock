@@ -2016,9 +2016,9 @@ dependencies = [
 
 [[package]]
 name = "lyon_geom"
-version = "0.17.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edb987cd391542608ca8d43c0cd5ec44ebe4a0957eb89769a316c99d7fe14537"
+checksum = "d6b5d72694ade806440faf600defca6143dbe5499e90a9ec8caed62adbfd5db5"
 dependencies = [
  "arrayvec",
  "euclid",

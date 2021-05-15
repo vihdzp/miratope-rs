@@ -1014,10 +1014,7 @@ impl Polytope<Con> for Concrete {
         let res = self.abs.petrial_mut();
 
         if res.is_ok() {
-            *self.name_mut() = Name::Petrial {
-                base: Box::new(self.name().clone()),
-                facet_count: self.facet_count(),
-            }
+            *self.name_mut() = self.name().clone().petrial(self.facet_count());
         }
 
         res

@@ -758,6 +758,20 @@ impl<T: NameType> Name<T> {
         }
     }
 
+    pub fn petrial(self, facet_count: usize) -> Self {
+        match self {
+            // Petrials are involutions.
+            Name::Petrial {
+                base,
+                facet_count: _,
+            } => *base,
+            _ => Name::Petrial {
+                base: Box::new(self),
+                facet_count,
+            },
+        }
+    }
+
     /// Returns the name for a rectangle, depending on whether it's abstract or
     /// not.
     pub fn rectangle() -> Self {
