@@ -248,7 +248,6 @@ impl Subspace {
     /// point.
     pub fn flatten(&self, p: &Point) -> Point {
         let p = p - &self.offset;
-
         Point::from_iterator(self.rank(), self.basis.iter().map(|b| p.dot(b)))
     }
 

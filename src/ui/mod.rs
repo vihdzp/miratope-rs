@@ -251,9 +251,13 @@ pub fn ui(
                                 let mut p = query.iter_mut().next().unwrap();
                                 p.flatten();
 
-                                let dim = p.dim().unwrap_or(0);
-                                let mut direction = Vector::zeros(dim);
-                                direction[dim - 1] = 1.0;
+                                let mut direction;
+                                if let Some(dim) = p.dim() {
+                                    direction = Vector::zeros(dim);
+                                    direction[dim - 1] = 1.0;
+                                } else {
+                                    direction = Vector::zeros(0);
+                                }
 
                                 let minmax = p.minmax(&direction).unwrap_or((-1.0, 1.0));
                                 let original_polytope = p.clone();
@@ -410,7 +414,7 @@ pub fn ui(
                     }
 
                     // Gets rid of floating point shenanigans.
-                    if *coord < Float::EPS {
+                    if coord.abs() < Float::EPS {
                         *coord = 0.0;
                     }
                 }
