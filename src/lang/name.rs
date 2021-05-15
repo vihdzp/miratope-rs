@@ -226,6 +226,7 @@ pub enum Name<T: NameType> {
     Antitegum {
         base: Box<Name<T>>,
         vertex_count: usize,
+        center: T::DataPoint,
     },
 
     /// The Petrial of a polyhedron.
@@ -332,6 +333,7 @@ impl<T: NameType> Name<T> {
             | Name::Antitegum {
                 base,
                 vertex_count: _,
+                center: _,
             } => base.rank().plus_one(),
 
             // Multimodifiers:
@@ -372,6 +374,7 @@ impl<T: NameType> Name<T> {
             Name::Antitegum {
                 base: _,
                 vertex_count,
+                center: _,
             } => *vertex_count,
             Name::Petrial {
                 base,
@@ -437,6 +440,7 @@ impl<T: NameType> Name<T> {
             Name::Antitegum {
                 base,
                 vertex_count: _,
+                center: _,
             } => base.vertex_count() + base.facet_count(),
             Name::Petrial {
                 base: _,
@@ -764,16 +768,25 @@ impl<T: NameType> Name<T> {
             Self::Antiprism { base, facet_count } => Self::Antitegum {
                 base,
                 vertex_count: facet_count,
+                center,
             },
-            Self::Antitegum { base, vertex_count } => {
-                if T::is_abstract() {
+            Self::Antitegum {
+                base,
+                vertex_count,
+                center: original_center,
+            } => {
+                if center == original_center {
                     Self::Antiprism {
                         base,
                         facet_count: vertex_count,
                     }
                 } else {
                     Self::Dual {
-                        base: Box::new(Self::Antitegum { base, vertex_count }),
+                        base: Box::new(Self::Antitegum {
+                            base,
+                            vertex_count,
+                            center: original_center,
+                        }),
                         center,
                     }
                 }

@@ -433,6 +433,7 @@ pub trait Language: Prefix {
             Name::Antitegum {
                 base,
                 vertex_count: _,
+                center: _,
             } => Self::antitegum_of(base, options),
             Name::Petrial {
                 base,
