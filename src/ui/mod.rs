@@ -6,10 +6,10 @@ pub mod library;
 use std::{marker::PhantomData, path::PathBuf};
 
 use crate::{
-    geometry::{Hyperplane, Point},
+    geometry::{Hyperplane, Point, Vector},
     lang::{Options, SelectedLanguage},
     polytope::{concrete::Concrete, Polytope},
-    Float, OffOptions,
+    Consts, Float, OffOptions,
 };
 use camera::ProjectionType;
 use library::{Library, ShowResult, SpecialLibrary};
@@ -59,6 +59,19 @@ impl SectionState {
         }
     }
 
+    /// Sets the minmax of the hyperplane.
+    pub fn set_minmax(&mut self, new_minmax: (Float, Float)) {
+        if let Self::Active {
+            original_polytope: _,
+            minmax,
+            hyperplane_pos: _,
+            flatten: _,
+        } = self
+        {
+            *minmax = new_minmax;
+        }
+    }
+
     /// Sets the flattening setting.
     pub fn set_flat(&mut self, flat: bool) {
         if let Self::Active {
@@ -79,12 +92,22 @@ impl Default for SectionState {
     }
 }
 
+pub struct SectionDirection(Option<Vector>);
+
+impl Default for SectionDirection {
+    fn default() -> Self {
+        Self(None)
+    }
+}
+
 /// The system in charge of the UI. Loads every single thing on screen save for
 /// the polytope itself.
+#[allow(clippy::too_many_arguments)]
 pub fn ui(
     egui_ctx: ResMut<EguiContext>,
     mut query: Query<&mut Concrete>,
     mut section_state: ResMut<SectionState>,
+    mut section_direction: ResMut<SectionDirection>,
     mut file_dialog_state: ResMut<FileDialogState>,
     mut projection_type: ResMut<ProjectionType>,
     mut library: ResMut<Library>,
@@ -210,7 +233,7 @@ pub fn ui(
 
                     // Toggles cross-section mode.
                     if ui.button("Cross-section").clicked() {
-                        *section_state = match &mut *section_state {
+                        match &mut *section_state {
                             // The view is active, but will be inactivated.
                             SectionState::Active {
                                 original_polytope,
@@ -219,7 +242,8 @@ pub fn ui(
                                 flatten: _,
                             } => {
                                 *query.iter_mut().next().unwrap() = original_polytope.clone();
-                                SectionState::Inactive
+                                *section_state = SectionState::Inactive;
+                                section_direction.0 = None;
                             }
 
                             // The view is inactive, but will be activated.
@@ -227,15 +251,20 @@ pub fn ui(
                                 let mut p = query.iter_mut().next().unwrap();
                                 p.flatten();
 
-                                let minmax = p.x_minmax().unwrap_or((-1.0, 1.0));
+                                let dim = p.dim().unwrap_or(0);
+                                let mut direction = Vector::zeros(dim);
+                                direction[dim - 1] = 1.0;
+
+                                let minmax = p.minmax(&direction).unwrap_or((-1.0, 1.0));
                                 let original_polytope = p.clone();
 
-                                SectionState::Active {
+                                *section_state = SectionState::Active {
                                     original_polytope,
                                     minmax,
                                     hyperplane_pos: (minmax.0 + minmax.1) / 2.0,
                                     flatten: true,
-                                }
+                                };
+                                section_direction.0 = Some(direction);
                             }
                         };
                     }
@@ -347,8 +376,7 @@ pub fn ui(
         } = *section_state
         {
             ui.label("Cross section settings:");
-
-            ui.spacing_mut().slider_width = ui.available_width() / 2.0;
+            ui.spacing_mut().slider_width = ui.available_width() / 3.0;
 
             // Sets the slider range to the range of x coordinates in the polytope.
             let mut new_hyperplane_pos = hyperplane_pos;
@@ -358,13 +386,48 @@ pub fn ui(
                     (minmax.0 + 0.00001)..=(minmax.1 - 0.00001),
                 )
                 .text("Slice depth")
-                .prefix("x: "),
+                .prefix("pos: "),
             );
 
             // Updates the slicing depth.
             #[allow(clippy::float_cmp)]
             if hyperplane_pos != new_hyperplane_pos {
                 section_state.set_pos(new_hyperplane_pos);
+            }
+
+            let mut new_direction = section_direction.0.clone().unwrap();
+            let mut modified_coord = 0;
+
+            ui.horizontal(|ui| {
+                ui.label("Slice direction:");
+                for (idx, coord) in new_direction.iter_mut().enumerate() {
+                    ui.add(egui::DragValue::new(coord).speed(0.01));
+
+                    // The index of the modified coordinate.
+                    #[allow(clippy::float_cmp)]
+                    if section_direction.0.as_ref().unwrap()[idx] != *coord {
+                        modified_coord = idx;
+                    }
+
+                    // Gets rid of floating point shenanigans.
+                    if *coord < Float::EPS {
+                        *coord = 0.0;
+                    }
+                }
+            });
+
+            if new_direction.try_normalize_mut(Float::EPS).is_none() {
+                for coord in new_direction.iter_mut() {
+                    *coord = 0.0;
+                }
+                new_direction[modified_coord] = 1.0;
+            }
+
+            // Updates the slicing direction.
+            let new_direction = Some(new_direction);
+            #[allow(clippy::float_cmp)]
+            if section_direction.0 != new_direction {
+                section_direction.0 = new_direction;
             }
 
             ui.horizontal(|ui| {
@@ -386,55 +449,57 @@ pub fn ui(
 
     // Shows the polytope library.
     egui::SidePanel::left("side_panel", 350.0).show(ctx, |ui| {
-        match library.show_root(ui, *selected_language) {
-            // No action needs to be taken.
-            ShowResult::None => {}
+        egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
+            match library.show_root(ui, *selected_language) {
+                // No action needs to be taken.
+                ShowResult::None => {}
 
-            // Loads a selected file.
-            ShowResult::Load(file) => {
-                if let Some(mut p) = query.iter_mut().next() {
-                    if let Ok(q) = Concrete::from_path(&file) {
-                        *p = q;
-                    } else {
-                        println!("File open failed!");
+                // Loads a selected file.
+                ShowResult::Load(file) => {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        if let Ok(q) = Concrete::from_path(&file) {
+                            *p = q;
+                        } else {
+                            println!("File open failed!");
+                        }
                     }
                 }
+
+                // Loads a special polytope.
+                ShowResult::Special(special) => match special {
+                    SpecialLibrary::Polygon(n, d) => {
+                        if let Some(mut p) = query.iter_mut().next() {
+                            *p = Concrete::star_polygon(n, d);
+                        }
+                    }
+                    SpecialLibrary::Prism(n, d) => {
+                        if let Some(mut p) = query.iter_mut().next() {
+                            *p = Concrete::uniform_prism(n, d);
+                        }
+                    }
+                    SpecialLibrary::Antiprism(n, d) => {
+                        if let Some(mut p) = query.iter_mut().next() {
+                            *p = Concrete::uniform_antiprism(n, d);
+                        }
+                    }
+                    SpecialLibrary::Simplex(rank) => {
+                        if let Some(mut p) = query.iter_mut().next() {
+                            *p = Concrete::simplex(rank);
+                        }
+                    }
+                    SpecialLibrary::Hypercube(rank) => {
+                        if let Some(mut p) = query.iter_mut().next() {
+                            *p = Concrete::hypercube(rank);
+                        }
+                    }
+                    SpecialLibrary::Orthoplex(rank) => {
+                        if let Some(mut p) = query.iter_mut().next() {
+                            *p = Concrete::orthoplex(rank);
+                        }
+                    }
+                },
             }
-
-            // Loads a special polytope.
-            ShowResult::Special(special) => match special {
-                SpecialLibrary::Polygon(n, d) => {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        *p = Concrete::star_polygon(n, d);
-                    }
-                }
-                SpecialLibrary::Prism(n, d) => {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        *p = Concrete::uniform_prism(n, d);
-                    }
-                }
-                SpecialLibrary::Antiprism(n, d) => {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        *p = Concrete::uniform_antiprism(n, d);
-                    }
-                }
-                SpecialLibrary::Simplex(rank) => {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        *p = Concrete::simplex(rank);
-                    }
-                }
-                SpecialLibrary::Hypercube(rank) => {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        *p = Concrete::hypercube(rank);
-                    }
-                }
-                SpecialLibrary::Orthoplex(rank) => {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        *p = Concrete::orthoplex(rank);
-                    }
-                }
-            },
-        }
+        })
     });
 }
 
@@ -585,21 +650,50 @@ pub fn update_changed_polytopes(
 }
 
 /// Updates the cross-section shown.
-pub fn update_cross_section(mut query: Query<&mut Concrete>, section_state: Res<SectionState>) {
+///
+/// TODO: separate direction, make update_slice_direction method.
+pub fn update_cross_section(
+    mut query: Query<&mut Concrete>,
+    mut section_state: ResMut<SectionState>,
+    section_direction: Res<SectionDirection>,
+) {
+    if section_direction.is_changed() {
+        if let SectionState::Active {
+            original_polytope,
+            hyperplane_pos: _,
+            minmax,
+            flatten: _,
+        } = &mut *section_state
+        {
+            *minmax = original_polytope
+                .minmax(section_direction.0.as_ref().unwrap())
+                .unwrap_or((-1.0, 1.0));
+        }
+    }
+
     if section_state.is_changed() {
         if let SectionState::Active {
             original_polytope,
             hyperplane_pos,
-            minmax: _,
+            minmax,
             flatten,
-        } = &*section_state
+        } = &mut *section_state
         {
             for mut p in query.iter_mut() {
                 let r = original_polytope.clone();
-                let hyp_pos = hyperplane_pos + 0.0000001; // Botch fix for degeneracies.
+                let hyp_pos = *hyperplane_pos + 0.0000001; // Botch fix for degeneracies.
 
                 if let Some(dim) = r.dim() {
-                    let hyperplane = Hyperplane::x(dim, hyp_pos);
+                    let section_direction = section_direction.0.as_ref().unwrap();
+                    let hyperplane = Hyperplane::from_normal(
+                        original_polytope.dim().unwrap_or(0),
+                        section_direction.clone(),
+                        hyp_pos,
+                    );
+                    *minmax = original_polytope
+                        .minmax(section_direction)
+                        .unwrap_or((-1.0, 1.0));
+
                     let mut slice = r.cross_section(&hyperplane);
 
                     if *flatten {

@@ -21,8 +21,8 @@ use strum_macros::Display;
 ///
 /// The variants of the special library store whatever value is currently being
 /// stored on screen. When the user clicks on the button to load them, they're
-/// sent together with their values as a [`ShowResult`] to the [`ui`](crate::ui::ui)
-/// system, which then actually loads the polytope.
+/// sent together with their values as a [`ShowResult`] to the
+/// [`ui`](crate::ui::ui) system, which then actually loads the polytope.
 #[derive(Clone, Serialize, Deserialize, Debug, Display)]
 pub enum SpecialLibrary {
     /// Allows one to select a regular polygon.

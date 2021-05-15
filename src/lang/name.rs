@@ -254,7 +254,7 @@ pub enum Name<T: NameType> {
     /// A polytope with a given facet count and rank, in that order. The facet
     /// count must be **at least 2,** and the dimension must be **at least 3**
     /// and **at most 20.**
-    Generic { n: usize, rank: Rank },
+    Generic { facet_count: usize, rank: Rank },
 
     /// A smaller variant of a polytope.
     Small(Box<Name<T>>),
@@ -320,7 +320,10 @@ impl<T: NameType> Name<T> {
             | Name::Small(base)
             | Name::Stellated(base) => base.rank(),
 
-            Name::Generic { n: _, rank } => *rank,
+            Name::Generic {
+                facet_count: _,
+                rank,
+            } => *rank,
 
             // Modifiers:
             Name::Pyramid(base)
@@ -358,7 +361,11 @@ impl<T: NameType> Name<T> {
             Name::Square | Name::Rectangle | Name::Orthodiagonal => 4,
 
             // Regular families:
-            Name::Polygon { regular: _, n } | Name::Generic { n, rank: _ } => *n,
+            Name::Polygon { regular: _, n }
+            | Name::Generic {
+                facet_count: n,
+                rank: _,
+            } => *n,
             Name::Simplex { regular: _, rank } => rank.0,
             Name::Hyperblock { regular: _, rank } => 2u32.pow(rank.u32()) as usize,
             Name::Orthoplex { regular: _, rank } => rank.usize() * 2,
@@ -424,7 +431,11 @@ impl<T: NameType> Name<T> {
             Name::Square | Name::Rectangle | Name::Orthodiagonal => 4,
 
             // Regular families:
-            Name::Polygon { regular: _, n } | Name::Generic { n, rank: _ } => *n,
+            Name::Polygon { regular: _, n }
+            | Name::Generic {
+                facet_count: n,
+                rank: _,
+            } => *n,
             Name::Simplex { regular: _, rank } => rank.0,
             Name::Hyperblock { regular: _, rank } => rank.usize() * 2,
             Name::Orthoplex { regular: _, rank } => 2u32.pow(rank.u32()) as usize,
@@ -527,7 +538,10 @@ impl<T: NameType> Name<T> {
 
                 true
             }
-            Self::Generic { n, rank } => *n >= 2 && *rank >= Rank::new(3) && *rank <= Rank::new(20),
+            Self::Generic {
+                facet_count: n,
+                rank,
+            } => *n >= 2 && *rank >= Rank::new(3) && *rank <= Rank::new(20),
             _ => true,
         }
     }
@@ -556,7 +570,10 @@ impl<T: NameType> Name<T> {
                     n,
                 },
             },
-            _ => Self::Generic { n, rank },
+            _ => Self::Generic {
+                facet_count: n,
+                rank,
+            },
         }
     }
 
@@ -749,7 +766,7 @@ impl<T: NameType> Name<T> {
                     *base
                 } else {
                     Self::Generic {
-                        n: base.facet_count(),
+                        facet_count: base.facet_count(),
                         rank: base.rank(),
                     }
                 }

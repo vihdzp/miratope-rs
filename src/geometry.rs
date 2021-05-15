@@ -308,6 +308,10 @@ impl Hyperplane {
         Self { subspace, normal }
     }
 
+    pub fn is_hyperplane(&self) -> bool {
+        self.subspace.is_hyperplane()
+    }
+
     /// Projects a point onto the hyperplane.
     pub fn project(&self, p: &Point) -> Point {
         self.subspace.project(p)
@@ -357,6 +361,20 @@ impl Hyperplane {
     }
 
     all_axes_names!("hyperplane");
+
+    /// Generates an oriented hyperplane from its normal vector.
+    pub fn from_normal(rank: usize, normal: Vector, pos: Float) -> Self {
+        let mut subspace = Subspace::new(pos * &normal);
+
+        for i in 0..rank {
+            let mut e = Vector::zeros(rank);
+            e[i] = 1.0;
+            e += (pos - e.dot(&normal)) * &normal;
+            subspace.add(&e);
+        }
+
+        Self { subspace, normal }
+    }
 }
 
 /// Represents a line segment between two points.

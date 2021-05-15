@@ -87,7 +87,7 @@ use polytope::{
 use ui::{
     camera::{CameraInputEvent, ProjectionType},
     library::Library,
-    FileDialogState, SectionState,
+    FileDialogState, SectionDirection, SectionState,
 };
 
 mod geometry;
@@ -137,6 +137,7 @@ fn main() {
         .insert_resource(Msaa { samples: 4 })
         .insert_resource(SectionState::default())
         .insert_resource(FileDialogState::default())
+        .insert_resource(SectionDirection::default())
         .insert_resource(ProjectionType::Perspective)
         .insert_resource(Library::new_folder(&"./lib/"))
         .insert_resource(SelectedLanguage::default())

@@ -451,7 +451,7 @@ pub trait Language: Prefix {
             Name::Great(base) => Self::great_of(base, options),
             Name::Stellated(base) => Self::stellated_of(base, options),
 
-            Name::Generic { n, rank } => Self::generic(*n, *rank, options),
+            Name::Generic { facet_count, rank } => Self::generic(*facet_count, *rank, options),
             Name::Dual { base, center: _ } => Self::dual_of(base, options),
             Name::Compound(components) => Self::compound(components, options),
         }
@@ -519,9 +519,13 @@ pub trait Language: Prefix {
         format!("rectang{}", options.three("le", "les", "ular"))
     }
 
-    /// The generic name for a polytope with `n` facets with a given rank.
-    fn generic(n: usize, rank: Rank, options: Options) -> String {
-        format!("{}{}", Self::prefix(n), Self::suffix(rank, options))
+    /// The generic name for a polytope with a given facet count and rank.
+    fn generic(facet_count: usize, rank: Rank, options: Options) -> String {
+        format!(
+            "{}{}",
+            Self::prefix(facet_count),
+            Self::suffix(rank, options)
+        )
     }
 
     fn combine(adj: String, noun: String) -> String {

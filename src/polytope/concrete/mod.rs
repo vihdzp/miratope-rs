@@ -21,7 +21,7 @@ use super::{
     Polytope,
 };
 use crate::{
-    geometry::{Hyperplane, Hypersphere, Matrix, OrdPoint, Point, Segment, Subspace},
+    geometry::{Hyperplane, Hypersphere, Matrix, OrdPoint, Point, Segment, Subspace, Vector},
     lang::name::{Con, ConData, Name, NameData, Regular},
     ui::camera::ProjectionType,
     Consts, Float,
@@ -206,49 +206,29 @@ impl Concrete {
         Some(g / (self.vertices.len() as Float))
     }
 
-    /// Gets the least `x` coordinate of a vertex of the polytope.
-    pub fn x_min(&self) -> Option<Float> {
-        if self.dim()? == 0 {
-            None
-        } else {
-            self.vertices
-                .iter()
-                .map(|v| float_ord::FloatOrd(v[0]))
-                .min()
-                .map(|x| x.0)
-        }
-    }
-
-    /// Gets the greatest `x` coordinate of a vertex of the polytope.
-    pub fn x_max(&self) -> Option<Float> {
-        if self.dim()? == 0 {
-            None
-        } else {
-            self.vertices
-                .iter()
-                .map(|v| float_ord::FloatOrd(v[0]))
-                .max()
-                .map(|x| x.0)
-        }
-    }
-
     /// Gets the least and greatest `x` coordinate of a vertex of the polytope.
-    pub fn x_minmax(&self) -> Option<(Float, Float)> {
+    pub fn minmax(&self, direction: &Vector) -> Option<(Float, Float)> {
         use itertools::{Itertools, MinMaxResult};
 
-        if self.dim()? == 0 {
-            None
-        } else {
+        if let Some(dim) = self.dim() {
+            if dim == 0 {
+                return None;
+            }
+
+            let hyperplane = Hyperplane::from_normal(dim, direction.clone(), 0.0);
+
             match self
                 .vertices
                 .iter()
-                .map(|v| float_ord::FloatOrd(v[0]))
+                .map(|v| float_ord::FloatOrd(hyperplane.distance(v)))
                 .minmax()
             {
                 MinMaxResult::NoElements => None,
                 MinMaxResult::OneElement(x) => Some((x.0, x.0)),
                 MinMaxResult::MinMax(x, y) => Some((x.0, y.0)),
             }
+        } else {
+            None
         }
     }
 
@@ -668,6 +648,10 @@ impl Concrete {
     /// # Todo
     /// We should make this function take a general [`Subspace`] instead.
     pub fn cross_section(&self, slice: &Hyperplane) -> Self {
+        debug_assert!(
+            slice.is_hyperplane(),
+            "Sections can only be taken from hyperplanes!"
+        );
         let mut vertices = Vec::new();
         let mut abs = AbstractBuilder::new();
 
