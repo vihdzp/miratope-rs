@@ -222,6 +222,12 @@ pub enum Name<T: NameType> {
         facet_count: usize,
     },
 
+    /// An antitegum based on a polytope.
+    Antitegum {
+        base: Box<Name<T>>,
+        vertex_count: usize,
+    },
+
     /// The Petrial of a polyhedron.
     Petrial {
         base: Box<Name<T>>,
@@ -322,6 +328,10 @@ impl<T: NameType> Name<T> {
             | Name::Antiprism {
                 base,
                 facet_count: _,
+            }
+            | Name::Antitegum {
+                base,
+                vertex_count: _,
             } => base.rank().plus_one(),
 
             // Multimodifiers:
@@ -359,6 +369,10 @@ impl<T: NameType> Name<T> {
                 base,
                 facet_count: _,
             } => base.vertex_count() + base.facet_count(),
+            Name::Antitegum {
+                base: _,
+                vertex_count,
+            } => *vertex_count,
             Name::Petrial {
                 base,
                 facet_count: _,
@@ -420,6 +434,10 @@ impl<T: NameType> Name<T> {
                 base: _,
                 facet_count,
             } => *facet_count,
+            Name::Antitegum {
+                base,
+                vertex_count: _,
+            } => base.vertex_count() + base.facet_count(),
             Name::Petrial {
                 base: _,
                 facet_count,
@@ -743,6 +761,23 @@ impl<T: NameType> Name<T> {
             Self::Pyramid(base) => modifier_dual!(base, Pyramid, Pyramid),
             Self::Prism(base) => modifier_dual!(base, Prism, Tegum),
             Self::Tegum(base) => modifier_dual!(base, Tegum, Prism),
+            Self::Antiprism { base, facet_count } => Self::Antitegum {
+                base,
+                vertex_count: facet_count,
+            },
+            Self::Antitegum { base, vertex_count } => {
+                if T::is_abstract() {
+                    Self::Antiprism {
+                        base,
+                        facet_count: vertex_count,
+                    }
+                } else {
+                    Self::Dual {
+                        base: Box::new(Self::Antitegum { base, vertex_count }),
+                        center,
+                    }
+                }
+            }
 
             // Duals of multi-modifiers.
             Self::Multipyramid(bases) => multimodifier_dual!(bases, Multipyramid, Multipyramid),

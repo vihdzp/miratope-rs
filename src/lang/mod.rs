@@ -430,6 +430,10 @@ pub trait Language: Prefix {
                 base,
                 facet_count: _,
             } => Self::antiprism_of(base, options),
+            Name::Antitegum {
+                base,
+                vertex_count: _,
+            } => Self::antitegum_of(base, options),
             Name::Petrial {
                 base,
                 facet_count: _,
@@ -564,6 +568,16 @@ pub trait Language: Prefix {
     /// The name for an antiprism with a given base.
     fn antiprism_of<T: NameType>(base: &Name<T>, options: Options) -> String {
         Self::combine(Self::base_adj(base, options), Self::antiprism(options))
+    }
+
+    /// The name for an antitegum.
+    fn antitegum(options: Options) -> String {
+        format!("antiteg{}", options.three("um", "ums", "matic"))
+    }
+
+    /// The name for an antitegum with a given base.
+    fn antitegum_of<T: NameType>(base: &Name<T>, options: Options) -> String {
+        Self::combine(Self::base_adj(base, options), Self::antitegum(options))
     }
 
     /// The name for a Petrial.

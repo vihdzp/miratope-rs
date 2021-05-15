@@ -410,7 +410,7 @@ impl IndexMut<usize> for SubelementList {
     }
 }
 
-/// Builds a polytope from the bottom up.
+/// A structure used to build a polytope from the bottom up.
 pub struct AbstractBuilder(Abstract);
 
 impl AbstractBuilder {
