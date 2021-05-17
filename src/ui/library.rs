@@ -67,8 +67,14 @@ impl SpecialLibrary {
                     );
 
                     // Turning number.
+                    let max_n = *n / 2;
                     ui.label("d:");
-                    ui.add(egui::DragValue::new(d).speed(0.25).clamp_range(1..=*n / 2));
+                    ui.add(egui::DragValue::new(d).speed(0.25).clamp_range(1..=max_n));
+
+                    // Circumvents egui bug #404.
+                    if *d > max_n {
+                        *d = max_n;
+                    }
                 });
 
                 if clicked {
@@ -92,12 +98,14 @@ impl SpecialLibrary {
                     );
 
                     // Turning number.
+                    let max_n = *n * 2 / 3;
                     ui.label("d:");
-                    ui.add(
-                        egui::DragValue::new(d)
-                            .speed(0.25)
-                            .clamp_range(1..=(*n * 2 / 3)),
-                    );
+                    ui.add(egui::DragValue::new(d).speed(0.25).clamp_range(1..=max_n));
+
+                    // Circumvents egui bug #404.
+                    if *d > max_n {
+                        *d = max_n;
+                    }
                 });
 
                 if clicked {
