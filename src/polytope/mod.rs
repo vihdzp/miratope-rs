@@ -195,7 +195,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Returns any flag of the polytope.
     fn first_oriented_flag(&self) -> Option<OrientedFlag> {
-        Some(OrientedFlag ::from( self.first_flag()?))
+        Some(OrientedFlag::from(self.first_flag()?))
     }
 
     /// Returns an iterator over all flags of a polytope.
