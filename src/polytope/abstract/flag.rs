@@ -107,6 +107,7 @@ impl Flag {
 
 /// Gets the common elements of two lists. There's definitely a better way.
 fn common(vec0: &[usize], vec1: &[usize]) -> Vec<usize> {
+    // Hopefully this isn't much of a bottleneck.
     let mut vec0 = vec0.to_owned();
     vec0.sort_unstable();
     let mut vec1 = vec1.to_owned();
@@ -231,17 +232,20 @@ impl std::ops::IndexMut<Rank> for Flag {
 /// of its flags. Hence, we can't bundle the information that the polytope is
 /// non-orientable with the flags.
 pub struct FlagIter<'a> {
-    /// The polytope whose flags are iterated. We must sort all of its elements
-    /// before using it for the algorithm to work.
+    /// The polytope whose flags are iterated.
     polytope: &'a Abstract,
 
     /// The flags whose adjacencies are being searched.
     queue: VecDeque<Flag>,
 
+    /// The flag changes we're applying.
     flag_changes: Vec<usize>,
 
     /// The flag index we need to check next.
     flag_idx: usize,
+
+    /// Have we already returned the first flag?
+    first: bool,
 
     /// The flags that have already been found, but whose neighbors haven't all
     /// been found yet.
@@ -267,27 +271,56 @@ pub enum IterResult {
     None,
 }
 
+impl Abstract {
+    /// Gets whatever flag from the polytope.
+    pub fn some_flag(&self) -> Flag {
+        let rank = self.rank();
+        let mut flag = Flag::with_capacity(rank.usize());
+        let mut idx = 0;
+        flag.elements.push(0);
+
+        for r in Rank::range_iter(Rank::new(1), rank) {
+            idx = self.element_ref(r.minus_one(), idx).unwrap().sups[0];
+            flag.elements.push(idx);
+        }
+
+        flag
+    }
+}
+
 impl<'a> FlagIter<'a> {
+    /// Returns a dummy iterator that returns `None` every single time.
+    pub fn empty(polytope: &'a Abstract) -> Self {
+        Self {
+            polytope,
+            queue: VecDeque::new(), // This is the important bit.
+            flag_changes: Vec::new(),
+            flag_idx: 0,
+            first: true,
+            found: HashMap::new(),
+            orientable: true,
+        }
+    }
     /// Initializes a new iterator over the flag events of a polytope.
     pub fn new(polytope: &'a Abstract) -> Self {
         let rank = polytope.rank();
 
-        // Initializes with any flag from the polytope.
-        let mut first_flag = Flag::with_capacity(rank.usize());
-        let mut idx = 0;
-        first_flag.elements.push(0);
+        // A nullitope has no flags.
+        if rank == Rank::new(-1) {
+            Self::empty(polytope)
+        } else {
+            // Initializes with any flag from the polytope.
+            let first_flag = polytope.some_flag();
 
-        for r in Rank::range_iter(Rank::new(1), rank) {
-            idx = polytope.element_ref(r.minus_one(), idx).unwrap().sups[0];
-            first_flag.elements.push(idx);
+            // All flag changes.
+            let flag_changes = (0..rank.usize()).collect();
+
+            Self::with_flags(polytope, flag_changes, first_flag)
         }
-
-        // All flag changes.
-        let flag_changes = (0..rank.usize()).collect();
-
-        Self::with_flags(polytope, flag_changes, first_flag)
     }
 
+    /// Initializes a new iterator over the flag events of a polytope, given an
+    /// initial flag and a set of flag changes to apply.
     pub fn with_flags(polytope: &'a Abstract, flag_changes: Vec<usize>, first_flag: Flag) -> Self {
         assert!(polytope.is_bounded(), "Polytope is not bounded.");
         let rank = polytope.rank();
@@ -308,22 +341,22 @@ impl<'a> FlagIter<'a> {
             queue,
             flag_changes,
             flag_idx: 0,
+            first: rank == Rank::new(-1),
             found,
             orientable: true,
         }
     }
 
+    /// Returns the index of the current flag change to apply.
     pub fn flag_change(&self) -> usize {
         self.flag_changes[self.flag_idx]
     }
 
     /// Attempts to get the next flag.
     pub fn try_next(&mut self) -> IterResult {
-        let rank = self.polytope.rank().usize();
-        let new_flag;
-
         if let Some(current) = self.queue.front() {
-            new_flag = current.change(&self.polytope, self.flag_change());
+            let rank = self.polytope.rank().usize();
+            let new_flag = current.change(&self.polytope, self.flag_change());
 
             // Increments flag_idx.
             self.flag_idx = if self.flag_idx + 1 == self.flag_changes.len() {
@@ -332,53 +365,47 @@ impl<'a> FlagIter<'a> {
             } else {
                 self.flag_idx + 1
             };
-        } else {
-            return IterResult::None;
-        }
 
-        let new_orientation = new_flag.orientation;
-        match self.found.entry(new_flag) {
-            // If the flag is already in the found dictionary:
-            Entry::Occupied(mut occupied_entry) => {
-                *occupied_entry.get_mut() += 1;
-                let val = *occupied_entry.get();
+            let new_orientation = new_flag.orientation;
+            match self.found.entry(new_flag) {
+                // If the flag is already in the found dictionary:
+                Entry::Occupied(mut occupied_entry) => {
+                    *occupied_entry.get_mut() += 1;
+                    let val = *occupied_entry.get();
 
-                if self.orientable && new_orientation != occupied_entry.key().orientation {
-                    self.orientable = false;
-                    return IterResult::NonOrientable;
-                }
+                    // If there's a mismatch between the seen and the expected
+                    // orientability, then we know the polytope isn't orientable.
+                    if self.orientable && new_orientation != occupied_entry.key().orientation {
+                        self.orientable = false;
+                        return IterResult::NonOrientable;
+                    }
 
-                // In the special case we just found the initial flag again, we
-                // return it.
-                if val == 1 {
-                    let new_flag = occupied_entry.key().clone();
-
-                    // If we've found it all of the times we'll ever find it, no use
-                    // in keeping it in the dictionary.
+                    // In any case, if we got here, we know this is a repeated flag.
+                    //
+                    // If we've found it all of the times we'll ever find it,
+                    // there's no use in keeping it in the dictionary (profiling
+                    // shows this is marginally faster than letting it be).
                     if val == rank {
                         occupied_entry.remove();
                     }
 
-                    IterResult::New(new_flag)
-                } else {
-                    // If we've found it all of the times we'll ever find it, no use
-                    // in keeping it in the dictionary.
-                    if val == rank {
-                        occupied_entry.remove();
-                    }
-
-                    // Otherwise, this will always be a repeat.
                     IterResult::Repeat
                 }
-            }
-            // If this flag is new, we just add it and return it.
-            Entry::Vacant(vacant_entry) => {
-                let new_flag = vacant_entry.key().clone();
-                self.queue.push_back(new_flag.clone());
-                vacant_entry.insert(1);
+                // If this flag is new, we just add it and return it.
+                Entry::Vacant(vacant_entry) => {
+                    let new_flag = vacant_entry.key().clone();
+                    self.queue.push_back(new_flag.clone());
 
-                IterResult::New(new_flag)
+                    // We've found the flag one (1) time.
+                    vacant_entry.insert(1);
+
+                    IterResult::New(new_flag)
+                }
             }
+        }
+        // The queue is empty.
+        else {
+            return IterResult::None;
         }
     }
 }
@@ -397,29 +424,129 @@ pub enum FlagEvent {
 impl<'a> Iterator for FlagIter<'a> {
     type Item = FlagEvent;
 
+    /// Gets the next flag event.
     fn next(&mut self) -> Option<Self::Item> {
         let rank = self.polytope.rank();
 
-        // A nullitope has no flags.
-        if rank == Rank::new(-1) {
-            None
-        }
-        // A point has a single flag.
-        else if rank == Rank::new(0) {
-            self.queue.pop_front().map(FlagEvent::Flag)
-        } else {
-            loop {
-                match self.try_next() {
-                    IterResult::New(f) => {
-                        return Some(FlagEvent::Flag(f));
-                    }
-                    IterResult::NonOrientable => {
-                        return Some(FlagEvent::NonOrientable);
-                    }
-                    IterResult::None => return None,
-                    IterResult::Repeat => {}
-                }
+        // The first flag is a special case.
+        if !self.first {
+            self.first = true;
+
+            let flag = Some(FlagEvent::Flag(self.found.keys().next().cloned().unwrap()));
+
+            // If we're dealing with a point, this is the only flag.
+            if rank == Rank::new(0) {
+                self.queue = VecDeque::new();
             }
+
+            return flag;
+        }
+
+        // Loops until we get a new flag event.
+        loop {
+            match self.try_next() {
+                // We found a new flag.
+                IterResult::New(f) => {
+                    return Some(FlagEvent::Flag(f));
+                }
+
+                // We just realized the polytope is non-orientable.
+                IterResult::NonOrientable => {
+                    return Some(FlagEvent::NonOrientable);
+                }
+
+                // We already exhausted the flag supply.
+                IterResult::None => return None,
+
+                // Repeat flag, try again.
+                IterResult::Repeat => {}
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::polytope::Polytope;
+
+    #[test]
+    fn nullitope() {
+        let flag_count = Abstract::nullitope().flags().count();
+        assert_eq!(flag_count, 0, "Expected {} flags, found {}.", 0, flag_count);
+    }
+
+    #[test]
+    fn point() {
+        let flag_count = Abstract::point().flags().count();
+        assert_eq!(flag_count, 1, "Expected {} flags, found {}.", 1, flag_count);
+    }
+
+    #[test]
+    fn dyad() {
+        let flag_count = Abstract::dyad().flags().count();
+        assert_eq!(flag_count, 2, "Expected {} flags, found {}.", 2, flag_count);
+    }
+
+    #[test]
+    fn polygon() {
+        for n in 2..=10 {
+            let flag_count = Abstract::polygon(n).flags().count();
+            assert_eq!(
+                flag_count,
+                2 * n,
+                "Expected {} flags, found {}.",
+                2 * n,
+                flag_count
+            );
+        }
+    }
+
+    #[test]
+    fn simplex() {
+        use factorial::Factorial;
+
+        for n in 0..=5 {
+            let flag_count = Abstract::simplex(Rank::new(n as isize)).flags().count();
+            let expected = (n + 1).factorial();
+
+            assert_eq!(
+                flag_count, expected,
+                "Expected {} flags, found {}.",
+                expected, flag_count
+            );
+        }
+    }
+
+    #[test]
+    fn hypercube() {
+        use factorial::Factorial;
+
+        for n in 0..=5 {
+            let flag_count = Abstract::hypercube(Rank::new(n as isize)).flags().count();
+            let expected = (2u32.pow(n as u32) as usize) * n.factorial();
+
+            assert_eq!(
+                flag_count, expected,
+                "Expected {} flags, found {}.",
+                expected, flag_count
+            );
+        }
+    }
+
+    #[test]
+    fn orthoplex() {
+        use factorial::Factorial;
+
+        for n in 0..=5 {
+            let flag_count = Abstract::orthoplex(Rank::new(n as isize)).flags().count();
+            let expected = (2u32.pow(n as u32) as usize) * n.factorial();
+
+            assert_eq!(
+                flag_count, expected,
+                "Expected {} flags, found {}.",
+                expected, flag_count
+            );
         }
     }
 }
