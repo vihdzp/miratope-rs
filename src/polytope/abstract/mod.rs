@@ -3,7 +3,7 @@ pub mod flag;
 pub mod rank;
 
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeSet, HashMap, HashSet},
     mem,
 };
 
@@ -12,7 +12,7 @@ use self::{
         AbstractBuilder, Element, ElementHash, ElementList, Section, SectionHash, SubelementList,
         Subelements, Subsupelements, Superelements,
     },
-    flag::{FlagEvent, FlagIter},
+    flag::{Flag, FlagEvent, FlagIter},
     rank::{Rank, RankVec},
 };
 use super::Polytope;
@@ -173,6 +173,49 @@ impl Abstract {
     pub fn is_valid(&self) -> bool {
         self.is_bounded() && self.check_incidences() && self.is_dyadic()
         // && self.is_strongly_connected()
+    }
+
+    /// Returns the indices of a Petrial polygon in cyclic order, or `None` if
+    /// it self-intersects.
+    pub fn petrie_polygon_vertices(&self, flag: Flag) -> Option<Vec<usize>> {
+        let rank = self.rank().try_usize()?;
+        let mut new_flag = flag.clone();
+        let first_vertex = flag[0];
+        let mut vertices = Vec::new();
+
+        // Gotta love that O(n log(n)).
+        let mut vertex_hash = HashSet::new();
+
+        loop {
+            // Applies 0-changes up to (rank-1)-changes in order.
+            for idx in 0..rank {
+                new_flag.change_mut(self, idx);
+            }
+
+            // If we just hit a previous vertex, we return.
+            let new_vertex = new_flag[0];
+            if vertex_hash.contains(&new_vertex) {
+                return None;
+            }
+
+            // Adds the new vertex.
+            vertices.push(new_vertex);
+            vertex_hash.insert(new_vertex);
+
+            // If we're back to the beginning, we break out of the loop.
+            if new_vertex == first_vertex {
+                break;
+            }
+        }
+
+        // We returned to precisely the initial flag.
+        if flag == new_flag {
+            Some(vertices)
+        }
+        // The Petrie polygon self-intersects.
+        else {
+            None
+        }
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
@@ -656,6 +699,23 @@ impl Polytope<Abs> for Abstract {
         Ok(())
     }
 
+    /// Gets whatever flag from the polytope.
+    fn some_flag(&self) -> Option<Flag> {
+        let rank = self.rank();
+        let rank_usize = rank.try_usize()?;
+
+        let mut flag = Flag::with_capacity(rank_usize);
+        let mut idx = 0;
+        flag.elements.push(0);
+
+        for r in Rank::range_iter(Rank::new(1), rank) {
+            idx = self.element_ref(r.minus_one(), idx).unwrap().sups[0];
+            flag.elements.push(idx);
+        }
+
+        Some(flag)
+    }
+
     /// Builds the [Petrial](https://polytope.miraheze.org/wiki/Petrial) of a
     /// polyhedron in place.
     fn petrial_mut(&mut self) -> Result<(), ()> {
@@ -732,6 +792,10 @@ impl Polytope<Abs> for Abstract {
         } else {
             Err(())
         }
+    }
+
+    fn petrie_polygon_with(&self, flag: Flag) -> Option<Self> {
+        Some(Self::polygon(self.petrie_polygon_vertices(flag)?.len()))
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)

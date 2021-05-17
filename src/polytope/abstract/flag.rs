@@ -271,23 +271,6 @@ pub enum IterResult {
     None,
 }
 
-impl Abstract {
-    /// Gets whatever flag from the polytope.
-    pub fn some_flag(&self) -> Flag {
-        let rank = self.rank();
-        let mut flag = Flag::with_capacity(rank.usize());
-        let mut idx = 0;
-        flag.elements.push(0);
-
-        for r in Rank::range_iter(Rank::new(1), rank) {
-            idx = self.element_ref(r.minus_one(), idx).unwrap().sups[0];
-            flag.elements.push(idx);
-        }
-
-        flag
-    }
-}
-
 impl<'a> FlagIter<'a> {
     /// Returns a dummy iterator that returns `None` every single time.
     pub fn empty(polytope: &'a Abstract) -> Self {
@@ -301,21 +284,23 @@ impl<'a> FlagIter<'a> {
             orientable: true,
         }
     }
+
     /// Initializes a new iterator over the flag events of a polytope.
     pub fn new(polytope: &'a Abstract) -> Self {
+        use crate::polytope::Polytope;
+
         let rank = polytope.rank();
 
-        // A nullitope has no flags.
-        if rank == Rank::new(-1) {
-            Self::empty(polytope)
-        } else {
-            // Initializes with any flag from the polytope.
-            let first_flag = polytope.some_flag();
-
+        // Initializes with any flag from the polytope.
+        if let Some(first_flag) = polytope.some_flag() {
             // All flag changes.
             let flag_changes = (0..rank.usize()).collect();
 
             Self::with_flags(polytope, flag_changes, first_flag)
+        }
+        // A nullitope has no flags.
+        else {
+            Self::empty(polytope)
         }
     }
 

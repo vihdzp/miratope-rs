@@ -14,7 +14,7 @@ use super::{
         elements::{
             AbstractBuilder, Element, ElementList, SubelementList, Subelements, Subsupelements,
         },
-        flag::{FlagEvent, FlagIter},
+        flag::{Flag, FlagEvent, FlagIter},
         rank::{Rank, RankVec},
         Abstract,
     },
@@ -992,6 +992,10 @@ impl Polytope<Con> for Concrete {
         self.try_dual_mut_with(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
+    fn some_flag(&self) -> Option<Flag> {
+        self.abs.some_flag()
+    }
+
     fn petrial_mut(&mut self) -> Result<(), ()> {
         let res = self.abs.petrial_mut();
 
@@ -1001,6 +1005,21 @@ impl Polytope<Con> for Concrete {
         }
 
         res
+    }
+
+    /// Builds the Petrie polygon of a polytope from a given flag, or returns
+    /// `None` if it's invalid.
+    fn petrie_polygon_with(&self, flag: Flag) -> Option<Self> {
+        let vertices = self.abs.petrie_polygon_vertices(flag)?;
+        let n = vertices.len();
+
+        Some(Self::new(
+            vertices
+                .into_iter()
+                .map(|idx| self.vertices[idx].clone())
+                .collect(),
+            Abstract::polygon(n),
+        ))
     }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails

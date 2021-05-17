@@ -209,6 +209,19 @@ pub fn ui(
                         }
                     }
 
+                    // Converts the active polytope into its Petrie polygon.
+                    if ui.button("Petrie polygon").clicked() {
+                        for mut p in query.iter_mut() {
+                            match p.petrie_polygon() {
+                                Some(q) => {
+                                    *p = q;
+                                    println!("Petrie polygon succeeded.")
+                                }
+                                None => println!("Petrie polygon failed."),
+                            }
+                        }
+                    }
+
                     ui.separator();
 
                     // Recenters a polytope.

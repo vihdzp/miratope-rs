@@ -185,6 +185,15 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         clone.petrial_mut().ok().map(|_| clone)
     }
 
+    fn petrie_polygon(&self) -> Option<Self> {
+        self.petrie_polygon_with(self.some_flag()?)
+    }
+
+    fn petrie_polygon_with(&self, flag: Flag) -> Option<Self>;
+
+    /// Returns any flag of the polytope.
+    fn some_flag(&self) -> Option<Flag>;
+
     /// Returns an iterator over all "flag events" of a polytope. For more info,
     /// see [`FlagIter`].
     fn flag_events(&self) -> FlagIter;
