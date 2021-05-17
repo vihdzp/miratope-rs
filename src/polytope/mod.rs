@@ -112,6 +112,15 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
+    /// if the polytopes have different ranks. *Update neither the name nor the
+    /// min/max elements.**
+    ///
+    /// # Todo
+    /// We should make this method take only the `ranks`, so that we can use the
+    /// names from the previous polytopes.
+    fn _append(&mut self, p: Self);
+
+    /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks.
     fn append(&mut self, p: Self);
 
@@ -169,9 +178,10 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     fn compound_iter<U: Iterator<Item = Self>>(mut components: U) -> Self {
         if let Some(mut p) = components.next() {
             for q in components {
-                p.append(q);
+                p._append(q);
             }
 
+            // TODO: UPDATE NAME.
             p
         } else {
             Self::nullitope()

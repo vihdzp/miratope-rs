@@ -826,8 +826,9 @@ impl Polytope<Abs> for Abstract {
     }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
-    /// if the polytopes have different ranks.
-    fn append(&mut self, p: Self) {
+    /// if the polytopes have different ranks. *Update neither the name nor the
+    /// min/max elements.**
+    fn _append(&mut self, p: Self) {
         let rank = self.rank();
 
         // The polytopes must have the same ranks.
@@ -859,12 +860,18 @@ impl Polytope<Abs> for Abstract {
                 self.push_at(r, el);
             }
         }
+    }
+
+    fn append(&mut self, p: Self) {
+        let name = mem::replace(&mut self.name, Name::Nullitope);
+        let new_name = Name::compound(vec![(1, name), (1, p.name.clone())]);
+
+        self._append(p);
 
         *self.min_mut() = Element::min(self.vertex_count());
         *self.max_mut() = Element::max(self.facet_count());
 
-        let name = mem::replace(&mut self.name, Name::Nullitope);
-        self.name = Name::compound(vec![(1, name), (1, p.name)]);
+        self.name = new_name;
     }
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
