@@ -106,7 +106,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// through the inversion center.
     fn try_dual(&self) -> DualResult<Self>;
 
-    /// Calls [`try_dual`] and unwraps the result.
+    /// Calls [`Self::try_dual`] and unwraps the result.
     fn dual(&self) -> Self {
         self.try_dual().unwrap()
     }
@@ -116,7 +116,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// of a facet through the inversion center and does nothing.
     fn try_dual_mut(&mut self) -> DualResult<()>;
 
-    /// Calls [`try_dual_mut`] and unwraps the result.
+    /// Calls [`Self::try_dual_mut`] and unwraps the result.
     fn dual_mut(&mut self) {
         self.try_dual_mut().unwrap();
     }

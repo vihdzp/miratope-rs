@@ -1,3 +1,5 @@
+//! Contains the methods used to show and load the Miratope library.
+
 use std::{
     ffi::{OsStr, OsString},
     fs, io,
@@ -46,12 +48,13 @@ pub enum SpecialLibrary {
 }
 
 impl SpecialLibrary {
-    /// Shows the special component of the library.
+    /// Shows the special component of the library. Returns the action selected
+    /// by the user, if any.
     pub fn show(&mut self, ui: &mut Ui, _selected_language: SelectedLanguage) -> ShowResult {
         let text = self.to_string();
 
         match self {
-            // An {n/d} regular polygon or uniform polygonal prism.
+            // An {n / d} regular polygon or uniform polygonal prism.
             Self::Polygon(n, d) | Self::Prism(n, d) => {
                 let mut clicked = false;
 
@@ -78,6 +81,8 @@ impl SpecialLibrary {
                     ShowResult::None
                 }
             }
+
+            // An {n / d} uniform antiprism.
             Self::Antiprism(n, d) => {
                 let mut clicked = false;
 
@@ -104,6 +109,8 @@ impl SpecialLibrary {
                     ShowResult::None
                 }
             }
+
+            // A simplex, hypercube, or orthoplex of a given rank.
             Self::Simplex(rank) | Self::Hypercube(rank) | Self::Orthoplex(rank) => {
                 let mut clicked = false;
 

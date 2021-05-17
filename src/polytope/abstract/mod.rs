@@ -700,7 +700,7 @@ impl Polytope<Abs> for Abstract {
         poly.build().with_name(Name::polygon(AbsData::default(), n))
     }
 
-    /// Converts a polytope into its dual. Use [`dual`] instead, as this method
+    /// Converts a polytope into its dual. Use [`Self::dual`] instead, as this method
     /// can never fail.
     fn try_dual(&self) -> Result<Self, usize> {
         let mut clone = self.clone();
@@ -708,7 +708,7 @@ impl Polytope<Abs> for Abstract {
         Ok(clone)
     }
 
-    /// Converts a polytope into its dual in place. Use [`dual_mut`] instead, as
+    /// Converts a polytope into its dual in place. Use [`Self::dual_mut`] instead, as
     /// this method can never fail.
     fn try_dual_mut(&mut self) -> Result<(), usize> {
         for elements in self.ranks.iter_mut() {
@@ -823,7 +823,7 @@ impl Polytope<Abs> for Abstract {
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
-    /// based on a given polytope. Use [`antiprism`] instead, as this method can
+    /// based on a given polytope. Use [`Self::antiprism`] instead, as this method can
     /// never fail.
     fn try_antiprism(&self) -> Result<Self, usize> {
         Ok(self.antiprism_and_vertices().0)

@@ -18,11 +18,11 @@ as well as the following:
   * [x] [Petrials](https://polytope.miraheze.org/wiki/Petrial)
   * [x] [Prism products](https://polytope.miraheze.org/wiki/Prism_product)
   * [x] [Tegum products](https://polytope.miraheze.org/wiki/Tegum_product)
-  * [ ] [Pyramid products](https://polytope.miraheze.org/wiki/Pyramid_product)
+  * [x] [Pyramid products](https://polytope.miraheze.org/wiki/Pyramid_product)
   * [ ] [Convex hulls](https://polytope.miraheze.org/wiki/Convex_hull)
 * Loading and saving into various formats
-  * [x] Support for the [Stella `off` format](https://www.software3d.com/StellaManual.php?prod=stella4D#import)
-  * [ ] Support for the [GeoGebra GGB format](https://wiki.geogebra.org/en/Reference:File_Format)
+  * [x] Support for the [Stella `.off` format](https://www.software3d.com/StellaManual.php?prod=stella4D#import)
+  * [ ] Support for the [GeoGebra `.ggb` format](https://wiki.geogebra.org/en/Reference:File_Format)
 * Localization
   * Automatic name generation in various languages for many shapes
     * [x] English
@@ -52,7 +52,7 @@ It was initially meant for the [Geomview software](https://people.sc.fsu.edu/~jb
 and was later adapted for the [Stella software](https://www.software3d.com/StellaManual.php?prod=stella4D#import).
 Miratope plans to use a further generalization of the Stella `.off` format for any amount of dimensions.
 
-Miratope includes a small library simple or generatable polytopes at startup. For more complicated polytopes, many of them can be downloaded from
+Miratope includes a small library simple or generatable polytopes at startup. More complicated polytopes can be downloaded from
 [OfficialURL's personal collection](https://drive.google.com/drive/u/0/folders/1nQZ-QVVBfgYSck4pkZ7he0djF82T9MVy).
 Eventually, most here will be browsable from Miratope itself.
 
