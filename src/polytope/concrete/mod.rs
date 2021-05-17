@@ -605,8 +605,8 @@ impl Concrete {
                     OrientedFlag::from(flag),
                 ) {
                     if let FlagEvent::Flag(oriented_flag) = flag_event {
-                        // TODO: Figure out how to make this into a debug assert.
-                        assert!(all_flags.insert(oriented_flag.flag.clone()));
+                        let new = all_flags.insert(oriented_flag.flag.clone());
+                        debug_assert!(new, "A flag is in two different components.");
 
                         component_volume += oriented_flag.orientation.sign()
                             * Matrix::from_iterator(

@@ -1,5 +1,9 @@
 //! Helpful methods and structs for operating on the [flags](https://polytope.miraheze.org/wiki/Flag)
 //! of a polytope.
+//!
+//! Recall that a flag is a maximal set of pairwise incident elements in a
+//! polytope. For convenience, we omit the minimal and maximal elements from our
+//! flags, though we sometimes pretend like they're still there for convenience.
 
 use std::{
     cmp::Ordering,
@@ -40,6 +44,7 @@ impl Flag {
         self.0.get_mut(index.try_usize()?)
     }
 
+    /// Pushes an index into the flag.
     pub fn push(&mut self, value: usize) {
         self.0.push(value);
     }
@@ -52,7 +57,7 @@ impl Flag {
     /// Applies a specified flag change to the flag in place.
     pub fn change_mut(&mut self, polytope: &Abstract, r: usize) {
         let rank = polytope.rank();
-        assert_ne!(
+        debug_assert_ne!(
             rank,
             Rank::new(-1),
             "Can't iterate over flags of the nullitope."
@@ -77,7 +82,7 @@ impl Flag {
 
         let common = common(&below.sups.0, &above.subs.0);
 
-        assert_eq!(
+        debug_assert_eq!(
             common.len(),
             2,
             "Diamond property fails between rank {}, index {}, and rank {}, index {}.",
@@ -520,7 +525,7 @@ impl<'a> OrientedFlagIter<'a> {
         flag_changes: FlagChanges,
         first_flag: OrientedFlag,
     ) -> Self {
-        assert!(polytope.is_bounded(), "Polytope is not bounded.");
+        debug_assert!(polytope.is_bounded(), "Polytope is not bounded.");
         let rank = polytope.rank();
 
         // Initializes found flags.
