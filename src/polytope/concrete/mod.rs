@@ -963,14 +963,12 @@ impl Polytope<Con> for Concrete {
         &mut self.name
     }
 
-    /// Gets the number of elements of a given rank.
-    fn el_count(&self, rank: Rank) -> usize {
-        self.abs.el_count(rank)
+    fn abs(&self) -> &Abstract {
+        &self.abs
     }
 
-    /// Gets the number of elements of all ranks.
-    fn el_counts(&self) -> RankVec<usize> {
-        self.abs.el_counts()
+    fn abs_mut(&mut self) -> &mut Abstract {
+        &mut self.abs
     }
 
     /// Builds the unique polytope of rank −1.
@@ -1029,7 +1027,7 @@ impl Polytope<Con> for Concrete {
 
     /// Builds the Petrie polygon of a polytope from a given flag, or returns
     /// `None` if it's invalid.
-    fn petrie_polygon_with(&self, flag: OrientedFlag) -> Option<Self> {
+    fn petrie_polygon_with(&self, flag: Flag) -> Option<Self> {
         let vertices = self.abs.petrie_polygon_vertices(flag)?;
         let n = vertices.len();
 

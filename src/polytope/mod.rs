@@ -6,8 +6,10 @@ pub mod r#abstract;
 pub mod concrete;
 
 use self::r#abstract::{
+    elements::Element,
     flag::{Flag, FlagEvent, FlagIter, OrientedFlag, OrientedFlagIter},
     rank::{Rank, RankVec},
+    Abstract,
 };
 use crate::lang::{
     self,
@@ -38,6 +40,10 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// A mutable reference to the name of the polytope.
     fn name_mut(&mut self) -> &mut Name<T>;
 
+    fn abs(&self) -> &Abstract;
+
+    fn abs_mut(&mut self) -> &mut Abstract;
+
     /// Gets the wiki link to the polytope, based on its English name.
     fn wiki_link(&self) -> String {
         format!(
@@ -54,10 +60,14 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     }
 
     /// The number of elements of a given rank.
-    fn el_count(&self, rank: Rank) -> usize;
+    fn el_count(&self, rank: Rank) -> usize {
+        self.abs().el_count(rank)
+    }
 
     /// The element counts of the polytope.
-    fn el_counts(&self) -> RankVec<usize>;
+    fn el_counts(&self) -> RankVec<usize> {
+        self.abs().el_counts()
+    }
 
     /// The number of vertices on the polytope.
     fn vertex_count(&self) -> usize {
@@ -181,6 +191,9 @@ pub trait Polytope<T: NameType>: Sized + Clone {
                 p._append(q);
             }
 
+            *p.abs_mut().min_mut() = Element::min(p.vertex_count());
+            *p.abs_mut().max_mut() = Element::max(p.facet_count());
+
             // TODO: UPDATE NAME.
             p
         } else {
@@ -196,10 +209,10 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     }
 
     fn petrie_polygon(&self) -> Option<Self> {
-        self.petrie_polygon_with(self.first_oriented_flag()?)
+        self.petrie_polygon_with(self.first_flag()?)
     }
 
-    fn petrie_polygon_with(&self, flag: OrientedFlag) -> Option<Self>;
+    fn petrie_polygon_with(&self, flag: Flag) -> Option<Self>;
 
     fn first_flag(&self) -> Option<Flag>;
 

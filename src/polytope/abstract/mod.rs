@@ -12,7 +12,7 @@ use self::{
         AbstractBuilder, Element, ElementHash, ElementList, Section, SectionHash, SubelementList,
         Subelements, Subsupelements, Superelements,
     },
-    flag::{Flag, FlagEvent, FlagIter, OrientedFlag, OrientedFlagIter},
+    flag::{Flag, FlagEvent, FlagIter, OrientedFlagIter},
     rank::{Rank, RankVec},
 };
 use super::Polytope;
@@ -193,7 +193,7 @@ impl Abstract {
 
     /// Returns the indices of a Petrial polygon in cyclic order, or `None` if
     /// it self-intersects.
-    pub fn petrie_polygon_vertices(&self, flag: OrientedFlag) -> Option<Vec<usize>> {
+    pub fn petrie_polygon_vertices(&self, flag: Flag) -> Option<Vec<usize>> {
         let rank = self.rank().try_usize()?;
         let mut new_flag = flag.clone();
         let first_vertex = flag[0];
@@ -619,6 +619,14 @@ impl Polytope<Abs> for Abstract {
         &mut self.name
     }
 
+    fn abs(&self) -> &Abstract {
+        self
+    }
+
+    fn abs_mut(&mut self) -> &mut Abstract {
+        self
+    }
+
     /// The number of elements of a given rank.
     fn el_count(&self, rank: Rank) -> usize {
         self.ranks
@@ -810,7 +818,7 @@ impl Polytope<Abs> for Abstract {
         }
     }
 
-    fn petrie_polygon_with(&self, flag: OrientedFlag) -> Option<Self> {
+    fn petrie_polygon_with(&self, flag: Flag) -> Option<Self> {
         Some(Self::polygon(self.petrie_polygon_vertices(flag)?.len()))
     }
 
@@ -826,7 +834,7 @@ impl Polytope<Abs> for Abstract {
     }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
-    /// if the polytopes have different ranks. *Update neither the name nor the
+    /// if the polytopes have different ranks. *Updates neither the name nor the
     /// min/max elements.**
     fn _append(&mut self, p: Self) {
         let rank = self.rank();
@@ -836,11 +844,13 @@ impl Polytope<Abs> for Abstract {
 
         let el_counts = self.el_counts();
 
-        for (r, elements) in p.ranks.into_iter().rank_enumerate() {
-            if r == Rank::new(-1) || r == rank {
-                continue;
-            }
-
+        for (r, elements) in p
+            .ranks
+            .into_iter()
+            .rank_enumerate()
+            .skip(1)
+            .take(rank.usize())
+        {
             let sub_offset = el_counts[r.minus_one()];
             let sup_offset = el_counts[r.plus_one()];
 
