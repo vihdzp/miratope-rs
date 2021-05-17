@@ -6,7 +6,7 @@ pub mod r#abstract;
 pub mod concrete;
 
 use self::r#abstract::{
-    flag::{Flag, FlagEvent, FlagIter},
+    flag::{Flag, FlagIter, OrientedFlag, OrientedFlagIter, Parity},
     rank::{Rank, RankVec},
 };
 use crate::lang::{
@@ -186,30 +186,27 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     }
 
     fn petrie_polygon(&self) -> Option<Self> {
-        self.petrie_polygon_with(self.some_flag()?)
+        self.petrie_polygon_with(self.first_oriented_flag()?)
     }
 
-    fn petrie_polygon_with(&self, flag: Flag) -> Option<Self>;
+    fn petrie_polygon_with(&self, flag: OrientedFlag) -> Option<Self>;
+
+    fn first_flag(&self) -> Option<Flag>;
 
     /// Returns any flag of the polytope.
-    fn some_flag(&self) -> Option<Flag>;
+    fn first_oriented_flag(&self) -> Option<OrientedFlag> {
+        Some(OrientedFlag {
+            elements: self.first_flag()?,
+            orientation: Parity::default(),
+        })
+    }
+
+    /// Returns an iterator over all flags of a polytope.
+    fn flags(&self) -> FlagIter;
 
     /// Returns an iterator over all "flag events" of a polytope. For more info,
     /// see [`FlagIter`].
-    fn flag_events(&self) -> FlagIter;
-
-    /// Returns an iterator over all flags of a polytope.
-    fn flags(&self) -> std::iter::FilterMap<FlagIter, &dyn Fn(FlagEvent) -> Option<Flag>> {
-        // Debug assert that all elements are sorted!
-
-        self.flag_events().filter_map(&|flag_event| {
-            if let FlagEvent::Flag(flag) = flag_event {
-                Some(flag)
-            } else {
-                None
-            }
-        })
-    }
+    fn flag_events(&self) -> OrientedFlagIter;
 
     fn flag_omnitruncate(&self) -> Self;
 

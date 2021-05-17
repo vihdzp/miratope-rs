@@ -14,7 +14,7 @@ use super::{
         elements::{
             AbstractBuilder, Element, ElementList, SubelementList, Subelements, Subsupelements,
         },
-        flag::{Flag, FlagEvent, FlagIter},
+        flag::{Flag, FlagEvent, FlagIter, OrientedFlag, OrientedFlagIter},
         rank::{Rank, RankVec},
         Abstract,
     },
@@ -992,8 +992,8 @@ impl Polytope<Con> for Concrete {
         self.try_dual_mut_with(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
-    fn some_flag(&self) -> Option<Flag> {
-        self.abs.some_flag()
+    fn first_flag(&self) -> Option<Flag> {
+        self.abs.first_flag()
     }
 
     fn petrial_mut(&mut self) -> Result<(), ()> {
@@ -1009,7 +1009,7 @@ impl Polytope<Con> for Concrete {
 
     /// Builds the Petrie polygon of a polytope from a given flag, or returns
     /// `None` if it's invalid.
-    fn petrie_polygon_with(&self, flag: Flag) -> Option<Self> {
+    fn petrie_polygon_with(&self, flag: OrientedFlag) -> Option<Self> {
         let vertices = self.abs.petrie_polygon_vertices(flag)?;
         let n = vertices.len();
 
@@ -1046,7 +1046,11 @@ impl Polytope<Con> for Concrete {
         ))
     }
 
-    fn flag_events(&self) -> FlagIter {
+    fn flags(&self) -> FlagIter {
+        self.abs.flags()
+    }
+
+    fn flag_events(&self) -> OrientedFlagIter {
         self.abs.flag_events()
     }
 

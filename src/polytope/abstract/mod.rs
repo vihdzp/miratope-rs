@@ -12,7 +12,7 @@ use self::{
         AbstractBuilder, Element, ElementHash, ElementList, Section, SectionHash, SubelementList,
         Subelements, Subsupelements, Superelements,
     },
-    flag::{Flag, FlagEvent, FlagIter},
+    flag::{Flag, FlagEvent, FlagIter, OrientedFlag, OrientedFlagIter},
     rank::{Rank, RankVec},
 };
 use super::Polytope;
@@ -177,7 +177,7 @@ impl Abstract {
 
     /// Returns the indices of a Petrial polygon in cyclic order, or `None` if
     /// it self-intersects.
-    pub fn petrie_polygon_vertices(&self, flag: Flag) -> Option<Vec<usize>> {
+    pub fn petrie_polygon_vertices(&self, flag: OrientedFlag) -> Option<Vec<usize>> {
         let rank = self.rank().try_usize()?;
         let mut new_flag = flag.clone();
         let first_vertex = flag[0];
@@ -700,17 +700,17 @@ impl Polytope<Abs> for Abstract {
     }
 
     /// Gets whatever flag from the polytope.
-    fn some_flag(&self) -> Option<Flag> {
+    fn first_flag(&self) -> Option<Flag> {
         let rank = self.rank();
         let rank_usize = rank.try_usize()?;
 
         let mut flag = Flag::with_capacity(rank_usize);
         let mut idx = 0;
-        flag.elements.push(0);
+        flag.push(0);
 
         for r in Rank::range_iter(Rank::new(1), rank) {
             idx = self.element_ref(r.minus_one(), idx).unwrap().sups[0];
-            flag.elements.push(idx);
+            flag.push(idx);
         }
 
         Some(flag)
@@ -741,7 +741,7 @@ impl Polytope<Abs> for Abstract {
             }
 
             let mut face = BTreeSet::new();
-            let mut edge = flag[1];
+            let mut edge = flag[Rank::new(1)];
             let mut loop_continue = true;
 
             // We apply our flag changes and mark our flags until we reach the
@@ -756,7 +756,7 @@ impl Polytope<Abs> for Abstract {
                 flag.change_mut(&self, 2);
                 traversed_flags.insert(flag.clone());
 
-                edge = flag[1];
+                edge = flag[Rank::new(1)];
             }
 
             // If the edge we found after we returned to the original edge was
@@ -794,7 +794,7 @@ impl Polytope<Abs> for Abstract {
         }
     }
 
-    fn petrie_polygon_with(&self, flag: Flag) -> Option<Self> {
+    fn petrie_polygon_with(&self, flag: OrientedFlag) -> Option<Self> {
         Some(Self::polygon(self.petrie_polygon_vertices(flag)?.len()))
     }
 
@@ -853,10 +853,14 @@ impl Polytope<Abs> for Abstract {
         Some(ElementHash::from_element(self, rank, idx)?.to_polytope(self))
     }
 
+    fn flags(&self) -> FlagIter {
+        FlagIter::new(&self)
+    }
+
     /// Returns an iterator over the "flag events" of a polytope. See
     /// [`FlagIter`] for more info.
-    fn flag_events(&self) -> FlagIter {
-        FlagIter::new(&self)
+    fn flag_events(&self) -> OrientedFlagIter {
+        OrientedFlagIter::new(&self)
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)

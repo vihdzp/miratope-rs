@@ -7,151 +7,35 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use super::{rank::Rank, Abstract};
+use super::{elements::Subsupelements, rank::Rank, Abstract};
 use crate::Float;
 
-/// The parity of a flag, which flips on any flag change.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub enum Parity {
-    /// A flag of even parity.
-    Even,
-
-    /// A flag of odd parity.
-    Odd,
-}
-
-impl Parity {
-    /// Flips the parity of a flag.
-    pub fn flip_mut(&mut self) {
-        match self {
-            Parity::Even => *self = Parity::Odd,
-            Parity::Odd => *self = Parity::Even,
-        }
-    }
-
-    /// Returns the "sign" associated with a flag, which is either `1.0` or `-1.0`.
-    pub fn sign(&self) -> Float {
-        match self {
-            Parity::Even => 1.0,
-            Parity::Odd => -1.0,
-        }
-    }
-}
-
-impl Default for Parity {
-    fn default() -> Self {
-        Self::Even
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Flag {
-    /// The indices of the elements the flag contains, excluding the null and
-    /// maximal elements.
-    pub elements: Vec<usize>,
-
-    /// The orientation of the flag. If the polytope is non-orientable, this
-    /// will contain garbage.
-    pub orientation: Parity,
-}
-
-impl Hash for Flag {
-    /// Returns the hash of the flag. **Does not take orientation into
-    /// account.**
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.elements.hash(state);
-    }
-}
-
-impl PartialEq for Flag {
-    /// Determines whether two flags are equal. **Does not take orientation into
-    /// account.**
-    fn eq(&self, other: &Self) -> bool {
-        self.elements.eq(&other.elements)
-    }
-}
-
-impl PartialOrd for Flag {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.elements.partial_cmp(&other.elements)
-    }
-}
-
-impl Ord for Flag {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.elements.cmp(&other.elements)
-    }
-}
-
-impl Eq for Flag {}
-
-impl std::ops::Index<usize> for Flag {
-    type Output = usize;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.elements[index]
-    }
-}
-
-impl std::ops::IndexMut<usize> for Flag {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.elements[index]
-    }
-}
+/// A flag in a polytope. Stores the indices of the elements of each rank,
+/// excluding the minimal and maximal rank.
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Flag(Vec<usize>);
 
 impl Flag {
+    /// Initializes a new `Flag` with a given capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
+    pub fn get(&self, index: Rank) -> Option<&usize> {
+        self.0.get(index.try_usize()?)
+    }
+
+    pub fn get_mut(&mut self, index: Rank) -> Option<&mut usize> {
+        self.0.get_mut(index.try_usize()?)
+    }
+
     pub fn push(&mut self, value: usize) {
-        self.elements.push(value);
-    }
-}
-
-/// Gets the common elements of two lists. There's definitely a better way.
-fn common(vec0: &[usize], vec1: &[usize]) -> Vec<usize> {
-    // Hopefully this isn't much of a bottleneck.
-    let mut vec0 = vec0.to_owned();
-    vec0.sort_unstable();
-    let mut vec1 = vec1.to_owned();
-    vec1.sort_unstable();
-
-    let mut common = Vec::new();
-    let mut i = 0;
-    let mut j = 0;
-
-    while let Some(&sub0) = vec0.get(i) {
-        if let Some(sub1) = vec1.get(j) {
-            match sub0.cmp(sub1) {
-                Ordering::Equal => {
-                    common.push(sub0);
-                    i += 1;
-                }
-                Ordering::Greater => j += 1,
-                Ordering::Less => i += 1,
-            };
-        } else {
-            break;
-        }
+        self.0.push(value);
     }
 
-    common
-}
-
-impl Flag {
-    /// Constructs a new, empty `Flag` with the specified capacity.
-    pub fn with_capacity(rank: usize) -> Self {
-        Self {
-            elements: Vec::with_capacity(rank),
-            orientation: Parity::default(),
-        }
-    }
-
-    /// Gets the index of the element stored at a given rank, whilst pretending
-    /// that the flag contains a minimal and maximal element.
-    pub fn get(&self, rank: Rank) -> Option<&usize> {
-        if rank == Rank::new(-1) || rank == Rank::from(self.elements.len()) {
-            Some(&0)
-        } else {
-            self.elements.get(rank.usize())
-        }
+    /// Returns the rank of the polytope from which the flag was built.
+    pub fn rank(&self) -> Rank {
+        Rank::from(self.0.len())
     }
 
     /// Applies a specified flag change to the flag in place.
@@ -197,8 +81,6 @@ impl Flag {
         } else {
             self[r] = common[0];
         }
-
-        self.orientation.flip_mut();
     }
 
     /// Applies a specified flag change to the flag.
@@ -209,7 +91,218 @@ impl Flag {
     }
 }
 
+impl std::ops::Index<usize> for Flag {
+    type Output = usize;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl std::ops::IndexMut<usize> for Flag {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
+
+/// Allows indexing a flag by rank.
 impl std::ops::Index<Rank> for Flag {
+    type Output = usize;
+
+    fn index(&self, index: Rank) -> &Self::Output {
+        &self[index.usize()]
+    }
+}
+
+/// Allows mutably indexing a flag by rank.
+impl std::ops::IndexMut<Rank> for Flag {
+    fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
+        &mut self[index.usize()]
+    }
+}
+
+/// Iterates over the contents of the flag.
+impl std::iter::IntoIterator for Flag {
+    type Item = usize;
+
+    type IntoIter = std::vec::IntoIter<usize>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+/// The parity of a flag, which flips on any flag change.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub enum Parity {
+    /// A flag of even parity.
+    Even,
+
+    /// A flag of odd parity.
+    Odd,
+}
+
+impl Parity {
+    /// Flips the parity of a flag.
+    pub fn flip(&self) -> Self {
+        match self {
+            Parity::Even => Parity::Odd,
+            Parity::Odd => Parity::Even,
+        }
+    }
+
+    /// Mutably flips the parity of a flag.
+    pub fn flip_mut(&mut self) {
+        *self = self.flip();
+    }
+
+    /// Returns the "sign" associated with a flag, which is either `1.0` or `-1.0`.
+    pub fn sign(&self) -> Float {
+        match self {
+            Parity::Even => 1.0,
+            Parity::Odd => -1.0,
+        }
+    }
+}
+
+impl Default for Parity {
+    fn default() -> Self {
+        Self::Even
+    }
+}
+
+pub struct FlagIter<'a> {
+    /// The polytope whose flags we iterate over.
+    polytope: &'a Abstract,
+
+    /// The flag we just found, or `None` if we already went through the entire
+    /// iterator.
+    flag: Option<Flag>,
+
+    /// The indices of each element of the flag in its upper element.
+    indices: Vec<usize>,
+}
+
+impl<'a> FlagIter<'a> {
+    pub fn new(polytope: &'a Abstract) -> Self {
+        use crate::polytope::Polytope;
+
+        let r = polytope.rank().try_usize().unwrap_or(0);
+        Self {
+            polytope,
+            flag: polytope.first_flag(),
+            indices: vec![0; r],
+        }
+    }
+}
+
+impl<'a> Iterator for FlagIter<'a> {
+    type Item = Flag;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let flag = self.flag.as_mut()?;
+        let prev_flag = flag.clone();
+        let rank = self.polytope.rank();
+
+        let mut r = 0;
+        loop {
+            if r == rank.usize() {
+                self.flag = None;
+                return Some(prev_flag);
+            }
+
+            let r_plus_one = Rank::from(r + 1);
+            let ranks = &self.polytope[r_plus_one];
+            let idx = flag.get(r_plus_one).copied().unwrap_or(0);
+
+            if ranks[idx].subs.len() == self.indices[r] + 1 {
+                self.indices[r] = 0;
+                r += 1;
+            } else {
+                self.indices[r] += 1;
+                break;
+            }
+        }
+
+        let idx = self.indices.get(r + 1).copied().unwrap_or(0);
+        let mut element = &self.polytope[Rank::from(r + 1)][idx];
+        loop {
+            let idx = self.indices[r];
+            flag[r] = element.subs[idx];
+            element = &self.polytope[Rank::from(r)][flag[r]];
+
+            if r == 0 {
+                break;
+            }
+
+            r -= 1;
+        }
+
+        Some(prev_flag)
+    }
+}
+
+#[derive(Clone, Debug)]
+/// A flag together with an orientation. Any flag change flips the orientation.
+/// If the polytope associated to the flag is non-orientable, the orientation
+/// will be garbage.
+pub struct OrientedFlag {
+    /// The indices of the elements the flag contains, excluding the null and
+    /// maximal elements.
+    pub elements: Flag,
+
+    /// The orientation of the flag. If the polytope is non-orientable, this
+    /// will contain garbage.
+    pub orientation: Parity,
+}
+
+impl Hash for OrientedFlag {
+    /// Returns the hash of the flag. **Does not take orientation into
+    /// account.**
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.elements.hash(state);
+    }
+}
+
+impl PartialEq for OrientedFlag {
+    /// Determines whether two flags are equal. **Does not take orientation into
+    /// account.**
+    fn eq(&self, other: &Self) -> bool {
+        self.elements.eq(&other.elements)
+    }
+}
+
+impl PartialOrd for OrientedFlag {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.elements.partial_cmp(&other.elements)
+    }
+}
+
+impl Ord for OrientedFlag {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.elements.cmp(&other.elements)
+    }
+}
+
+impl Eq for OrientedFlag {}
+
+/// Allows indexing an oriented flag by rank.
+impl std::ops::Index<usize> for OrientedFlag {
+    type Output = usize;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.elements[index]
+    }
+}
+
+/// Allows mutably indexing an oriented flag by rank.
+impl std::ops::IndexMut<usize> for OrientedFlag {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.elements[index]
+    }
+}
+
+impl std::ops::Index<Rank> for OrientedFlag {
     type Output = usize;
 
     fn index(&self, index: Rank) -> &Self::Output {
@@ -217,26 +310,95 @@ impl std::ops::Index<Rank> for Flag {
     }
 }
 
-impl std::ops::IndexMut<Rank> for Flag {
+impl std::ops::IndexMut<Rank> for OrientedFlag {
     fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
-        self.elements.get_mut(index.usize()).unwrap()
+        self.elements.get_mut(index).unwrap()
+    }
+}
+
+impl OrientedFlag {
+    pub fn push(&mut self, value: usize) {
+        self.elements.push(value);
+    }
+}
+
+/// Gets the common elements of two lists. There's definitely a better way.
+fn common(vec0: &[usize], vec1: &[usize]) -> Vec<usize> {
+    // Hopefully this isn't much of a bottleneck.
+    let mut vec0 = vec0.to_owned();
+    let mut vec1 = vec1.to_owned();
+    vec0.sort_unstable();
+    vec1.sort_unstable();
+
+    let mut common = Vec::new();
+    let mut i = 0;
+    let mut j = 0;
+
+    while let Some(&sub0) = vec0.get(i) {
+        if let Some(sub1) = vec1.get(j) {
+            match sub0.cmp(sub1) {
+                Ordering::Equal => {
+                    common.push(sub0);
+                    i += 1;
+                }
+                Ordering::Greater => j += 1,
+                Ordering::Less => i += 1,
+            };
+        } else {
+            break;
+        }
+    }
+
+    common
+}
+
+impl OrientedFlag {
+    /// Constructs a new, empty `OrientedFlag` with the specified capacity.
+    pub fn with_capacity(rank: usize) -> Self {
+        Self {
+            elements: Flag::with_capacity(rank),
+            orientation: Parity::default(),
+        }
+    }
+
+    /// Gets the index of the element stored at a given rank, whilst pretending
+    /// that the flag contains a minimal and maximal element.
+    pub fn get(&self, rank: Rank) -> Option<&usize> {
+        if rank == Rank::new(-1) || rank == self.elements.rank() {
+            Some(&0)
+        } else {
+            self.elements.get(rank)
+        }
+    }
+
+    pub fn change_mut(&mut self, polytope: &Abstract, idx: usize) {
+        self.elements.change_mut(polytope, idx);
+        self.orientation.flip_mut();
+    }
+
+    /// Applies a specified flag change to the flag.
+    pub fn change(&self, polytope: &Abstract, idx: usize) -> Self {
+        Self {
+            elements: self.elements.change(polytope, idx),
+            orientation: self.orientation.flip(),
+        }
     }
 }
 
 /// An iterator over all of the "flag events" of a polytope. A flag event is
-/// simply either a [`Flag`], or an event that determines that a polytope is
+/// either an [`OrientedFlag`], or an event that determines that a polytope is
 /// non-orientable.
 ///
 /// The reason we don't iterate over flags directly is that sometimes, we
 /// realize a polytope is non-orientable only after traversing every single one
 /// of its flags. Hence, we can't bundle the information that the polytope is
 /// non-orientable with the flags.
-pub struct FlagIter<'a> {
-    /// The polytope whose flags are iterated.
+pub struct OrientedFlagIter<'a> {
+    /// The polytope whose flags we iterate over.
     polytope: &'a Abstract,
 
     /// The flags whose adjacencies are being searched.
-    queue: VecDeque<Flag>,
+    queue: VecDeque<OrientedFlag>,
 
     /// The flag changes we're applying.
     flag_changes: Vec<usize>,
@@ -249,7 +411,7 @@ pub struct FlagIter<'a> {
 
     /// The flags that have already been found, but whose neighbors haven't all
     /// been found yet.
-    found: HashMap<Flag, usize>,
+    found: HashMap<OrientedFlag, usize>,
 
     /// Whether all of the flags the iterator has checked so far have a parity.
     orientable: bool,
@@ -259,7 +421,7 @@ pub struct FlagIter<'a> {
 #[derive(Debug)]
 pub enum IterResult {
     /// We found a new flag.
-    New(Flag),
+    New(OrientedFlag),
 
     /// We found a flag we had already found before.
     Repeat,
@@ -271,7 +433,7 @@ pub enum IterResult {
     None,
 }
 
-impl<'a> FlagIter<'a> {
+impl<'a> OrientedFlagIter<'a> {
     /// Returns a dummy iterator that returns `None` every single time.
     pub fn empty(polytope: &'a Abstract) -> Self {
         Self {
@@ -292,7 +454,7 @@ impl<'a> FlagIter<'a> {
         let rank = polytope.rank();
 
         // Initializes with any flag from the polytope.
-        if let Some(first_flag) = polytope.some_flag() {
+        if let Some(first_flag) = polytope.first_oriented_flag() {
             // All flag changes.
             let flag_changes = (0..rank.usize()).collect();
 
@@ -306,7 +468,11 @@ impl<'a> FlagIter<'a> {
 
     /// Initializes a new iterator over the flag events of a polytope, given an
     /// initial flag and a set of flag changes to apply.
-    pub fn with_flags(polytope: &'a Abstract, flag_changes: Vec<usize>, first_flag: Flag) -> Self {
+    pub fn with_flags(
+        polytope: &'a Abstract,
+        flag_changes: Vec<usize>,
+        first_flag: OrientedFlag,
+    ) -> Self {
         assert!(polytope.is_bounded(), "Polytope is not bounded.");
         let rank = polytope.rank();
 
@@ -400,13 +566,13 @@ impl<'a> FlagIter<'a> {
 /// realizes that the polytope is non-orientable.
 pub enum FlagEvent {
     /// We found a new flag.
-    Flag(Flag),
+    Flag(OrientedFlag),
 
     /// We just realized the polytope is non-orientable.
     NonOrientable,
 }
 
-impl<'a> Iterator for FlagIter<'a> {
+impl<'a> Iterator for OrientedFlagIter<'a> {
     type Item = FlagEvent;
 
     /// Gets the next flag event.
