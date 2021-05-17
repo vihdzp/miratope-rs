@@ -36,6 +36,8 @@ default-features = false
 features = ["bevy_gltf", "bevy_winit", "bevy_wgpu", "render", "bevy_dynamic_plugin", "hdr", "x11"]
 
 [patch.crates-io]
+bevy_egui = { git = "https://github.com/ndarilek/bevy_egui", branch = "main" }
+egui = { git = 'https://github.com/OfficialURL/egui' }
 winit = { git = 'https://github.com/OfficialURL/winit' }
 
 [profile.release]

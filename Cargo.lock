@@ -326,8 +326,7 @@ dependencies = [
 [[package]]
 name = "bevy_egui"
 version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3de8da8d35ee092c04816725eb9ab9f4dc809f0c1ad2cda4de74042fa8a3454"
+source = "git+https://github.com/ndarilek/bevy_egui?branch=main#33205cbb4a6ddb7c069f15ca3e2fdb603026e7c1"
 dependencies = [
  "bevy",
  "clipboard",
@@ -1170,9 +1169,8 @@ checksum = "ee2626afccd7561a06cf1367e2950c4718ea04565e20fb5029b6c7d8ad09abcf"
 
 [[package]]
 name = "egui"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d7d6535c3ecdc8627a72c1c52d052d66cd9f71c238428690cc46bef9d1f2bce"
+version = "0.12.0"
+source = "git+https://github.com/OfficialURL/egui#8c8bedf5080edf6cee83fca76ae9364d2b9bd41d"
 dependencies = [
  "epaint",
 ]
@@ -1185,9 +1183,8 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
 name = "emath"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4ed72c14666517e5c0198490864adea871081abe4f5523af8c3f4f56595142e"
+version = "0.12.0"
+source = "git+https://github.com/OfficialURL/egui#8c8bedf5080edf6cee83fca76ae9364d2b9bd41d"
 
 [[package]]
 name = "env_logger"
@@ -1201,9 +1198,8 @@ dependencies = [
 
 [[package]]
 name = "epaint"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a19eff631454edbe5abe4693be00be0c1ea9832d727dc385c16841caa2d0162"
+version = "0.12.0"
+source = "git+https://github.com/OfficialURL/egui#8c8bedf5080edf6cee83fca76ae9364d2b9bd41d"
 dependencies = [
  "ahash 0.7.2",
  "atomic_refcell",
@@ -1757,9 +1753,9 @@ dependencies = [
 
 [[package]]
 name = "guillotiere"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc7cccefbf418f663e11e9500326f46a44273dc598210bbedc8bbe95e696531f"
+checksum = "9253eedea82720b2bc91fe831c9ce3a31299955ed5eb19b9ed600a625b686212"
 dependencies = [
  "euclid",
  "svg_fmt",
