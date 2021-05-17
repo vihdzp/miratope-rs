@@ -634,7 +634,7 @@ pub fn update_changed_polytopes(
         // The mesh is currently hidden, so we don't bother updating it.
         // *meshes.get_mut(_mesh_handle).unwrap() = poly.get_mesh(*orthogonal);
 
-        debug_assert!(poly.abs.is_valid());
+        debug_assert!(poly.abs.is_valid(), "Invalid polytope:\n{:?}", &poly.abs);
 
         // Sets the window's name to the polytope's name.
         windows

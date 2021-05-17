@@ -6,7 +6,10 @@ pub mod group;
 pub mod mesh_builder;
 pub mod off;
 
-use std::{collections::HashMap, mem};
+use std::{
+    collections::{HashMap, HashSet},
+    mem,
+};
 
 use self::mesh_builder::MeshBuilder;
 use super::{
@@ -14,7 +17,7 @@ use super::{
         elements::{
             AbstractBuilder, Element, ElementList, SubelementList, Subelements, Subsupelements,
         },
-        flag::{Flag, FlagEvent, FlagIter, OrientedFlag, OrientedFlagIter},
+        flag::{Flag, FlagChanges, FlagEvent, FlagIter, OrientedFlag, OrientedFlagIter},
         rank::{Rank, RankVec},
         Abstract,
     },
@@ -591,26 +594,43 @@ impl Concrete {
         // For each flag, there's a simplex defined by any vertices in its
         // elements and the origin. We add up the volumes of all of these
         // simplices times the sign of the flag that generated them.
-        for flag_event in self.flag_events() {
-            if let FlagEvent::Flag(flag) = flag_event {
-                volume += flag.orientation.sign()
-                    * Matrix::from_iterator(
-                        rank.usize(),
-                        rank.usize(),
-                        flag.flag
-                            .into_iter()
-                            .enumerate()
-                            .map(|(rank, idx)| &flat_vertices[vertex_map[rank][idx]])
-                            .flatten()
-                            .copied(),
-                    )
-                    .determinant();
-            } else {
-                return None;
+        let mut all_flags = HashSet::new();
+        for flag in self.flags() {
+            if !all_flags.contains(&flag) {
+                let mut component_volume = 0.0;
+
+                for flag_event in OrientedFlagIter::with_flags(
+                    &self.abs,
+                    FlagChanges::all(self.rank()),
+                    OrientedFlag::from(flag),
+                ) {
+                    if let FlagEvent::Flag(oriented_flag) = flag_event {
+                        // TODO: Figure out how to make this into a debug assert.
+                        assert!(all_flags.insert(oriented_flag.flag.clone()));
+
+                        component_volume += oriented_flag.orientation.sign()
+                            * Matrix::from_iterator(
+                                rank.usize(),
+                                rank.usize(),
+                                oriented_flag
+                                    .flag
+                                    .into_iter()
+                                    .enumerate()
+                                    .map(|(rank, idx)| &flat_vertices[vertex_map[rank][idx]])
+                                    .flatten()
+                                    .copied(),
+                            )
+                            .determinant();
+                    } else {
+                        return None;
+                    }
+                }
+
+                volume += component_volume.abs();
             }
         }
 
-        Some(volume.abs() / (rank.usize()).factorial() as Float)
+        Some(volume / (rank.usize()).factorial() as Float)
     }
 
     pub fn flat_vertices(&self) -> Option<Vec<Point>> {

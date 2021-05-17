@@ -276,6 +276,11 @@ impl ElementList {
         self.0.get(idx)
     }
 
+    /// Returns a mutable reference to the element at a given index.
+    pub fn get_mut(&mut self, idx: usize) -> Option<&mut Element> {
+        self.0.get_mut(idx)
+    }
+
     /// Determines whether the element list contains a given element.
     pub fn contains(&self, x: &Element) -> bool {
         self.0.contains(x)

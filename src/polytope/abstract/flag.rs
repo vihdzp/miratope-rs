@@ -21,10 +21,21 @@ impl Flag {
         Self(Vec::with_capacity(capacity))
     }
 
-    pub fn get(&self, index: Rank) -> Option<&usize> {
-        self.0.get(index.try_usize()?)
+    /// Gets the index of the element with a given rank, or returns `None` if it
+    /// doesn't exist.
+    pub fn get(&self, rank: Rank) -> Option<&usize> {
+        self.0.get(rank.try_usize()?)
     }
 
+    /// Gets the index of the element with a given rank, or returns `0` if it
+    /// doesn't exist. This allows us to pretend that the flag stores a minimal
+    /// and maximal element.
+    pub fn get_or_zero(&self, rank: Rank) -> usize {
+        self.get(rank).cloned().unwrap_or(0)
+    }
+
+    /// Gets the index of the element with a given rank, or returns `None` if it
+    /// doesn't exist.
     pub fn get_mut(&mut self, index: Rank) -> Option<&mut usize> {
         self.0.get_mut(index.try_usize()?)
     }
@@ -58,10 +69,10 @@ impl Flag {
 
         // Determines the common elements between the subelements of the element
         // above and the superelements of the element below.
-        let below_idx = self.get(r_minus_one).copied().unwrap_or(0);
+        let below_idx = self.get_or_zero(r_minus_one);
         let below = polytope.element_ref(r_minus_one, below_idx).unwrap();
 
-        let above_idx = self.get(r_plus_one).copied().unwrap_or(0);
+        let above_idx = self.get_or_zero(r_plus_one);
         let above = polytope.element_ref(r_plus_one, above_idx).unwrap();
 
         let common = common(&below.sups.0, &above.subs.0);
@@ -98,7 +109,7 @@ impl std::ops::Index<Rank> for Flag {
     type Output = usize;
 
     fn index(&self, index: Rank) -> &Self::Output {
-        self.get(index).unwrap()
+        &self.get(index).unwrap()
     }
 }
 
@@ -181,11 +192,14 @@ pub struct FlagIter<'a> {
     /// iterator.
     flag: Option<Flag>,
 
-    /// The indices of each element of the flag in its upper element.
+    /// The indices of each element of the flag, as a subelement of its
+    /// superelement.
     indices: Vec<usize>,
 }
 
 impl<'a> FlagIter<'a> {
+    /// Initializes a new iterator over all flags of a polytope. This works even
+    /// if the polytope is a compound polytope.
     pub fn new(polytope: &'a Abstract) -> Self {
         use crate::polytope::Polytope;
 
@@ -215,7 +229,7 @@ impl<'a> Iterator for FlagIter<'a> {
 
             let r_plus_one = Rank::from(r + 1);
             let ranks = &self.polytope[r_plus_one];
-            let idx = flag.get(r_plus_one).copied().unwrap_or(0);
+            let idx = flag.get_or_zero(r_plus_one);
 
             if ranks[idx].subs.len() == self.indices[r] + 1 {
                 self.indices[r] = 0;
@@ -226,17 +240,18 @@ impl<'a> Iterator for FlagIter<'a> {
             }
         }
 
-        let idx = self.indices.get(r + 1).copied().unwrap_or(0);
-        let mut element = &self.polytope[Rank::from(r + 1)][idx];
+        let r_plus_one = Rank::from(r + 1);
+        let idx = flag.get(r_plus_one).copied().unwrap_or(0);
+        let mut element = &self.polytope[r_plus_one][idx];
         loop {
             let idx = self.indices[r];
             flag[r] = element.subs[idx];
-            element = &self.polytope[Rank::from(r)][flag[r]];
 
             if r == 0 {
                 break;
             }
 
+            element = &self.polytope[Rank::from(r)][flag[r]];
             r -= 1;
         }
 
@@ -256,6 +271,15 @@ pub struct OrientedFlag {
     /// The orientation of the flag. If the polytope is non-orientable, this
     /// will contain garbage.
     pub orientation: Orientation,
+}
+
+impl From<Flag> for OrientedFlag {
+    fn from(flag: Flag) -> Self {
+        Self {
+            flag,
+            orientation: Default::default(),
+        }
+    }
 }
 
 impl Hash for OrientedFlag {
@@ -308,7 +332,7 @@ impl std::ops::Index<Rank> for OrientedFlag {
     type Output = usize;
 
     fn index(&self, index: Rank) -> &Self::Output {
-        self.get(index).unwrap()
+        &self.get(index).unwrap()
     }
 }
 
@@ -363,14 +387,16 @@ impl OrientedFlag {
         }
     }
 
+    /// Gets the index of the element with a given rank, or returns `None` if it
+    /// doesn't exist.
+    pub fn get(&self, rank: Rank) -> Option<&usize> {
+        self.flag.get(rank)
+    }
+
     /// Gets the index of the element stored at a given rank, whilst pretending
     /// that the flag contains a minimal and maximal element.
-    pub fn get(&self, rank: Rank) -> Option<&usize> {
-        if rank == Rank::new(-1) || rank == self.flag.rank() {
-            Some(&0)
-        } else {
-            self.flag.get(rank)
-        }
+    pub fn get_or_zero(&self, rank: Rank) -> usize {
+        self.flag.get_or_zero(rank)
     }
 
     pub fn change_mut(&mut self, polytope: &Abstract, idx: usize) {
@@ -384,6 +410,30 @@ impl OrientedFlag {
             flag: self.flag.change(polytope, idx),
             orientation: self.orientation.flip(),
         }
+    }
+}
+
+pub struct FlagChanges(Vec<usize>);
+
+impl FlagChanges {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn all(rank: Rank) -> Self {
+        Self((0..rank.usize()).collect())
+    }
+}
+
+impl std::ops::Index<usize> for FlagChanges {
+    type Output = usize;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
     }
 }
 
@@ -403,7 +453,7 @@ pub struct OrientedFlagIter<'a> {
     queue: VecDeque<OrientedFlag>,
 
     /// The flag changes we're applying.
-    flag_changes: Vec<usize>,
+    flag_changes: FlagChanges,
 
     /// The flag index we need to check next.
     flag_idx: usize,
@@ -441,7 +491,7 @@ impl<'a> OrientedFlagIter<'a> {
         Self {
             polytope,
             queue: VecDeque::new(), // This is the important bit.
-            flag_changes: Vec::new(),
+            flag_changes: FlagChanges::new(),
             flag_idx: 0,
             first: true,
             found: HashMap::new(),
@@ -453,14 +503,9 @@ impl<'a> OrientedFlagIter<'a> {
     pub fn new(polytope: &'a Abstract) -> Self {
         use crate::polytope::Polytope;
 
-        let rank = polytope.rank();
-
-        // Initializes with any flag from the polytope.
+        // Initializes with any flag from the polytope and all flag changes.
         if let Some(first_flag) = polytope.first_oriented_flag() {
-            // All flag changes.
-            let flag_changes = (0..rank.usize()).collect();
-
-            Self::with_flags(polytope, flag_changes, first_flag)
+            Self::with_flags(polytope, FlagChanges::all(polytope.rank()), first_flag)
         }
         // A nullitope has no flags.
         else {
@@ -472,7 +517,7 @@ impl<'a> OrientedFlagIter<'a> {
     /// initial flag and a set of flag changes to apply.
     pub fn with_flags(
         polytope: &'a Abstract,
-        flag_changes: Vec<usize>,
+        flag_changes: FlagChanges,
         first_flag: OrientedFlag,
     ) -> Self {
         assert!(polytope.is_bounded(), "Polytope is not bounded.");

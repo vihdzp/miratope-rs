@@ -6,7 +6,7 @@ pub mod r#abstract;
 pub mod concrete;
 
 use self::r#abstract::{
-    flag::{Flag, FlagEvent, FlagIter, Orientation, OrientedFlag, OrientedFlagIter},
+    flag::{Flag, FlagEvent, FlagIter, OrientedFlag, OrientedFlagIter},
     rank::{Rank, RankVec},
 };
 use crate::lang::{
@@ -195,10 +195,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Returns any flag of the polytope.
     fn first_oriented_flag(&self) -> Option<OrientedFlag> {
-        Some(OrientedFlag {
-            flag: self.first_flag()?,
-            orientation: Orientation::default(),
-        })
+        Some(OrientedFlag ::from( self.first_flag()?))
     }
 
     /// Returns an iterator over all flags of a polytope.

@@ -78,9 +78,19 @@ impl Abstract {
         self.element_ref(Rank::new(-1), 0).unwrap()
     }
 
+    /// Returns a mutable reference to the minimal element of the polytope.
+    pub fn min_mut(&mut self) -> &mut Element {
+        self.element_ref_mut(Rank::new(-1), 0).unwrap()
+    }
+
     /// Returns a reference to the maximal element of the polytope.
     pub fn max(&self) -> &Element {
         self.element_ref(self.rank(), 0).unwrap()
+    }
+
+    /// Returns a mutable reference to the maximal element of the polytope.
+    pub fn max_mut(&mut self) -> &mut Element {
+        self.element_ref_mut(self.rank(), 0).unwrap()
     }
 
     /// Pushes a new element list, assuming that the superelements of the
@@ -149,6 +159,12 @@ impl Abstract {
     /// entire polytope it defines, use [`element`](Self::element).
     pub fn element_ref(&self, rank: Rank, idx: usize) -> Option<&Element> {
         self.ranks.get(rank)?.get(idx)
+    }
+
+    /// Returns a mutable reference to an element of the polytope. To actually get the
+    /// entire polytope it defines, use [`element`](Self::element).
+    pub fn element_ref_mut(&mut self, rank: Rank, idx: usize) -> Option<&mut Element> {
+        self.ranks.get_mut(rank)?.get_mut(idx)
     }
 
     /// Gets the indices of the vertices of an element in the polytope, if it
@@ -843,6 +859,9 @@ impl Polytope<Abs> for Abstract {
                 self.push_at(r, el);
             }
         }
+
+        *self.min_mut() = Element::min(self.vertex_count());
+        *self.max_mut() = Element::max(self.facet_count());
 
         let name = mem::replace(&mut self.name, Name::Nullitope);
         self.name = Name::compound(vec![(1, name), (1, p.name)]);
