@@ -11,6 +11,7 @@ use crate::{
     polytope::{concrete::Concrete, Polytope},
     Consts, Float, OffOptions,
 };
+use approx::{abs_diff_eq, abs_diff_ne};
 use camera::ProjectionType;
 use library::{Library, ShowResult, SpecialLibrary};
 
@@ -79,11 +80,12 @@ impl Default for SectionState {
     }
 }
 
-pub struct SectionDirection(Option<Vector>);
+/// Stores the direction in which the cross-sections are taken.
+pub struct SectionDirection(Vector);
 
 impl Default for SectionDirection {
     fn default() -> Self {
-        Self(None)
+        Self(Vector::zeros(0))
     }
 }
 
@@ -230,7 +232,6 @@ pub fn ui(
                             } => {
                                 *query.iter_mut().next().unwrap() = original_polytope.clone();
                                 *section_state = SectionState::Inactive;
-                                section_direction.0 = None;
                             }
 
                             // The view is inactive, but will be activated.
@@ -238,6 +239,7 @@ pub fn ui(
                                 let mut p = query.iter_mut().next().unwrap();
                                 p.flatten();
 
+                                // The default direction is in the last coordinate axis.
                                 let dim = p.dim().unwrap_or(0);
                                 let mut direction = Vector::zeros(dim);
                                 if dim > 0 {
@@ -253,7 +255,7 @@ pub fn ui(
                                     hyperplane_pos: (minmax.0 + minmax.1) / 2.0,
                                     flatten: true,
                                 };
-                                section_direction.0 = Some(direction);
+                                section_direction.0 = direction;
                             }
                         };
                     }
@@ -269,8 +271,8 @@ pub fn ui(
                             if let Some(mut facet) = p.facet(0) {
                                 facet.flatten();
                                 facet.recenter();
-
                                 *p = facet;
+
                                 println!("Facet succeeded.")
                             } else {
                                 println!("Facet failed: no facets.")
@@ -379,12 +381,11 @@ pub fn ui(
             );
 
             // Updates the slicing depth.
-            #[allow(clippy::float_cmp)]
-            if hyperplane_pos != new_hyperplane_pos {
+            if abs_diff_ne!(hyperplane_pos, new_hyperplane_pos, epsilon = Float::EPS) {
                 section_state.set_pos(new_hyperplane_pos);
             }
 
-            let mut new_direction = section_direction.0.clone().unwrap();
+            let mut new_direction = section_direction.0.clone();
             let mut modified_coord = 0;
 
             ui.horizontal(|ui| {
@@ -393,19 +394,25 @@ pub fn ui(
                     ui.add(egui::DragValue::new(coord).speed(0.01));
 
                     // The index of the modified coordinate.
-                    #[allow(clippy::float_cmp)]
-                    if section_direction.0.as_ref().unwrap()[idx] != *coord {
+                    if abs_diff_eq!(section_direction.0[idx], *coord, epsilon = Float::EPS) {
                         modified_coord = idx;
                     }
 
                     // Gets rid of floating point shenanigans.
-                    if coord.abs() < Float::EPS {
+                    if abs_diff_eq!(*coord, 0.0, epsilon = Float::EPS.sqrt()) {
                         *coord = 0.0;
+                    } else if abs_diff_eq!(*coord, 1.0, epsilon = Float::EPS) {
+                        *coord = 1.0;
+                    } else if abs_diff_eq!(*coord, -1.0, epsilon = Float::EPS) {
+                        *coord = -1.0;
                     }
                 }
             });
 
+            // Normalizes the slicing direction.
             if new_direction.try_normalize_mut(Float::EPS).is_none() {
+                // If this fails, sets it to the axis direction corresponding
+                // to the last modified coordinate.
                 for coord in new_direction.iter_mut() {
                     *coord = 0.0;
                 }
@@ -413,7 +420,6 @@ pub fn ui(
             }
 
             // Updates the slicing direction.
-            let new_direction = Some(new_direction);
             #[allow(clippy::float_cmp)]
             if section_direction.0 != new_direction {
                 section_direction.0 = new_direction;
@@ -657,7 +663,7 @@ pub fn update_cross_section(
         } = &mut *section_state
         {
             *minmax = original_polytope
-                .minmax(section_direction.0.as_ref().unwrap())
+                .minmax(&section_direction.0)
                 .unwrap_or((-1.0, 1.0));
         }
     }
@@ -675,14 +681,13 @@ pub fn update_cross_section(
                 let hyp_pos = *hyperplane_pos + 0.0000001; // Botch fix for degeneracies.
 
                 if let Some(dim) = r.dim() {
-                    let section_direction = section_direction.0.as_ref().unwrap();
                     let hyperplane = Hyperplane::from_normal(
                         original_polytope.dim().unwrap_or(0),
-                        section_direction.clone(),
+                        section_direction.0.clone(),
                         hyp_pos,
                     );
                     *minmax = original_polytope
-                        .minmax(section_direction)
+                        .minmax(&section_direction.0)
                         .unwrap_or((-1.0, 1.0));
 
                     let mut slice = r.cross_section(&hyperplane);
