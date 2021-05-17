@@ -82,21 +82,6 @@ impl Hypersphere {
         self.reciprocate_mut(&mut clone).ok().map(|_| clone)
     }
 
-    pub fn random(dim: usize) -> Self {
-        use rand::Rng;
-
-        let mut rand = rand::thread_rng();
-        let mut center = Point::zeros(dim);
-        for coord in center.iter_mut() {
-            *coord = rand.gen_range(0.0..=1.0);
-        }
-
-        Hypersphere {
-            squared_radius: rand.gen_range(0.0..=1.0),
-            center,
-        }
-    }
-
     /// Returns whether two hyperspheres are "approximately" equal.
     /// Used for testing.
     pub fn approx(&self, sphere: &Hypersphere) -> bool {
@@ -384,11 +369,6 @@ impl Segment {
     /// between 0 and 1, the point will be contained on the line segment.
     pub fn at(&self, t: Float) -> Point {
         &self.0 * t + &self.1 * (1.0 - t)
-    }
-
-    /// Returns the midpoint of the segment.
-    pub fn midpoint(&self) -> Point {
-        self.at(0.5)
     }
 }
 

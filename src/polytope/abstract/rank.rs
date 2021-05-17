@@ -203,11 +203,6 @@ impl<T> RankVec<T> {
         self.0.get_mut(index.0)
     }
 
-    /// Returns the last element of the `RankVec<T>`, or `None` if it is empty.
-    pub fn last(&self) -> Option<&T> {
-        self.0.last()
-    }
-
     /// Returns an iterator over the `RankVec<T>`.
     pub fn iter(&self) -> Iter<T> {
         Iter(self.0.iter())

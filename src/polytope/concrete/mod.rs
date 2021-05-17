@@ -789,8 +789,6 @@ impl Concrete {
 
     /// Gets the element "types" of a polytope.
     fn get_element_types(&self) -> RankVec<Vec<ElementType>> {
-        const EPS: f64 = 1e-9;
-
         let rank = self.rank();
         let mut element_types = RankVec::with_capacity(rank);
         let el_counts = self.el_counts();

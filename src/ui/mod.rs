@@ -59,19 +59,6 @@ impl SectionState {
         }
     }
 
-    /// Sets the minmax of the hyperplane.
-    pub fn set_minmax(&mut self, new_minmax: (Float, Float)) {
-        if let Self::Active {
-            original_polytope: _,
-            minmax,
-            hyperplane_pos: _,
-            flatten: _,
-        } = self
-        {
-            *minmax = new_minmax;
-        }
-    }
-
     /// Sets the flattening setting.
     pub fn set_flat(&mut self, flat: bool) {
         if let Self::Active {
@@ -587,7 +574,9 @@ pub fn file_dialog(
             FileDialogMode::Save => {
                 if let Some(path) = token.save_file(file_dialog_state.name.as_ref().unwrap()) {
                     for p in query.iter_mut() {
-                        std::fs::write(path.clone(), p.to_off(OffOptions::default())).unwrap();
+                        if p.to_path(&path, OffOptions::default()).is_err() {
+                            println!("File saving failed!");
+                        }
                     }
                 }
             }

@@ -49,14 +49,6 @@ pub struct VertexLoop {
 pub struct Cycle(Vec<usize>);
 
 impl VertexLoop {
-    /// Initializes a new, empty vertex loop.
-    pub fn new() -> Self {
-        Self {
-            vertex_map: HashMap::new(),
-            edges: Vec::new(),
-        }
-    }
-
     /// Initializes a vertex loop with a given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
         Self {

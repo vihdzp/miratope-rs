@@ -369,10 +369,6 @@ impl<T: GreekPrefix> Prefix for T {
     }
 }
 
-pub fn is_vowel(c: char) -> bool {
-    matches!(c, 'a' | 'e' | 'i' | 'o' | 'u')
-}
-
 pub fn parentheses(str: String, paren: bool) -> String {
     if paren {
         format!("({})", str)
