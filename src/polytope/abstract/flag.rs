@@ -390,7 +390,7 @@ impl<'a> FlagIter<'a> {
         }
         // The queue is empty.
         else {
-            return IterResult::None;
+            IterResult::None
         }
     }
 }
