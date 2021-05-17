@@ -796,7 +796,7 @@ impl SelectedLanguage {
             Self::Es => "Spanish",
             Self::Fr => "French",
             Self::Ja => "Japanese",
-            Self::Pii => "Proto Indo-European",
+            Self::Pii => "Proto Indo-Iranian",
         }
     }
 }

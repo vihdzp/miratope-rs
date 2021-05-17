@@ -462,8 +462,6 @@ impl Concrete {
     /// Generates the vertices for either a tegum or a pyramid product with two
     /// given vertex sets and a given height.
     fn duopyramid_vertices(p: &[Point], q: &[Point], height: Float, tegum: bool) -> Vec<Point> {
-        use std::iter;
-
         // The dimension of the points in p.
         let p_dim = if let Some(p0) = p.get(0) {
             p0.len()
@@ -483,7 +481,7 @@ impl Concrete {
         q.iter()
             // To every point in q, we append zeros to the left.
             .map(|vq| {
-                let mut v: Vec<_> = iter::repeat(0.0)
+                let mut v: Vec<_> = std::iter::repeat(0.0)
                     .take(p_dim)
                     .into_iter()
                     .chain(vq.iter().copied())
@@ -498,7 +496,7 @@ impl Concrete {
                 let mut v: Vec<_> = vp
                     .iter()
                     .copied()
-                    .chain(iter::repeat(0.0).take(q_dim))
+                    .chain(std::iter::repeat(0.0).take(q_dim))
                     .collect();
                 if !tegum {
                     v.push(half_height);

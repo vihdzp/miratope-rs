@@ -1,13 +1,10 @@
-A renderer for polytopes, spinned off from [Miratope JS](https://github.com/OfficialURL/miratope).
-Still in alpha development.
+A tool for building and visualizing polytopes. Still in alpha development.
 
 ## What can Miratope do now?
-Miratope can already load polytopes from `.off`s and derive various properties
-from them, as well as do various simple operations on them. We're in the late stages of porting the original Miratope's functionality now.
+Miratope can already load polytopes from files and derive various properties from them, as well as do various operations on them. It can render wireframes in arbitrary dimension, though it can only rotate them in three of those dimensions.
 
 ## What are Miratope's goals?
-We plan to eventually support all of the original Miratope's features,
-as well as the following:
+We plan to eventually support all of the following:
 
 * Various families of polytopes to build and render
   * [x] All [regular polytopes](https://polytope.miraheze.org/wiki/Regular_polytope)
@@ -32,8 +29,8 @@ as well as the following:
 
 ## How do I use Miratope?
 Miratope is in the alpha stage, and so doesn't have a completed interface yet. You'll have to download the source code to do much of anything.
-Miratope is written in Rust, so if you don't already have the latest version and its Visual Studio C++ Build tools downloaded then you should do that first. Instructions for downloading can be found here: https://www.rust-lang.org/tools/install.
-**You may have to restart your computer for Rust to fully install**.
+
+Miratope is written in Rust, so if you don't already have the latest version and its Visual Studio C++ Build tools downloaded then you should do that first. Instructions for downloading can be found here: https://www.rust-lang.org/tools/install. **You may have to restart your computer for Rust to fully install**.
 1. Once you have Rust setup click the green button here on Github that says "Code".
    * If you already have Github Desktop, you can just click "Open with Github Desktop".
    * If you don't, click "Download ZIP" and once it's done downloading, extract the `.zip` file.
@@ -43,18 +40,13 @@ Miratope is written in Rust, so if you don't already have the latest version and
 
 Once you have completed all the steps you will only need to do step 4 to run Miratope from startup (but if the `[FILE PATH]` changes, you'll need to do step 3 again).
 
-These steps are in place because it would be too cumbersome at this stage to update the executable each time a bug is fixed or feature is added. Once Miratope leaves the alpha stage, a simple `.exe` for Version 1 will be provided.
+These steps are in place because it would be too cumbersome at this stage to update the executable each time a bug is fixed or feature is added. Once Miratope leaves the alpha stage, executable files for Version 1.0.0 will be provided.
 
 ## Where do I get these "`.off` files"?
 The **O**bject **F**ile **F**ormat is a format for storing certain kinds of geometric shapes.
-Although not in widespread use, it has become the standard format for those interested in polyhedra and polytopes.
-It was initially meant for the [Geomview software](https://people.sc.fsu.edu/~jburkardt/data/off/off.html),
-and was later adapted for the [Stella software](https://www.software3d.com/StellaManual.php?prod=stella4D#import).
-Miratope plans to use a further generalization of the Stella `.off` format for any amount of dimensions.
+Although not in widespread use, it has become the standard format for those interested in polyhedra and polytopes. It was initially meant for the [Geomview software](https://people.sc.fsu.edu/~jburkardt/data/off/off.html), and was later adapted for the [Stella software](https://www.software3d.com/StellaManual.php?prod=stella4D#import). Miratope uses a further generalization of the Stella `.off` format for any amount of dimensions.
 
-Miratope includes a small library simple or generatable polytopes at startup. More complicated polytopes can be downloaded from
-[OfficialURL's personal collection](https://drive.google.com/drive/u/0/folders/1nQZ-QVVBfgYSck4pkZ7he0djF82T9MVy).
-Eventually, most here will be browsable from Miratope itself.
+Miratope includes a small library simple or generatable polytopes at startup. More complicated polytopes can be downloaded from [OfficialURL's personal collection](https://drive.google.com/drive/u/0/folders/1nQZ-QVVBfgYSck4pkZ7he0djF82T9MVy). Eventually, most files here will be browsable from Miratope itself.
 
 ## Why is the rendering buggy?
 Proper rendering, even in 3D, is a work in progress.
