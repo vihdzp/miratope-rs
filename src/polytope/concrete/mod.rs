@@ -597,7 +597,7 @@ impl Concrete {
                     * Matrix::from_iterator(
                         rank.usize(),
                         rank.usize(),
-                        flag.elements
+                        flag.flag
                             .into_iter()
                             .enumerate()
                             .map(|(rank, idx)| &flat_vertices[vertex_map[rank][idx]])

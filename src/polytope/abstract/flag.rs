@@ -58,10 +58,12 @@ impl Flag {
 
         // Determines the common elements between the subelements of the element
         // above and the superelements of the element below.
-        let below = polytope
-            .element_ref(r_minus_one, self[r_minus_one])
-            .unwrap();
-        let above = polytope.element_ref(r_plus_one, self[r_plus_one]).unwrap();
+        let below_idx = self.get(r_minus_one).copied().unwrap_or(0);
+        let below = polytope.element_ref(r_minus_one, below_idx).unwrap();
+
+        let above_idx = self.get(r_plus_one).copied().unwrap_or(0);
+        let above = polytope.element_ref(r_plus_one, above_idx).unwrap();
+
         let common = common(&below.sups.0, &above.subs.0);
 
         assert_eq!(
@@ -91,33 +93,33 @@ impl Flag {
     }
 }
 
-impl std::ops::Index<usize> for Flag {
-    type Output = usize;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
-    }
-}
-
-impl std::ops::IndexMut<usize> for Flag {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.0[index]
-    }
-}
-
 /// Allows indexing a flag by rank.
 impl std::ops::Index<Rank> for Flag {
     type Output = usize;
 
     fn index(&self, index: Rank) -> &Self::Output {
-        &self[index.usize()]
+        self.get(index).unwrap()
     }
 }
 
 /// Allows mutably indexing a flag by rank.
 impl std::ops::IndexMut<Rank> for Flag {
     fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
-        &mut self[index.usize()]
+        self.get_mut(index).unwrap()
+    }
+}
+
+impl std::ops::Index<usize> for Flag {
+    type Output = usize;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self[Rank::from(index)]
+    }
+}
+
+impl std::ops::IndexMut<usize> for Flag {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self[Rank::from(index)]
     }
 }
 
@@ -134,7 +136,7 @@ impl std::iter::IntoIterator for Flag {
 
 /// The parity of a flag, which flips on any flag change.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub enum Parity {
+pub enum Orientation {
     /// A flag of even parity.
     Even,
 
@@ -142,12 +144,12 @@ pub enum Parity {
     Odd,
 }
 
-impl Parity {
+impl Orientation {
     /// Flips the parity of a flag.
     pub fn flip(&self) -> Self {
         match self {
-            Parity::Even => Parity::Odd,
-            Parity::Odd => Parity::Even,
+            Orientation::Even => Orientation::Odd,
+            Orientation::Odd => Orientation::Even,
         }
     }
 
@@ -159,13 +161,13 @@ impl Parity {
     /// Returns the "sign" associated with a flag, which is either `1.0` or `-1.0`.
     pub fn sign(&self) -> Float {
         match self {
-            Parity::Even => 1.0,
-            Parity::Odd => -1.0,
+            Orientation::Even => 1.0,
+            Orientation::Odd => -1.0,
         }
     }
 }
 
-impl Default for Parity {
+impl Default for Orientation {
     fn default() -> Self {
         Self::Even
     }
@@ -249,18 +251,18 @@ impl<'a> Iterator for FlagIter<'a> {
 pub struct OrientedFlag {
     /// The indices of the elements the flag contains, excluding the null and
     /// maximal elements.
-    pub elements: Flag,
+    pub flag: Flag,
 
     /// The orientation of the flag. If the polytope is non-orientable, this
     /// will contain garbage.
-    pub orientation: Parity,
+    pub orientation: Orientation,
 }
 
 impl Hash for OrientedFlag {
     /// Returns the hash of the flag. **Does not take orientation into
     /// account.**
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.elements.hash(state);
+        self.flag.hash(state);
     }
 }
 
@@ -268,19 +270,19 @@ impl PartialEq for OrientedFlag {
     /// Determines whether two flags are equal. **Does not take orientation into
     /// account.**
     fn eq(&self, other: &Self) -> bool {
-        self.elements.eq(&other.elements)
+        self.flag.eq(&other.flag)
     }
 }
 
 impl PartialOrd for OrientedFlag {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.elements.partial_cmp(&other.elements)
+        self.flag.partial_cmp(&other.flag)
     }
 }
 
 impl Ord for OrientedFlag {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.elements.cmp(&other.elements)
+        self.flag.cmp(&other.flag)
     }
 }
 
@@ -291,14 +293,14 @@ impl std::ops::Index<usize> for OrientedFlag {
     type Output = usize;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.elements[index]
+        &self.flag[index]
     }
 }
 
 /// Allows mutably indexing an oriented flag by rank.
 impl std::ops::IndexMut<usize> for OrientedFlag {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.elements[index]
+        &mut self.flag[index]
     }
 }
 
@@ -312,13 +314,13 @@ impl std::ops::Index<Rank> for OrientedFlag {
 
 impl std::ops::IndexMut<Rank> for OrientedFlag {
     fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
-        self.elements.get_mut(index).unwrap()
+        self.flag.get_mut(index).unwrap()
     }
 }
 
 impl OrientedFlag {
     pub fn push(&mut self, value: usize) {
-        self.elements.push(value);
+        self.flag.push(value);
     }
 }
 
@@ -356,30 +358,30 @@ impl OrientedFlag {
     /// Constructs a new, empty `OrientedFlag` with the specified capacity.
     pub fn with_capacity(rank: usize) -> Self {
         Self {
-            elements: Flag::with_capacity(rank),
-            orientation: Parity::default(),
+            flag: Flag::with_capacity(rank),
+            orientation: Orientation::default(),
         }
     }
 
     /// Gets the index of the element stored at a given rank, whilst pretending
     /// that the flag contains a minimal and maximal element.
     pub fn get(&self, rank: Rank) -> Option<&usize> {
-        if rank == Rank::new(-1) || rank == self.elements.rank() {
+        if rank == Rank::new(-1) || rank == self.flag.rank() {
             Some(&0)
         } else {
-            self.elements.get(rank)
+            self.flag.get(rank)
         }
     }
 
     pub fn change_mut(&mut self, polytope: &Abstract, idx: usize) {
-        self.elements.change_mut(polytope, idx);
+        self.flag.change_mut(polytope, idx);
         self.orientation.flip_mut();
     }
 
     /// Applies a specified flag change to the flag.
     pub fn change(&self, polytope: &Abstract, idx: usize) -> Self {
         Self {
-            elements: self.elements.change(polytope, idx),
+            flag: self.flag.change(polytope, idx),
             orientation: self.orientation.flip(),
         }
     }
@@ -621,35 +623,41 @@ mod tests {
     use super::*;
     use crate::polytope::Polytope;
 
+    fn test(polytope: &Abstract, expected: usize) {
+        let flag_count = polytope.flags().count();
+        assert_eq!(
+            expected, flag_count,
+            "Expected {} flags, found {}.",
+            expected, flag_count
+        );
+
+        let flag_count = polytope.oriented_flags().count();
+        assert_eq!(
+            expected, flag_count,
+            "Expected {} oriented flags, found {}.",
+            expected, flag_count
+        );
+    }
+
     #[test]
     fn nullitope() {
-        let flag_count = Abstract::nullitope().flags().count();
-        assert_eq!(flag_count, 0, "Expected {} flags, found {}.", 0, flag_count);
+        test(&Abstract::nullitope(), 0)
     }
 
     #[test]
     fn point() {
-        let flag_count = Abstract::point().flags().count();
-        assert_eq!(flag_count, 1, "Expected {} flags, found {}.", 1, flag_count);
+        test(&Abstract::point(), 1)
     }
 
     #[test]
     fn dyad() {
-        let flag_count = Abstract::dyad().flags().count();
-        assert_eq!(flag_count, 2, "Expected {} flags, found {}.", 2, flag_count);
+        test(&Abstract::dyad(), 2)
     }
 
     #[test]
     fn polygon() {
         for n in 2..=10 {
-            let flag_count = Abstract::polygon(n).flags().count();
-            assert_eq!(
-                flag_count,
-                2 * n,
-                "Expected {} flags, found {}.",
-                2 * n,
-                flag_count
-            );
+            test(&Abstract::polygon(n), 2 * n);
         }
     }
 
@@ -658,14 +666,7 @@ mod tests {
         use factorial::Factorial;
 
         for n in 0..=5 {
-            let flag_count = Abstract::simplex(Rank::new(n as isize)).flags().count();
-            let expected = (n + 1).factorial();
-
-            assert_eq!(
-                flag_count, expected,
-                "Expected {} flags, found {}.",
-                expected, flag_count
-            );
+            test(&Abstract::simplex(Rank::from(n)), (n + 1).factorial());
         }
     }
 
@@ -674,13 +675,9 @@ mod tests {
         use factorial::Factorial;
 
         for n in 0..=5 {
-            let flag_count = Abstract::hypercube(Rank::new(n as isize)).flags().count();
-            let expected = (2u32.pow(n as u32) as usize) * n.factorial();
-
-            assert_eq!(
-                flag_count, expected,
-                "Expected {} flags, found {}.",
-                expected, flag_count
+            test(
+                &Abstract::hypercube(Rank::new(n as isize)),
+                (2u32.pow(n as u32) as usize) * n.factorial(),
             );
         }
     }
@@ -690,13 +687,9 @@ mod tests {
         use factorial::Factorial;
 
         for n in 0..=5 {
-            let flag_count = Abstract::orthoplex(Rank::new(n as isize)).flags().count();
-            let expected = (2u32.pow(n as u32) as usize) * n.factorial();
-
-            assert_eq!(
-                flag_count, expected,
-                "Expected {} flags, found {}.",
-                expected, flag_count
+            test(
+                &Abstract::orthoplex(Rank::new(n as isize)),
+                (2u32.pow(n as u32) as usize) * n.factorial(),
             );
         }
     }
