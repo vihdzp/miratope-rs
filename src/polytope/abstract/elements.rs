@@ -10,6 +10,7 @@ use super::{
     rank::{Rank, RankVec},
     Abstract,
 };
+use crate::polytope::Polytope;
 
 /// Common boilerplate code for [`Subelements`] and [`Superelements`].
 pub trait Subsupelements: Sized + Index<usize> + IndexMut<usize> + IntoIterator {

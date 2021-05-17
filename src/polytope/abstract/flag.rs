@@ -12,10 +12,11 @@ use std::{
 };
 
 use super::{elements::Subsupelements, rank::Rank, Abstract};
-use crate::Float;
+use crate::{polytope::Polytope, Float};
 
-/// A flag in a polytope. Stores the indices of the elements of each rank,
-/// excluding the minimal and maximal rank.
+/// A [flag](https://polytope.miraheze.org/wiki/Flag) in a polytope. Stores the
+/// indices of the elements of each rank, excluding the minimal and maximal
+/// elements.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Flag(Vec<usize>);
 
@@ -169,12 +170,13 @@ impl Orientation {
         }
     }
 
-    /// Mutably flips the parity of a flag.
+    /// Flips the parity of a flag in place.
     pub fn flip_mut(&mut self) {
         *self = self.flip();
     }
 
-    /// Returns the "sign" associated with a flag, which is either `1.0` or `-1.0`.
+    /// Returns the "sign" associated with a flag, which is either `1.0` or
+    /// `-1.0`.
     pub fn sign(&self) -> Float {
         match self {
             Orientation::Even => 1.0,
@@ -183,12 +185,16 @@ impl Orientation {
     }
 }
 
+/// An arbitrary orientation to serve as the default.
 impl Default for Orientation {
     fn default() -> Self {
         Self::Even
     }
 }
 
+/// An interator over all [`Flags`](Flag) of a polytope. This iterator works
+/// even if the polytope is a compound polytope. If you also care about the
+/// orientation of the flags, you should use an [`OrientedFlagIter`] instead.
 pub struct FlagIter<'a> {
     /// The polytope whose flags we iterate over.
     polytope: &'a Abstract,
@@ -197,17 +203,14 @@ pub struct FlagIter<'a> {
     /// iterator.
     flag: Option<Flag>,
 
-    /// The indices of each element of the flag, as a subelement of its
-    /// superelement.
+    /// The indices of each element of the flag, as subelements of their
+    /// superelements.
     indices: Vec<usize>,
 }
 
 impl<'a> FlagIter<'a> {
-    /// Initializes a new iterator over all flags of a polytope. This works even
-    /// if the polytope is a compound polytope.
+    /// Initializes an iterator over all flags of a polytope.
     pub fn new(polytope: &'a Abstract) -> Self {
-        use crate::polytope::Polytope;
-
         let r = polytope.rank().try_usize().unwrap_or(0);
         Self {
             polytope,
@@ -337,13 +340,13 @@ impl std::ops::Index<Rank> for OrientedFlag {
     type Output = usize;
 
     fn index(&self, index: Rank) -> &Self::Output {
-        &self.get(index).unwrap()
+        &self.flag[index]
     }
 }
 
 impl std::ops::IndexMut<Rank> for OrientedFlag {
     fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
-        self.flag.get_mut(index).unwrap()
+        &mut self.flag[index]
     }
 }
 
@@ -506,8 +509,6 @@ impl<'a> OrientedFlagIter<'a> {
 
     /// Initializes a new iterator over the flag events of a polytope.
     pub fn new(polytope: &'a Abstract) -> Self {
-        use crate::polytope::Polytope;
-
         // Initializes with any flag from the polytope and all flag changes.
         if let Some(first_flag) = polytope.first_oriented_flag() {
             Self::with_flags(polytope, FlagChanges::all(polytope.rank()), first_flag)

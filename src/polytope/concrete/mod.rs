@@ -17,7 +17,7 @@ use super::{
         elements::{
             AbstractBuilder, Element, ElementList, SubelementList, Subelements, Subsupelements,
         },
-        flag::{Flag, FlagChanges, FlagEvent, FlagIter, OrientedFlag, OrientedFlagIter},
+        flag::{Flag, FlagChanges, FlagEvent, OrientedFlag, OrientedFlagIter},
         rank::{Rank, RankVec},
         Abstract,
     },
@@ -77,20 +77,18 @@ impl Concrete {
         }
     }
 
-    /// Returns the rank of the polytope.
-    pub fn rank(&self) -> Rank {
-        self.abs.rank()
-    }
-
     /// Returns the number of dimensions of the space the polytope lives in,
     /// or `None` in the case of the nullitope.
     pub fn dim(&self) -> Option<usize> {
         Some(self.vertices.get(0)?.len())
     }
 
+    /// Builds a dyad with a specified height.
     pub fn dyad_with(height: Float) -> Self {
+        let half_height = height / 2.0;
+
         Self::new(
-            vec![vec![-height / 2.0].into(), vec![height / 2.0].into()],
+            vec![vec![-half_height].into(), vec![half_height].into()],
             Abstract::dyad(),
         )
         .with_name(Name::Dyad)
@@ -403,9 +401,10 @@ impl Concrete {
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope.
     pub fn try_antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Result<Self, usize> {
-        let vertices = self.vertices.iter().map(|v| v.push(height / 2.0));
+        let half_height = height / 2.0;
+        let vertices = self.vertices.iter().map(|v| v.push(-half_height));
         let dual = self.try_dual_with(sphere)?;
-        let dual_vertices = dual.vertices.iter().map(|v| v.push(-height / 2.0));
+        let dual_vertices = dual.vertices.iter().map(|v| v.push(half_height));
 
         Ok(self.antiprism_with_vertices(vertices, dual_vertices))
     }
@@ -427,12 +426,12 @@ impl Concrete {
         }
         // Digon compounds are a special case.
         else {
-            let height = Float::SQRT_2;
-            let vertices = polygon.vertices.iter().map(|v| v.push(height / 2.0));
+            let half_height = Float::SQRT_2 / 2.0;
+            let vertices = polygon.vertices.iter().map(|v| v.push(-half_height));
             let dual_vertices = polygon
                 .vertices
                 .iter()
-                .map(|v| vec![v[1], -v[0], -height / 2.0].into());
+                .map(|v| vec![v[1], -v[0], half_height].into());
 
             polygon.antiprism_with_vertices(vertices, dual_vertices)
         }
@@ -463,82 +462,76 @@ impl Concrete {
     /// Generates the vertices for either a tegum or a pyramid product with two
     /// given vertex sets and a given height.
     fn duopyramid_vertices(p: &[Point], q: &[Point], height: Float, tegum: bool) -> Vec<Point> {
+        use std::iter;
+
+        // The dimension of the points in p.
         let p_dim = if let Some(p0) = p.get(0) {
             p0.len()
         } else {
-            return vec![vec![].into()];
+            return q.to_owned();
         };
+
+        // The dimensions of the points in q.
         let q_dim = if let Some(q0) = q.get(0) {
             q0.len()
         } else {
-            return vec![vec![].into()];
+            return p.to_owned();
         };
 
-        let dim = p_dim + q_dim + tegum as usize;
+        let half_height = height / 2.0;
 
-        let mut vertices = Vec::with_capacity(p.len() + q.len());
-
-        // The vertices corresponding to products of p's nullitope with q's
-        // vertices.
-        for q_vertex in q {
-            let mut prod_vertex = Vec::with_capacity(dim);
-            let pad = p_dim;
-
-            // Pads prod_vertex to the left.
-            prod_vertex.resize(pad, 0.0);
-
-            // Copies q_vertex into prod_vertex.
-            for &c in q_vertex.iter() {
-                prod_vertex.push(c);
-            }
-
-            // Adds the height, in case of a pyramid product.
-            if !tegum {
-                prod_vertex.push(height / 2.0);
-            }
-
-            vertices.push(prod_vertex.into());
-        }
-
-        // The vertices corresponding to products of q's nullitope with p's
-        // vertices.
-        for p_vertex in p {
-            let mut prod_vertex = Vec::with_capacity(dim);
-
-            // Copies p_vertex into prod_vertex.
-            for &c in p_vertex.iter() {
-                prod_vertex.push(c);
-            }
-
-            // Pads prod_vertex to the right.
-            prod_vertex.resize(p_dim + q_dim, 0.0);
-
-            // Adds the height, in case of a pyramid product.
-            if !tegum {
-                prod_vertex.push(-height / 2.0);
-            }
-
-            vertices.push(prod_vertex.into());
-        }
-
-        vertices
+        q.iter()
+            // To every point in q, we append zeros to the left.
+            .map(|vq| {
+                let mut v: Vec<_> = iter::repeat(0.0)
+                    .take(p_dim)
+                    .into_iter()
+                    .chain(vq.iter().copied())
+                    .collect();
+                if !tegum {
+                    v.push(-half_height);
+                }
+                v.into()
+            })
+            // To every point in p, we append zeros to the right.
+            .chain(p.iter().map(|vp| {
+                let mut v: Vec<_> = vp
+                    .iter()
+                    .copied()
+                    .chain(iter::repeat(0.0).take(q_dim))
+                    .collect();
+                if !tegum {
+                    v.push(half_height);
+                }
+                v.into()
+            }))
+            .collect()
     }
 
     /// Generates the vertices for a duoprism with two given vertex sets.
     fn duoprism_vertices(p: &[Point], q: &[Point]) -> Vec<Point> {
-        let mut vertices = Vec::with_capacity(p.len() * q.len());
+        // The dimension of the points in p.
+        let p_dim = if let Some(vp) = p.get(0) {
+            vp.len()
+        } else {
+            return Vec::new();
+        };
 
-        // Concatenates all pairs of vertices in order.
-        for p_vertex in p {
-            for q_vertex in q {
-                let p_vertex = p_vertex.into_iter();
-                let q_vertex = q_vertex.into_iter();
+        // The dimension of the points in q.
+        let q_dim = if let Some(vq) = q.get(0) {
+            vq.len()
+        } else {
+            return Vec::new();
+        };
 
-                vertices.push(p_vertex.chain(q_vertex).cloned().collect::<Vec<_>>().into());
-            }
-        }
+        // The dimension of our new points.
+        let dim = p_dim + q_dim;
 
-        vertices
+        // We take all elements in the cartesian product p × q, and chain each
+        // pair together.
+        itertools::iproduct!(p.iter(), q.iter())
+            .map(|(vp, vq)| Point::from_iterator(dim, vp.iter().chain(vq.iter()).copied()))
+            .collect::<Vec<_>>()
     }
 
     /// Generates a duopyramid from two given polytopes with a given height.
@@ -550,6 +543,8 @@ impl Concrete {
         .with_name(Name::Multipyramid(vec![p.name.clone(), q.name.clone()]))
     }
 
+    /// Computes the volume of a polytope by adding up the contributions of all
+    /// flags. Returns `None` if the volume is undefined.
     pub fn volume(&self) -> Option<Float> {
         use factorial::Factorial;
 
@@ -564,6 +559,7 @@ impl Concrete {
         let flat_vertices = self.flat_vertices();
         let flat_vertices = flat_vertices.as_ref().unwrap_or(&self.vertices);
 
+        // Skew polytopes don't have a defined volume.
         if flat_vertices.get(0)?.len() != rank.usize() {
             return None;
         }
@@ -590,12 +586,15 @@ impl Concrete {
         }
 
         let mut volume = 0.0;
+        let rank_usize = rank.usize();
 
-        // For each flag, there's a simplex defined by any vertices in its
-        // elements and the origin. We add up the volumes of all of these
-        // simplices times the sign of the flag that generated them.
+        // All of the flags we've found so far.
         let mut all_flags = HashSet::new();
+
+        // We iterate over all flags in the polytope.
         for flag in self.flags() {
+            // If this flag forms a new component of the polytope, we iterate
+            // over the oriented flags in this component.
             if !all_flags.contains(&flag) {
                 let mut component_volume = 0.0;
 
@@ -608,10 +607,13 @@ impl Concrete {
                         let new = all_flags.insert(oriented_flag.flag.clone());
                         debug_assert!(new, "A flag is in two different components.");
 
+                        // For each flag, there's a simplex defined by any vertices in its
+                        // elements and the origin. We add up the volumes of all of these
+                        // simplices times the sign of the flag that generated them.
                         component_volume += oriented_flag.orientation.sign()
                             * Matrix::from_iterator(
-                                rank.usize(),
-                                rank.usize(),
+                                rank_usize,
+                                rank_usize,
                                 oriented_flag
                                     .flag
                                     .into_iter()
@@ -621,16 +623,19 @@ impl Concrete {
                                     .copied(),
                             )
                             .determinant();
-                    } else {
+                    }
+                    // A non-orientable polytope doesn't have a volume.
+                    else {
                         return None;
                     }
                 }
 
+                // We add up the volumes of all components.
                 volume += component_volume.abs();
             }
         }
 
-        Some(volume / (rank.usize()).factorial() as Float)
+        Some(volume / rank_usize.factorial() as Float)
     }
 
     pub fn flat_vertices(&self) -> Option<Vec<Point>> {
@@ -655,6 +660,7 @@ impl Concrete {
         }
     }
 
+    /// Flattens the vertices of a polytope into a specified subspace.
     pub fn flatten_into(&mut self, subspace: &Subspace) {
         if !subspace.is_full_rank() {
             for v in self.vertices.iter_mut() {
@@ -799,10 +805,12 @@ impl Concrete {
         }
     }
 
+    /// Builds the mesh of a polytope.
     pub fn get_mesh(&self, projection_type: ProjectionType) -> Mesh {
         MeshBuilder::new(self).get_mesh(projection_type)
     }
 
+    /// Builds the wireframe of a polytope.
     pub fn get_wireframe(&self, projection_type: ProjectionType) -> Mesh {
         MeshBuilder::new(self).get_wireframe(projection_type)
     }
@@ -1010,10 +1018,6 @@ impl Polytope<Con> for Concrete {
         self.try_dual_mut_with(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
-    fn first_flag(&self) -> Option<Flag> {
-        self.abs.first_flag()
-    }
-
     fn petrial_mut(&mut self) -> Result<(), ()> {
         let res = self.abs.petrial_mut();
 
@@ -1066,14 +1070,6 @@ impl Polytope<Con> for Concrete {
                 .collect(),
             abs,
         ))
-    }
-
-    fn flags(&self) -> FlagIter {
-        self.abs.flags()
-    }
-
-    fn flag_events(&self) -> OrientedFlagIter {
-        self.abs.flag_events()
     }
 
     fn flag_omnitruncate(&self) -> Self {

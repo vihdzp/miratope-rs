@@ -12,7 +12,7 @@ use self::{
         AbstractBuilder, Element, ElementHash, ElementList, Section, SectionHash, SubelementList,
         Subelements, Subsupelements, Superelements,
     },
-    flag::{Flag, FlagEvent, FlagIter, OrientedFlagIter},
+    flag::{Flag, FlagEvent},
     rank::{Rank, RankVec},
 };
 use super::Polytope;
@@ -66,11 +66,6 @@ impl Abstract {
         };
 
         Self { ranks, name }
-    }
-
-    /// Returns the rank of the polytope.
-    pub fn rank(&self) -> Rank {
-        self.ranks.rank()
     }
 
     /// Returns a reference to the minimal element of the polytope.
@@ -627,25 +622,6 @@ impl Polytope<Abs> for Abstract {
         self
     }
 
-    /// The number of elements of a given rank.
-    fn el_count(&self, rank: Rank) -> usize {
-        self.ranks
-            .get(rank)
-            .map(|elements| elements.len())
-            .unwrap_or(0)
-    }
-
-    /// The element counts of the polytope.
-    fn el_counts(&self) -> RankVec<usize> {
-        let mut counts = RankVec::with_capacity(self.rank());
-
-        for r in Rank::range_inclusive_iter(Rank::new(-1), self.rank()) {
-            counts.push(self[r].len())
-        }
-
-        counts
-    }
-
     /// Returns an instance of the
     /// [nullitope](https://polytope.miraheze.org/wiki/Nullitope), the unique
     /// polytope of rank &minus;1.
@@ -721,23 +697,6 @@ impl Polytope<Abs> for Abstract {
         self.name = self.name.clone().dual(AbsData::default());
 
         Ok(())
-    }
-
-    /// Gets whatever flag from the polytope.
-    fn first_flag(&self) -> Option<Flag> {
-        let rank = self.rank();
-        let rank_usize = rank.try_usize()?;
-
-        let mut flag = Flag::with_capacity(rank_usize);
-        let mut idx = 0;
-        flag.push(0);
-
-        for r in Rank::range_iter(Rank::new(1), rank) {
-            idx = self.element_ref(r.minus_one(), idx).unwrap().sups[0];
-            flag.push(idx);
-        }
-
-        Some(flag)
     }
 
     /// Builds the [Petrial](https://polytope.miraheze.org/wiki/Petrial) of a
@@ -887,16 +846,6 @@ impl Polytope<Abs> for Abstract {
     /// Gets the element with a given rank and index as a polytope, if it exists.
     fn element(&self, rank: Rank, idx: usize) -> Option<Self> {
         Some(ElementHash::from_element(self, rank, idx)?.to_polytope(self))
-    }
-
-    fn flags(&self) -> FlagIter {
-        FlagIter::new(&self)
-    }
-
-    /// Returns an iterator over the "flag events" of a polytope. See
-    /// [`FlagIter`] for more info.
-    fn flag_events(&self) -> OrientedFlagIter {
-        OrientedFlagIter::new(&self)
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)

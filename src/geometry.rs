@@ -372,9 +372,15 @@ impl Segment {
     }
 }
 
+/// A matrix with a given number of rows and columns.
 type MatrixMxN<R, C> = nalgebra::Matrix<Float, R, C, VecStorage<Float, R, C>>;
 
-/// A matrix ordered by fuzzy lexicographic ordering.
+/// A matrix ordered by fuzzy lexicographic ordering. That is, lexicographic
+/// ordering where two entries that differ by less than an epsilon are
+/// considered equal.
+///
+/// This struct can be used to build a `HashMap` of points or matrices in a way
+/// that's resistant to floating point errors.
 #[derive(Clone, Debug)]
 pub struct OrdMatrixMxN<R: Dim, C: Dim>(pub MatrixMxN<R, C>)
 where
@@ -399,6 +405,8 @@ where
     }
 }
 
+/// Equality on `OrdMatrices` should be an equality relation, as long as the
+/// distance between the `OrdMatrices` you're comparing is "small".
 impl<R: Dim, C: Dim> Eq for OrdMatrixMxN<R, C> where VecStorage<Float, R, C>: Storage<Float, R, C> {}
 
 impl<R: Dim, C: Dim> PartialOrd for OrdMatrixMxN<R, C>
@@ -433,16 +441,23 @@ impl<R: Dim, C: Dim> OrdMatrixMxN<R, C>
 where
     VecStorage<Float, R, C>: Storage<Float, R, C>,
 {
+    /// Initializes a new `OrdMatrix` from a `Matrix`.
     pub fn new(mat: MatrixMxN<R, C>) -> Self {
         Self(mat)
     }
 
+    /// Iterates over the entries of the `OrdMatrix`.
     pub fn iter(&self) -> nalgebra::iter::MatrixIter<Float, R, C, VecStorage<Float, R, C>> {
         self.0.iter()
     }
 }
 
+/// A matrix ordered by fuzzy lexicographic ordering. For more info, see
+/// [`OrdMatrixMxN`].
 pub type OrdMatrix = OrdMatrixMxN<Dynamic, Dynamic>;
+
+/// A point ordered by fuzzy lexicographic ordering. For more info, see
+/// [`OrdMatrixMxN`].
 pub type OrdPoint = OrdMatrixMxN<Dynamic, U1>;
 
 #[cfg(test)]

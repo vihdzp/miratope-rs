@@ -31,18 +31,22 @@ type DualResult<T> = Result<T, usize>;
 
 /// The trait for methods common to all polytopes.
 pub trait Polytope<T: NameType>: Sized + Clone {
+    /// Returns a reference to the underlying abstract polytope.
+    fn abs(&self) -> &Abstract;
+
+    /// Returns a mutable reference to the underlying abstract polytope.
+    fn abs_mut(&mut self) -> &mut Abstract;
+
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
-    fn rank(&self) -> Rank;
+    fn rank(&self) -> Rank {
+        self.abs().ranks.rank()
+    }
 
     /// The name of the polytope in its language-independent representation.
     fn name(&self) -> &Name<T>;
 
     /// A mutable reference to the name of the polytope.
     fn name_mut(&mut self) -> &mut Name<T>;
-
-    fn abs(&self) -> &Abstract;
-
-    fn abs_mut(&mut self) -> &mut Abstract;
 
     /// Gets the wiki link to the polytope, based on its English name.
     fn wiki_link(&self) -> String {
@@ -59,14 +63,25 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         self
     }
 
-    /// The number of elements of a given rank.
+    /// Returns the number of elements of a given rank.
     fn el_count(&self, rank: Rank) -> usize {
-        self.abs().el_count(rank)
+        self.abs()
+            .ranks
+            .get(rank)
+            .map(|elements| elements.len())
+            .unwrap_or(0)
     }
 
-    /// The element counts of the polytope.
+    /// Returns the element counts of the polytope.
     fn el_counts(&self) -> RankVec<usize> {
-        self.abs().el_counts()
+        let abs = self.abs();
+        let mut counts = RankVec::with_capacity(abs.rank());
+
+        for r in Rank::range_inclusive_iter(Rank::new(-1), abs.rank()) {
+            counts.push(abs[r].len())
+        }
+
+        counts
     }
 
     /// The number of vertices on the polytope.
@@ -214,19 +229,41 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     fn petrie_polygon_with(&self, flag: Flag) -> Option<Self>;
 
-    fn first_flag(&self) -> Option<Flag>;
+    /// Returns the first [`Flag`] of a polytope. This is the flag built when we
+    /// start at the maximal element and repeatedly take the first subelement.
+    fn first_flag(&self) -> Option<Flag> {
+        let rank = self.rank();
+        let rank_usize = rank.try_usize()?;
 
-    /// Returns any flag of the polytope.
+        let mut flag = Flag::with_capacity(rank_usize);
+        let mut idx = 0;
+        flag.push(0);
+
+        for r in Rank::range_iter(Rank::new(1), rank) {
+            idx = self.abs().element_ref(r.minus_one(), idx).unwrap().sups[0];
+            flag.push(idx);
+        }
+
+        Some(flag)
+    }
+
+    /// Returns the first [`OrientedFlag`] of a polytope. This is the flag built
+    /// when we start at the maximal element and repeatedly take the first
+    /// subelement.
     fn first_oriented_flag(&self) -> Option<OrientedFlag> {
         Some(OrientedFlag::from(self.first_flag()?))
     }
 
     /// Returns an iterator over all flags of a polytope.
-    fn flags(&self) -> FlagIter;
+    fn flags(&self) -> FlagIter {
+        FlagIter::new(self.abs())
+    }
 
     /// Returns an iterator over all "flag events" of a polytope. For more info,
     /// see [`FlagIter`].
-    fn flag_events(&self) -> OrientedFlagIter;
+    fn flag_events(&self) -> OrientedFlagIter {
+        OrientedFlagIter::new(self.abs())
+    }
 
     fn oriented_flags(
         &self,
