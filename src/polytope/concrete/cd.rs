@@ -1,6 +1,6 @@
 use petgraph::graph::NodeIndex;
 use petgraph::{graph::Graph, Undirected};
-use std::{f64, fmt::Display, str::Chars};
+use std::{f64, fmt::Display, iter::Peekable, str::Chars};
 
 /// Possible types of CD
 struct Cd(
@@ -20,27 +20,15 @@ impl Cd {
         self.0.node_count()
     }
 }
-
-impl Display for Cd {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Prints node and edge counts.
-        writeln!(f, "{} Nodes", self.0.node_count())?;
-        writeln!(f, "{} Edges", self.0.edge_count())?;
-
-        // Prints out nodes.
-        for (i, n) in self.0.raw_nodes().iter().enumerate() {
-            write!(f, "Node {}: ", i)?;
-            NodeVal::fmt(&n.weight, f)?;
-        }
-
-        // Prints out edges.
-        for (i, e) in self.0.raw_edges().iter().enumerate() {
-            write!(f, "Edge {}: ", i)?;
-            EdgeVal::fmt(&e.weight, f)?;
-        }
-
-        Ok(())
-    }
+/// Possible types of node values.
+enum NodeVal {
+    ///Unringed Nodes (different from Ringed(0))
+    Unringed,
+    ///Ringed Nodes, can hold any float
+    Ringed(f64),
+    ///Snub Nodes, should definitely make this hold a float
+    ///TODO: Agree on a way to specify the length in a snub node
+    Snub,
 }
 
 /// Possible types of Edge Values
@@ -54,43 +42,19 @@ enum EdgeVal {
     //No intersection Ø
     Non,
 }
-
-impl Display for EdgeVal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            EdgeVal::Rational(n, d) => writeln!(f, "Edge carries {}/{}", n, d),
-            EdgeVal::Inf(false) => writeln!(f, "Edge carries prograde ∞"),
-            EdgeVal::Inf(true) => writeln!(f, "Edge carries retrograde ∞"),
-            EdgeVal::Non => writeln!(f, "Edge carries Ø"),
-        }
-    }
-}
-
-/// Possible types of node values.
-enum NodeVal {
-    ///Unringed Nodes (different from Ringed(0))
-    Unringed,
-    ///Ringed Nodes, can hold any float
-    Ringed(f64),
-    ///Snub Nodes, should definitely make this hold a float
-    ///TODO: Agree on a way to specify the length in a snub node
-    Snub,
-}
-
-impl Display for NodeVal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NodeVal::Unringed => writeln!(f, "Node is unringed"),
-            NodeVal::Ringed(x) => writeln!(f, "Node carries {}", x),
-            NodeVal::Snub => writeln!(f, "Node is snub"),
-        }
-    }
+/// Stores the indices of the node and edge of the next edge in the graph. This
+/// is used in order to handle virtual nodes. A new edge will be added to the
+/// graph only when both fields of the `EdgeMem` are full, and we're reading a
+/// new node.
+struct EdgeMem {
+    node: Option<NodeIndex>,
+    edge: Option<EdgeVal>,
 }
 
 /// Main function for parsing CDs from strings.
 fn cd_parse(input: &str) -> Option<Cd> {
     let mut caret = Caret {
-        diagram: input.chars(),
+        diagram: input.chars().peekable(),
         graph: Graph::new_undirected(),
         edge_mem: EdgeMem {
             node: None,
@@ -101,49 +65,18 @@ fn cd_parse(input: &str) -> Option<Cd> {
     // Reads through the diagram.
     loop {
         caret.create_node()?;
-        caret.read_edge()?;
 
-        if caret.make_edge().is_none() {
+        if caret.read_edge().is_none() {
             return Some(Cd(caret.graph));
         }
     }
 }
 
-/*
-///Parses compound and lace cds
-fn multi_cd_parse(diagram: &str) -> Option<Vec<Graph<EdgeVal, EdgeVal, Undirected>>> {
-    if input.contains("&")||input.contains("#") {
-        if Regex::new(r#"&#([a-zA-z]|\(([a-zA-z]|\d+(/\d+)?\)))[tr]?$"#).unwrap().is_match(&input) {
-            match &input[input.len()-1..] {
-                "t" => /*Lace Tower*/ ,
-                "r" => /*Lace Ring*/,
-                _ => /*Lace Simplex*/,
-            }
-        } else {
-            /*Invalid Lace*/
-            None
-        }
-    } else {
-        /*Compound*/
-
-    }
-}
-*/
-
 /// Packages important information needed to interpret CDs
 struct Caret<'a> {
-    diagram: Chars<'a>,
+    diagram: Peekable<Chars<'a>>,
     graph: Graph<NodeVal, EdgeVal, Undirected>,
     edge_mem: EdgeMem,
-}
-
-/// Stores the indices of the node and edge of the next edge in the graph. This
-/// is used in order to handle virtual nodes. A new edge will be added to the
-/// graph only when both fields of the `EdgeMem` are full, and we're reading a
-/// new node.
-struct EdgeMem {
-    node: Option<NodeIndex>,
-    edge: Option<EdgeVal>,
 }
 
 /// Operations that are commonly done to parse CDs
@@ -220,13 +153,24 @@ impl<'a> Caret<'a> {
     }
 
     /// Reads an edge from a CD and stores into edgemem
-    fn read_edge(&self) -> Option<()> {
-        todo!()
-    }
+    fn read_edge(&mut self) -> Option<()> {
+        let mut chars = Vec::new();
 
-    /// Creates an edge from edgemem
-    fn make_edge(&self) -> Option<()> {
-        todo!()
+        //We read through the diagram until we encounter something that looks like the start of a node
+        while let Some(&d) = self.diagram.peek() {
+            if d.is_alphabetic() || d == '(' || d == '*' {
+                // Adds the edge value to edge_mem
+                self.edge_mem.edge = Some(edge_to_val(&chars)?);
+                return Some(());
+            }
+
+            //Here, we want to look ahead before adding characters,
+            //so we don't add the first character of the next node
+            chars.push(self.diagram.next()?);
+        }
+
+        //If we unexpectedly hit the end of the iterator, exit and return None
+        None
     }
 
     /*
@@ -236,7 +180,7 @@ impl<'a> Caret<'a> {
 }
 
 ///Converts Vecs of chars to wrapped EdgeVals
-fn edge_to_val(raw: Vec<char>) -> Option<EdgeVal> {
+fn edge_to_val(raw: &[char]) -> Option<EdgeVal> {
     use EdgeVal::*;
     let mut raw_iter = raw.iter();
     let mut edge = Vec::new();
@@ -367,5 +311,51 @@ fn num_retro(val: EdgeVal) -> EdgeVal {
             Inf(ret)
         }
         Non => Non,
+    }
+}
+
+impl Display for Cd {
+    ///Prints the node and edge count, along with the value each node and edge contains
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Prints node and edge counts.
+        writeln!(f, "{} Nodes", self.0.node_count())?;
+        writeln!(f, "{} Edges", self.0.edge_count())?;
+
+        // Prints out nodes.
+        for (i, n) in self.0.raw_nodes().iter().enumerate() {
+            write!(f, "Node {}: ", i)?;
+            NodeVal::fmt(&n.weight, f)?;
+        }
+
+        // Prints out edges.
+        for (i, e) in self.0.raw_edges().iter().enumerate() {
+            write!(f, "Edge {}: ", i)?;
+            EdgeVal::fmt(&e.weight, f)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Display for NodeVal {
+    ///Prints the value a node contains
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NodeVal::Unringed => writeln!(f, "Node is unringed"),
+            NodeVal::Ringed(x) => writeln!(f, "Node carries {}", x),
+            NodeVal::Snub => writeln!(f, "Node is snub"),
+        }
+    }
+}
+
+impl Display for EdgeVal {
+    ///Prints the value an edge contains
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EdgeVal::Rational(n, d) => writeln!(f, "Edge carries {}/{}", n, d),
+            EdgeVal::Inf(false) => writeln!(f, "Edge carries prograde ∞"),
+            EdgeVal::Inf(true) => writeln!(f, "Edge carries retrograde ∞"),
+            EdgeVal::Non => writeln!(f, "Edge carries Ø"),
+        }
     }
 }
