@@ -35,6 +35,9 @@ pub enum SectionState {
 
         /// Whether the cross-section is flattened into a dimension lower.
         flatten: bool,
+
+        /// Whether we're updating the cross-section.
+        lock: bool,
     },
 
     /// The view is inactive.
@@ -54,22 +57,38 @@ impl SectionState {
             minmax: _,
             hyperplane_pos,
             flatten: _,
+            lock: _,
         } = self
         {
             *hyperplane_pos = pos;
         }
     }
 
-    /// Sets the flattening setting.
-    pub fn set_flat(&mut self, flat: bool) {
+    /// Flips the flattening setting.
+    pub fn flip_flat(&mut self) {
         if let Self::Active {
             original_polytope: _,
             minmax: _,
             hyperplane_pos: _,
             flatten,
+            lock: _,
         } = self
         {
-            *flatten = flat;
+            *flatten = !*flatten;
+        }
+    }
+
+    /// Flips the lock setting.
+    pub fn flip_lock(&mut self) {
+        if let Self::Active {
+            original_polytope: _,
+            minmax: _,
+            hyperplane_pos: _,
+            flatten: _,
+            lock,
+        } = self
+        {
+            *lock = !*lock;
         }
     }
 }
@@ -242,6 +261,7 @@ pub fn ui(
                                 minmax: _,
                                 hyperplane_pos: _,
                                 flatten: _,
+                                lock: _,
                             } => {
                                 *query.iter_mut().next().unwrap() = original_polytope.clone();
                                 *section_state = SectionState::Inactive;
@@ -267,6 +287,7 @@ pub fn ui(
                                     minmax,
                                     hyperplane_pos: (minmax.0 + minmax.1) / 2.0,
                                     flatten: true,
+                                    lock: false,
                                 };
                                 section_direction.0 = direction;
                             }
@@ -377,6 +398,7 @@ pub fn ui(
             minmax,
             hyperplane_pos,
             flatten,
+            lock,
         } = *section_state
         {
             ui.label("Cross section settings:");
@@ -449,7 +471,15 @@ pub fn ui(
 
                 // Updates the flattening setting.
                 if flatten != new_flatten {
-                    section_state.set_flat(new_flatten);
+                    section_state.flip_flat();
+                }
+
+                let mut new_lock = lock;
+                ui.add(egui::Checkbox::new(&mut new_lock, "Lock"));
+
+                // Updates the flattening setting.
+                if lock != new_lock {
+                    section_state.flip_lock();
                 }
             });
         }
@@ -599,6 +629,7 @@ pub fn file_dialog(
                     }
                 }
             }
+
             // We want to open a file.
             FileDialogMode::Open => {
                 if let Some(path) = token.pick_file() {
@@ -675,6 +706,7 @@ pub fn update_cross_section(
             hyperplane_pos: _,
             minmax,
             flatten: _,
+            lock: _,
         } = &mut *section_state
         {
             *minmax = original_polytope
@@ -689,8 +721,14 @@ pub fn update_cross_section(
             hyperplane_pos,
             minmax,
             flatten,
+            lock,
         } = &mut *section_state
         {
+            // We don't update the view if it's locked.
+            if *lock {
+                return;
+            }
+
             for mut p in query.iter_mut() {
                 let r = original_polytope.clone();
                 let hyp_pos = *hyperplane_pos + 0.0000001; // Botch fix for degeneracies.

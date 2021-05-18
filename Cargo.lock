@@ -1170,7 +1170,8 @@ checksum = "ee2626afccd7561a06cf1367e2950c4718ea04565e20fb5029b6c7d8ad09abcf"
 [[package]]
 name = "egui"
 version = "0.12.0"
-source = "git+https://github.com/OfficialURL/egui#3c60bfeeea904074211376dca9ca6ed9c122655f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "788148861d80b87d28d64440a3d31cae190e50ccc3ea585597466d38428365d7"
 dependencies = [
  "epaint",
 ]
@@ -1184,7 +1185,8 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 [[package]]
 name = "emath"
 version = "0.12.0"
-source = "git+https://github.com/OfficialURL/egui#3c60bfeeea904074211376dca9ca6ed9c122655f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e73d6c8c70eadb71756fbbc3c303ab25e163b46b656886dd250de5636efea12"
 
 [[package]]
 name = "env_logger"
@@ -1199,7 +1201,8 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.12.0"
-source = "git+https://github.com/OfficialURL/egui#3c60bfeeea904074211376dca9ca6ed9c122655f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80e2db640801230bdda80629bc3a063927a462f5eaf38a98da676954e78ccb99"
 dependencies = [
  "ahash 0.7.2",
  "atomic_refcell",
@@ -1219,9 +1222,9 @@ dependencies = [
 
 [[package]]
 name = "euclid"
-version = "0.22.3"
+version = "0.22.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "536d206ede9fae5a338a1576623b04fd2459f6086e551d374ebf10e9b78bb4df"
+checksum = "7b9b0b0868386d989090b2431c4c2a4d31228490a132ca5db3a36184331782d3"
 dependencies = [
  "num-traits",
 ]
@@ -3499,7 +3502,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 [[package]]
 name = "winit"
 version = "0.24.0"
-source = "git+https://github.com/OfficialURL/winit#8eb5035bd008efac6b3dbd6d4de46cb6ab49aba0"
+source = "git+https://github.com/OfficialURL/winit?rev=078b9719cc3ba06630291d5bc05c90787bd84c4f#078b9719cc3ba06630291d5bc05c90787bd84c4f"
 dependencies = [
  "bitflags",
  "cocoa",
