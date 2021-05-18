@@ -15,7 +15,8 @@ use self::mesh_builder::MeshBuilder;
 use super::{
     r#abstract::{
         elements::{
-            AbstractBuilder, Element, ElementList, SubelementList, Subelements, Subsupelements,
+            AbstractBuilder, Element, ElementList, ElementRef, SubelementList, Subelements,
+            Subsupelements,
         },
         flag::{Flag, FlagChanges, FlagEvent, OrientedFlag, OrientedFlagIter},
         rank::{Rank, RankVec},
@@ -269,7 +270,7 @@ impl Concrete {
 
     /// Checks whether a polytope is equilateral to a fixed precision.
     pub fn is_equilateral(&self) -> bool {
-        if let Some(vertices) = self.element_vertices_ref(Rank::new(1), 0) {
+        if let Some(vertices) = self.element_vertices_ref(&ElementRef::new(Rank::new(1), 0)) {
             let (v0, v1) = (vertices[0], vertices[1]);
 
             return self.is_equilateral_with_len((v0 - v1).norm());
@@ -336,7 +337,9 @@ impl Concrete {
             for idx in 0..facet_count {
                 projections.push(
                     Subspace::from_point_refs(
-                        &self.element_vertices_ref(rank.minus_one(), idx).unwrap(),
+                        &self
+                            .element_vertices_ref(&ElementRef::new(rank.minus_one(), idx))
+                            .unwrap(),
                     )
                     .project(&o),
                 );
@@ -439,10 +442,10 @@ impl Concrete {
 
     /// Gets the references to the (geometric) vertices of an element on the
     /// polytope.
-    pub fn element_vertices_ref(&self, rank: Rank, idx: usize) -> Option<Vec<&Point>> {
+    pub fn element_vertices_ref(&self, el: &ElementRef) -> Option<Vec<&Point>> {
         Some(
             self.abs
-                .element_vertices(rank, idx)?
+                .element_vertices(el)?
                 .iter()
                 .map(|&v| &self.vertices[v])
                 .collect(),
@@ -450,9 +453,9 @@ impl Concrete {
     }
 
     /// Gets the (geometric) vertices of an element on the polytope.
-    pub fn element_vertices(&self, rank: Rank, idx: usize) -> Option<Vec<Point>> {
+    pub fn element_vertices(&self, el: &ElementRef) -> Option<Vec<Point>> {
         Some(
-            self.element_vertices_ref(rank, idx)?
+            self.element_vertices_ref(el)?
                 .into_iter()
                 .cloned()
                 .collect(),
@@ -1058,8 +1061,8 @@ impl Polytope<Con> for Concrete {
 
     /// Gets the element with a given rank and index as a polytope, or returns
     /// `None` if such an element doesn't exist.
-    fn element(&self, rank: Rank, idx: usize) -> Option<Self> {
-        let (vertices, abs) = self.abs.element_and_vertices(rank, idx)?;
+    fn element(&self, el: &ElementRef) -> Option<Self> {
+        let (vertices, abs) = self.abs.element_and_vertices(el)?;
 
         Some(Self::new(
             vertices

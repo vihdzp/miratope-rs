@@ -9,14 +9,125 @@ use std::{
 
 use self::{
     elements::{
-        AbstractBuilder, Element, ElementHash, ElementList, Section, SectionHash, SubelementList,
-        Subelements, Subsupelements, Superelements,
+        AbstractBuilder, Element, ElementHash, ElementList, ElementRef, Section, SectionHash,
+        SubelementList, Subelements, Subsupelements, Superelements,
     },
     flag::{Flag, FlagEvent},
     rank::{Rank, RankVec},
 };
 use super::Polytope;
 use crate::lang::name::{Abs, AbsData, Name};
+
+use strum_macros::Display;
+
+#[derive(Display)]
+pub enum IncidenceType {
+    #[strum(serialize = "subelement")]
+    Subelement,
+
+    #[strum(serialize = "superelement")]
+    Superelement,
+}
+
+/// Represents an error in an abstract polytope.
+pub enum AbstractError {
+    /// The polytope is not bounded, i.e. it doesn't have a single minimal and
+    /// maximal element.
+    Bounded { min_count: usize, max_count: usize },
+
+    /// The polytope has some invalid index, i.e. some element points to another
+    /// non-existent element.
+    Index {
+        el: ElementRef,
+        incidence_type: IncidenceType,
+        index: usize,
+    },
+
+    /// The polytope has a consistency error, i.e. some element is incident to
+    /// another but not viceversa.
+    Consistency {
+        el: ElementRef,
+        incidence_type: IncidenceType,
+        index: usize,
+    },
+
+    /// The polytope is not ranked, i.e. some element that's not minimal or not
+    /// maximal lacks a subelement or superelement, respectively.
+    Ranked {
+        el: ElementRef,
+        incidence_type: IncidenceType,
+    },
+
+    /// The polytope is not dyadic, i.e. some section of height 1 does not have
+    /// exactly 4 elements.
+    Dyadic { section: Section, more: bool },
+
+    /// The polytope is not strictly connected, i.e. some section's flags don't
+    /// form a connected graph under flag changes.
+    Connected(Section),
+}
+
+impl std::fmt::Debug for AbstractError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            // The polytope is not bounded.
+            AbstractError::Bounded {
+                min_count: min,
+                max_count: max,
+            } => write!(
+                f,
+                "Polytope is unbounded: found {} minimal elements and {} maximal elements",
+                min, max
+            ),
+
+            // The polytope has an invalid index.
+            AbstractError::Index {
+                el,
+                incidence_type,
+                index,
+            } => write!(
+                f,
+                "Polytope has an invalid index: {} has a {} with index {}, but it doesn't exist",
+                el, incidence_type, index
+            ),
+
+            AbstractError::Consistency {
+                el,
+                incidence_type,
+                index,
+            } => write!(
+                f,
+                "Polytope has an invalid index: {} has a {} with index {}, but not viceversa",
+                el, incidence_type, index
+            ),
+
+            // The polytope is not ranked.
+            AbstractError::Ranked { el, incidence_type } => write!(
+                f,
+                "Polytope is not ranked: {} has no {}s",
+                el, incidence_type
+            ),
+
+            // The polytope is not dyadic.
+            AbstractError::Dyadic { section, more } => write!(
+                f,
+                "Polytope is not dyadic: there are {} than 2 elements between {}",
+                if *more { "more" } else { "less" },
+                section
+            ),
+
+            // The polytope is not strictly connected.
+            AbstractError::Connected(section) => write!(
+                f,
+                "Polytope is not strictly connected: {} is not connected",
+                section
+            ),
+        }
+    }
+}
+
+/// The return value for [`Abstract::is_valid`].
+pub type AbstractResult = Result<(), AbstractError>;
 
 /// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
 /// to an [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
@@ -70,22 +181,25 @@ impl Abstract {
 
     /// Returns a reference to the minimal element of the polytope.
     pub fn min(&self) -> &Element {
-        self.element_ref(Rank::new(-1), 0).unwrap()
+        self.get_element(&ElementRef::new(Rank::new(-1), 0))
+            .unwrap()
     }
 
     /// Returns a mutable reference to the minimal element of the polytope.
     pub fn min_mut(&mut self) -> &mut Element {
-        self.element_ref_mut(Rank::new(-1), 0).unwrap()
+        self.get_element_mut(&ElementRef::new(Rank::new(-1), 0))
+            .unwrap()
     }
 
     /// Returns a reference to the maximal element of the polytope.
     pub fn max(&self) -> &Element {
-        self.element_ref(self.rank(), 0).unwrap()
+        self.get_element(&ElementRef::new(self.rank(), 0)).unwrap()
     }
 
     /// Returns a mutable reference to the maximal element of the polytope.
     pub fn max_mut(&mut self) -> &mut Element {
-        self.element_ref_mut(self.rank(), 0).unwrap()
+        self.get_element_mut(&ElementRef::new(self.rank(), 0))
+            .unwrap()
     }
 
     /// Pushes a new element list, assuming that the superelements of the
@@ -152,38 +266,31 @@ impl Abstract {
 
     /// Returns a reference to an element of the polytope. To actually get the
     /// entire polytope it defines, use [`element`](Self::element).
-    pub fn element_ref(&self, rank: Rank, idx: usize) -> Option<&Element> {
-        self.ranks.get(rank)?.get(idx)
+    pub fn get_element(&self, el: &ElementRef) -> Option<&Element> {
+        self.ranks.get(el.rank)?.get(el.idx)
     }
 
     /// Returns a mutable reference to an element of the polytope. To actually get the
     /// entire polytope it defines, use [`element`](Self::element).
-    pub fn element_ref_mut(&mut self, rank: Rank, idx: usize) -> Option<&mut Element> {
-        self.ranks.get_mut(rank)?.get_mut(idx)
+    pub fn get_element_mut(&mut self, el: &ElementRef) -> Option<&mut Element> {
+        self.ranks.get_mut(el.rank)?.get_mut(el.idx)
     }
 
     /// Gets the indices of the vertices of an element in the polytope, if it
     /// exists.
-    pub fn element_vertices(&self, rank: Rank, idx: usize) -> Option<Vec<usize>> {
-        Some(ElementHash::from_element(self, rank, idx)?.to_elements(Rank::new(0)))
+    pub fn element_vertices(&self, el: &ElementRef) -> Option<Vec<usize>> {
+        Some(ElementHash::from_element(self, el)?.to_elements(Rank::new(0)))
     }
 
     /// Gets both elements with a given rank and index as a polytope and the
     /// indices of its vertices on the original polytope, if it exists.
-    pub fn element_and_vertices(&self, rank: Rank, idx: usize) -> Option<(Vec<usize>, Self)> {
-        let element_hash = ElementHash::from_element(self, rank, idx)?;
+    pub fn element_and_vertices(&self, el: &ElementRef) -> Option<(Vec<usize>, Self)> {
+        let element_hash = ElementHash::from_element(self, el)?;
 
         Some((
             element_hash.to_elements(Rank::new(0)),
             element_hash.to_polytope(self),
         ))
-    }
-
-    /// Checks whether the polytope is valid, i.e. whether the polytope is
-    /// bounded, dyadic, and all of its indices refer to valid elements.
-    pub fn is_valid(&self) -> bool {
-        self.is_bounded() && self.check_incidences() && self.is_dyadic()
-        // && self.is_strongly_connected()
     }
 
     /// Returns the indices of a Petrial polygon in cyclic order, or `None` if
@@ -272,30 +379,35 @@ impl Abstract {
                 for (indices, &idx) in map {
                     // Finds all of the subelements of our old section's
                     // lowest element.
-                    for &idx_lo in &self.element_ref(rank_lo, indices.0).unwrap().subs {
+                    for &idx_lo in &self
+                        .get_element(&ElementRef::new(rank_lo, indices.0))
+                        .unwrap()
+                        .subs
+                    {
                         // Adds the new sections of the current height, gets
                         // their index, uses that to build the ElementList.
-                        let sub = new_section_hash.get(Section {
-                            rank_lo: rank_lo.minus_one(),
-                            idx_lo,
-                            rank_hi,
-                            idx_hi: indices.1,
-                        });
+                        let sub = new_section_hash.get(Section::new(
+                            ElementRef::new(rank_lo.minus_one(), idx_lo),
+                            ElementRef::new(rank_hi, indices.1),
+                        ));
 
                         elements[idx].push(sub);
                     }
 
                     // Finds all of the superelements of our old section's
                     // highest element.
-                    for &idx_hi in self.element_ref(rank_hi, indices.1).unwrap().sups.iter() {
+                    for &idx_hi in self
+                        .get_element(&ElementRef::new(rank_hi, indices.1))
+                        .unwrap()
+                        .sups
+                        .iter()
+                    {
                         // Adds the new sections of the current height, gets
                         // their index, uses that to build the ElementList.
-                        let sub = new_section_hash.get(Section {
-                            rank_lo,
-                            idx_lo: indices.0,
-                            rank_hi: rank_hi.plus_one(),
-                            idx_hi,
-                        });
+                        let sub = new_section_hash.get(Section::new(
+                            ElementRef::new(rank_lo, indices.0),
+                            ElementRef::new(rank_hi.plus_one(), idx_hi),
+                        ));
 
                         elements[idx].push(sub);
                     }
@@ -307,22 +419,18 @@ impl Abstract {
             if height == rank.minus_one() {
                 // We create a map from the base's vertices to the new vertices.
                 for v in 0..vertex_count {
-                    vertices.push(new_section_hash.get(Section {
-                        rank_lo: Rank::new(0),
-                        idx_lo: v,
-                        rank_hi: rank,
-                        idx_hi: 0,
-                    }));
+                    vertices.push(new_section_hash.get(Section::new(
+                        ElementRef::new(Rank::new(0), v),
+                        ElementRef::new(rank, 0),
+                    )));
                 }
 
                 // We create a map from the dual base's vertices to the new vertices.
                 for f in 0..facet_count {
-                    dual_vertices.push(new_section_hash.get(Section {
-                        rank_lo: Rank::new(-1),
-                        idx_lo: 0,
-                        rank_hi: rank.minus_one(),
-                        idx_hi: f,
-                    }));
+                    dual_vertices.push(new_section_hash.get(Section::new(
+                        ElementRef::new(Rank::new(-1), 0),
+                        ElementRef::new(rank.minus_one(), f),
+                    )));
                 }
             }
 
@@ -345,44 +453,117 @@ impl Abstract {
         (abs, vertices, dual_vertices)
     }
 
+    /// Checks whether the polytope is valid, i.e. whether the polytope is
+    /// bounded, dyadic, and all of its indices refer to valid elements.
+    pub fn is_valid(&self) -> AbstractResult {
+        self.bounded()?;
+        self.check_incidences()?;
+        self.is_dyadic()?;
+
+        Ok(())
+        // && self.is_strongly_connected()
+    }
+
     /// Determines whether the polytope is bounded, i.e. whether it has a single
     /// minimal element and a single maximal element. A valid polytope should
     /// always return `true`.
-    pub fn is_bounded(&self) -> bool {
-        self.el_count(Rank::new(-1)) == 1 && self.el_count(self.rank()) == 1
+    pub fn bounded(&self) -> AbstractResult {
+        let min_count = self.el_count(Rank::new(-1));
+        let max_count = self.el_count(self.rank());
+
+        if min_count == 1 && max_count == 1 {
+            Ok(())
+        } else {
+            Err(AbstractError::Bounded {
+                min_count,
+                max_count,
+            })
+        }
     }
 
     /// Checks whether subelements and superelements match up, and whether they
     /// all refer to valid elements in the polytope. If this returns `false`,
     /// then either the polytope hasn't fully built up, or there's something
     /// seriously wrong.
-    pub fn check_incidences(&self) -> bool {
-        // Superelements of the maximal element should be empty.
-        if !self.max().sups.is_empty() {
-            return false;
-        }
-
+    pub fn check_incidences(&self) -> AbstractResult {
         // Iterates over elements of every rank.
         for (r, elements) in self.ranks.iter().rank_enumerate() {
             // Iterates over all such elements.
             for (idx, el) in elements.iter().enumerate() {
+                // Only the minimal element can have no subelements.
+                if r != Rank::new(-1) && el.subs.len() == 0 {
+                    return Err(AbstractError::Ranked {
+                        el: ElementRef::new(r, idx),
+                        incidence_type: IncidenceType::Subelement,
+                    });
+                }
+
                 // Iterates over the element's subelements.
                 for &sub in &el.subs {
+                    // Attempts to get the subelement's superelements.
                     if let Some(r_minus_one) = r.try_sub(Rank::new(1)) {
-                        if !self[r_minus_one][sub].sups.contains(&idx) {
-                            return false;
+                        if let Some(sub_el) = self.get_element(&ElementRef::new(r_minus_one, sub)) {
+                            if sub_el.sups.contains(&idx) {
+                                continue;
+                            } else {
+                                // The element contains a subelement, but not viceversa.
+                                return Err(AbstractError::Consistency {
+                                    el: ElementRef::new(r, idx),
+                                    index: sub,
+                                    incidence_type: IncidenceType::Subelement,
+                                });
+                            }
                         }
                     }
+
+                    // We got ourselves an invalid index.
+                    return Err(AbstractError::Index {
+                        el: ElementRef::new(r, idx),
+                        index: sub,
+                        incidence_type: IncidenceType::Subelement,
+                    });
+                }
+
+                // Only the maximal element can have no superelements.
+                if r != self.rank() && el.sups.len() == 0 {
+                    return Err(AbstractError::Ranked {
+                        el: ElementRef::new(r, idx),
+                        incidence_type: IncidenceType::Superelement,
+                    });
+                }
+
+                // Iterates over the element's superelements.
+                for &sup in &el.sups {
+                    // Attempts to get the subelement's superelements.
+                    if let Some(sub_el) = self.get_element(&ElementRef::new(r.plus_one(), sup)) {
+                        if sub_el.subs.contains(&idx) {
+                            continue;
+                        } else {
+                            // The element contains a superelement, but not viceversa.
+                            return Err(AbstractError::Consistency {
+                                el: ElementRef::new(r, idx),
+                                index: sup,
+                                incidence_type: IncidenceType::Superelement,
+                            });
+                        }
+                    }
+
+                    // We got ourselves an invalid index.
+                    return Err(AbstractError::Index {
+                        el: ElementRef::new(r, idx),
+                        index: sup,
+                        incidence_type: IncidenceType::Superelement,
+                    });
                 }
             }
         }
 
-        true
+        Ok(())
     }
 
     /// Determines whether the polytope satisfies the diamond property. A valid
     /// non-fissary polytope should always return `true`.
-    pub fn is_dyadic(&self) -> bool {
+    pub fn is_dyadic(&self) -> AbstractResult {
         #[derive(PartialEq)]
         enum Count {
             Once,
@@ -394,7 +575,7 @@ impl Abstract {
         for r in 1..self.rank().isize() {
             let r = Rank::new(r);
 
-            for el in self[r].iter() {
+            for (idx, el) in self[r].iter().enumerate() {
                 let mut hash_sub_subs = HashMap::new();
 
                 for &sub in &el.subs {
@@ -409,28 +590,45 @@ impl Abstract {
                             Some(Count::Once) => hash_sub_subs.insert(sub_sub, Count::Twice),
 
                             // Found for the third time?! Abort!
-                            Some(Count::Twice) => return false,
+                            Some(Count::Twice) => {
+                                return Err(AbstractError::Dyadic {
+                                    section: Section::new(
+                                        ElementRef::new(r - Rank::new(2), sub_sub),
+                                        ElementRef::new(r, idx),
+                                    ),
+                                    more: true,
+                                });
+                            }
                         };
                     }
                 }
 
                 // If any subsubelement was found only once, this also
                 // violates the diamond property.
-                for (_, count) in hash_sub_subs.into_iter() {
+                for (sub_sub, count) in hash_sub_subs.into_iter() {
                     if count == Count::Once {
-                        return false;
+                        return Err(AbstractError::Dyadic {
+                            section: Section::new(
+                                ElementRef::new(r - Rank::new(2), sub_sub),
+                                ElementRef::new(r, idx),
+                            ),
+                            more: false,
+                        });
                     }
                 }
             }
         }
 
-        true
+        Ok(())
     }
 
     /// Determines whether the polytope is connected. A valid non-compound
     /// polytope should always return `true`.
-    pub fn is_connected(&self) -> bool {
+    pub fn is_connected(&self, _section: Section) -> bool {
         todo!()
+        /*
+        let section = self.get_section(section).unwrap();
+        section.flags().count() == section.oriented_flags().count() */
     }
 
     /// Determines whether the polytope is strongly connected. A valid
@@ -604,20 +802,25 @@ impl Polytope<Abs> for Abstract {
         self.ranks.rank()
     }
 
-    /// Returns a reference to the [`Name`] of the polytope.
+    /// Returns a reference to the [`Name`] of the polytope. This exists only
+    /// for trait purposes.
     fn name(&self) -> &Name<Abs> {
         &self.name
     }
 
-    /// Returns a mutable reference to the [`Name`] of the polytope.
+    /// Returns a mutable reference to the [`Name`] of the polytope. This exists
+    /// only for trait purposes.
     fn name_mut(&mut self) -> &mut Name<Abs> {
         &mut self.name
     }
 
+    /// Returns a reference to `self`. This exists only for trait purposes.
     fn abs(&self) -> &Abstract {
         self
     }
 
+    /// Returns a mutable reference to `self`. This exists only for trait
+    /// purposes.
     fn abs_mut(&mut self) -> &mut Abstract {
         self
     }
@@ -769,12 +972,8 @@ impl Polytope<Abs> for Abstract {
         let name = mem::replace(&mut self.name, Name::Nullitope);
         self.name = name.petrial(self.facet_count());
 
-        // Checks for dyadicity, since sometimes that fails.
-        if self.is_dyadic() {
-            Ok(())
-        } else {
-            Err(())
-        }
+        // Checks for dyadicity, since that sometimes fails.
+        self.is_dyadic().map_err(|_| ())
     }
 
     fn petrie_polygon_with(&self, flag: Flag) -> Option<Self> {
@@ -844,8 +1043,8 @@ impl Polytope<Abs> for Abstract {
     }
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
-    fn element(&self, rank: Rank, idx: usize) -> Option<Self> {
-        Some(ElementHash::from_element(self, rank, idx)?.to_polytope(self))
+    fn element(&self, el: &ElementRef) -> Option<Self> {
+        Some(ElementHash::from_element(self, el)?.to_polytope(self))
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
@@ -983,7 +1182,7 @@ mod tests {
             vec![1],
             "Nullitope element counts don't match expected value."
         );
-        assert!(nullitope.is_valid(), "Nullitope is invalid.");
+        assert!(nullitope.is_valid().is_ok(), "Nullitope is invalid.");
     }
 
     #[test]
@@ -996,7 +1195,7 @@ mod tests {
             vec![1, 1],
             "Point element counts don't match expected value."
         );
-        assert!(point.is_valid(), "Point is invalid.");
+        assert!(point.is_valid().is_ok(), "Point is invalid.");
     }
 
     #[test]
@@ -1009,7 +1208,7 @@ mod tests {
             vec![1, 2, 1],
             "Dyad element counts don't match expected value."
         );
-        assert!(dyad.is_valid(), "Dyad is invalid.");
+        assert!(dyad.is_valid().is_ok(), "Dyad is invalid.");
     }
 
     #[test]
@@ -1024,7 +1223,7 @@ mod tests {
                 "{}-gon element counts don't match expected value.",
                 n
             );
-            assert!(polygon.is_valid(), "{}-gon is invalid.", n);
+            assert!(polygon.is_valid().is_ok(), "{}-gon is invalid.", n);
         }
     }
 
@@ -1055,7 +1254,12 @@ mod tests {
                     m,
                     n
                 );
-                assert!(duopyramid.is_valid(), "{}-{} duopyramid is invalid.", m, n);
+                assert!(
+                    duopyramid.is_valid().is_ok(),
+                    "{}-{} duopyramid is invalid.",
+                    m,
+                    n
+                );
             }
         }
     }
@@ -1079,7 +1283,12 @@ mod tests {
                     m,
                     n
                 );
-                assert!(duoprism.is_valid(), "{}-{} duoprism is invalid.", m, n);
+                assert!(
+                    duoprism.is_valid().is_ok(),
+                    "{}-{} duoprism is invalid.",
+                    m,
+                    n
+                );
             }
         }
     }
@@ -1103,7 +1312,12 @@ mod tests {
                     m,
                     n
                 );
-                assert!(duotegum.is_valid(), "{}-{} duotegum is invalid.", m, n);
+                assert!(
+                    duotegum.is_valid().is_ok(),
+                    "{}-{} duotegum is invalid.",
+                    m,
+                    n
+                );
             }
         }
     }
@@ -1127,7 +1341,12 @@ mod tests {
                     m,
                     n
                 );
-                assert!(duocomb.is_valid(), "{}-{} duocomb is invalid.", m, n);
+                assert!(
+                    duocomb.is_valid().is_ok(),
+                    "{}-{} duocomb is invalid.",
+                    m,
+                    n
+                );
             }
         }
     }
@@ -1160,7 +1379,7 @@ mod tests {
                 );
             }
 
-            assert!(simplex.is_valid(), "{}-simplex is invalid.", n)
+            assert!(simplex.is_valid().is_ok(), "{}-simplex is invalid.", n)
         }
     }
 
@@ -1180,7 +1399,7 @@ mod tests {
                 );
             }
 
-            assert!(hypercube.is_valid(), "{}-hypercube is invalid.", n)
+            assert!(hypercube.is_valid().is_ok(), "{}-hypercube is invalid.", n)
         }
     }
 
@@ -1200,7 +1419,7 @@ mod tests {
                 );
             }
 
-            assert!(orthoplex.is_valid(), "{}-orthoplex is invalid.", n)
+            assert!(orthoplex.is_valid().is_ok(), "{}-orthoplex is invalid.", n)
         }
     }
 
@@ -1225,7 +1444,7 @@ mod tests {
                 En::parse(poly.name(), Default::default())
             );
             assert!(
-                poly.is_valid(),
+                poly.is_valid().is_ok(),
                 "Dual of polytope {} is invalid.",
                 En::parse(poly.name(), Default::default())
             );

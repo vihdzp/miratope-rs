@@ -11,7 +11,11 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use super::{elements::Subsupelements, rank::Rank, Abstract};
+use super::{
+    elements::{ElementRef, Subsupelements},
+    rank::Rank,
+    Abstract,
+};
 use crate::{polytope::Polytope, Float};
 
 /// A [flag](https://polytope.miraheze.org/wiki/Flag) in a polytope. Stores the
@@ -76,10 +80,14 @@ impl Flag {
         // Determines the common elements between the subelements of the element
         // above and the superelements of the element below.
         let below_idx = self.get_or_zero(r_minus_one);
-        let below = polytope.element_ref(r_minus_one, below_idx).unwrap();
+        let below = polytope
+            .get_element(&ElementRef::new(r_minus_one, below_idx))
+            .unwrap();
 
         let above_idx = self.get_or_zero(r_plus_one);
-        let above = polytope.element_ref(r_plus_one, above_idx).unwrap();
+        let above = polytope
+            .get_element(&ElementRef::new(r_plus_one, above_idx))
+            .unwrap();
 
         let common = common(&below.sups.0, &above.subs.0);
 
@@ -526,7 +534,9 @@ impl<'a> OrientedFlagIter<'a> {
         flag_changes: FlagChanges,
         first_flag: OrientedFlag,
     ) -> Self {
-        debug_assert!(polytope.is_bounded(), "Polytope is not bounded.");
+        if cfg!(debug_assertions) {
+            polytope.bounded().unwrap();
+        }
         let rank = polytope.rank();
 
         // Initializes found flags.

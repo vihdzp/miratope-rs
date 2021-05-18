@@ -357,7 +357,7 @@ mod tests {
 
     #[test]
     /// Checks that rank arithmetic is in order.
-    fn rank() {
+    fn rank_arithmetic() {
         assert_eq!(Rank::new(2) + Rank::new(3), Rank::new(5));
         assert_eq!(Rank::new(7) - Rank::new(4), Rank::new(3));
         assert_eq!(Rank::new(-1).try_sub(Rank::new(1)), None);
