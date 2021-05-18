@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, hash::Hash};
 
 use serde::{Deserialize, Serialize};
 
@@ -154,7 +154,7 @@ impl bevy_egui::egui::emath::Numeric for Rank {
 
 /// A `Vec` indexed by [rank](https://polytope.miraheze.org/wiki/Rank). Wraps
 /// around operations that offset by a constant for our own convenience.
-#[derive(Debug, Clone)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct RankVec<T>(pub Vec<T>);
 
 impl<T> RankVec<T> {

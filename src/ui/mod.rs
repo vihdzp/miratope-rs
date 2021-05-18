@@ -337,6 +337,15 @@ pub fn ui(
                             }
                         }
                     }
+
+                    // Outputs the element types, currently just prints to console.
+                    if ui.button("Print el. types").clicked() {
+                        for p in query.iter_mut() {
+                            println!("Print element types");
+
+                            println!("{}", p.print_element_types());
+                        }
+                    }
                 });
 
                 // Prints out properties about the loaded polytope.
