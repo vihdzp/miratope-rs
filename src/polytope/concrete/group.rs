@@ -6,7 +6,7 @@ use super::{convex, cox::CoxMatrix, Concrete};
 
 #[allow(unused_imports)] // Circumvents rust-analyzer bug.
 use crate::cox;
-use crate::geometry::{Matrix, OrdMatrix, OrdPoint, Point, Vector};
+use crate::geometry::{Matrix, MatrixOrd, Point, PointOrd, Vector};
 use crate::{Consts, Float};
 
 use approx::{abs_diff_ne, relative_eq};
@@ -315,7 +315,7 @@ impl Group {
         let mut h_indices = BTreeMap::new();
 
         for (i, h_el) in h.iter().enumerate() {
-            h_indices.insert(OrdMatrix::new(h_el.clone()), i);
+            h_indices.insert(MatrixOrd::new(h_el.clone()), i);
         }
 
         // Converts h into a permutation group.
@@ -327,7 +327,7 @@ impl Group {
             for h_el_2 in &h {
                 perm.push(
                     *h_indices
-                        .get(&OrdMatrix::new(h_el_1 * h_el_2))
+                        .get(&MatrixOrd::new(h_el_1 * h_el_2))
                         .expect("h is not a valid group!"),
                 );
             }
@@ -376,7 +376,7 @@ impl Group {
         let mut points = BTreeSet::new();
 
         for m in self {
-            points.insert(OrdPoint::new(m * &p));
+            points.insert(PointOrd::new(m * &p));
         }
 
         points.into_iter().map(|x| x.0).collect()
@@ -428,10 +428,10 @@ pub struct GenIter {
     /// Stores the elements that have been generated and that can still be
     /// generated again. Is integral for the algorithm to work, as without it,
     /// duplicate group elements will just keep generating forever.
-    elements: BTreeMap<OrdMatrix, usize>,
+    elements: BTreeMap<MatrixOrd, usize>,
 
     /// Stores the elements that haven't yet been processed.
-    queue: VecDeque<OrdMatrix>,
+    queue: VecDeque<MatrixOrd>,
 
     /// Stores the index in (`generators`)[GenGroup.generators] of the generator
     /// that's being checked. All previous once will have already been
@@ -489,13 +489,13 @@ impl GenIter {
     fn new(dim: usize, gens: Vec<Matrix>) -> Self {
         // Initializes the queue with only the identity matrix.
         let mut queue = VecDeque::new();
-        queue.push_back(OrdMatrix::new(Matrix::identity(dim, dim)));
+        queue.push_back(MatrixOrd::new(Matrix::identity(dim, dim)));
 
         // We say that the identity has been found zero times. This is a special
         // case that ensures that neither the identity is queued nor found
         // twice.
         let mut elements = BTreeMap::new();
-        elements.insert(OrdMatrix::new(Matrix::identity(dim, dim)), 0);
+        elements.insert(MatrixOrd::new(Matrix::identity(dim, dim)), 0);
 
         Self {
             dim,
@@ -508,7 +508,7 @@ impl GenIter {
 
     /// Inserts a new element into the group. Returns whether the element is new.
     fn insert(&mut self, el: Matrix) -> bool {
-        let el = OrdMatrix::new(el);
+        let el = MatrixOrd::new(el);
 
         // If the element has been found before.
         if let Some(value) = self.elements.insert(el.clone(), 1) {

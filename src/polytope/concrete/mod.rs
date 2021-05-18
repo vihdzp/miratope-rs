@@ -26,7 +26,7 @@ use super::{
     Polytope,
 };
 use crate::{
-    geometry::{Hyperplane, Hypersphere, Matrix, OrdPoint, Point, Segment, Subspace, Vector},
+    geometry::{Hyperplane, Hypersphere, Matrix, Point, PointOrd, Segment, Subspace, Vector},
     lang::name::{Con, ConData, Name, NameData, Regular},
     ui::camera::ProjectionType,
     Consts, Float,
@@ -227,6 +227,11 @@ impl Concrete {
         } else {
             None
         }
+    }
+
+    pub fn edge_len(&self, idx: usize) -> Option<Float> {
+        let edge = self.abs.get_element(&ElementRef::new(Rank::new(1), idx))?;
+        Some((&self.vertices[edge.subs[0]] - &self.vertices[edge.subs[1]]).norm())
     }
 
     /// Gets the edge lengths of all edges in the polytope, in order.
@@ -746,7 +751,7 @@ impl Concrete {
                 let comps = edge_sub.len() / 2;
 
                 if comps > 1 {
-                    edge_sub.sort_unstable_by_key(|&x| OrdPoint::new(vertices[x].clone()));
+                    edge_sub.sort_unstable_by_key(|&x| PointOrd::new(vertices[x].clone()));
                 }
 
                 for comp in 1..comps {

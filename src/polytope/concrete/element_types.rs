@@ -1,29 +1,71 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
-use crate::polytope::{
-    concrete::Concrete,
-    r#abstract::{
-        elements::ElementRef,
-        rank::{Rank, RankVec},
-    },
-    Polytope,
+use crate::{
+    polytope::{concrete::Concrete, r#abstract::rank::Rank, Polytope},
+    Consts, Float,
 };
+
+use approx::abs_diff_eq;
+use float_ord::FloatOrd;
+
+#[derive(PartialOrd, Ord, PartialEq, Eq, Hash)]
+pub struct ElementCount {
+    /// The index of the type of these elements.
+    type_index: usize,
+
+    /// The number of elements of a given type.
+    count: usize,
+}
+
+pub struct ElementCountBuilder(BTreeMap<usize, usize>);
+
+impl ElementCountBuilder {
+    pub fn new() -> Self {
+        Self(BTreeMap::new())
+    }
+
+    pub fn insert(&mut self, type_index: usize) {
+        if let Some(count) = self.0.get_mut(&type_index) {
+            *count += 1;
+        } else {
+            self.0.insert(type_index, 1);
+        }
+    }
+
+    pub fn build(self) -> ElementData {
+        let mut res = Vec::new();
+        for (type_index, count) in self.0 {
+            res.push(ElementCount { type_index, count });
+        }
+        ElementData::ElementCounts(res)
+    }
+}
 
 /// The info for any of the "element types" in the polytope. We store metadata
 /// about every element of the polytope, and consider these elements as having
 /// the same "type" if the metadata matches up.
 #[derive(PartialEq, Eq, Hash)]
-pub struct ElementData {
-    element_counts: RankVec<usize>,
+pub enum ElementData {
+    /// Every point has the same type for now.
+    Point,
+
+    /// An edge's type is given by its length.
+    Edge(FloatOrd<Float>),
+
+    /// Any other element's type is given by the number of subelements of each
+    /// type that it contains.
+    ElementCounts(Vec<ElementCount>),
 }
 
 impl ElementData {
-    pub fn rank(&self) -> Rank {
-        self.element_counts.rank()
-    }
-
     pub fn facet_count(&self) -> usize {
-        self.element_counts[self.rank() - Rank::new(1)]
+        match self {
+            ElementData::Point => 1,
+            ElementData::Edge(_) => 2,
+            ElementData::ElementCounts(element_counts) => {
+                element_counts.iter().map(|el_count| el_count.count).sum()
+            }
+        }
     }
 }
 
@@ -42,27 +84,83 @@ impl ElementType {
     }
 }
 
-fn get_data(el: &ElementRef, polytope: &Concrete) -> ElementData {
-    ElementData {
-        element_counts: polytope.element(el).unwrap().el_counts(),
-    }
-}
+// We'll move this over to the translation module... some day.
+const EL_NAMES: [&str; 12] = [
+    "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta", "Xenna",
+    "Daka", "Henda",
+];
+
+const EL_SUFFIXES: [&str; 12] = [
+    "", "", "gon", "hedron", "choron", "teron", "peton", "exon", "zetton", "yotton", "xennon",
+    "dakon",
+];
 
 impl Concrete {
     /// Gets the element "types" of a polytope.
-    fn get_element_types(&self) -> RankVec<Vec<ElementType>> {
+    fn get_element_types(&self) -> Vec<Vec<ElementType>> {
         use std::collections::hash_map::Entry;
 
         let rank = self.rank();
-        let mut output = RankVec::with_capacity(rank);
+        let mut output = Vec::with_capacity(rank.usize());
 
-        for (r, elements) in self.abs.ranks.iter().rank_enumerate() {
+        // There's only one point type, for now.
+        output.push(vec![ElementType {
+            indices: (0..self.vertex_count()).collect(),
+            data: ElementData::Point,
+        }]);
+
+        // Gets the edge lengths of all edges in the polytope.
+        let mut edge_lengths: BTreeMap<FloatOrd<Float>, Vec<usize>> = BTreeMap::new();
+        let edge_count = self.el_count(Rank::new(1));
+
+        for edge_idx in 0..edge_count {
+            let len = FloatOrd(self.edge_len(edge_idx).unwrap());
+
+            // Searches for the greatest length smaller than the current one.
+            if let Some((prev_len, indices)) = edge_lengths.range_mut(..len).next_back() {
+                if abs_diff_eq!(prev_len.0, len.0, epsilon = Float::EPS) {
+                    indices.push(edge_idx);
+                    continue;
+                }
+            }
+
+            // Searches for the smallest length greater than the current one.
+            if let Some((next_len, indices)) = edge_lengths.range_mut(len..).next() {
+                if abs_diff_eq!(next_len.0, len.0, epsilon = Float::EPS) {
+                    indices.push(edge_idx);
+                    continue;
+                }
+            }
+
+            edge_lengths.insert(len, vec![edge_idx]);
+        }
+
+        // Creates a map from edge indices to indices of types.
+        let mut prev_types = Vec::new();
+        let mut edge_types = Vec::new();
+        prev_types.resize(edge_count, 0);
+        for (type_index, (len, indices)) in edge_lengths.into_iter().enumerate() {
+            for &idx in &indices {
+                prev_types[idx] = type_index;
+            }
+            edge_types.push(ElementType {
+                indices,
+                data: ElementData::Edge(len),
+            })
+        }
+        output.push(edge_types);
+
+        for elements in self.abs.ranks.iter().skip(3) {
             // A map from element data to the indices of the elements with such data.
             let mut types = HashMap::new();
 
             // We build the map.
-            for idx in 0..elements.len() {
-                let data = get_data(&ElementRef::new(r, idx), self);
+            for (idx, el) in elements.iter().enumerate() {
+                let mut element_count_builder = ElementCountBuilder::new();
+                for &sub in &el.subs {
+                    element_count_builder.insert(prev_types[sub]);
+                }
+                let data = element_count_builder.build();
 
                 match types.entry(data) {
                     Entry::Vacant(entry) => {
@@ -76,7 +174,12 @@ impl Concrete {
 
             // We create the element types from the map.
             let mut element_types = Vec::with_capacity(types.len());
-            for (data, indices) in types {
+            prev_types = Vec::new(); // This can probably be taken out.
+            prev_types.resize(elements.len(), 0);
+            for (type_index, (data, indices)) in types.into_iter().enumerate() {
+                for &idx in &indices {
+                    prev_types[idx] = type_index;
+                }
                 element_types.push(ElementType { indices, data });
             }
 
@@ -87,57 +190,41 @@ impl Concrete {
     }
 
     pub fn print_element_types(&self) -> String {
-        let types = self.get_element_types();
+        let mut type_iter = self.get_element_types().into_iter().enumerate();
         let mut output = String::new();
 
-        // We'll move this over to the translation module... some day.
-        let el_names = RankVec(vec![
-            "", "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta",
-            "Xenna", "Daka", "Henda",
-        ]);
-        let el_suffixes = RankVec(vec![
-            "", "", "", "gon", "hedron", "choron", "teron", "peton", "exon", "zetton", "yotton",
-            "xennon", "dakon",
-        ]);
-
-        output.push_str(&el_names[Rank::new(0)].to_string());
+        // Prints points.
+        let (r, types) = type_iter.next().unwrap();
+        output.push_str(&EL_NAMES[r].to_string());
         output.push('\n');
-        for t in &types[Rank::new(0)] {
+        for t in types {
             output.push_str(&t.count().to_string());
             output.push('\n');
         }
         output.push('\n');
 
-        output.push_str(&el_names[Rank::new(1)].to_string());
+        // Prints edges.
+        let (r, types) = type_iter.next().unwrap();
+        output.push_str(&EL_NAMES[r].to_string());
         output.push('\n');
-        for t in &types[Rank::new(1)] {
+        for t in types {
             output.push_str(&format!("{}\n", t.count()));
         }
         output.push('\n');
 
-        for d in Rank::range_iter(Rank::new(2), self.rank()) {
-            output.push_str(&el_names[d].to_string());
+        // Prints everything else.
+        for (d, types) in type_iter {
+            output.push_str(&EL_NAMES[d].to_string());
             output.push('\n');
-            for t in &types[d] {
+            for t in types {
                 output.push_str(&format!(
                     "{} × {}-{}\n",
                     t.count(),
                     t.data.facet_count(),
-                    el_suffixes[d]
+                    EL_SUFFIXES[d]
                 ));
             }
             output.push('\n');
-        }
-
-        // This doesn't actually print components lol.
-        output.push_str("Components:\n");
-        for t in &types[self.rank()] {
-            output.push_str(&format!(
-                "{} × {}-{}\n",
-                t.count(),
-                t.data.facet_count(),
-                el_suffixes[self.rank()]
-            ));
         }
 
         output

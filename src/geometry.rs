@@ -382,11 +382,11 @@ type MatrixMxN<R, C> = nalgebra::Matrix<Float, R, C, VecStorage<Float, R, C>>;
 /// This struct can be used to build a `HashMap` of points or matrices in a way
 /// that's resistant to floating point errors.
 #[derive(Clone, Debug)]
-pub struct OrdMatrixMxN<R: Dim, C: Dim>(pub MatrixMxN<R, C>)
+pub struct MatrixOrdMxN<R: Dim, C: Dim>(pub MatrixMxN<R, C>)
 where
     VecStorage<Float, R, C>: Storage<Float, R, C>;
 
-impl<R: Dim, C: Dim> PartialEq for OrdMatrixMxN<R, C>
+impl<R: Dim, C: Dim> PartialEq for MatrixOrdMxN<R, C>
 where
     VecStorage<Float, R, C>: Storage<Float, R, C>,
 {
@@ -407,9 +407,9 @@ where
 
 /// Equality on `OrdMatrices` should be an equality relation, as long as the
 /// distance between the `OrdMatrices` you're comparing is "small".
-impl<R: Dim, C: Dim> Eq for OrdMatrixMxN<R, C> where VecStorage<Float, R, C>: Storage<Float, R, C> {}
+impl<R: Dim, C: Dim> Eq for MatrixOrdMxN<R, C> where VecStorage<Float, R, C>: Storage<Float, R, C> {}
 
-impl<R: Dim, C: Dim> PartialOrd for OrdMatrixMxN<R, C>
+impl<R: Dim, C: Dim> PartialOrd for MatrixOrdMxN<R, C>
 where
     VecStorage<Float, R, C>: Storage<Float, R, C>,
 {
@@ -428,7 +428,7 @@ where
     }
 }
 
-impl<R: Dim, C: Dim> Ord for OrdMatrixMxN<R, C>
+impl<R: Dim, C: Dim> Ord for MatrixOrdMxN<R, C>
 where
     VecStorage<Float, R, C>: Storage<Float, R, C>,
 {
@@ -437,28 +437,28 @@ where
     }
 }
 
-impl<R: Dim, C: Dim> OrdMatrixMxN<R, C>
+impl<R: Dim, C: Dim> MatrixOrdMxN<R, C>
 where
     VecStorage<Float, R, C>: Storage<Float, R, C>,
 {
-    /// Initializes a new `OrdMatrix` from a `Matrix`.
+    /// Initializes a new `MatrixOrd` from a `Matrix`.
     pub fn new(mat: MatrixMxN<R, C>) -> Self {
         Self(mat)
     }
 
-    /// Iterates over the entries of the `OrdMatrix`.
+    /// Iterates over the entries of the `MatrixOrd`.
     pub fn iter(&self) -> nalgebra::iter::MatrixIter<Float, R, C, VecStorage<Float, R, C>> {
         self.0.iter()
     }
 }
 
 /// A matrix ordered by fuzzy lexicographic ordering. For more info, see
-/// [`OrdMatrixMxN`].
-pub type OrdMatrix = OrdMatrixMxN<Dynamic, Dynamic>;
+/// [`MatrixOrdMxN`].
+pub type MatrixOrd = MatrixOrdMxN<Dynamic, Dynamic>;
 
 /// A point ordered by fuzzy lexicographic ordering. For more info, see
-/// [`OrdMatrixMxN`].
-pub type OrdPoint = OrdMatrixMxN<Dynamic, U1>;
+/// [`MatrixOrdMxN`].
+pub type PointOrd = MatrixOrdMxN<Dynamic, U1>;
 
 #[cfg(test)]
 mod tests {
