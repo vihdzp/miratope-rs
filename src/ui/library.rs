@@ -156,10 +156,7 @@ impl Name {
 #[derive(Serialize, Deserialize)]
 pub enum Library {
     /// A folder whose contents have not yet been read.
-    UnloadedFolder {
-        folder_name: String,
-        name: Name,
-    },
+    UnloadedFolder { folder_name: String, name: Name },
 
     /// A folder whose contents have been read.
     LoadedFolder {
@@ -169,11 +166,9 @@ pub enum Library {
     },
 
     /// A file that can be loaded into Miratope.
-    File {
-        file_name: String,
-        name: Name,
-    },
+    File { file_name: String, name: Name },
 
+    /// Any special file in the library.
     Special(SpecialLibrary),
 }
 
@@ -237,33 +232,40 @@ impl Library {
     }
 
     /// Creates a new unloaded folder from a given path.
-    pub fn new_folder(path: &impl AsRef<OsStr>) -> Self {
+    pub fn new_folder(path: &impl AsRef<OsStr>) -> Option<Self> {
+        // If the path doesn't exist, we return `None`.
         let path = PathBuf::from(&path);
-        assert!(path.is_dir(), "Path {:?} not a directory!", path);
+        if !path.exists() {
+            return None;
+        }
+
+        debug_assert!(path.is_dir(), "Path {:?} not a directory!", path);
 
         // Attempts to read from the .name file.
-        if let Ok(Ok(name)) = fs::read(path.join(".name"))
-            .map(|file| ron::from_str(&String::from_utf8(file).unwrap()))
-        {
-            Self::UnloadedFolder {
-                folder_name: path_to_str(path),
-                name,
+        Some(
+            if let Ok(Ok(name)) = fs::read(path.join(".name"))
+                .map(|file| ron::from_str(&String::from_utf8(file).unwrap()))
+            {
+                Self::UnloadedFolder {
+                    folder_name: path_to_str(path),
+                    name,
+                }
             }
-        }
-        // Else, takes the name from the folder itself.
-        else {
-            let name = Name::Literal(String::from(
-                path.file_name()
-                    .map(|name| name.to_str())
-                    .flatten()
-                    .unwrap_or(""),
-            ));
+            // Else, takes the name from the folder itself.
+            else {
+                let name = Name::Literal(String::from(
+                    path.file_name()
+                        .map(|name| name.to_str())
+                        .flatten()
+                        .unwrap_or(""),
+                ));
 
-            Self::UnloadedFolder {
-                folder_name: String::from(path.file_name().unwrap().to_str().unwrap()),
-                name,
-            }
-        }
+                Self::UnloadedFolder {
+                    folder_name: String::from(path.file_name().unwrap().to_str().unwrap()),
+                    name,
+                }
+            },
+        )
     }
 
     /// Reads a folder's data from the `.folder` file. If it doesn't exist, it
@@ -290,7 +292,7 @@ impl Library {
 
                     // Adds a new unloaded folder.
                     if path.is_dir() {
-                        contents.push(Self::new_folder(path));
+                        contents.push(Self::new_folder(path).unwrap());
                     }
                     // Adds a new file.
                     else {
