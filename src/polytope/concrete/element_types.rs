@@ -82,6 +82,14 @@ impl ElementType {
     pub fn count(&self) -> usize {
         self.indices.len()
     }
+
+    pub fn len(&self) -> Float {
+        if let ElementData::Edge(len) = self.data {
+            len.0
+        } else {
+            panic!("Expected edge!")
+        }
+    }
 }
 
 // We'll move this over to the translation module... some day.
@@ -189,44 +197,42 @@ impl Concrete {
         output
     }
 
-    pub fn print_element_types(&self) -> String {
-        let mut type_iter = self.get_element_types().into_iter().enumerate();
-        let mut output = String::new();
+    pub fn print_element_types(&self) {
+        // An iterator over the element types of each rank.
+        let mut type_iter = self
+            .get_element_types()
+            .into_iter()
+            .enumerate()
+            .take(self.rank().usize());
 
         // Prints points.
         let (r, types) = type_iter.next().unwrap();
-        output.push_str(&EL_NAMES[r].to_string());
-        output.push('\n');
+        println!("{}", EL_NAMES[r]);
         for t in types {
-            output.push_str(&t.count().to_string());
-            output.push('\n');
+            println!("{}", t.count());
         }
-        output.push('\n');
+        println!();
 
         // Prints edges.
         let (r, types) = type_iter.next().unwrap();
-        output.push_str(&EL_NAMES[r].to_string());
-        output.push('\n');
+        println!("{}", EL_NAMES[r]);
         for t in types {
-            output.push_str(&format!("{}\n", t.count()));
+            println!("{} × length {}", t.count(), t.len());
         }
-        output.push('\n');
+        println!();
 
         // Prints everything else.
         for (d, types) in type_iter {
-            output.push_str(&EL_NAMES[d].to_string());
-            output.push('\n');
+            println!("{}", EL_NAMES[d]);
             for t in types {
-                output.push_str(&format!(
-                    "{} × {}-{}\n",
+                println!(
+                    "{} × {}-{}",
                     t.count(),
                     t.data.facet_count(),
                     EL_SUFFIXES[d]
-                ));
+                );
             }
-            output.push('\n');
+            println!();
         }
-
-        output
     }
 }
