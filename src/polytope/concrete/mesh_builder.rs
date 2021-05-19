@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::Concrete;
 use crate::{
-    geometry::{Point, Subspace},
+    geometry::{Point, Subspace, Vector},
     polytope::r#abstract::{
         elements::{ElementList, Subsupelements},
         rank::Rank,
@@ -309,9 +309,10 @@ impl<'a> MeshBuilder<'a> {
             .vertices
             .iter()
             .chain(self.extra_vertices.iter());
+        let dim = self.concrete.dim().unwrap_or(0);
 
         // If the polytope is at most 3D, we just embed it into 3D space.
-        if projection_type.is_orthogonal() || self.concrete.dim().unwrap_or(0) <= 3 {
+        if projection_type.is_orthogonal() || dim <= 3 {
             vert_iter
                 .map(|point| {
                     let mut iter = point.iter().copied().take(3);
@@ -325,11 +326,14 @@ impl<'a> MeshBuilder<'a> {
         // Else, we project it down.
         else {
             // Distance from the projection planes.
-            const DIST: Float = 2.0;
+            let mut direction = Vector::zeros(dim);
+            direction[3] = 1.0;
+            let (min, max) = self.concrete.minmax(&direction).unwrap();
+            let dist = (min - 1.0).abs().max(max + 1.0).abs();
 
             vert_iter
                 .map(|point| {
-                    let factor: Float = point.iter().skip(3).map(|x| x + DIST).product();
+                    let factor: Float = point.iter().skip(3).map(|x| x + dist).product();
 
                     // We scale the first three coordinates accordingly.
                     let mut iter = point.iter().copied().take(3);
