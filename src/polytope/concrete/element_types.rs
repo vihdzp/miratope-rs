@@ -1,3 +1,5 @@
+//! The code used to tally up the "element types" in a polytope.
+
 use std::collections::{BTreeMap, HashMap};
 
 use crate::{
@@ -109,13 +111,22 @@ impl Concrete {
         use std::collections::hash_map::Entry;
 
         let rank = self.rank();
-        let mut output = Vec::with_capacity(rank.usize());
+        let mut output;
+        if let Some(rank_usize) = rank.try_usize() {
+            output = Vec::with_capacity(rank_usize);
+        } else {
+            return Vec::new();
+        }
 
         // There's only one point type, for now.
         output.push(vec![ElementType {
             indices: (0..self.vertex_count()).collect(),
             data: ElementData::Point,
         }]);
+
+        if rank == Rank::new(0) {
+            return output;
+        }
 
         // Gets the edge lengths of all edges in the polytope.
         let mut edge_lengths: BTreeMap<FloatOrd<Float>, Vec<usize>> = BTreeMap::new();
@@ -158,7 +169,7 @@ impl Concrete {
         }
         output.push(edge_types);
 
-        for elements in self.abs.ranks.iter().skip(3) {
+        for elements in self.abs.ranks.iter().take(self.rank().0).skip(3) {
             // A map from element data to the indices of the elements with such data.
             let mut types = HashMap::new();
 
@@ -199,27 +210,29 @@ impl Concrete {
 
     pub fn print_element_types(&self) {
         // An iterator over the element types of each rank.
-        let mut type_iter = self
-            .get_element_types()
-            .into_iter()
-            .enumerate()
-            .take(self.rank().usize());
+        let mut type_iter = self.get_element_types().into_iter().enumerate();
 
         // Prints points.
-        let (r, types) = type_iter.next().unwrap();
-        println!("{}", EL_NAMES[r]);
-        for t in types {
-            println!("{}", t.count());
+        if let Some((r, types)) = type_iter.next() {
+            println!("{}", EL_NAMES[r]);
+            for t in types {
+                println!("{}", t.count());
+            }
+            println!();
+        } else {
+            return;
         }
-        println!();
 
         // Prints edges.
-        let (r, types) = type_iter.next().unwrap();
-        println!("{}", EL_NAMES[r]);
-        for t in types {
-            println!("{} × length {}", t.count(), t.len());
+        if let Some((r, types)) = type_iter.next() {
+            println!("{}", EL_NAMES[r]);
+            for t in types {
+                println!("{} × length {}", t.count(), t.len());
+            }
+            println!();
+        } else {
+            return;
         }
-        println!();
 
         // Prints everything else.
         for (d, types) in type_iter {
