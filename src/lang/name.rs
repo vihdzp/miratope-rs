@@ -366,7 +366,7 @@ impl<T: NameType> Name<T> {
                 facet_count: n,
                 rank: _,
             } => *n,
-            Name::Simplex { regular: _, rank } => rank.0,
+            Name::Simplex { regular: _, rank } => rank.plus_one_usize(),
             Name::Hyperblock { regular: _, rank } => 2u32.pow(rank.u32()) as usize,
             Name::Orthoplex { regular: _, rank } => rank.usize() * 2,
 
@@ -436,7 +436,7 @@ impl<T: NameType> Name<T> {
                 facet_count: n,
                 rank: _,
             } => *n,
-            Name::Simplex { regular: _, rank } => rank.0,
+            Name::Simplex { regular: _, rank } => rank.plus_one_usize(),
             Name::Hyperblock { regular: _, rank } => rank.usize() * 2,
             Name::Orthoplex { regular: _, rank } => 2u32.pow(rank.u32()) as usize,
 

@@ -1372,7 +1372,7 @@ mod tests {
             for k in Rank::range_inclusive_iter(Rank::new(-1), n) {
                 assert_eq!(
                     simplex.el_count(k),
-                    choose(n.0, k.0),
+                    choose(n.plus_one_usize(), k.plus_one_usize()),
                     "{}-simplex {}-element counts don't match up",
                     n,
                     k
@@ -1412,7 +1412,7 @@ mod tests {
             for k in Rank::range_iter(Rank::new(-1), n) {
                 assert_eq!(
                     orthoplex.el_count(k),
-                    choose(n.usize(), k.0) * 2u32.pow(k.0 as u32) as usize,
+                    choose(n.usize(), k.plus_one_usize()) * 2u32.pow(k.plus_one_u32()) as usize,
                     "{}-orthoplex {}-element counts don't match up",
                     n,
                     k

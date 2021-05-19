@@ -409,12 +409,14 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         if rank == Rank::new(-1) {
             Self::nullitope()
         } else {
-            Self::multipyramid(&vec![&Self::point(); rank.0]).with_name(Name::simplex(
-                T::DataRegular::new(Regular::Yes {
-                    center: vec![0.0; rank.usize()].into(),
-                }),
-                rank,
-            ))
+            Self::multipyramid(&vec![&Self::point(); rank.plus_one_usize()]).with_name(
+                Name::simplex(
+                    T::DataRegular::new(Regular::Yes {
+                        center: vec![0.0; rank.usize()].into(),
+                    }),
+                    rank,
+                ),
+            )
         }
     }
 

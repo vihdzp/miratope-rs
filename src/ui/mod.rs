@@ -339,7 +339,7 @@ pub fn ui(
                     }
 
                     // Outputs the element types, currently just prints to console.
-                    if ui.button("Print el. types").clicked() {
+                    if ui.button("Counts").clicked() {
                         for p in query.iter_mut() {
                             p.print_element_types();
                         }
@@ -367,6 +367,13 @@ pub fn ui(
                             } else {
                                 println!("The polytope has no volume.");
                             }
+                        }
+                    }
+
+                    // Gets the number of flags of the polytope.
+                    if ui.button("Flag count").clicked() {
+                        for p in query.iter_mut() {
+                            println!("The polytope has {} flags.", p.flags().count())
                         }
                     }
                 });

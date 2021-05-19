@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// Externally, it behaves as a number from -1 onwards. Internally, it contains
 /// a signed integer, representing the rank plus 1.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug, Hash, Serialize, Deserialize)]
-pub struct Rank(pub usize);
+pub struct Rank(usize);
 
 impl Rank {
     /// Initializes a `Rank` from an `isize`.
@@ -49,6 +49,17 @@ impl Rank {
     /// Adds one to the rank.
     pub const fn plus_one(&self) -> Self {
         Self(self.0 + 1)
+    }
+
+    /// Adds one to the rank, returns it as a `usize`. This is equivalent to
+    /// simply getting the internal value.
+    pub const fn plus_one_usize(&self) -> usize {
+        self.0
+    }
+
+    /// Adds one to the rank, returns it as a `u32`.
+    pub const fn plus_one_u32(&self) -> u32 {
+        self.0 as u32
     }
 
     /// Subtracts one from the rank.
@@ -170,7 +181,7 @@ impl<T> RankVec<T> {
 
     /// Constructs a new, empty `RankVec<T>` with the capacity.
     pub fn with_capacity(rank: Rank) -> Self {
-        RankVec(Vec::with_capacity(rank.0 + 1))
+        RankVec(Vec::with_capacity(rank.plus_one_usize() + 1))
     }
 
     /// Returns the greatest rank stored in the array.

@@ -629,7 +629,7 @@ pub trait Language: Prefix {
 
     /// The name for a simplex with a given rank.
     fn simplex(rank: Rank, options: Options) -> String {
-        Self::generic(rank.0, rank, options)
+        Self::generic(rank.plus_one_usize(), rank, options)
     }
 
     /// The name for a hyperblock with a given rank.
