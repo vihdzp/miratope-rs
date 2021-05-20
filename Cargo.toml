@@ -10,7 +10,6 @@ edition = "2018"
 
 [dependencies]
 approx = "0.4"
-bevy_egui = "0.4"
 dyn-clone = "1.0"
 factorial = "0.2"
 float-ord = "0.3"
@@ -30,17 +29,23 @@ webbrowser = "0.5"
 xml-rs = "0.8"
 zip = "0.5"
 
+# Use latest version of Bevy (might cause breakage!)
+[dependencies.bevy_egui]
+git = "https://github.com/jakobhellermann/bevy_egui"
+branch = "bevy-main"
+
 [dependencies.bevy]
-version = "0.5"
+git = "https://github.com/bevyengine/bevy"
+branch = "main"
 default-features = false
 features = ["bevy_gltf", "bevy_winit", "bevy_wgpu", "render", "bevy_dynamic_plugin", "hdr", "x11"]
 
 [patch.crates-io]
-# Bumps egui to 0.12.0.
-bevy_egui = { git = "https://github.com/ndarilek/bevy_egui", branch = "main" }
+# Patches egui issue #404.
+egui = { git = "https://github.com/emilk/egui" }
 
 # Fixes winit issue #1779.
-winit = { git = 'https://github.com/OfficialURL/winit', rev = '078b9719cc3ba06630291d5bc05c90787bd84c4f' }
+winit = { git = 'https://github.com/OfficialURL/winit' }
 
 [profile.release]
 lto = "thin"

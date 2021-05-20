@@ -23,7 +23,7 @@ pub fn build_no_cull_pipeline(shaders: &mut Assets<Shader>) -> PipelineDescripto
     PipelineDescriptor {
         primitive: PrimitiveState {
             front_face: FrontFace::Ccw,
-            cull_mode: CullMode::None,
+            cull_mode: None,
             ..Default::default()
         },
         depth_stencil: Some(DepthStencilState {
@@ -41,20 +41,21 @@ pub fn build_no_cull_pipeline(shaders: &mut Assets<Shader>) -> PipelineDescripto
                 slope_scale: 0.0,
                 clamp: 0.0,
             },
-            clamp_depth: false,
         }),
         color_target_states: vec![ColorTargetState {
             format: TextureFormat::default(),
-            color_blend: BlendState {
-                src_factor: BlendFactor::SrcAlpha,
-                dst_factor: BlendFactor::OneMinusSrcAlpha,
-                operation: BlendOperation::Add,
-            },
-            alpha_blend: BlendState {
-                src_factor: BlendFactor::One,
-                dst_factor: BlendFactor::One,
-                operation: BlendOperation::Add,
-            },
+            blend: Some(BlendState {
+                alpha: BlendComponent {
+                    src_factor: BlendFactor::One,
+                    dst_factor: BlendFactor::One,
+                    operation: BlendOperation::Add,
+                },
+                color: BlendComponent {
+                    src_factor: BlendFactor::SrcAlpha,
+                    dst_factor: BlendFactor::OneMinusSrcAlpha,
+                    operation: BlendOperation::Add,
+                },
+            }),
             write_mask: ColorWrite::ALL,
         }],
         ..PipelineDescriptor::new(ShaderStages {

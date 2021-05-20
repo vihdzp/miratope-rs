@@ -119,6 +119,9 @@ impl Concrete {
     /// Builds the star polygon `{n / d}`. with unit circumradius. If `n` and `d`
     /// have a common factor, the result is a compound.
     pub fn star_polygon(n: usize, d: usize) -> Self {
+        assert!(n >= 2);
+        assert!(d >= 1);
+
         use gcd::Gcd;
 
         let gcd = n.gcd(d);
