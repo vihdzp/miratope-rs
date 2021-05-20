@@ -46,13 +46,13 @@ pub fn build_no_cull_pipeline(shaders: &mut Assets<Shader>) -> PipelineDescripto
             format: TextureFormat::default(),
             blend: Some(BlendState {
                 alpha: BlendComponent {
-                    src_factor: BlendFactor::SrcAlpha,
-                    dst_factor: BlendFactor::OneMinusSrcAlpha,
+                    src_factor: BlendFactor::One,
+                    dst_factor: BlendFactor::One,
                     operation: BlendOperation::Add,
                 },
                 color: BlendComponent {
-                    src_factor: BlendFactor::One,
-                    dst_factor: BlendFactor::One,
+                    src_factor: BlendFactor::SrcAlpha,
+                    dst_factor: BlendFactor::OneMinusSrcAlpha,
                     operation: BlendOperation::Add,
                 },
             }),

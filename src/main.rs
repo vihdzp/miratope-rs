@@ -200,10 +200,12 @@ fn setup(
         .insert(poly);
 
     // Light source
+    /* 
     commands.spawn_bundle(PointLightBundle {
         transform: Transform::from_translation(Vec3::new(-2.0, 2.5, 2.0)),
         ..Default::default()
-    });
+    }); 
+    */
 
     // Camera anchor
     commands
