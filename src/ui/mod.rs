@@ -502,8 +502,10 @@ pub fn ui(
     // Shows the polytope library.
     if let Some(library) = &mut *library {
         egui::SidePanel::left("side_panel", 350.0).show(ctx, |ui| {
+            // A container that can only be resized horizontally.
             egui::containers::Resize::default()
                 .min_height(ui.available_size().y)
+                .max_size(ui.available_size())
                 .show(ui, |ui| {
                     egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
                         match library.show_root(ui, *selected_language) {
@@ -523,31 +525,50 @@ pub fn ui(
 
                             // Loads a special polytope.
                             ShowResult::Special(special) => match special {
+                                // Loads a regular star polygon.
                                 SpecialLibrary::Polygon(n, d) => {
                                     if let Some(mut p) = query.iter_mut().next() {
                                         *p = Concrete::star_polygon(n, d);
                                     }
                                 }
+                                // Loads a uniform polygonal prism.
                                 SpecialLibrary::Prism(n, d) => {
                                     if let Some(mut p) = query.iter_mut().next() {
                                         *p = Concrete::uniform_prism(n, d);
                                     }
                                 }
+                                // Loads a uniform polygonal antiprism.
                                 SpecialLibrary::Antiprism(n, d) => {
                                     if let Some(mut p) = query.iter_mut().next() {
                                         *p = Concrete::uniform_antiprism(n, d);
                                     }
                                 }
+                                // Loads a (uniform 4D) duoprism.
+                                SpecialLibrary::Duoprism(n1, d1, n2, d2) => {
+                                    if let Some(mut p) = query.iter_mut().next() {
+                                        let p1 = Concrete::star_polygon(n1, d1);
+
+                                        if n1 == n2 && d1 == d2 {
+                                            *p = Concrete::duoprism(&p1, &p1);
+                                        } else {
+                                            let p2 = Concrete::star_polygon(n2, d2);
+                                            *p = Concrete::duoprism(&p1, &p2);
+                                        }
+                                    }
+                                }
+                                // Loads a simplex with a given rank.
                                 SpecialLibrary::Simplex(rank) => {
                                     if let Some(mut p) = query.iter_mut().next() {
                                         *p = Concrete::simplex(rank);
                                     }
                                 }
+                                // Loads a hypercube with a given rank.
                                 SpecialLibrary::Hypercube(rank) => {
                                     if let Some(mut p) = query.iter_mut().next() {
                                         *p = Concrete::hypercube(rank);
                                     }
                                 }
+                                // Loads an orthoplex with a given rank.
                                 SpecialLibrary::Orthoplex(rank) => {
                                     if let Some(mut p) = query.iter_mut().next() {
                                         *p = Concrete::orthoplex(rank);

@@ -177,7 +177,7 @@ fn setup(
         // Mesh
         .insert_bundle(PbrNoBackfaceBundle {
             mesh: meshes.add(poly.get_mesh(ProjectionType::Perspective)),
-            material: materials.add(Color::rgb(0.93, 0.5, 0.93).into()),
+            material: materials.add(Color::rgb(1.0, 1.0, 1.0).into()),
             visible: Visible {
                 is_visible: false,
                 ..Default::default()
@@ -200,11 +200,11 @@ fn setup(
         .insert(poly);
 
     // Light source
-    /* 
+    /*
     commands.spawn_bundle(PointLightBundle {
         transform: Transform::from_translation(Vec3::new(-2.0, 2.5, 2.0)),
         ..Default::default()
-    }); 
+    });
     */
 
     // Camera anchor

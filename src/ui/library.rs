@@ -27,23 +27,26 @@ use strum_macros::Display;
 /// [`ui`](crate::ui::ui) system, which then actually loads the polytope.
 #[derive(Clone, Serialize, Deserialize, Debug, Display)]
 pub enum SpecialLibrary {
-    /// Allows one to select a regular polygon.
+    /// A regular polygon.
     #[strum(serialize = "Regular polygon")]
     Polygon(usize, usize),
 
-    /// Allows one to select a (uniform 3D) prism.
+    /// A (uniform 3D) prism.
     Prism(usize, usize),
 
-    /// Allows one to select a (uniform 3D) antiprism.
+    /// A (uniform 3D) antiprism.
     Antiprism(usize, usize),
 
-    /// Allows one to select a simplex.
+    /// A (4D uniform) duoprism.
+    Duoprism(usize, usize, usize, usize),
+
+    /// A simplex.
     Simplex(Rank),
 
-    /// Allows one to select a hypercube.
+    /// A hypercube.
     Hypercube(Rank),
 
-    /// Allows one to select an orthoplex.
+    /// An orthoplex.
     Orthoplex(Rank),
 }
 
@@ -110,6 +113,47 @@ impl SpecialLibrary {
                 }
             }
 
+            // An step prism based on two uniform polygons..
+            Self::Duoprism(n1, d1, n2, d2) => {
+                let mut clicked = false;
+
+                ui.horizontal(|ui| {
+                    clicked = ui.button(text).clicked();
+
+                    // Number of sides.
+                    ui.label("n₁:");
+                    ui.add(
+                        egui::DragValue::new(n1)
+                            .speed(0.25)
+                            .clamp_range(2..=usize::MAX),
+                    );
+
+                    // Turning number.
+                    let max_n1 = *n1 / 2;
+                    ui.label("d₁:");
+                    ui.add(egui::DragValue::new(d1).speed(0.25).clamp_range(1..=max_n1));
+
+                    // Number of sides.
+                    ui.label("n₂:");
+                    ui.add(
+                        egui::DragValue::new(n2)
+                            .speed(0.25)
+                            .clamp_range(2..=usize::MAX),
+                    );
+
+                    // Turning number.
+                    let max_n2 = *n2 / 2;
+                    ui.label("d₂:");
+                    ui.add(egui::DragValue::new(d2).speed(0.25).clamp_range(1..=max_n2));
+                });
+
+                if clicked {
+                    ShowResult::Special(self.clone())
+                } else {
+                    ShowResult::None
+                }
+            }
+
             // A simplex, hypercube, or orthoplex of a given rank.
             Self::Simplex(rank) | Self::Hypercube(rank) | Self::Orthoplex(rank) => {
                 let mut clicked = false;
@@ -119,7 +163,7 @@ impl SpecialLibrary {
 
                     // Rank.
                     ui.label("Rank:");
-                    ui.add(egui::DragValue::new(rank).speed(0.1).clamp_range(-1..=20));
+                    ui.add(egui::DragValue::new(rank).speed(0.05).clamp_range(-1..=20));
                 });
 
                 if clicked {

@@ -544,7 +544,7 @@ impl Concrete {
             Self::duopyramid_vertices(&p.vertices, &q.vertices, height, false),
             Abstract::duopyramid(&p.abs, &q.abs),
         )
-        .with_name(Name::Multipyramid(vec![p.name.clone(), q.name.clone()]))
+        .with_name(Name::multipyramid(vec![p.name.clone(), q.name.clone()]))
     }
 
     /// Computes the volume of a polytope by adding up the contributions of all
@@ -954,7 +954,7 @@ impl Polytope<Con> for Concrete {
             Self::duoprism_vertices(&p.vertices, &q.vertices),
             Abstract::duoprism(&p.abs, &q.abs),
         )
-        .with_name(Name::Multiprism(vec![p.name.clone(), q.name.clone()]))
+        .with_name(Name::multiprism(vec![p.name.clone(), q.name.clone()]))
     }
 
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
@@ -970,7 +970,7 @@ impl Polytope<Con> for Concrete {
                 Self::duopyramid_vertices(&p.vertices, &q.vertices, 0.0, true),
                 Abstract::duotegum(&p.abs, &q.abs),
             )
-            .with_name(Name::Multitegum(vec![p.name.clone(), q.name.clone()]))
+            .with_name(Name::multitegum(vec![p.name.clone(), q.name.clone()]))
         }
     }
 
@@ -981,7 +981,7 @@ impl Polytope<Con> for Concrete {
             Self::duoprism_vertices(&p.vertices, &q.vertices),
             Abstract::duocomb(&p.abs, &q.abs),
         )
-        .with_name(Name::Multicomb(vec![p.name.clone(), q.name.clone()]))
+        .with_name(Name::multicomb(vec![p.name.clone(), q.name.clone()]))
     }
 
     /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
