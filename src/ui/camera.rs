@@ -2,12 +2,14 @@
 
 use bevy::{
     input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
+    math::EulerRot,
     prelude::*,
     render::camera::Camera,
 };
 
 #[derive(Clone, Copy)]
 pub enum ProjectionType {
+    /// We're projecting orthogonally.
     Orthogonal,
     Perspective,
 }
@@ -93,7 +95,7 @@ impl std::ops::Mul<CameraInputEvent> for f32 {
 
 impl CameraInputEvent {
     fn rotate(vec: Vec2, anchor_tf: &mut Transform) {
-        anchor_tf.rotate(Quat::from_rotation_ypr(vec.x, vec.y, 0.0));
+        anchor_tf.rotate(Quat::from_euler(EulerRot::YXZ, vec.x, vec.y, 0.0));
     }
 
     fn translate(vec: Vec3, anchor_tf: &mut Transform, cam_gtf: &GlobalTransform) {
@@ -101,7 +103,7 @@ impl CameraInputEvent {
     }
 
     fn roll(roll: f32, anchor_tf: &mut Transform) {
-        anchor_tf.rotate(Quat::from_rotation_ypr(0.0, 0.0, roll));
+        anchor_tf.rotate(Quat::from_euler(EulerRot::YXZ, 0.0, 0.0, roll));
     }
 
     /// Zooms into the camera.
