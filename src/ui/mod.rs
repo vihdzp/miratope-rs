@@ -502,57 +502,61 @@ pub fn ui(
     // Shows the polytope library.
     if let Some(library) = &mut *library {
         egui::SidePanel::left("side_panel", 350.0).show(ctx, |ui| {
-            egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
-                match library.show_root(ui, *selected_language) {
-                    // No action needs to be taken.
-                    ShowResult::None => {}
+            egui::containers::Resize::default()
+                .min_height(ui.available_size().y)
+                .show(ui, |ui| {
+                    egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
+                        match library.show_root(ui, *selected_language) {
+                            // No action needs to be taken.
+                            ShowResult::None => {}
 
-                    // Loads a selected file.
-                    ShowResult::Load(file) => {
-                        if let Some(mut p) = query.iter_mut().next() {
-                            if let Ok(q) = Concrete::from_path(&file) {
-                                *p = q;
-                            } else {
-                                println!("File open failed!");
+                            // Loads a selected file.
+                            ShowResult::Load(file) => {
+                                if let Some(mut p) = query.iter_mut().next() {
+                                    if let Ok(q) = Concrete::from_path(&file) {
+                                        *p = q;
+                                    } else {
+                                        println!("File open failed!");
+                                    }
+                                }
                             }
-                        }
-                    }
 
-                    // Loads a special polytope.
-                    ShowResult::Special(special) => match special {
-                        SpecialLibrary::Polygon(n, d) => {
-                            if let Some(mut p) = query.iter_mut().next() {
-                                *p = Concrete::star_polygon(n, d);
-                            }
+                            // Loads a special polytope.
+                            ShowResult::Special(special) => match special {
+                                SpecialLibrary::Polygon(n, d) => {
+                                    if let Some(mut p) = query.iter_mut().next() {
+                                        *p = Concrete::star_polygon(n, d);
+                                    }
+                                }
+                                SpecialLibrary::Prism(n, d) => {
+                                    if let Some(mut p) = query.iter_mut().next() {
+                                        *p = Concrete::uniform_prism(n, d);
+                                    }
+                                }
+                                SpecialLibrary::Antiprism(n, d) => {
+                                    if let Some(mut p) = query.iter_mut().next() {
+                                        *p = Concrete::uniform_antiprism(n, d);
+                                    }
+                                }
+                                SpecialLibrary::Simplex(rank) => {
+                                    if let Some(mut p) = query.iter_mut().next() {
+                                        *p = Concrete::simplex(rank);
+                                    }
+                                }
+                                SpecialLibrary::Hypercube(rank) => {
+                                    if let Some(mut p) = query.iter_mut().next() {
+                                        *p = Concrete::hypercube(rank);
+                                    }
+                                }
+                                SpecialLibrary::Orthoplex(rank) => {
+                                    if let Some(mut p) = query.iter_mut().next() {
+                                        *p = Concrete::orthoplex(rank);
+                                    }
+                                }
+                            },
                         }
-                        SpecialLibrary::Prism(n, d) => {
-                            if let Some(mut p) = query.iter_mut().next() {
-                                *p = Concrete::uniform_prism(n, d);
-                            }
-                        }
-                        SpecialLibrary::Antiprism(n, d) => {
-                            if let Some(mut p) = query.iter_mut().next() {
-                                *p = Concrete::uniform_antiprism(n, d);
-                            }
-                        }
-                        SpecialLibrary::Simplex(rank) => {
-                            if let Some(mut p) = query.iter_mut().next() {
-                                *p = Concrete::simplex(rank);
-                            }
-                        }
-                        SpecialLibrary::Hypercube(rank) => {
-                            if let Some(mut p) = query.iter_mut().next() {
-                                *p = Concrete::hypercube(rank);
-                            }
-                        }
-                        SpecialLibrary::Orthoplex(rank) => {
-                            if let Some(mut p) = query.iter_mut().next() {
-                                *p = Concrete::orthoplex(rank);
-                            }
-                        }
-                    },
-                }
-            })
+                    })
+                });
         });
     }
 }
