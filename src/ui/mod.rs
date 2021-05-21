@@ -515,8 +515,12 @@ pub fn ui(
                             // Loads a selected file.
                             ShowResult::Load(file) => {
                                 if let Some(mut p) = query.iter_mut().next() {
-                                    if let Ok(q) = Concrete::from_path(&file) {
-                                        *p = q;
+                                    if let Ok(res) = Concrete::from_path(&file) {
+                                        if let Ok(q) = res {
+                                            *p = q;
+                                        } else {
+                                            println!("{:?}", res);
+                                        }
                                     } else {
                                         println!("File open failed!");
                                     }
@@ -675,8 +679,16 @@ pub fn file_dialog(
             FileDialogMode::Open => {
                 if let Some(path) = token.pick_file() {
                     for mut p in query.iter_mut() {
-                        *p = Concrete::from_path(&path).unwrap();
-                        p.recenter();
+                        if let Ok(res) = Concrete::from_path(&path) {
+                            if let Ok(q) = res {
+                                *p = q;
+                                p.recenter();
+                            } else {
+                                println!("{:?}", res);
+                            }
+                        } else {
+                            println!("File open failed!");
+                        }
                     }
                 }
             }

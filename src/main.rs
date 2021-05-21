@@ -60,11 +60,7 @@ use bevy_egui::EguiPlugin;
 use lang::SelectedLanguage;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
-use polytope::{
-    concrete::{off::OffOptions, Concrete},
-    r#abstract::rank::Rank,
-    Polytope,
-};
+use polytope::concrete::{file::off::OffOptions, Concrete};
 use ui::{
     camera::{CameraInputEvent, ProjectionType},
     library::Library,
@@ -147,7 +143,7 @@ fn setup(
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
     // Default polytope.
-    let poly = Concrete::hypercube(Rank::new(3));
+    let poly = Concrete::from_off(include_str!("default.off").to_string()).unwrap();
 
     // Disables backface culling.
     pipelines.set_untracked(

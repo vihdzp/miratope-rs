@@ -2,17 +2,16 @@ pub mod cd;
 pub mod convex;
 pub mod cox;
 pub mod element_types;
-pub mod ggb;
+pub mod file;
 pub mod group;
 pub mod mesh_builder;
-pub mod off;
 
 use std::{
     collections::{HashMap, HashSet},
     mem,
 };
 
-use self::mesh_builder::MeshBuilder;
+use self::{mesh_builder::MeshBuilder};
 use super::{
     r#abstract::{
         elements::{
@@ -790,25 +789,6 @@ impl Concrete {
             Self::new(vertices, abs)
         }
     }
-
-    /// Loads a polytope from a file path.
-    pub fn from_path(fp: &impl AsRef<std::path::Path>) -> std::io::Result<Self> {
-        use std::{ffi::OsStr, fs, io};
-
-        let ext = fp.as_ref().extension();
-
-        if ext == Some(OsStr::new("off")) {
-            Self::from_off(String::from_utf8(fs::read(fp)?).unwrap())
-        } else if ext == Some(OsStr::new("ggb")) {
-            Self::from_ggb(zip::read::ZipArchive::new(&mut fs::File::open(fp)?)?)
-        } else {
-            Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "File extension not recognized.",
-            ))
-        }
-    }
-
     /// Builds the mesh of a polytope.
     pub fn get_mesh(&self, projection_type: ProjectionType) -> Mesh {
         MeshBuilder::new(self).get_mesh(projection_type)

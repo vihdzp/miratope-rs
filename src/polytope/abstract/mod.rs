@@ -127,7 +127,7 @@ impl std::fmt::Debug for AbstractError {
 }
 
 /// The return value for [`Abstract::is_valid`].
-pub type AbstractResult = Result<(), AbstractError>;
+pub type AbstractResult<T> = Result<T, AbstractError>;
 
 /// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
 /// to an [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
@@ -455,7 +455,7 @@ impl Abstract {
 
     /// Checks whether the polytope is valid, i.e. whether the polytope is
     /// bounded, dyadic, and all of its indices refer to valid elements.
-    pub fn is_valid(&self) -> AbstractResult {
+    pub fn is_valid(&self) -> AbstractResult<()> {
         self.bounded()?;
         self.check_incidences()?;
         self.is_dyadic()?;
@@ -467,7 +467,7 @@ impl Abstract {
     /// Determines whether the polytope is bounded, i.e. whether it has a single
     /// minimal element and a single maximal element. A valid polytope should
     /// always return `true`.
-    pub fn bounded(&self) -> AbstractResult {
+    pub fn bounded(&self) -> AbstractResult<()> {
         let min_count = self.el_count(Rank::new(-1));
         let max_count = self.el_count(self.rank());
 
@@ -485,7 +485,7 @@ impl Abstract {
     /// all refer to valid elements in the polytope. If this returns `false`,
     /// then either the polytope hasn't fully built up, or there's something
     /// seriously wrong.
-    pub fn check_incidences(&self) -> AbstractResult {
+    pub fn check_incidences(&self) -> AbstractResult<()> {
         // Iterates over elements of every rank.
         for (r, elements) in self.ranks.iter().rank_enumerate() {
             // Iterates over all such elements.
@@ -563,7 +563,7 @@ impl Abstract {
 
     /// Determines whether the polytope satisfies the diamond property. A valid
     /// non-fissary polytope should always return `true`.
-    pub fn is_dyadic(&self) -> AbstractResult {
+    pub fn is_dyadic(&self) -> AbstractResult <()>{
         #[derive(PartialEq)]
         enum Count {
             Once,

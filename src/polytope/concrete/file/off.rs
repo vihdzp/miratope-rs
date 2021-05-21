@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs, io, path::Path, str::FromStr};
 
-use super::{Concrete, ElementList, Point, Polytope, RankVec, Subelements};
+use super::super::{Concrete, ElementList, Point, Polytope, RankVec, Subelements};
 use crate::{
     lang::name::{Con, Name},
     polytope::{
@@ -14,6 +14,33 @@ use crate::{
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 
+pub enum OffError {
+    /// The OFF file ended unexpectedly.
+    UnexpectedEnding,
+
+    /// Could not parse a number.
+    Parsing,
+
+    /// Empty file.
+    Empty,
+
+    /// Didn't find the OFF magic word.
+    MagicWord,
+}
+
+impl std::fmt::Debug for OffError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnexpectedEnding => write!(f, "File ended unexpectedly."),
+            Self::Parsing => write!(f, "Could not parse number."),
+            Self::Empty => write!(f, "File is empty."),
+            Self::MagicWord => write!(f, "No \"OFF\" detected."),
+        }
+    }
+}
+
+pub type OffResult<T> = Result<T, OffError>;
+
 /// Gets the name for an element with a given rank.
 fn element_name(rank: Rank) -> String {
     match ELEMENT_NAMES.get(rank.usize()) {
@@ -24,6 +51,9 @@ fn element_name(rank: Rank) -> String {
 
 /// Returns an iterator over the OFF file, with all whitespace and comments
 /// removed.
+///
+/// TODO: for error handling purposes, it'd be nice if the iterator also kept
+/// track of row and column number.
 fn data_tokens(src: &str) -> impl Iterator<Item = &str> {
     let mut comment = false;
 
@@ -39,27 +69,26 @@ fn data_tokens(src: &str) -> impl Iterator<Item = &str> {
 }
 
 /// Reads the next integer or float from the OFF file.
-fn next_tok<'a, T>(toks: &mut impl Iterator<Item = &'a str>) -> T
+fn next_tok<'a, T: Iterator<Item = &'a str>, U: FromStr>(toks: &mut T) -> OffResult<U>
 where
-    T: FromStr,
-    <T as FromStr>::Err: std::fmt::Debug,
+    <U as FromStr>::Err: std::fmt::Debug,
 {
     toks.next()
-        .expect("OFF file ended unexpectedly.")
+        .ok_or(OffError::UnexpectedEnding)?
         .parse()
-        .expect("Could not parse number.")
+        .map_err(|_| OffError::Parsing)
 }
 
 /// Gets the number of elements from the OFF file.
 /// This includes components iff dim ≤ 2, as this makes things easier down the
 /// line.
-fn get_el_nums<'a>(rank: Rank, toks: &mut impl Iterator<Item = &'a str>) -> Vec<usize> {
+fn get_el_nums<'a, T: Iterator<Item = &'a str>>(rank: Rank, toks: &mut T) -> OffResult<Vec<usize>> {
     let rank = rank.usize();
     let mut el_nums = Vec::with_capacity(rank);
 
     // Reads entries one by one.
     for _ in 0..rank {
-        el_nums.push(next_tok(toks));
+        el_nums.push(next_tok(toks)?);
     }
 
     // A point has a single component (itself)
@@ -80,15 +109,15 @@ fn get_el_nums<'a>(rank: Rank, toks: &mut impl Iterator<Item = &'a str>) -> Vec<
         el_nums.swap(1, 2);
     }
 
-    el_nums
+    Ok(el_nums)
 }
 
 /// Parses all vertex coordinates from the OFF file.
-fn parse_vertices<'a>(
+fn parse_vertices<'a, T: Iterator<Item = &'a str>>(
     num: usize,
     dim: usize,
-    toks: &mut impl Iterator<Item = &'a str>,
-) -> Vec<Point> {
+    toks: &mut T,
+) -> OffResult<Vec<Point>> {
     // Reads all vertices.
     let mut vertices = Vec::with_capacity(num);
 
@@ -97,24 +126,24 @@ fn parse_vertices<'a>(
         let mut vert = Vec::with_capacity(dim);
 
         for _ in 0..dim {
-            vert.push(next_tok(toks));
+            vert.push(next_tok(toks)?);
         }
 
         vertices.push(vert.into());
     }
 
-    vertices
+    Ok(vertices)
 }
 
 /// Reads the faces from the OFF file and gets the edges and faces from them.
-/// Since the OFF file doesn't store edges explicitly, this is harder than reading
-/// general elements.
-fn parse_edges_and_faces<'a>(
+/// Since the OFF file doesn't store edges explicitly, this is harder than
+/// reading general elements.
+fn parse_edges_and_faces<'a, T: Iterator<Item = &'a str>>(
     rank: Rank,
     num_edges: usize,
     num_faces: usize,
-    toks: &mut impl Iterator<Item = &'a str>,
-) -> (SubelementList, SubelementList) {
+    toks: &mut T,
+) -> OffResult<(SubelementList, SubelementList)> {
     let mut edges = SubelementList::with_capacity(num_edges);
     let mut faces = SubelementList::with_capacity(num_faces);
 
@@ -122,14 +151,14 @@ fn parse_edges_and_faces<'a>(
 
     // Add each face to the element list.
     for _ in 0..num_faces {
-        let face_sub_num = next_tok(toks);
+        let face_sub_num = next_tok(toks)?;
 
         let mut face = Subelements::new();
         let mut face_verts = Vec::with_capacity(face_sub_num);
 
         // Reads all vertices of the face.
         for _ in 0..face_sub_num {
-            face_verts.push(next_tok(toks));
+            face_verts.push(next_tok(toks)?);
         }
 
         // Gets all edges of the face.
@@ -162,27 +191,29 @@ fn parse_edges_and_faces<'a>(
         println!("WARNING: Edge count doesn't match expected edge count!");
     }
 
-    (edges, faces)
+    Ok((edges, faces))
 }
 
-fn parse_els<'a>(num_el: usize, toks: &mut impl Iterator<Item = &'a str>) -> SubelementList {
+fn parse_els<'a, T: Iterator<Item = &'a str>>(
+    num_el: usize,
+    toks: &mut T,
+) -> OffResult<SubelementList> {
     let mut els_subs = SubelementList::with_capacity(num_el);
 
     // Adds every d-element to the element list.
     for _ in 0..num_el {
-        let el_sub_num = next_tok(toks);
+        let el_sub_num = next_tok(toks)?;
         let mut subs = Subelements::with_capacity(el_sub_num);
 
         // Reads all sub-elements of the d-element.
         for _ in 0..el_sub_num {
-            let el_sub = toks.next().expect("OFF file ended unexpectedly.");
-            subs.push(el_sub.parse().expect("Integer parsing failed!"));
+            subs.push(next_tok(toks)?);
         }
 
         els_subs.push(subs);
     }
 
-    els_subs
+    Ok(els_subs)
 }
 
 impl Concrete {
@@ -211,7 +242,7 @@ impl Concrete {
     }
 
     /// Builds a polytope from the string representation of an OFF file.
-    pub fn from_off(src: String) -> io::Result<Self> {
+    pub fn from_off(src: String) -> OffResult<Self> {
         // Reads name.
         let name = src
             .lines()
@@ -221,8 +252,8 @@ impl Concrete {
 
         let mut toks = data_tokens(&src);
         let rank = {
-            let first = toks.next().expect("OFF file empty");
-            let rank = first.strip_suffix("OFF").expect("no \"OFF\" detected");
+            let first = toks.next().ok_or(OffError::Empty)?;
+            let rank = first.strip_suffix("OFF").ok_or(OffError::MagicWord)?;
 
             if rank.is_empty() {
                 Rank::new(3)
@@ -243,8 +274,8 @@ impl Concrete {
             return Ok(Concrete::dyad());
         }
 
-        let num_elems = get_el_nums(rank, &mut toks);
-        let vertices = parse_vertices(num_elems[0], rank.usize(), &mut toks);
+        let num_elems = get_el_nums(rank, &mut toks)?;
+        let vertices = parse_vertices(num_elems[0], rank.usize(), &mut toks)?;
         let mut abs = AbstractBuilder::with_capacity(rank);
 
         // Adds nullitope and vertices.
@@ -253,14 +284,15 @@ impl Concrete {
 
         // Reads edges and faces.
         if rank >= Rank::new(2) {
-            let (edges, faces) = parse_edges_and_faces(rank, num_elems[1], num_elems[2], &mut toks);
+            let (edges, faces) =
+                parse_edges_and_faces(rank, num_elems[1], num_elems[2], &mut toks)?;
             abs.push(edges);
             abs.push(faces);
         }
 
         // Adds all higher elements.
         for &num_el in num_elems.iter().take(rank.usize()).skip(3) {
-            abs.push(parse_els(num_el, &mut toks));
+            abs.push(parse_els(num_el, &mut toks)?);
         }
 
         // Caps the abstract polytope, returns the concrete one.
