@@ -8,8 +8,13 @@ use off::OffError;
 
 /// Any error encountered while trying to load a polytope.
 pub enum FileError<'a> {
+    /// An error while reading an OFF file.
     OffError(OffError),
+
+    /// An error while reading a GGB file.
     GgbError,
+
+    /// A non-supported file extension.
     InvalidExtension(Option<&'a str>),
 }
 
@@ -33,19 +38,24 @@ pub type FileResult<'a, T> = Result<T, FileError<'a>>;
 
 impl Concrete {
     /// Loads a polytope from a file path.
-    pub fn from_path(fp: &impl AsRef<std::path::Path>) -> std::io::Result<FileResult<Self>> {
+    pub fn from_path<U: AsRef<std::path::Path>>(fp: &U) -> std::io::Result<FileResult<Self>> {
         use std::{ffi::OsStr, fs};
 
         let ext = fp.as_ref().extension();
 
+        // Reads the file as an OFF file.
         Ok(if ext == Some(OsStr::new("off")) {
             String::from_utf8(fs::read(fp)?)
                 .map_or(Err(FileError::OffError(OffError::InvalidFile)), |x| {
                     Self::from_off(&x).map_err(FileError::OffError)
                 })
-        } else if ext == Some(OsStr::new("ggb")) {
+        }
+        // Reads the file as a GGB file.
+        else if ext == Some(OsStr::new("ggb")) {
             Ok(Self::from_ggb(zip::read::ZipArchive::new(&mut fs::File::open(fp)?)?).unwrap())
-        } else {
+        }
+        // Could not recognize the file extension.
+        else {
             Err(FileError::InvalidExtension(
                 ext.map(|ext| ext.to_str()).flatten(),
             ))

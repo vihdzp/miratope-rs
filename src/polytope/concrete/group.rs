@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use super::{convex, cox::CoxMatrix, Concrete};
+use super::{cox::CoxMatrix, Concrete};
 
 #[allow(unused_imports)] // Circumvents rust-analyzer bug.
 use crate::cox;
@@ -384,8 +384,9 @@ impl Group {
 
     /// Generates a polytope as the convex hull of the orbit of a point under a
     /// given symmetry group.
-    pub fn into_polytope(self, p: Point) -> Concrete {
-        convex::convex_hull(self.orbit(p))
+    pub fn into_polytope(self, _: Point) -> Concrete {
+        todo!()
+        // convex::convex_hull(self.orbit(p))
     }
 }
 

@@ -1,5 +1,4 @@
 pub mod cd;
-pub mod convex;
 pub mod cox;
 pub mod element_types;
 pub mod file;
@@ -219,7 +218,7 @@ impl Concrete {
             match self
                 .vertices
                 .iter()
-                .map(|v| float_ord::FloatOrd(hyperplane.distance(v)))
+                .map(|v| ordered_float::OrderedFloat(hyperplane.distance(v)))
                 .minmax()
             {
                 MinMaxResult::NoElements => None,

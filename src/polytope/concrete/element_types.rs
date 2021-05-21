@@ -8,7 +8,7 @@ use crate::{
 };
 
 use approx::abs_diff_eq;
-use float_ord::FloatOrd;
+use ordered_float::OrderedFloat as FloatOrd;
 
 #[derive(PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub struct ElementCount {

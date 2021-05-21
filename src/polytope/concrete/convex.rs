@@ -1,3 +1,5 @@
+// This code is broken and I will have to fix it some day.
+
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},

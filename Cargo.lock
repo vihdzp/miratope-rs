@@ -1309,12 +1309,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "float-ord"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64860170d0b2dd3f1c5af6d96aafa47b5928ac0163116c1ab27313480d82b547"
-
-[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1700,9 +1694,9 @@ dependencies = [
 
 [[package]]
 name = "gpu-alloc"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc76088804bb65a6f3b880bea9306fdaeffb25ebb453105fafa691282ee9fdba"
+checksum = "c83e37330a1881e1dae36553f2326b14f4fda84e7e40eab84f0c9bafa7c09230"
 dependencies = [
  "bitflags",
  "gpu-alloc-types",
@@ -1961,12 +1955,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fc7aa29613bd6a620df431842069224d8bc9011086b1db4c0e0cd47fa03ec9a"
 
 [[package]]
-name = "libm"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
-
-[[package]]
 name = "lock_api"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2151,16 +2139,15 @@ dependencies = [
  "bevy_egui",
  "dyn-clone",
  "factorial",
- "float-ord",
  "gcd",
  "itertools",
  "lyon",
  "nalgebra",
+ "ordered-float",
  "petgraph",
  "rand 0.8.3",
  "rfd",
  "ron",
- "scapegoat",
  "serde",
  "strum 0.20.0",
  "strum_macros 0.20.1",
@@ -2197,8 +2184,6 @@ dependencies = [
  "num-complex",
  "num-rational",
  "num-traits",
- "rand 0.8.3",
- "rand_distr",
  "serde",
  "simba",
  "typenum",
@@ -2352,7 +2337,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
 dependencies = [
  "autocfg",
- "libm 0.2.1",
 ]
 
 [[package]]
@@ -2456,9 +2440,9 @@ checksum = "af8b08b04175473088b46763e51ee54da5f9a164bc162f615b91bc179dbf15a3"
 
 [[package]]
 name = "ordered-float"
-version = "2.2.0"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b50b8919aecb97e5ee9aceef27e24f39c46b11831130f4a6b7b091ec5de0de12"
+checksum = "76d99537dd7019c4dabfcf3898a43ee685412f76e6bee1ecc48785d730c1a275"
 dependencies = [
  "num-traits",
 ]
@@ -2661,16 +2645,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rand_distr"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da9e8f32ad24fb80d07d2323a9a2ce8b30d68a62b8cb4df88119ff49a698f038"
-dependencies = [
- "num-traits",
- "rand 0.8.3",
-]
-
-[[package]]
 name = "rand_hc"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2753,9 +2727,9 @@ checksum = "f497285884f3fcff424ffc933e56d7cbca511def0c9831a7f9b5f6153e3cc89b"
 
 [[package]]
 name = "rfd"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d70f2f644f85e23857c7fa9b939ec6a85f3eace37ebcae9ec977a33865496f5"
+checksum = "c1084e570d9ce1890734b33edd8c1a7b7276076f9610fa23a48aa955587da141"
 dependencies = [
  "block",
  "dispatch",
@@ -2808,16 +2782,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "scapegoat"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98132b80ba4f9d0ce0aa94937d17110b51e4a98acd3ed49f51b40ea943564791"
-dependencies = [
- "libm 0.2.1",
- "smallvec",
 ]
 
 [[package]]
@@ -2985,7 +2949,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b0dc6d20ce137f302edf90f9cd3d278866fd7fb139efca6f246161222ad6d87"
 dependencies = [
  "lazy_static",
- "libm 0.1.4",
+ "libm",
 ]
 
 [[package]]
