@@ -1,4 +1,10 @@
-use std::{collections::HashMap, fs, io, path::Path, str::FromStr};
+use std::{
+    collections::HashMap,
+    fs, io,
+    path::Path,
+    str::FromStr,
+    sync::{Arc, Mutex},
+};
 
 use super::super::{Concrete, ElementList, Point, Polytope, RankVec, Subelements};
 use crate::{
@@ -14,27 +20,62 @@ use crate::{
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 
+/// Row, column.
+#[derive(Clone, Copy)]
+pub struct Position(u32, u32);
+
+impl std::default::Default for Position {
+    fn default() -> Self {
+        Self(0, 0)
+    }
+}
+
+impl Position {
+    pub fn next(&mut self) {
+        self.1 += 1;
+    }
+
+    pub fn next_line(&mut self) {
+        self.0 += 1;
+        self.1 = 0;
+    }
+}
+
+impl std::fmt::Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "row {}, column {}", self.0 + 1, self.1)
+    }
+}
+
 pub enum OffError {
     /// The OFF file ended unexpectedly.
-    UnexpectedEnding,
+    UnexpectedEnding(Position),
 
     /// Could not parse a number.
-    Parsing,
+    Parsing(Position),
 
     /// Empty file.
     Empty,
 
+    /// Could not parse rank.
+    Rank(Position),
+
     /// Didn't find the OFF magic word.
-    MagicWord,
+    MagicWord(Position),
+
+    /// The file couldn't be parsed as UTF-8.
+    InvalidFile,
 }
 
 impl std::fmt::Debug for OffError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnexpectedEnding => write!(f, "File ended unexpectedly."),
-            Self::Parsing => write!(f, "Could not parse number."),
-            Self::Empty => write!(f, "File is empty."),
-            Self::MagicWord => write!(f, "No \"OFF\" detected."),
+            Self::UnexpectedEnding(pos) => write!(f, "file ended unexpectedly at {}", pos),
+            Self::Parsing(pos) => write!(f, "could not parse number at {}", pos),
+            Self::Empty => write!(f, "file is empty."),
+            Self::Rank(pos) => write!(f, "could not read rank at {}", pos),
+            Self::MagicWord(pos) => write!(f, "no \"OFF\" detected at {}", pos),
+            Self::InvalidFile => write!(f, "invalid file"),
         }
     }
 }
@@ -49,46 +90,93 @@ fn element_name(rank: Rank) -> String {
     }
 }
 
-/// Returns an iterator over the OFF file, with all whitespace and comments
-/// removed.
-///
-/// TODO: for error handling purposes, it'd be nice if the iterator also kept
-/// track of row and column number.
-fn data_tokens(src: &str) -> impl Iterator<Item = &str> {
-    let mut comment = false;
+/// An iterator over the tokens in an OFF file that also keeps track of position.
+pub struct TokenIter<'a, T: Iterator<Item = &'a str>> {
+    /// The inner iterator over the tokens.
+    iter: T,
 
-    str::split(&src, move |c: char| {
-        if c == '#' {
-            comment = true;
-        } else if c == '\n' {
-            comment = false;
-        }
-        comment || c.is_whitespace()
-    })
-    .filter(|s| !s.is_empty())
+    /// The row and column in the file.
+    position: Arc<Mutex<Position>>,
 }
 
-/// Reads the next integer or float from the OFF file.
-fn next_tok<'a, T: Iterator<Item = &'a str>, U: FromStr>(toks: &mut T) -> OffResult<U>
-where
-    <U as FromStr>::Err: std::fmt::Debug,
-{
-    toks.next()
-        .ok_or(OffError::UnexpectedEnding)?
-        .parse()
-        .map_err(|_| OffError::Parsing)
+type DummyIterator<'a> = std::vec::IntoIter<&'a str>;
+impl<'a> TokenIter<'a, DummyIterator<'a>> {
+    /// Returns an iterator over the OFF file, with all whitespace and comments
+    /// removed.
+    #[allow(clippy::new_ret_no_self)]
+    pub fn new(src: &'a str) -> TokenIter<'a, impl Iterator<Item = &'a str>> {
+        let mut comment = false;
+        let position = Arc::new(Mutex::new(Position::default()));
+        let position_clone = Arc::clone(&position);
+
+        TokenIter {
+            iter: str::split(src, move |c: char| {
+                if c == '#' {
+                    comment = true;
+                    position_clone.lock().unwrap().next();
+                } else if c == '\n' {
+                    comment = false;
+                    position_clone.lock().unwrap().next_line();
+                } else {
+                    position_clone.lock().unwrap().next();
+                }
+
+                comment || c.is_whitespace()
+            }),
+            position,
+        }
+    }
+}
+
+impl<'a, T: Iterator<Item = &'a str>> TokenIter<'a, T> {
+    /// Returns the current position of the iterator.
+    pub fn position(&self) -> Position {
+        *self.position.lock().unwrap()
+    }
+
+    /// Returns the next token from the file, and the position at which it
+    /// starts. Manual implementation of a filter
+    /// over non-empty strings.
+    pub fn next(&mut self) -> Option<(&str, Position)> {
+        loop {
+            let pos = self.position();
+            let str = self.iter.next()?;
+
+            if !str.is_empty() {
+                return Some((str, pos));
+            }
+        }
+    }
+
+    /// Reads the next integer or float from the OFF file.
+    pub fn parse_next<U: FromStr>(&mut self) -> OffResult<U>
+    where
+        <U as FromStr>::Err: std::fmt::Debug,
+    {
+        loop {
+            let pos = self.position();
+            let str = self.iter.next().ok_or(OffError::UnexpectedEnding(pos))?;
+
+            if !str.is_empty() {
+                return str.parse().map_err(|_| OffError::Parsing(pos));
+            }
+        }
+    }
 }
 
 /// Gets the number of elements from the OFF file.
 /// This includes components iff dim ≤ 2, as this makes things easier down the
 /// line.
-fn get_el_nums<'a, T: Iterator<Item = &'a str>>(rank: Rank, toks: &mut T) -> OffResult<Vec<usize>> {
+fn get_el_nums<'a, T: Iterator<Item = &'a str>>(
+    rank: Rank,
+    toks: &mut TokenIter<'a, T>,
+) -> OffResult<Vec<usize>> {
     let rank = rank.usize();
     let mut el_nums = Vec::with_capacity(rank);
 
     // Reads entries one by one.
     for _ in 0..rank {
-        el_nums.push(next_tok(toks)?);
+        el_nums.push(toks.parse_next()?);
     }
 
     // A point has a single component (itself)
@@ -116,7 +204,7 @@ fn get_el_nums<'a, T: Iterator<Item = &'a str>>(rank: Rank, toks: &mut T) -> Off
 fn parse_vertices<'a, T: Iterator<Item = &'a str>>(
     num: usize,
     dim: usize,
-    toks: &mut T,
+    toks: &mut TokenIter<'a, T>,
 ) -> OffResult<Vec<Point>> {
     // Reads all vertices.
     let mut vertices = Vec::with_capacity(num);
@@ -126,7 +214,7 @@ fn parse_vertices<'a, T: Iterator<Item = &'a str>>(
         let mut vert = Vec::with_capacity(dim);
 
         for _ in 0..dim {
-            vert.push(next_tok(toks)?);
+            vert.push(toks.parse_next()?);
         }
 
         vertices.push(vert.into());
@@ -142,7 +230,7 @@ fn parse_edges_and_faces<'a, T: Iterator<Item = &'a str>>(
     rank: Rank,
     num_edges: usize,
     num_faces: usize,
-    toks: &mut T,
+    toks: &mut TokenIter<'a, T>,
 ) -> OffResult<(SubelementList, SubelementList)> {
     let mut edges = SubelementList::with_capacity(num_edges);
     let mut faces = SubelementList::with_capacity(num_faces);
@@ -151,14 +239,14 @@ fn parse_edges_and_faces<'a, T: Iterator<Item = &'a str>>(
 
     // Add each face to the element list.
     for _ in 0..num_faces {
-        let face_sub_num = next_tok(toks)?;
+        let face_sub_num = toks.parse_next()?;
 
         let mut face = Subelements::new();
         let mut face_verts = Vec::with_capacity(face_sub_num);
 
         // Reads all vertices of the face.
         for _ in 0..face_sub_num {
-            face_verts.push(next_tok(toks)?);
+            face_verts.push(toks.parse_next()?);
         }
 
         // Gets all edges of the face.
@@ -196,18 +284,18 @@ fn parse_edges_and_faces<'a, T: Iterator<Item = &'a str>>(
 
 fn parse_els<'a, T: Iterator<Item = &'a str>>(
     num_el: usize,
-    toks: &mut T,
+    toks: &mut TokenIter<'a, T>,
 ) -> OffResult<SubelementList> {
     let mut els_subs = SubelementList::with_capacity(num_el);
 
     // Adds every d-element to the element list.
     for _ in 0..num_el {
-        let el_sub_num = next_tok(toks)?;
+        let el_sub_num = toks.parse_next()?;
         let mut subs = Subelements::with_capacity(el_sub_num);
 
         // Reads all sub-elements of the d-element.
         for _ in 0..el_sub_num {
-            subs.push(next_tok(toks)?);
+            subs.push(toks.parse_next()?);
         }
 
         els_subs.push(subs);
@@ -242,7 +330,7 @@ impl Concrete {
     }
 
     /// Builds a polytope from the string representation of an OFF file.
-    pub fn from_off(src: String) -> OffResult<Self> {
+    pub fn from_off(src: &str) -> OffResult<Self> {
         // Reads name.
         let name = src
             .lines()
@@ -250,18 +338,15 @@ impl Concrete {
             .map(|first_line| Self::name_from_src(first_line))
             .flatten();
 
-        let mut toks = data_tokens(&src);
+        let mut toks = TokenIter::new(&src);
         let rank = {
-            let first = toks.next().ok_or(OffError::Empty)?;
-            let rank = first.strip_suffix("OFF").ok_or(OffError::MagicWord)?;
+            let (first, pos) = toks.next().ok_or(OffError::Empty)?;
+            let rank = first.strip_suffix("OFF").ok_or(OffError::MagicWord(pos))?;
 
             if rank.is_empty() {
                 Rank::new(3)
             } else {
-                Rank::new(
-                    rank.parse()
-                        .expect("could not parse dimension as an integer"),
-                )
+                Rank::new(rank.parse().map_err(|_| OffError::Rank(pos))?)
             }
         };
 
@@ -553,7 +638,7 @@ mod tests {
 
         // Checks that the polytope can be reloaded correctly.
         assert_eq!(
-            Concrete::from_off(p.to_off(OffOptions::default()))
+            Concrete::from_off(&p.to_off(OffOptions::default()))
                 .unwrap()
                 .el_counts()
                 .0,
@@ -564,7 +649,7 @@ mod tests {
     #[test]
     /// Checks that a point has the correct amount of elements.
     fn point_nums() {
-        let point = Concrete::from_off("0OFF".to_string()).unwrap();
+        let point = Concrete::from_off("0OFF").unwrap();
 
         test_shape(point, vec![1, 1])
     }
@@ -572,7 +657,7 @@ mod tests {
     #[test]
     /// Checks that a dyad has the correct amount of elements.
     fn dyad_nums() {
-        let dyad = Concrete::from_off("1OFF 2 -1 1 0 1".to_string()).unwrap();
+        let dyad = Concrete::from_off("1OFF 2 -1 1 0 1").unwrap();
 
         test_shape(dyad, vec![1, 2, 1])
     }
@@ -582,7 +667,7 @@ mod tests {
     /// Checks that a hexagon has the correct amount of elements.
     fn hig_nums() {
         let hig =from_src(
-            "2OFF 6 1 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 6 0 1 2 3 4 5".to_string()
+            "2OFF 6 1 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 6 0 1 2 3 4 5"
         );
 
         test_shape(hig, vec![1, 6, 6, 1])
@@ -592,7 +677,7 @@ mod tests {
     /// Checks that a hexagram has the correct amount of elements.
     fn shig_nums() {
         let shig: Concrete = from_src(
-            "2OFF 6 2 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 3 0 2 4 3 1 3 5".to_string()
+            "2OFF 6 2 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 3 0 2 4 3 1 3 5"
         ).into();
 
         test_shape(shig, vec![1, 6, 6, 1])
@@ -603,7 +688,7 @@ mod tests {
     /// Checks that a tetrahedron has the correct amount of elements.
     fn tet_nums() {
         let tet = Concrete::from_off(
-            "OFF 4 4 6 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2".to_string(),
+            "OFF 4 4 6 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2",
         )
         .unwrap();
 
@@ -614,7 +699,7 @@ mod tests {
     /// Checks that a 2-tetrahedron compund has the correct amount of elements.
     fn so_nums() {
         let so = Concrete::from_off(
-            "OFF 8 8 12 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 -1 -1 -1 -1 1 1 1 -1 1 1 1 -1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2 3 4 5 6 3 7 4 6 3 4 5 7 3 7 5 6 ".to_string(),
+            "OFF 8 8 12 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 -1 -1 -1 -1 1 1 1 -1 1 1 1 -1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2 3 4 5 6 3 7 4 6 3 4 5 7 3 7 5 6 ",
         ).unwrap();
 
         test_shape(so, vec![1, 8, 12, 8, 1])
@@ -625,7 +710,7 @@ mod tests {
     fn pen_nums() {
         let pen =   Concrete::   from_off(
             "4OFF 5 10 10 5 0.158113883008419 0.204124145231932 0.288675134594813 0.5 0.158113883008419 0.204124145231932 0.288675134594813 -0.5 0.158113883008419 0.204124145231932 -0.577350269189626 0 0.158113883008419 -0.612372435695794 0 0 -0.632455532033676 0 0 0 3 0 3 4 3 0 2 4 3 2 3 4 3 0 2 3 3 0 1 4 3 1 3 4 3 0 1 3 3 1 2 4 3 0 1 2 3 1 2 3 4 0 1 2 3 4 0 4 5 6 4 1 4 7 8 4 2 5 7 9 4 3 6 8 9"
-                .to_string(),
+                ,
         ).unwrap();
 
         test_shape(pen, vec![1, 5, 10, 10, 5, 1])
@@ -646,8 +731,7 @@ mod tests {
             3 0 1 2 #let #us #see
             3 3 0 2# if
             3 0 1 3#it
-            3 3 1 2#works!#"
-                .to_string(),
+            3 3 1 2#works!#",
         )
         .unwrap();
 
@@ -655,14 +739,26 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "OFF file empty")]
+    #[should_panic(expected = "file is empty")]
     fn empty() {
-        Concrete::from_off("".to_string()).unwrap();
+        Concrete::from_off("").unwrap();
     }
 
     #[test]
-    #[should_panic(expected = "no \"OFF\" detected")]
+    #[should_panic(expected = "could not read rank at row 1, column 3")]
+    fn rank() {
+        Concrete::from_off("   fooOFF").unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "no \"OFF\" detected at row 2, column 3")]
     fn magic_num() {
-        Concrete::from_off("foo bar".to_string()).unwrap();
+        Concrete::from_off("# comment\n   foo bar").unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "could not parse number at row 2, column 3")]
+    fn parse() {
+        Concrete::from_off("OFF\n10 foo bar").unwrap();
     }
 }

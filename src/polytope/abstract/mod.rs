@@ -563,7 +563,7 @@ impl Abstract {
 
     /// Determines whether the polytope satisfies the diamond property. A valid
     /// non-fissary polytope should always return `true`.
-    pub fn is_dyadic(&self) -> AbstractResult <()>{
+    pub fn is_dyadic(&self) -> AbstractResult<()> {
         #[derive(PartialEq)]
         enum Count {
             Once,

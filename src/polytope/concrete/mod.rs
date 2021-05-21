@@ -11,7 +11,7 @@ use std::{
     mem,
 };
 
-use self::{mesh_builder::MeshBuilder};
+use self::mesh_builder::MeshBuilder;
 use super::{
     r#abstract::{
         elements::{
@@ -53,7 +53,7 @@ impl Concrete {
     /// underlying abstract polytope. Does some debug assertions on the input.
     pub fn new(vertices: Vec<Point>, abs: Abstract) -> Self {
         // There must be as many abstract vertices as concrete ones.
-        debug_assert_eq!(vertices.len(), abs.el_count(Rank::new(0)));
+        debug_assert_eq!(vertices.len(), abs.vertex_count());
 
         // All vertices must have the same dimension.
         if let Some(vertex0) = vertices.get(0) {

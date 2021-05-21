@@ -143,7 +143,7 @@ fn setup(
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
     // Default polytope.
-    let poly = Concrete::from_off(include_str!("default.off").to_string()).unwrap();
+    let poly = Concrete::from_off(include_str!("default.off")).unwrap();
 
     // Disables backface culling.
     pipelines.set_untracked(
