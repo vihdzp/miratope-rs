@@ -36,9 +36,9 @@ checksum = "739f4a8db6605981345c5654f3a85b056ce52f37a39d34da03f25bf2151ea16e"
 
 [[package]]
 name = "ahash"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f200cbb1e856866d9eade941cf3aa0c5d7dd36f74311c4273b494f4ef036957"
+checksum = "11149c3eb723d15cb065a9ea5cc74ab57250f098ef33c9f6f7f39b48bd207750"
 dependencies = [
  "getrandom 0.2.3",
  "once_cell",
@@ -623,7 +623,7 @@ name = "bevy_utils"
 version = "0.5.0"
 source = "git+https://github.com/bevyengine/bevy?branch=main#653c10371e546176059bb779844c0569c0190b6b"
 dependencies = [
- "ahash 0.7.2",
+ "ahash 0.7.3",
  "bevy_derive",
  "getrandom 0.2.3",
  "instant",
@@ -1223,7 +1223,7 @@ name = "epaint"
 version = "0.12.0"
 source = "git+https://github.com/emilk/egui#196ddff499e7e27c0abf3119ac93fd5df81cb081"
 dependencies = [
- "ahash 0.7.2",
+ "ahash 0.7.3",
  "atomic_refcell",
  "emath",
  "ordered-float",
@@ -1694,9 +1694,9 @@ dependencies = [
 
 [[package]]
 name = "gpu-alloc"
-version = "0.4.6"
+version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c83e37330a1881e1dae36553f2326b14f4fda84e7e40eab84f0c9bafa7c09230"
+checksum = "cbc1b6ca374e81862526786d9cb42357ce03706ed1b8761730caafd02ab91f3a"
 dependencies = [
  "bitflags",
  "gpu-alloc-types",

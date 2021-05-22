@@ -6,7 +6,7 @@ pub mod library;
 use std::{marker::PhantomData, path::PathBuf};
 
 use crate::{
-    geometry::{Hyperplane, Point, Vector},
+    geometry::{Hyperplane, Hypersphere, Point, Vector},
     lang::{Options, SelectedLanguage},
     polytope::{concrete::Concrete, Polytope},
     Consts, Float, OffOptions,
@@ -209,6 +209,22 @@ pub fn ui(
                     if ui.button("Antiprism").clicked() {
                         for mut p in query.iter_mut() {
                             match p.try_antiprism() {
+                                Ok(q) => *p = q,
+                                Err(idx) => println!(
+                                    "Dual failed: Facet {} passes through inversion center.",
+                                    idx
+                                ),
+                            }
+                        }
+                    }
+
+                    // Converts the active polytope into its retroprism.
+                    if ui.button("Retroprism").clicked() {
+                        for mut p in query.iter_mut() {
+                            match p.try_antiprism_with(
+                                &Hypersphere::with_squared_radius(p.dim().unwrap_or(0), -1.0),
+                                1.0,
+                            ) {
                                 Ok(q) => *p = q,
                                 Err(idx) => println!(
                                     "Dual failed: Facet {} passes through inversion center.",
