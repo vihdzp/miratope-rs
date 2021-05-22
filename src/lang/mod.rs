@@ -279,6 +279,9 @@ pub trait GreekPrefix {
     /// The prefix for 20.
     const ICOSA: &'static str = "icosa";
 
+    /// Represents the number 20 for numbers between 21 and 29.
+    const ICOSI: &'static str = "icosi";
+
     /// The prefix for 30.
     const TRIACONTA: &'static str = "triaconta";
 
@@ -292,10 +295,13 @@ pub trait GreekPrefix {
     const COSA: &'static str = "cosa";
 
     /// The prefix for 200.
-    const DIACOSA: &'static str = "diacosa";
+    const DIACOSI: &'static str = "diacosi";
 
     /// The prefix for 300.
-    const TRIACOSA: &'static str = "triacosa";
+    const TRIACOSI: &'static str = "triacosi";
+
+    /// Represents the number 100 for numbers between 400 and 999.
+    const COSI: &'static str = "cosi";
 
     /// The prefix for 1000.    
     const CHILIA: &'static str = "chilia";
@@ -322,7 +328,8 @@ pub trait GreekPrefix {
             11 => Self::HENDECA.to_string(),
             12 => Self::DODECA.to_string(),
             10 | 13..=19 => format!("{}{}", Self::UNITS[n % 10], Self::DECA),
-            20..=29 => format!("{}{}", Self::ICOSA, Self::UNITS[n % 10]),
+            20 => Self::ICOSA.to_string(),
+            20..=29 => format!("{}{}", Self::ICOSI, Self::UNITS[n % 10]),
             30..=39 => format!("{}{}", Self::TRIACONTA, Self::UNITS[n % 10]),
             40..=99 => format!(
                 "{}{}{}",
@@ -332,12 +339,12 @@ pub trait GreekPrefix {
             ),
             100 => Self::HECTO.to_string(),
             101..=199 => format!("{}{}", Self::HECATON, Self::greek_prefix(n % 100)),
-            200..=299 => format!("{}{}", Self::DIACOSA, Self::greek_prefix(n % 100)),
-            300..=399 => format!("{}{}", Self::TRIACOSA, Self::greek_prefix(n % 100)),
+            200..=299 => format!("{}{}", Self::DIACOSI, Self::greek_prefix(n % 100)),
+            300..=399 => format!("{}{}", Self::TRIACOSI, Self::greek_prefix(n % 100)),
             400..=999 => format!(
                 "{}{}{}",
                 Self::UNITS[n / 100],
-                Self::COSA,
+                Self::COSI,
                 Self::greek_prefix(n % 100)
             ),
             1000..=1999 => format!("{}{}", Self::CHILIA, Self::greek_prefix(n % 1000)),
