@@ -329,7 +329,7 @@ pub trait GreekPrefix {
             12 => Self::DODECA.to_string(),
             10 | 13..=19 => format!("{}{}", Self::UNITS[n % 10], Self::DECA),
             20 => Self::ICOSA.to_string(),
-            20..=29 => format!("{}{}", Self::ICOSI, Self::UNITS[n % 10]),
+            21..=29 => format!("{}{}", Self::ICOSI, Self::UNITS[n % 10]),
             30..=39 => format!("{}{}", Self::TRIACONTA, Self::UNITS[n % 10]),
             40..=99 => format!(
                 "{}{}{}",
