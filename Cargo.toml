@@ -5,7 +5,11 @@ license = "MIT"
 version = "0.1.0"
 repository = "https://github.com/OfficialURL/miratope-rs"
 keywords = ["polytope", "dimension", "geometry"]
-authors = ["Violeta Hernández <vi.hdz.p@gmail.com>", "Grayson Burton <ocornoc@protonmail.com>", "Roman Salinas <ultraroman01@gmail.com>"]
+authors = [
+    "Violeta Hernández <vi.hdz.p@gmail.com>",
+    "Grayson Burton <ocornoc@protonmail.com>",
+    "Roman Salinas <ultraroman01@gmail.com>"
+]
 edition = "2018"
 
 [dependencies]
@@ -15,13 +19,13 @@ factorial = "0.2"
 gcd = "2.0"
 itertools = "0.10"
 lyon = "0.17"
-nalgebra = {version = "0.26", features = ["serde-serialize"]}
+nalgebra = { version = "0.26", features = ["serde-serialize"] }
 ordered-float = "2.4"
 petgraph = "0.5"
 rand = "0.8"
 rfd = "0.4"
 ron = "0.6"
-serde = {version = "1.0", features = ["derive"]}
+serde = { version = "1.0", features = ["derive"] }
 strum = "0.20"
 strum_macros = "0.20"
 webbrowser = "0.5"
@@ -32,10 +36,16 @@ zip = "0.5"
 [dependencies.bevy]
 git = "https://github.com/bevyengine/bevy"
 branch = "main"
-
-# We need to disable audio for file dialogs to work... for some reason.
 default-features = false
-features = ["bevy_gltf", "bevy_winit", "bevy_wgpu", "render", "bevy_dynamic_plugin", "hdr", "x11"]
+features = [
+    "bevy_gltf",
+    "bevy_winit",
+    "bevy_wgpu",
+    "render",
+    "bevy_dynamic_plugin",
+    "hdr",
+    "x11"
+]
 
 # Bevy egui integration with this latest version.
 [dependencies.bevy_egui]
@@ -45,9 +55,8 @@ branch = "bevy-main"
 [patch.crates-io]
 # Fixes egui issue #404.
 egui = { git = "https://github.com/emilk/egui" }
-
 # Fixes winit issue #1779.
-winit = { git = 'https://github.com/OfficialURL/winit' }
+winit = { git = "https://github.com/OfficialURL/winit" }
 
 [profile.release]
 lto = "thin"

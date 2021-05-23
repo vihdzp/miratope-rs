@@ -144,7 +144,7 @@ impl Cycle {
     pub fn path(&self, vertices: &[Point]) -> Option<Path> {
         let dim = vertices[0].len();
         let mut cycle_iter = self.0.iter().map(|&v| &vertices[v]);
-        let s = Subspace::from_point_refs(&cycle_iter.clone().collect::<Vec<_>>());
+        let s = Subspace::from_points(cycle_iter.clone());
 
         // We don't bother with any polygons that aren't in 2D space.
         if s.rank() != 2 {
@@ -383,34 +383,40 @@ impl<'a> MeshBuilder<'a> {
 
     /// Generates the wireframe for a polytope.
     pub fn get_wireframe(&self, projection_type: ProjectionType) -> Mesh {
-        let empty_els = ElementList::new();
-        let edges = self
-            .concrete
-            .abs
-            .ranks
-            .get(Rank::new(1))
-            .unwrap_or(&empty_els);
-        let vertices = self.get_vertex_coords(projection_type);
-        let mut indices = Vec::with_capacity(edges.len() * 2);
+        use crate::polytope::Polytope;
 
-        for edge in edges.iter() {
-            debug_assert_eq!(
-                edge.subs.len(),
-                2,
-                "Edge must have exactly 2 elements, found {}.",
-                edge.subs.len()
-            );
+        let edges = self.concrete.abs.ranks.get(Rank::new(1));
+        let mut vertex_count = self.concrete.vertex_count();
+        let edge_count = self.concrete.el_count(Rank::new(1));
 
-            indices.push(edge.subs[0] as u16);
-            indices.push(edge.subs[1] as u16);
+        // We add a single vertex so that Miratope doesn't crash.
+        let vertices = if vertex_count == 0 {
+            vertex_count = 1;
+            vec![[0.0; 3]]
+        } else {
+            self.get_vertex_coords(projection_type)
+        };
+        let mut indices = Vec::with_capacity(edge_count * 2);
+
+        // Adds the edges to the wireframe.
+        if let Some(edges) = edges {
+            for edge in edges.iter() {
+                debug_assert_eq!(
+                    edge.subs.len(),
+                    2,
+                    "Edge must have exactly 2 elements, found {}.",
+                    edge.subs.len()
+                );
+
+                indices.push(edge.subs[0] as u16);
+                indices.push(edge.subs[1] as u16);
+            }
         }
 
+        // Sets the mesh attributes.
         let mut mesh = Mesh::new(PrimitiveTopology::LineList);
-        mesh.set_attribute(
-            Mesh::ATTRIBUTE_NORMAL,
-            vec![[0.0, 1.0, 0.0]; vertices.len()],
-        );
-        mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 0.0]; vertices.len()]);
+        mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 1.0, 0.0]; vertex_count]);
+        mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 0.0]; vertex_count]);
         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
         mesh.set_indices(Some(Indices::U16(indices)));
 

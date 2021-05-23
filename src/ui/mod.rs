@@ -747,10 +747,7 @@ pub fn update_changed_polytopes(
         // Updates all wireframes.
         for child in children.iter() {
             if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {
-                let wf: &mut Mesh = meshes.get_mut(wf_handle).unwrap();
-                *wf = poly.get_wireframe(*orthogonal);
-
-                break;
+                *meshes.get_mut(wf_handle).unwrap() = poly.get_wireframe(*orthogonal);
             }
         }
 

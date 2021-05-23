@@ -62,3 +62,6 @@ impl Concrete {
         })
     }
 }
+
+#[cfg(tests)]
+mod tests {}

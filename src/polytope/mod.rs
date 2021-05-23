@@ -137,8 +137,8 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
-    /// if the polytopes have different ranks. *Update neither the name nor the
-    /// min/max elements.**
+    /// if the polytopes have different ranks. **Updates neither the name nor
+    /// the min/max elements.**
     ///
     /// # Todo
     /// We should make this method take only the `ranks`, so that we can use the
@@ -180,7 +180,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Gets the facet associated to the element of a given index as a polytope.
     fn facet(&self, idx: usize) -> Option<Self> {
-        self.element(&ElementRef::new(self.rank().minus_one(), idx))
+        self.element(&ElementRef::new(self.rank().try_minus_one()?, idx))
     }
 
     /// Gets the verf associated to the element of a given index as a polytope.
@@ -252,7 +252,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         Some(OrientedFlag::from(self.first_flag()?))
     }
 
-    /// Returns an iterator over all flags of a polytope.
+    /// Returns an iterator over all [`Flag`]s of a polytope.
     fn flags(&self) -> FlagIter {
         FlagIter::new(self.abs())
     }
@@ -263,6 +263,8 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         OrientedFlagIter::new(self.abs())
     }
 
+    /// Returns an iterator over all [`OrientedFlag`]s of a polytope, assuming
+    /// flag-connectedness.
     fn oriented_flags(
         &self,
     ) -> std::iter::FilterMap<OrientedFlagIter, &dyn Fn(FlagEvent) -> Option<OrientedFlag>> {

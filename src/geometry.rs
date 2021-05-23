@@ -178,32 +178,24 @@ impl Subspace {
         }
     }
 
-    /// Creates a subspace from a list of point references.
-    pub fn from_point_refs(points: &[&Point]) -> Self {
-        let mut points = points.iter();
+    /// Creates a subspace from an iterator over points.
+    pub fn from_points<'a, T: Iterator<Item = &'a Point>>(mut points: T) -> Self {
         let mut h = Self::new(
-            (*points
+            points
                 .next()
-                .expect("A hyperplane can't be created from an empty point array!"))
-            .clone(),
+                .expect("A hyperplane can't be created from an empty point array!")
+                .clone(),
         );
 
-        for &p in points {
-            if h.add(p).is_some() {
-                // If the subspace is of full rank, we don't need to check any
-                // more points.
-                if h.is_full_rank() {
-                    return h;
-                }
+        for p in points {
+            // If the subspace is of full rank, we don't need to check any
+            // more points.
+            if h.add(p).is_some() && h.is_full_rank() {
+                return h;
             }
         }
 
         h
-    }
-
-    /// Creates a subspace from a list of points.
-    pub fn from_points(points: &[Point]) -> Self {
-        Self::from_point_refs(&points.iter().collect::<Vec<_>>())
     }
 
     /// Projects a point onto the subspace.

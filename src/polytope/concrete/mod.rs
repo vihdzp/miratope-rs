@@ -55,19 +55,19 @@ impl Concrete {
         debug_assert_eq!(vertices.len(), abs.vertex_count());
 
         // All vertices must have the same dimension.
-        if let Some(vertex0) = vertices.get(0) {
-            for vertex1 in &vertices {
-                debug_assert_eq!(vertex0.len(), vertex1.len());
+        if cfg!(debug_assertions) {
+            if let Some(vertex0) = vertices.get(0) {
+                for vertex1 in &vertices {
+                    assert_eq!(vertex0.len(), vertex1.len());
+                }
             }
         }
 
         // With no further info, we create a generic name for the polytope.
-        let n = abs.facet_count();
-        let rank = abs.rank();
         Self {
             vertices,
+            name: Name::generic(abs.facet_count(), abs.rank()),
             abs,
-            name: Name::generic(n, rank),
         }
     }
 
@@ -166,7 +166,7 @@ impl Concrete {
     pub fn circumsphere(&self) -> Option<Hypersphere> {
         let mut vertices = self.vertices.iter();
 
-        let v0 = vertices.next().expect("Polytope has no vertices!").clone();
+        let v0 = vertices.next()?.clone();
         let mut o: Point = v0.clone();
         let mut h = Subspace::new(v0.clone());
 
@@ -325,7 +325,7 @@ impl Concrete {
 
         // We project the sphere's center onto the polytope's hyperplane to
         // avoid skew weirdness.
-        let h = Subspace::from_points(&self.vertices);
+        let h = Subspace::from_points(self.vertices.iter());
         let o = h.project(&sphere.center);
 
         let mut projections;
@@ -337,10 +337,10 @@ impl Concrete {
 
             for idx in 0..facet_count {
                 projections.push(
-                    Subspace::from_point_refs(
-                        &self
-                            .element_vertices_ref(&ElementRef::new(rank.minus_one(), idx))
-                            .unwrap(),
+                    Subspace::from_points(
+                        self.element_vertices_ref(&ElementRef::new(rank.minus_one(), idx))
+                            .unwrap()
+                            .into_iter(),
                     )
                     .project(&o),
                 );
@@ -570,8 +570,9 @@ impl Concrete {
         let mut vertex_map = Vec::new();
 
         // Vertices map to themselves.
-        let mut vertex_list = Vec::new();
-        for v in 0..self[Rank::new(0)].len() {
+        let vertex_count = self.vertex_count();
+        let mut vertex_list = Vec::with_capacity(vertex_count);
+        for v in 0..vertex_count {
             vertex_list.push(v);
         }
         vertex_map.push(vertex_list);
@@ -641,7 +642,7 @@ impl Concrete {
     }
 
     pub fn flat_vertices(&self) -> Option<Vec<Point>> {
-        let subspace = Subspace::from_points(&self.vertices);
+        let subspace = Subspace::from_points(self.vertices.iter());
 
         if subspace.is_full_rank() {
             None
@@ -658,7 +659,7 @@ impl Concrete {
     /// If the polytope's subspace is already of full rank, this is a no-op.
     pub fn flatten(&mut self) {
         if !self.vertices.is_empty() {
-            self.flatten_into(&Subspace::from_points(&self.vertices));
+            self.flatten_into(&Subspace::from_points(self.vertices.iter()));
         }
     }
 

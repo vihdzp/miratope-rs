@@ -16,6 +16,7 @@ We plan to eventually support all of the following:
   * [x] [Prism products](https://polytope.miraheze.org/wiki/Prism_product)
   * [x] [Tegum products](https://polytope.miraheze.org/wiki/Tegum_product)
   * [x] [Pyramid products](https://polytope.miraheze.org/wiki/Pyramid_product)
+  * [ ] [Antiprisms](https://polytope.miraheze.org/wiki/Antiprism)
   * [ ] [Convex hulls](https://polytope.miraheze.org/wiki/Convex_hull)
 * Loading and saving into various formats
   * [x] Support for the [Stella `.off` format](https://www.software3d.com/StellaManual.php?prod=stella4D#import)
@@ -25,7 +26,8 @@ We plan to eventually support all of the following:
     * [x] English
     * [x] Spanish
     * [ ] French
-    * [ ] PIE
+    * [ ] Japanese
+    * [ ] Proto Indo-Iranian
 
 ## How do I use Miratope?
 Miratope is in the alpha stage, and so doesn't have a completed interface yet. You'll have to download the source code to do much of anything.
