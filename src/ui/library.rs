@@ -14,7 +14,7 @@ use crate::{
     polytope::{concrete::Concrete, r#abstract::rank::Rank},
 };
 
-use bevy::prelude::{IntoSystem, Plugin, Query, Res, ResMut};
+use bevy::prelude::*;
 use bevy_egui::{egui, egui::Ui, EguiContext};
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
@@ -24,7 +24,7 @@ pub struct LibraryPlugin;
 impl Plugin for LibraryPlugin {
     fn build(&self, app: &mut bevy::prelude::AppBuilder) {
         app.insert_resource(Library::new_folder(&"./lib/"))
-            .add_system(show_library.system());
+            .add_system(show_library.system().after("top_panel"));
     }
 }
 

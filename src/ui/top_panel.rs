@@ -5,14 +5,13 @@ use crate::{
     geometry::{Hyperplane, Point, Vector},
     lang::SelectedLanguage,
     polytope::{concrete::Concrete, Polytope},
-    ui::egui_windows::{AntiprismWindow, DualWindow},
+    ui::egui_windows::{AntiprismWindow, DualWindow, WindowType},
     Consts, Float,
 };
 
+use approx::{abs_diff_eq, abs_diff_ne};
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext};
-
-use approx::{abs_diff_eq, abs_diff_ne};
 use rfd::FileDialog;
 use strum::IntoEnumIterator;
 
@@ -27,7 +26,7 @@ impl Plugin for TopPanelPlugin {
             .insert_non_send_resource(MainThreadToken::default())
             .add_system(file_dialog.system())
             .add_system(update_language.system())
-            .add_system(show_bar.system())
+            .add_system(show_bar.system().label("top_panel"))
             .add_system_to_stage(CoreStage::PostUpdate, update_cross_section.system());
     }
 }
@@ -380,8 +379,9 @@ pub fn show_bar(
                     if ui.button("Dual").clicked() {
                         if keyboard.pressed(KeyCode::LControl) {
                             println!("Advanced dual");
-                            let dim = query.iter_mut().next().unwrap().dim().unwrap_or(0);
-                            egui_windows.push(DualWindow::default(dim));
+                            egui_windows.push(DualWindow::default(
+                                query.iter_mut().next().unwrap().dim().unwrap_or(0),
+                            ));
                         } else {
                             for mut p in query.iter_mut() {
                                 match p.try_dual_mut() {

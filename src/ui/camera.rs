@@ -8,29 +8,6 @@ use bevy::{
 };
 use bevy_egui::{egui::CtxRef, EguiContext};
 
-#[derive(Clone, Copy)]
-pub enum ProjectionType {
-    /// We're projecting orthogonally.
-    Orthogonal,
-    Perspective,
-}
-
-impl ProjectionType {
-    pub fn flip(&mut self) {
-        match self {
-            Self::Orthogonal => *self = Self::Perspective,
-            Self::Perspective => *self = Self::Orthogonal,
-        }
-    }
-
-    pub fn is_orthogonal(&self) -> bool {
-        match self {
-            Self::Orthogonal => true,
-            Self::Perspective => false,
-        }
-    }
-}
-
 /// The plugin handling all camera input.
 pub struct InputPlugin;
 
@@ -40,6 +17,33 @@ impl Plugin for InputPlugin {
             .insert_resource(ProjectionType::Perspective)
             .add_system_to_stage(CoreStage::PostUpdate, add_cam_input_events.system())
             .add_system(update_cameras_and_anchors.system());
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum ProjectionType {
+    /// We're projecting orthogonally.
+    Orthogonal,
+
+    /// We're projecting from a point.
+    Perspective,
+}
+
+impl ProjectionType {
+    /// Flips the projection type.
+    pub fn flip(&mut self) {
+        match self {
+            Self::Orthogonal => *self = Self::Perspective,
+            Self::Perspective => *self = Self::Orthogonal,
+        }
+    }
+
+    /// Returns whether the projection type is `Orthogonal`.
+    pub fn is_orthogonal(&self) -> bool {
+        match self {
+            Self::Orthogonal => true,
+            Self::Perspective => false,
+        }
     }
 }
 
@@ -212,6 +216,7 @@ fn cam_events_from_wheel(
     }
 }
 
+/// The system that processes all input from the mouse and keyboard.
 #[allow(clippy::too_many_arguments)]
 fn add_cam_input_events(
     time: Res<Time>,

@@ -17,16 +17,9 @@ pub struct EguiWindowPlugin;
 impl Plugin for EguiWindowPlugin {
     fn build(&self, app: &mut bevy::prelude::AppBuilder) {
         app.insert_resource(EguiWindows::default())
-            .add_system_to_stage(CoreStage::PostUpdate, show_windows.system())
+            .add_system_to_stage(CoreStage::Update, show_windows.system())
             .add_system_to_stage(CoreStage::PostUpdate, update_windows.system());
     }
-}
-
-#[derive(Clone)]
-pub struct DualWindow {
-    center: Point,
-    radius: Float,
-    central_inversion: bool,
 }
 
 fn ok_reset(ui: &mut Ui) -> ShowResult {
@@ -43,20 +36,49 @@ fn ok_reset(ui: &mut Ui) -> ShowResult {
     result
 }
 
-impl DualWindow {
-    pub fn default(dim: usize) -> Self {
+pub trait WindowType: Clone + Into<WindowTypeId> {
+    /// The number of dimensions of the polytope on screen, used to set up the
+    /// window.
+    fn dim(&self) -> usize;
+
+    /// The default state of the window.
+    fn default(dim: usize) -> Self;
+
+    /// Resets a window to its default state.
+    fn reset(&mut self) {
+        *self = Self::default(self.dim())
+    }
+
+    /// Shows the window on screen.
+    fn show(&mut self, ctx: &CtxRef) -> ShowResult;
+
+    /// Updates the window's settings after the polytope's dimension is updated.
+    fn update(&mut self, dim: usize);
+}
+
+#[derive(Clone)]
+pub struct DualWindow {
+    center: Point,
+    radius: Float,
+}
+
+impl WindowType for DualWindow {
+    fn dim(&self) -> usize {
+        self.center.len()
+    }
+
+    fn default(dim: usize) -> Self {
         Self {
             center: Point::zeros(dim),
             radius: 1.0,
-            central_inversion: false,
         }
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         *self = Self::default(self.center.len());
     }
 
-    pub fn show(&mut self, ctx: &CtxRef) -> ShowResult {
+    fn show(&mut self, ctx: &CtxRef) -> ShowResult {
         let mut open = true;
         let mut result = ShowResult::None;
 
@@ -78,11 +100,6 @@ impl DualWindow {
                             .speed(0.01)
                             .clamp_range(0.0..=Float::MAX),
                     );
-
-                    ui.add(
-                        egui::Checkbox::new(&mut self.central_inversion, "Central inversion:")
-                            .text_style(TextStyle::Body),
-                    );
                 });
 
                 result = ok_reset(ui);
@@ -95,14 +112,14 @@ impl DualWindow {
         }
     }
 
-    pub fn update(&mut self, dim: usize) {
+    fn update(&mut self, dim: usize) {
         self.center = self.center.clone().resize_vertically(dim, 0.0);
     }
 }
 
-impl From<DualWindow> for WindowType {
+impl From<DualWindow> for WindowTypeId {
     fn from(dual: DualWindow) -> Self {
-        WindowType::Dual(dual)
+        WindowTypeId::Dual(dual)
     }
 }
 
@@ -110,21 +127,27 @@ impl From<DualWindow> for WindowType {
 pub struct AntiprismWindow {
     dual: DualWindow,
     height: Float,
+    central_inversion: bool,
 }
 
-impl AntiprismWindow {
-    pub fn default(dim: usize) -> Self {
+impl WindowType for AntiprismWindow {
+    fn dim(&self) -> usize {
+        self.dual.dim()
+    }
+
+    fn default(dim: usize) -> Self {
         Self {
             dual: DualWindow::default(dim),
             height: 1.0,
+            central_inversion: false,
         }
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         *self = Self::default(self.dual.center.len());
     }
 
-    pub fn show(&mut self, ctx: &CtxRef) -> ShowResult {
+    fn show(&mut self, ctx: &CtxRef) -> ShowResult {
         let mut open = true;
         let mut result = ShowResult::None;
 
@@ -151,7 +174,7 @@ impl AntiprismWindow {
                     ui.add(egui::DragValue::new(&mut self.height).speed(0.01));
 
                     ui.add(
-                        egui::Checkbox::new(&mut self.dual.central_inversion, "Central inversion:")
+                        egui::Checkbox::new(&mut self.central_inversion, "Central inversion:")
                             .text_style(TextStyle::Body),
                     );
                 });
@@ -159,39 +182,41 @@ impl AntiprismWindow {
                 result = ok_reset(ui);
             });
 
-        if !open {
-            ShowResult::Close
-        } else {
+        if open {
             result
+        } else {
+            ShowResult::Close
         }
     }
 
-    pub fn update(&mut self, dim: usize) {
+    fn update(&mut self, dim: usize) {
         self.dual.update(dim);
     }
 }
 
-impl From<AntiprismWindow> for WindowType {
+impl From<AntiprismWindow> for WindowTypeId {
     fn from(antiprism: AntiprismWindow) -> Self {
-        WindowType::Antiprism(antiprism)
+        WindowTypeId::Antiprism(antiprism)
     }
 }
 
-/// Represents any of the windows on screen and their settings.
+/// Makes sure that every window type is associated a unique ID (its enum
+/// discriminant), which we can then use to test whether it's already in the
+/// list of windows.
 #[derive(Clone)]
-pub enum WindowType {
+pub enum WindowTypeId {
     Dual(DualWindow),
     Antiprism(AntiprismWindow),
 }
 
 /// Compares by discriminant.
-impl std::cmp::PartialEq for WindowType {
+impl std::cmp::PartialEq for WindowTypeId {
     fn eq(&self, other: &Self) -> bool {
         std::mem::discriminant(self) == std::mem::discriminant(other)
     }
 }
 
-impl std::cmp::Eq for WindowType {}
+impl std::cmp::Eq for WindowTypeId {}
 
 /// The result of showing the windows every frame.
 pub enum ShowResult {
@@ -201,13 +226,14 @@ pub enum ShowResult {
     /// A window is closed.
     Close,
 
+    /// A window is reset to its default state.
     Reset,
 
     /// A window runs some action.
     Ok,
 }
 
-impl WindowType {
+impl WindowTypeId {
     /// Shows a given window on a given context.
     pub fn show(&mut self, ctx: &CtxRef) -> ShowResult {
         match self {
@@ -216,13 +242,16 @@ impl WindowType {
         }
     }
 
-    pub fn update(&mut self, poly: &Concrete) {
+    /// Updates the window after the amount of dimensions of the polytope on
+    /// screen changes.
+    pub fn update(&mut self, dim: usize) {
         match self {
-            Self::Dual(window) => window.update(poly.dim().unwrap_or(0)),
-            Self::Antiprism(window) => window.update(poly.dim().unwrap_or(0)),
+            Self::Dual(window) => window.update(dim),
+            Self::Antiprism(window) => window.update(dim),
         }
     }
 
+    /// Resets the window to its default state.
     pub fn reset(&mut self) {
         match self {
             Self::Dual(window) => window.reset(),
@@ -232,7 +261,7 @@ impl WindowType {
 }
 
 /// The list of all windows currently shown on screen.
-pub struct EguiWindows(Vec<WindowType>);
+pub struct EguiWindows(Vec<WindowTypeId>);
 
 impl std::default::Default for EguiWindows {
     fn default() -> Self {
@@ -242,16 +271,16 @@ impl std::default::Default for EguiWindows {
 
 impl EguiWindows {
     /// Adds a new window to the list.
-    pub fn push<T: Into<WindowType>>(&mut self, value: T) {
+    pub fn push<T: WindowType>(&mut self, value: T) {
         let value = value.into();
         if !self.0.contains(&value) {
             self.0.push(value);
         }
     }
 
-    ///Removes a window with a given index.
-    pub fn remove(&mut self, idx: usize) {
-        self.0.swap_remove(idx);
+    /// Removes a window with a given index and returns it.
+    pub fn swap_remove(&mut self, idx: usize) -> WindowTypeId {
+        self.0.swap_remove(idx)
     }
 
     /// The number of windows on the screen.
@@ -259,12 +288,13 @@ impl EguiWindows {
         self.0.len()
     }
 
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<WindowType> {
+    /// Mutably iterates over all windows.
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<WindowTypeId> {
         self.0.iter_mut()
     }
 
     /// Shows all of the windows, and returns one if its action has to run.
-    pub fn show(&mut self, ctx: &CtxRef) -> Option<WindowType> {
+    pub fn show(&mut self, ctx: &CtxRef) -> Option<WindowTypeId> {
         let mut action_window = None;
         let window_count = self.len();
 
@@ -274,11 +304,11 @@ impl EguiWindows {
             match window.show(ctx) {
                 ShowResult::Close => {
                     println!("Close");
-                    self.0.swap_remove(idx);
+                    self.swap_remove(idx);
                     break;
                 }
                 ShowResult::Ok => {
-                    action_window = Some(self.0.swap_remove(idx));
+                    action_window = Some(self.swap_remove(idx));
                     break;
                 }
                 ShowResult::Reset => window.reset(),
@@ -289,9 +319,9 @@ impl EguiWindows {
         action_window
     }
 
-    pub fn update(&mut self, poly: &Concrete) {
+    pub fn update(&mut self, dim: usize) {
         for window in self.iter_mut() {
-            window.update(poly);
+            window.update(dim);
         }
     }
 }
@@ -304,17 +334,8 @@ fn show_windows(
 ) {
     if let Some(result) = egui_windows.show(egui_ctx.ctx()) {
         match result {
-            WindowType::Dual(DualWindow {
-                center,
-                radius,
-                central_inversion,
-            }) => {
-                let mut squared_radius = radius * radius;
-                if central_inversion {
-                    squared_radius *= -1.0;
-                }
-
-                let sphere = Hypersphere::new(center, squared_radius);
+            WindowTypeId::Dual(DualWindow { center, radius }) => {
+                let sphere = Hypersphere::new(center, radius * radius);
 
                 for mut p in query.iter_mut() {
                     if let Err(err) = p.try_dual_mut_with(&sphere) {
@@ -322,14 +343,10 @@ fn show_windows(
                     }
                 }
             }
-            WindowType::Antiprism(AntiprismWindow {
-                dual:
-                    DualWindow {
-                        center,
-                        radius,
-                        central_inversion,
-                    },
+            WindowTypeId::Antiprism(AntiprismWindow {
+                dual: DualWindow { center, radius },
                 height,
+                central_inversion,
             }) => {
                 let mut squared_radius = radius * radius;
                 if central_inversion {
@@ -355,6 +372,6 @@ pub fn update_windows(
     mut egui_windows: ResMut<EguiWindows>,
 ) {
     if let Some((poly, _, _)) = polies.iter().next() {
-        egui_windows.update(poly);
+        egui_windows.update(poly.dim().unwrap_or(0));
     }
 }
