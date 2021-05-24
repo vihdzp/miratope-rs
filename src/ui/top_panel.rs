@@ -5,10 +5,7 @@ use crate::{
     geometry::{Hyperplane, Point, Vector},
     lang::SelectedLanguage,
     polytope::{concrete::Concrete, Polytope},
-    ui::{
-        egui_windows::{AntiprismWindow, DualWindow, WindowType},
-        UnitPointWidget,
-    },
+    ui::{egui_windows::*, UnitPointWidget},
     Consts, Float,
 };
 
@@ -317,6 +314,11 @@ pub fn update_language(
     }
 }
 
+/// Whether the hotkey to enable "advanced" options is enabled.
+pub fn advanced(keyboard: &Res<Input<KeyCode>>) -> bool {
+    keyboard.pressed(KeyCode::LControl) || keyboard.pressed(KeyCode::RControl)
+}
+
 /// The system that shows the top panel.
 #[allow(clippy::too_many_arguments)]
 pub fn show_bar(
@@ -380,10 +382,9 @@ pub fn show_bar(
                 ui.collapsing("Operations", |ui| {
                     // Converts the active polytope into its dual.
                     if ui.button("Dual").clicked() {
-                        if keyboard.pressed(KeyCode::LControl) {
-                            println!("Advanced dual");
-                            egui_windows.push(DualWindow::default(
-                                query.iter_mut().next().unwrap().dim().unwrap_or(0),
+                        if advanced(&keyboard) {
+                            egui_windows.push(DualWindow::default_with(
+                                query.iter_mut().next().unwrap().rank(),
                             ));
                         } else {
                             for mut p in query.iter_mut() {
@@ -399,32 +400,50 @@ pub fn show_bar(
                     }
 
                     ui.separator();
-
-                    macro_rules! operation {
-                        ($name:expr, $operation:ident) => {
-                            if ui.button($name).clicked() {
-                                for mut p in query.iter_mut() {
-                                    *p = p.$operation();
-                                }
+                    // Makes a pyramid out of the current polytope.
+                    if ui.button("Pyramid").clicked() {
+                        if advanced(&keyboard) {
+                            egui_windows.push(PyramidWindow::default_with(
+                                query.iter_mut().next().unwrap().rank(),
+                            ));
+                        } else {
+                            for mut p in query.iter_mut() {
+                                *p = p.pyramid();
                             }
-                        };
+                        }
                     }
 
-                    // Makes a pyramid out of the current polytope.
-                    operation!("Pyramid", pyramid);
-
                     // Makes a prism out of the current polytope.
-                    operation!("Prism", prism);
+                    if ui.button("Prism").clicked() {
+                        if advanced(&keyboard) {
+                            egui_windows.push(PrismWindow::default());
+                        } else {
+                            for mut p in query.iter_mut() {
+                                *p = p.prism();
+                            }
+                        }
+                    }
 
                     // Makes a tegum out of the current polytope.
-                    operation!("Tegum", tegum);
+                    if ui.button("Tegum").clicked() {
+                        if advanced(&keyboard) {
+                            egui_windows.push(TegumWindow::default_with(
+                                query.iter_mut().next().unwrap().rank(),
+                            ));
+                        } else {
+                            for mut p in query.iter_mut() {
+                                *p = p.tegum();
+                            }
+                        }
+                    }
 
                     // Converts the active polytope into its antiprism.
                     if ui.button("Antiprism").clicked() {
-                        if keyboard.pressed(KeyCode::LControl) {
+                        if advanced(&keyboard) {
                             println!("Advanced antiprism");
-                            let dim = query.iter_mut().next().unwrap().dim().unwrap_or(0);
-                            egui_windows.push(AntiprismWindow::default(dim));
+                            egui_windows.push(AntiprismWindow::default_with(
+                                query.iter_mut().next().unwrap().rank(),
+                            ));
                         } else {
                             for mut p in query.iter_mut() {
                                 match p.try_antiprism() {

@@ -372,12 +372,25 @@ impl Concrete {
         self.try_dual_mut_with(sphere).unwrap()
     }
 
+    pub fn pyramid_with(&self, apex: Point) -> Self {
+        let mut poly = self.pyramid();
+        poly.vertices[0] = apex;
+        poly
+    }
+
     pub fn prism_with(&self, height: Float) -> Self {
-        Self::duoprism(self, &Self::dyad_with(height)).with_name(Name::prism(self.name.clone()))
+        Self::duoprism(self, &Self::dyad_with(height))
     }
 
     pub fn uniform_prism(n: usize, d: usize) -> Self {
         Concrete::star_polygon(n, d).prism_with(2.0 * (Float::PI * d as Float / n as Float).sin())
+    }
+
+    pub fn tegum_with(&self, apex: Point, zenith: Point) -> Self {
+        let mut poly = self.tegum();
+        poly.vertices[0] = apex;
+        poly.vertices[1] = zenith;
+        poly
     }
 
     fn antiprism_with_vertices<T: Iterator<Item = Point>, U: Iterator<Item = Point>>(

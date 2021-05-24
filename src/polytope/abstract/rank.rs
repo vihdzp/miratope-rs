@@ -106,6 +106,13 @@ impl Rank {
     }
 }
 
+/// Default rank.
+impl std::default::Default for Rank {
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
 /// Adds two ranks.
 impl std::ops::Add for Rank {
     type Output = Self;
