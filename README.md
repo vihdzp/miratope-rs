@@ -44,6 +44,8 @@ Once you have completed all the steps you will only need to do step 4 to run Mir
 
 These steps are in place because it would be too cumbersome at this stage to update the executable each time a bug is fixed or feature is added. Once Miratope leaves the alpha stage, executable files for Version 1.0.0 will be provided.
 
+If you have downloaded Miratope previously, updated to the most recent version, and are getting an error like "`error[E0710]: an unknown tool name found in scoped lint`" in the console, this means a crate that Miratope uses has gone out of date. Don't worry about what that means, just make sure your command line has the header pointed at Miratope (like in step 3), and type `rustup update` in the console. Cargo, Rust's built-in file handler, will automatically update all the crates Miratope uses which should fix the issue. If this still doesn't fix it, contact the devs in the `#miratope` channel on [Polytope Discord](https://discord.gg/zMRu7T4).
+
 ## Where do I get these "`.off` files"?
 The **O**bject **F**ile **F**ormat is a format for storing certain kinds of geometric shapes.
 Although not in widespread use, it has become the standard format for those interested in polyhedra and polytopes. It was initially meant for the [Geomview software](https://people.sc.fsu.edu/~jburkardt/data/off/off.html), and was later adapted for the [Stella software](https://www.software3d.com/StellaManual.php?prod=stella4D#import). Miratope uses a further generalization of the Stella `.off` format for any amount of dimensions.
