@@ -2,10 +2,10 @@ use std::{marker::PhantomData, path::PathBuf};
 
 use super::{camera::ProjectionType, egui_windows::EguiWindows};
 use crate::{
-    geometry::{Hyperplane, Hypersphere, Point, Vector},
+    geometry::{Hyperplane, Point, Vector},
     lang::SelectedLanguage,
     polytope::{concrete::Concrete, Polytope},
-    ui::egui_windows::DualWindow,
+    ui::egui_windows::{AntiprismWindow, DualWindow},
     Consts, Float,
 };
 
@@ -418,29 +418,19 @@ pub fn show_bar(
 
                     // Converts the active polytope into its antiprism.
                     if ui.button("Antiprism").clicked() {
-                        for mut p in query.iter_mut() {
-                            match p.try_antiprism() {
-                                Ok(q) => *p = q,
-                                Err(idx) => println!(
-                                    "Dual failed: Facet {} passes through inversion center.",
-                                    idx
-                                ),
-                            }
-                        }
-                    }
-
-                    // Converts the active polytope into its retroprism.
-                    if ui.button("Retroprism").clicked() {
-                        for mut p in query.iter_mut() {
-                            match p.try_antiprism_with(
-                                &Hypersphere::with_squared_radius(p.dim().unwrap_or(0), -1.0),
-                                1.0,
-                            ) {
-                                Ok(q) => *p = q,
-                                Err(idx) => println!(
-                                    "Dual failed: Facet {} passes through inversion center.",
-                                    idx
-                                ),
+                        if keyboard.pressed(KeyCode::LControl) {
+                            println!("Advanced antiprism");
+                            let dim = query.iter_mut().next().unwrap().dim().unwrap_or(0);
+                            egui_windows.push(AntiprismWindow::default(dim));
+                        } else {
+                            for mut p in query.iter_mut() {
+                                match p.try_antiprism() {
+                                    Ok(q) => *p = q,
+                                    Err(idx) => println!(
+                                        "Dual failed: Facet {} passes through inversion center.",
+                                        idx
+                                    ),
+                                }
                             }
                         }
                     }

@@ -106,10 +106,82 @@ impl From<DualWindow> for WindowType {
     }
 }
 
+#[derive(Clone)]
+pub struct AntiprismWindow {
+    dual: DualWindow,
+    height: Float,
+}
+
+impl AntiprismWindow {
+    pub fn default(dim: usize) -> Self {
+        Self {
+            dual: DualWindow::default(dim),
+            height: 1.0,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        *self = Self::default(self.dual.center.len());
+    }
+
+    pub fn show(&mut self, ctx: &CtxRef) -> ShowResult {
+        let mut open = true;
+        let mut result = ShowResult::None;
+
+        egui::Window::new("Antiprism")
+            .open(&mut open)
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Center:");
+                    for c in self.dual.center.iter_mut() {
+                        ui.add(egui::DragValue::new(c).speed(0.01));
+                    }
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Radius:");
+                    ui.add(
+                        egui::DragValue::new(&mut self.dual.radius)
+                            .speed(0.01)
+                            .clamp_range(0.0..=Float::MAX),
+                    );
+
+                    ui.label("Height:");
+                    ui.add(egui::DragValue::new(&mut self.height).speed(0.01));
+
+                    ui.add(
+                        egui::Checkbox::new(&mut self.dual.central_inversion, "Central inversion:")
+                            .text_style(TextStyle::Body),
+                    );
+                });
+
+                result = ok_reset(ui);
+            });
+
+        if !open {
+            ShowResult::Close
+        } else {
+            result
+        }
+    }
+
+    pub fn update(&mut self, dim: usize) {
+        self.dual.update(dim);
+    }
+}
+
+impl From<AntiprismWindow> for WindowType {
+    fn from(antiprism: AntiprismWindow) -> Self {
+        WindowType::Antiprism(antiprism)
+    }
+}
+
 /// Represents any of the windows on screen and their settings.
 #[derive(Clone)]
 pub enum WindowType {
     Dual(DualWindow),
+    Antiprism(AntiprismWindow),
 }
 
 /// Compares by discriminant.
@@ -139,19 +211,22 @@ impl WindowType {
     /// Shows a given window on a given context.
     pub fn show(&mut self, ctx: &CtxRef) -> ShowResult {
         match self {
-            Self::Dual(dual_window) => dual_window.show(ctx),
+            Self::Dual(window) => window.show(ctx),
+            Self::Antiprism(window) => window.show(ctx),
         }
     }
 
     pub fn update(&mut self, poly: &Concrete) {
         match self {
-            WindowType::Dual(dual_window) => dual_window.update(poly.dim().unwrap_or(0)),
+            Self::Dual(window) => window.update(poly.dim().unwrap_or(0)),
+            Self::Antiprism(window) => window.update(poly.dim().unwrap_or(0)),
         }
     }
 
     pub fn reset(&mut self) {
         match self {
-            WindowType::Dual(dual_window) => dual_window.reset(),
+            Self::Dual(window) => window.reset(),
+            Self::Antiprism(window) => window.reset(),
         }
     }
 }
@@ -242,7 +317,32 @@ fn show_windows(
                 let sphere = Hypersphere::new(center, squared_radius);
 
                 for mut p in query.iter_mut() {
-                    p.dual_mut_with(&sphere);
+                    if let Err(err) = p.try_dual_mut_with(&sphere) {
+                        println!("{:?}", err);
+                    }
+                }
+            }
+            WindowType::Antiprism(AntiprismWindow {
+                dual:
+                    DualWindow {
+                        center,
+                        radius,
+                        central_inversion,
+                    },
+                height,
+            }) => {
+                let mut squared_radius = radius * radius;
+                if central_inversion {
+                    squared_radius *= -1.0;
+                }
+
+                let sphere = Hypersphere::new(center, squared_radius);
+
+                for mut p in query.iter_mut() {
+                    match p.try_antiprism_with(&sphere, height) {
+                        Ok(q) => *p = q,
+                        Err(err) => println!("{:?}", err),
+                    }
                 }
             }
         }
