@@ -127,9 +127,9 @@ fn main() {
         // Adds systems.
         .add_startup_system(setup.system())
         .add_system(ui::update_scale_factor.system())
-        .add_system(ui::ui.system())
         .add_system(ui::file_dialog.system())
         .add_system(ui::update_language.system())
+        .add_system(ui::ui.system())
         .add_system_to_stage(CoreStage::PostUpdate, ui::update_cross_section.system())
         .add_system_to_stage(CoreStage::PostUpdate, ui::update_changed_polytopes.system())
         .run();

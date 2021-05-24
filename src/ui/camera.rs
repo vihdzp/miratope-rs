@@ -6,6 +6,7 @@ use bevy::{
     prelude::*,
     render::camera::Camera,
 };
+use bevy_egui::{egui::CtxRef, EguiContext};
 
 #[derive(Clone, Copy)]
 pub enum ProjectionType {
@@ -39,7 +40,7 @@ pub struct InputPlugin;
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_event::<CameraInputEvent>()
-            .add_system_to_stage(CoreStage::PreUpdate, add_cam_input_events.system())
+            .add_system_to_stage(CoreStage::PostUpdate, add_cam_input_events.system())
             .add_system(update_cameras_and_anchors.system());
     }
 }
@@ -65,13 +66,14 @@ pub enum CameraInputEvent {
     /// The zoom tapers with distance: closer in zooms slow, etc.
     Zoom(f32),
 
+    /// Resets the camera to its default state.
     Reset,
 }
 
 impl std::ops::Mul<f32> for CameraInputEvent {
     type Output = CameraInputEvent;
 
-    /// Composes two camera events together.
+    /// Scales the effect of a camera input event by a certain factor.
     fn mul(mut self, rhs: f32) -> CameraInputEvent {
         match &mut self {
             CameraInputEvent::RotateAnchor(r) => *r *= rhs,
@@ -87,7 +89,7 @@ impl std::ops::Mul<f32> for CameraInputEvent {
 impl std::ops::Mul<CameraInputEvent> for f32 {
     type Output = CameraInputEvent;
 
-    /// Composes two camera events together.
+    /// Scales the effect of a camera input event by a certain factor.
     fn mul(self, rhs: CameraInputEvent) -> CameraInputEvent {
         rhs * self
     }
@@ -143,6 +145,7 @@ fn cam_events_from_kb(
     time: Res<Time>,
     keyboard: Res<Input<KeyCode>>,
     cam_inputs: &mut EventWriter<CameraInputEvent>,
+    ctx: &CtxRef,
 ) -> (f32, f32) {
     const SPIN_RATE: f32 = std::f32::consts::TAU / 5.0;
     let real_scale = time.delta_seconds();
@@ -157,19 +160,21 @@ fn cam_events_from_kb(
     let ud = CameraInputEvent::Translate(Vec3::Y);
     const ROLL: CameraInputEvent = CameraInputEvent::Roll(SPIN_RATE);
 
-    for keycode in keyboard.get_pressed() {
-        cam_inputs.send(match keycode {
-            KeyCode::W | KeyCode::Up => -scale * fb,
-            KeyCode::S | KeyCode::Down => scale * fb,
-            KeyCode::D | KeyCode::Right => scale * lr,
-            KeyCode::A | KeyCode::Left => -scale * lr,
-            KeyCode::Space => scale * ud,
-            KeyCode::LShift | KeyCode::RShift => -scale * ud,
-            KeyCode::Q => real_scale * ROLL,
-            KeyCode::E => -real_scale * ROLL,
-            KeyCode::R => CameraInputEvent::Reset,
-            _ => continue,
-        })
+    if !ctx.wants_keyboard_input() {
+        for keycode in keyboard.get_pressed() {
+            cam_inputs.send(match keycode {
+                KeyCode::W | KeyCode::Up => -scale * fb,
+                KeyCode::S | KeyCode::Down => scale * fb,
+                KeyCode::D | KeyCode::Right => scale * lr,
+                KeyCode::A | KeyCode::Left => -scale * lr,
+                KeyCode::Space => scale * ud,
+                KeyCode::LShift | KeyCode::RShift => -scale * ud,
+                KeyCode::Q => real_scale * ROLL,
+                KeyCode::E => -real_scale * ROLL,
+                KeyCode::R => CameraInputEvent::Reset,
+                _ => continue,
+            })
+        }
     }
 
     (real_scale, scale)
@@ -209,6 +214,7 @@ fn cam_events_from_wheel(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn add_cam_input_events(
     time: Res<Time>,
     keyboard: Res<Input<KeyCode>>,
@@ -217,6 +223,7 @@ fn add_cam_input_events(
     mouse_wheel: EventReader<MouseWheel>,
     windows: Res<Windows>,
     mut cam_inputs: EventWriter<CameraInputEvent>,
+    egui_ctx: ResMut<EguiContext>,
 ) {
     let (width, height) = {
         let primary_win = windows.get_primary().expect("There is no primary window");
@@ -226,18 +233,22 @@ fn add_cam_input_events(
         )
     };
 
+    let ctx = egui_ctx.ctx();
     let cam_inputs = &mut cam_inputs;
-    let (real_scale, scale) = cam_events_from_kb(time, keyboard, cam_inputs);
+    let (real_scale, scale) = cam_events_from_kb(time, keyboard, cam_inputs, ctx);
 
-    cam_events_from_mouse(
-        mouse_button,
-        mouse_move,
-        width,
-        height,
-        real_scale,
-        cam_inputs,
-    );
-    cam_events_from_wheel(mouse_wheel, scale, cam_inputs);
+    // Omit any events if the UI will process them instead.
+    if !ctx.wants_pointer_input() {
+        cam_events_from_mouse(
+            mouse_button,
+            mouse_move,
+            width,
+            height,
+            real_scale,
+            cam_inputs,
+        );
+        cam_events_from_wheel(mouse_wheel, scale, cam_inputs);
+    }
 }
 
 fn update_cameras_and_anchors(
