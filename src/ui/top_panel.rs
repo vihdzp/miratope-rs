@@ -1,11 +1,11 @@
 use std::{marker::PhantomData, path::PathBuf};
 
-use super::{camera::ProjectionType, windows::EguiWindows};
+use super::{camera::ProjectionType, egui_windows::EguiWindows};
 use crate::{
     geometry::{Hyperplane, Hypersphere, Point, Vector},
     lang::SelectedLanguage,
     polytope::{concrete::Concrete, Polytope},
-    ui::windows::WindowType,
+    ui::egui_windows::DualWindow,
     Consts, Float,
 };
 
@@ -20,7 +20,8 @@ pub struct TopPanelPlugin;
 
 impl Plugin for TopPanelPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.insert_resource(SectionDirection::default())
+        app.insert_resource(FileDialogState::default())
+            .insert_resource(SectionDirection::default())
             .insert_resource(SectionState::default())
             .insert_resource(SelectedLanguage::default())
             .insert_non_send_resource(MainThreadToken::default())
@@ -380,11 +381,7 @@ pub fn show_bar(
                         if keyboard.pressed(KeyCode::LControl) {
                             println!("Advanced dual");
                             let dim = query.iter_mut().next().unwrap().dim().unwrap_or(0);
-                            egui_windows.push(WindowType::Dual {
-                                center: vec![0.0; dim].into(),
-                                radius: 1.0,
-                                central_inversion: false,
-                            });
+                            egui_windows.push(DualWindow::default(dim));
                         } else {
                             for mut p in query.iter_mut() {
                                 match p.try_dual_mut() {

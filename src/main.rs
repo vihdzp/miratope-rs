@@ -63,9 +63,7 @@ use no_cull_pipeline::PbrNoBackfaceBundle;
 use polytope::concrete::Concrete;
 use ui::{
     camera::{CameraInputEvent, ProjectionType},
-    library::Library,
-    top_panel::FileDialogState,
-    windows::EguiWindows,
+    MiratopePlugins,
 };
 
 mod geometry;
@@ -112,22 +110,13 @@ fn main() {
     App::build()
         // Adds resources.
         .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
-        .insert_resource(EguiWindows::default())
-        .insert_resource(FileDialogState::default())
-        .insert_resource(Library::new_folder(&"./lib/"))
         .insert_resource(Msaa { samples: 4 })
         // Adds plugins.
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
-        .add_plugin(ui::windows::EguiWindowPlugin)
-        .add_plugin(ui::camera::InputPlugin)
-        // TODO: separate these into stages so that they load in a predetermined order.
-        .add_plugin(ui::library::LibraryPlugin)
-        .add_plugin(ui::top_panel::TopPanelPlugin)
+        .add_plugins(MiratopePlugins)
         // Adds systems.
         .add_startup_system(setup.system())
-        .add_system(ui::update_scale_factor.system())
-        .add_system_to_stage(CoreStage::PostUpdate, ui::update_changed_polytopes.system())
         .run();
 }
 

@@ -23,7 +23,8 @@ pub struct LibraryPlugin;
 
 impl Plugin for LibraryPlugin {
     fn build(&self, app: &mut bevy::prelude::AppBuilder) {
-        app.add_system(show_library.system());
+        app.insert_resource(Library::new_folder(&"./lib/"))
+            .add_system(show_library.system());
     }
 }
 
@@ -138,7 +139,7 @@ impl SpecialLibrary {
             Self::Duoprism(n1, d1, n2, d2) => {
                 let mut clicked = false;
 
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     clicked = ui.button(text).clicked();
 
                     // Number of sides.

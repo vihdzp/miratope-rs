@@ -11,10 +11,13 @@ use self::r#abstract::{
     rank::{Rank, RankVec},
     Abstract,
 };
-use crate::lang::{
-    self,
-    name::{Name, NameData, NameType, Regular},
-    Language,
+use crate::{
+    geometry::Point,
+    lang::{
+        self,
+        name::{Name, NameData, NameType, Regular},
+        Language,
+    },
 };
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
@@ -154,17 +157,22 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Gets the element figure with a given rank and index as a polytope.
     fn element_fig(&self, el: &ElementRef) -> DualResult<Option<Self>> {
-        Ok(
-            if let Some(mut element_fig) = self
-                .try_dual()?
-                .element(&ElementRef::new(self.rank().minus_one() - el.rank, el.idx))
-            {
-                element_fig.try_dual_mut()?;
-                Some(element_fig)
-            } else {
-                None
-            },
-        )
+        if let Some(rank) = (self.rank() - el.rank).try_minus_one() {
+            Ok(
+                if let Some(mut element_fig) =
+                    self.try_dual()?.element(&ElementRef::new(rank, el.idx))
+                {
+                    element_fig.try_dual_mut()?;
+                    Some(element_fig)
+                } else {
+                    None
+                },
+            )
+        } else {
+            // TODO: this isn't one of the usual inversion through a facet
+            // errors. Fix this.
+            Err(123456789)
+        }
     }
 
     /// Gets the section defined by two elements with given ranks and indices as
@@ -414,7 +422,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
             Self::multipyramid(&vec![&Self::point(); rank.plus_one_usize()]).with_name(
                 Name::simplex(
                     T::DataRegular::new(Regular::Yes {
-                        center: vec![0.0; rank.usize()].into(),
+                        center: Point::zeros(rank.usize()),
                     }),
                     rank,
                 ),
@@ -432,7 +440,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
             Self::multiprism(&vec![&Self::dyad(); rank_u]).with_name(Name::hyperblock(
                 T::DataRegular::new(Regular::Yes {
-                    center: vec![0.0; rank_u].into(),
+                    center: Point::zeros(rank_u),
                 }),
                 rank,
             ))
@@ -449,7 +457,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
             Self::multitegum(&vec![&Self::dyad(); rank_u]).with_name(Name::orthoplex(
                 T::DataRegular::new(Regular::Yes {
-                    center: vec![0.0; rank_u].into(),
+                    center: Point::zeros(rank_u),
                 }),
                 rank,
             ))

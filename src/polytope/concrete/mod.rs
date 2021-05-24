@@ -195,7 +195,7 @@ impl Concrete {
     /// Gets the gravicenter of a polytope, or `None` in the case of the
     /// nullitope.
     pub fn gravicenter(&self) -> Option<Point> {
-        let mut g: Point = vec![0.0; self.dim()? as usize].into();
+        let mut g = Point::zeros(self.dim()? as usize);
 
         for v in &self.vertices {
             g += v;
@@ -841,7 +841,7 @@ impl Polytope<Con> for Concrete {
     fn polygon(n: usize) -> Self {
         Self::grunbaum_star_polygon(n, 1).with_name(Name::polygon(
             ConData::new(Regular::Yes {
-                center: vec![0.0, 0.0].into(),
+                center: Point::zeros(2),
             }),
             n,
         ))
