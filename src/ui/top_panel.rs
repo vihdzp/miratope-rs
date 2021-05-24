@@ -5,11 +5,14 @@ use crate::{
     geometry::{Hyperplane, Point, Vector},
     lang::SelectedLanguage,
     polytope::{concrete::Concrete, Polytope},
-    ui::egui_windows::{AntiprismWindow, DualWindow, WindowType},
+    ui::{
+        egui_windows::{AntiprismWindow, DualWindow, WindowType},
+        UnitPointWidget,
+    },
     Consts, Float,
 };
 
-use approx::{abs_diff_eq, abs_diff_ne};
+use approx::abs_diff_ne;
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext};
 use rfd::FileDialog;
@@ -26,7 +29,7 @@ impl Plugin for TopPanelPlugin {
             .insert_non_send_resource(MainThreadToken::default())
             .add_system(file_dialog.system())
             .add_system(update_language.system())
-            .add_system(show_bar.system().label("top_panel"))
+            .add_system(show_bar.system().label("top_panel").after("show_windows"))
             .add_system_to_stage(CoreStage::PostUpdate, update_cross_section.system());
     }
 }
@@ -652,38 +655,11 @@ pub fn show_bar(
             }
 
             let mut new_direction = section_direction.0.clone();
-            let mut modified_coord = 0;
 
-            ui.horizontal(|ui| {
-                ui.label("Slice direction:");
-                for (idx, coord) in new_direction.iter_mut().enumerate() {
-                    ui.add(egui::DragValue::new(coord).speed(0.01));
-
-                    // The index of the modified coordinate.
-                    if abs_diff_eq!(section_direction.0[idx], *coord, epsilon = Float::EPS) {
-                        modified_coord = idx;
-                    }
-
-                    // Gets rid of floating point shenanigans.
-                    if abs_diff_eq!(*coord, 0.0, epsilon = Float::EPS.sqrt()) {
-                        *coord = 0.0;
-                    } else if abs_diff_eq!(*coord, 1.0, epsilon = Float::EPS) {
-                        *coord = 1.0;
-                    } else if abs_diff_eq!(*coord, -1.0, epsilon = Float::EPS) {
-                        *coord = -1.0;
-                    }
-                }
-            });
-
-            // Normalizes the slicing direction.
-            if new_direction.try_normalize_mut(Float::EPS).is_none() {
-                // If this fails, sets it to the axis direction corresponding
-                // to the last modified coordinate.
-                for coord in new_direction.iter_mut() {
-                    *coord = 0.0;
-                }
-                new_direction[modified_coord] = 1.0;
-            }
+            ui.add(UnitPointWidget::new(
+                &mut new_direction,
+                "Cross-section depth:",
+            ));
 
             // Updates the slicing direction.
             #[allow(clippy::float_cmp)]

@@ -1,5 +1,6 @@
 //! Sets up the windows that permit more advanced settings.
 
+use super::PointWidget;
 use crate::{
     geometry::{Hypersphere, Point},
     polytope::concrete::Concrete,
@@ -8,16 +9,37 @@ use crate::{
 
 use bevy::prelude::*;
 use bevy_egui::{
-    egui::{self, CtxRef, Layout, TextStyle, Ui},
+    egui::{self, CtxRef, Layout, TextStyle, Ui, Widget},
     EguiContext,
 };
+
+pub struct OkReset<'a>(&'a mut ShowResult);
+
+impl<'a> OkReset<'a> {
+    pub fn new(result: &'a mut ShowResult) -> Self {
+        Self(result)
+    }
+}
+
+impl<'a> Widget for OkReset<'a> {
+    fn ui(self, ui: &mut Ui) -> egui::Response {
+        ui.allocate_ui_with_layout(ui.min_size(), Layout::right_to_left(), |ui| {
+            if ui.button("Ok").clicked() {
+                *self.0 = ShowResult::Ok;
+            } else if ui.button("Reset").clicked() {
+                *self.0 = ShowResult::Reset;
+            }
+        })
+        .response
+    }
+}
 
 pub struct EguiWindowPlugin;
 
 impl Plugin for EguiWindowPlugin {
     fn build(&self, app: &mut bevy::prelude::AppBuilder) {
         app.insert_resource(EguiWindows::default())
-            .add_system_to_stage(CoreStage::Update, show_windows.system())
+            .add_system_to_stage(CoreStage::Update, show_windows.system().label("show_windows"))
             .add_system_to_stage(CoreStage::PostUpdate, update_windows.system());
     }
 }
@@ -36,7 +58,7 @@ fn ok_reset(ui: &mut Ui) -> ShowResult {
     result
 }
 
-pub trait WindowType: Clone + Into<WindowTypeId> {
+pub trait WindowType: Into<WindowTypeId> {
     /// The number of dimensions of the polytope on screen, used to set up the
     /// window.
     fn dim(&self) -> usize;
@@ -56,7 +78,6 @@ pub trait WindowType: Clone + Into<WindowTypeId> {
     fn update(&mut self, dim: usize);
 }
 
-#[derive(Clone)]
 pub struct DualWindow {
     center: Point,
     radius: Float,
@@ -86,12 +107,7 @@ impl WindowType for DualWindow {
             .open(&mut open)
             .resizable(false)
             .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label("Center:");
-                    for c in self.center.iter_mut() {
-                        ui.add(egui::DragValue::new(c).speed(0.01));
-                    }
-                });
+                ui.add(PointWidget::new(&mut self.center, "Center:"));
 
                 ui.horizontal(|ui| {
                     ui.label("Radius:");
@@ -102,7 +118,7 @@ impl WindowType for DualWindow {
                     );
                 });
 
-                result = ok_reset(ui);
+                ui.add(OkReset::new(&mut result));
             });
 
         if !open {
@@ -123,7 +139,8 @@ impl From<DualWindow> for WindowTypeId {
     }
 }
 
-#[derive(Clone)]
+pub struct PrismWindow {}
+
 pub struct AntiprismWindow {
     dual: DualWindow,
     height: Float,
@@ -155,12 +172,7 @@ impl WindowType for AntiprismWindow {
             .open(&mut open)
             .resizable(false)
             .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label("Center:");
-                    for c in self.dual.center.iter_mut() {
-                        ui.add(egui::DragValue::new(c).speed(0.01));
-                    }
-                });
+                ui.add(PointWidget::new(&mut self.dual.center, "Center:"));
 
                 ui.horizontal(|ui| {
                     ui.label("Radius:");
@@ -179,7 +191,7 @@ impl WindowType for AntiprismWindow {
                     );
                 });
 
-                result = ok_reset(ui);
+                ui.add(OkReset::new(&mut result));
             });
 
         if open {
@@ -203,7 +215,6 @@ impl From<AntiprismWindow> for WindowTypeId {
 /// Makes sure that every window type is associated a unique ID (its enum
 /// discriminant), which we can then use to test whether it's already in the
 /// list of windows.
-#[derive(Clone)]
 pub enum WindowTypeId {
     Dual(DualWindow),
     Antiprism(AntiprismWindow),
