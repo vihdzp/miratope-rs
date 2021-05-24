@@ -528,7 +528,6 @@ impl GenIter {
         // If the element is new, we add it to the queue as well.
         else {
             self.queue.push_back(el);
-
             true
         }
     }
@@ -605,9 +604,8 @@ impl GenIter {
 
 #[cfg(test)]
 mod tests {
-    use gcd::Gcd;
-
     use super::*;
+    use gcd::Gcd;
 
     /// Tests a given symmetry group.
     fn test(group: Group, order: usize, rot_order: usize, name: &str) {

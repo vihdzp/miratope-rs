@@ -91,7 +91,6 @@ use strum_macros::EnumIter;
 pub enum Gender {
     Male,
     Female,
-    Neutral,
     None,
 }
 

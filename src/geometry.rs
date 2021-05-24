@@ -31,28 +31,24 @@ pub struct Hypersphere {
 }
 
 impl Hypersphere {
-    pub fn new(center: Point, squared_radius: Float) -> Self {
+    /// Constructs a hypersphere with a given dimension and radius,
+    /// centered at the origin.
+    pub fn with_radius(center: Point, radius: Float) -> Hypersphere {
+        Self::with_squared_radius(center, radius * radius)
+    }
+
+    /// Constructs a hypersphere with a given dimension and squared radius,
+    /// centered at the origin.
+    pub fn with_squared_radius(center: Point, squared_radius: Float) -> Hypersphere {
         Self {
             center,
             squared_radius,
         }
     }
 
-    /// Constructs a hypersphere with a given dimension and radius,
-    /// centered at the origin.
-    pub fn with_radius(dim: usize, radius: Float) -> Hypersphere {
-        Self::new(Point::zeros(dim), radius * radius)
-    }
-
-    /// Constructs a hypersphere with a given dimension and squared radius,
-    /// centered at the origin.
-    pub fn with_squared_radius(dim: usize, squared_radius: Float) -> Hypersphere {
-        Hypersphere::new(Point::zeros(dim), squared_radius)
-    }
-
     /// Represents the unit hypersphere in a certain number of dimensions.
     pub fn unit(dim: usize) -> Hypersphere {
-        Hypersphere::with_squared_radius(dim, 1.0)
+        Hypersphere::with_squared_radius(Point::zeros(dim), 1.0)
     }
 
     /// Reciprocates a point in place. If it's too close to the sphere's center,
@@ -102,32 +98,6 @@ pub struct Subspace {
 
     /// An "offset", which represents any point on the subspace.
     pub offset: Point,
-}
-
-/// Builds convenience functions like [`Subspace::x`] and [`Hyperplane::x`].
-macro_rules! axis_with_name {
-    ($x: ident, $coord_name: expr, $name: expr, $axis: expr) => {
-        /// Returns a
-        #[doc = $name]
-        /// defined by all points with a given
-        #[doc = $coord_name]
-        /// coordinate.
-        pub fn $x(rank: usize, $x: Float) -> Self {
-            Self::axis(rank, $axis, $x)
-        }
-    };
-}
-
-/// Builds convenience functions for all named axes using [`axis_with_name`].
-macro_rules! all_axes_names {
-    ($name: expr) => {
-        axis_with_name!(x, "`x`", $name, 0);
-        axis_with_name!(y, "`y`", $name, 1);
-        axis_with_name!(z, "`z`", $name, 2);
-        axis_with_name!(w, "`w`", $name, 3);
-        axis_with_name!(a, "`a`", $name, 4);
-        axis_with_name!(b, "`b`", $name, 5);
-    };
 }
 
 impl Subspace {
@@ -229,30 +199,6 @@ impl Subspace {
         Point::from_iterator(self.rank(), self.basis.iter().map(|b| p.dot(b)))
     }
 
-    /// Returns a subspace defined by all points with a given coordinate at a
-    /// given coordinate axis.
-    pub fn axis(rank: usize, axis: usize, pos: Float) -> Self {
-        // The basis is just all elementary unit vectors save for the
-        // (0, ..., 1, ..., 0) one, where the 1 is at position axis.
-        let mut basis = Vec::new();
-        for i in 0..rank {
-            if i != axis {
-                let mut p = Point::zeros(rank);
-                p[i] = 1.0;
-                basis.push(p);
-            }
-        }
-
-        // The offset is the point (0, ..., pos, ..., 0), where pos is at
-        // position axis.
-        let mut offset = Point::zeros(rank);
-        offset[axis] = pos;
-
-        Self { basis, offset }
-    }
-
-    all_axes_names!("subspace");
-
     /// Computes a set of independent vectors that span the orthogonal
     /// complement of the subspace.
     pub fn orthogonal_comp(&self) -> Vec<Vector> {
@@ -324,20 +270,6 @@ impl Hyperplane {
             Some(l.at(t))
         }
     }
-
-    pub fn axis(rank: usize, axis: usize, pos: Float) -> Self {
-        // The normal is the vector (0, ..., 1, ..., 0), where the 1 is at
-        // position axis.
-        let mut normal = Vector::zeros(rank);
-        normal[axis] = 1.0;
-
-        Self {
-            subspace: Subspace::axis(rank, axis, pos),
-            normal,
-        }
-    }
-
-    all_axes_names!("hyperplane");
 
     /// Generates an oriented hyperplane from its normal vector.
     pub fn from_normal(rank: usize, normal: Vector, pos: Float) -> Self {
@@ -473,7 +405,7 @@ mod tests {
         );
 
         assert_abs_diff_eq!(
-            (Hypersphere::with_radius(3, 13.0)
+            (Hypersphere::with_radius(Point::zeros(3), 13.0)
                 .reciprocate(&vec![3.0, 4.0, 12.0].into())
                 .unwrap()
                 - Point::from(vec![3.0, 4.0, 12.0]))

@@ -99,8 +99,8 @@ pub struct TokenIter<'a, T: Iterator<Item = &'a str>> {
     position: Arc<Mutex<Position>>,
 }
 
-type DummyIterator<'a> = std::vec::IntoIter<&'a str>;
-impl<'a> TokenIter<'a, DummyIterator<'a>> {
+/// Any dummy iterator would've done here.
+impl<'a> TokenIter<'a, std::vec::IntoIter<&'a str>> {
     /// Returns an iterator over the OFF file, with all whitespace and comments
     /// removed.
     #[allow(clippy::new_ret_no_self)]

@@ -303,17 +303,6 @@ impl ElementList {
         self.0.get_mut(idx)
     }
 
-    /// Determines whether the element list contains a given element.
-    pub fn contains(&self, x: &Element) -> bool {
-        self.0.contains(x)
-    }
-
-    /// Resizes the `ElementList` in-place so that `len` is equal to `new_len`.
-    /// Fills all new empty slots with `value`.
-    pub fn resize(&mut self, new_len: usize, value: Element) {
-        self.0.resize(new_len, value)
-    }
-
     /// Returns the element list for the nullitope in a polytope with a given
     /// vertex count.
     pub fn min(vertex_count: usize) -> Self {

@@ -3,7 +3,7 @@ use bevy_egui::egui::{self, Ui};
 
 use crate::{lang::En, polytope::concrete::Concrete};
 
-const MEMORY_SLOTS: usize = 9;
+const MEMORY_SLOTS: usize = 8;
 
 /// Represents the memory slots to store polytopes.
 pub struct Memory([Option<Concrete>; MEMORY_SLOTS]);

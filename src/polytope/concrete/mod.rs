@@ -152,7 +152,7 @@ impl Concrete {
         }
     }
 
-    /// Applies a function to all vertices of a polytope.
+    /// Applies a linear transformation to all vertices of a polytope.
     pub fn apply(mut self, m: &Matrix) -> Self {
         for v in &mut self.vertices {
             *v = m * v.clone();
@@ -302,10 +302,6 @@ impl Concrete {
         clone.try_dual_mut_with(sphere).map(|_| clone)
     }
 
-    pub fn dual_with(&self, sphere: &Hypersphere) -> Self {
-        self.try_dual_with(sphere).unwrap()
-    }
-
     /// Builds the dual of a polytope with a given reciprocation sphere in
     /// place, or does nothing in case any facets go through the reciprocation
     /// center. In case of failure, returns the index of the facet through the
@@ -366,10 +362,6 @@ impl Concrete {
             .dual(ConData::new(sphere.center.clone()));
 
         Ok(())
-    }
-
-    pub fn dual_mut_with(&mut self, sphere: &Hypersphere) {
-        self.try_dual_mut_with(sphere).unwrap()
     }
 
     pub fn pyramid_with(&self, apex: Point) -> Self {
@@ -439,7 +431,10 @@ impl Concrete {
             let cos = angle.cos();
             let height = ((cos - (2.0 * angle).cos()) * 2.0).sqrt();
 
-            polygon.antiprism_with(&Hypersphere::with_squared_radius(2, cos), height)
+            polygon.antiprism_with(
+                &Hypersphere::with_squared_radius(Point::zeros(2), cos),
+                height,
+            )
         }
         // Digon compounds are a special case.
         else {
@@ -462,16 +457,6 @@ impl Concrete {
                 .element_vertices(el)?
                 .iter()
                 .map(|&v| &self.vertices[v])
-                .collect(),
-        )
-    }
-
-    /// Gets the (geometric) vertices of an element on the polytope.
-    pub fn element_vertices(&self, el: &ElementRef) -> Option<Vec<Point>> {
-        Some(
-            self.element_vertices_ref(el)?
-                .into_iter()
-                .cloned()
                 .collect(),
         )
     }

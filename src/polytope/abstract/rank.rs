@@ -57,11 +57,6 @@ impl Rank {
         self.0
     }
 
-    /// Adds one to the rank, returns it as a `u32`.
-    pub const fn plus_one_u32(&self) -> u32 {
-        self.0 as u32
-    }
-
     /// Subtracts one from the rank.
     pub const fn minus_one(&self) -> Self {
         Self(self.0 - 1)

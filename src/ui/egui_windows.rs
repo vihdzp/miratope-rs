@@ -521,7 +521,7 @@ fn show_windows(
     if let Some(result) = egui_windows.show(egui_ctx.ctx()) {
         match result {
             WindowTypeId::Dual(DualWindow { center, radius }) => {
-                let sphere = Hypersphere::new(center, radius * radius);
+                let sphere = Hypersphere::with_radius(center, radius);
 
                 for mut p in query.iter_mut() {
                     if let Err(err) = p.try_dual_mut_with(&sphere) {
@@ -563,7 +563,7 @@ fn show_windows(
                     squared_radius *= -1.0;
                 }
 
-                let sphere = Hypersphere::new(center, squared_radius);
+                let sphere = Hypersphere::with_squared_radius(center, squared_radius);
 
                 for mut p in query.iter_mut() {
                     match p.try_antiprism_with(&sphere, height) {
