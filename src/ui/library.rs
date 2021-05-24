@@ -24,7 +24,7 @@ pub struct LibraryPlugin;
 impl Plugin for LibraryPlugin {
     fn build(&self, app: &mut bevy::prelude::AppBuilder) {
         app.insert_resource(Library::new_folder(&"./lib/"))
-            .add_system(show_library.system().after("top_panel"));
+            .add_system(show_library.system().after("show_top_panel"));
     }
 }
 

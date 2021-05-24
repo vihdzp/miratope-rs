@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, path::PathBuf};
 
-use super::{camera::ProjectionType, egui_windows::EguiWindows};
+use super::{camera::ProjectionType, egui_windows::EguiWindows, memory::Memory};
 use crate::{
     geometry::{Hyperplane, Point, Vector},
     lang::SelectedLanguage,
@@ -11,7 +11,10 @@ use crate::{
 
 use approx::abs_diff_ne;
 use bevy::prelude::*;
-use bevy_egui::{egui, EguiContext};
+use bevy_egui::{
+    egui::{self, Ui},
+    EguiContext,
+};
 use rfd::FileDialog;
 use strum::IntoEnumIterator;
 
@@ -20,14 +23,20 @@ pub struct TopPanelPlugin;
 impl Plugin for TopPanelPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.insert_resource(FileDialogState::default())
+            .insert_resource(Memory::default())
             .insert_resource(SectionDirection::default())
             .insert_resource(SectionState::default())
             .insert_resource(SelectedLanguage::default())
             .insert_non_send_resource(MainThreadToken::default())
             .add_system(file_dialog.system())
+            .add_system(update_cross_section.system())
             .add_system(update_language.system())
-            .add_system(show_bar.system().label("top_panel").after("show_windows"))
-            .add_system_to_stage(CoreStage::PostUpdate, update_cross_section.system());
+            .add_system(
+                show_top_panel
+                    .system()
+                    .label("show_top_panel")
+                    .after("show_windows"),
+            );
     }
 }
 
@@ -232,8 +241,6 @@ pub fn file_dialog(
 }
 
 /// Updates the cross-section shown.
-///
-/// TODO: separate direction, make update_slice_direction method.
 pub fn update_cross_section(
     mut query: Query<&mut Concrete>,
     mut section_state: ResMut<SectionState>,
@@ -321,7 +328,7 @@ pub fn advanced(keyboard: &Res<Input<KeyCode>>) -> bool {
 
 /// The system that shows the top panel.
 #[allow(clippy::too_many_arguments)]
-pub fn show_bar(
+pub fn show_top_panel(
     egui_ctx: ResMut<EguiContext>,
     mut query: Query<&mut Concrete>,
     keyboard: Res<Input<KeyCode>>,
@@ -330,6 +337,7 @@ pub fn show_bar(
     mut file_dialog_state: ResMut<FileDialogState>,
     mut projection_type: ResMut<ProjectionType>,
     mut selected_language: ResMut<SelectedLanguage>,
+    mut memory: ResMut<Memory>,
     mut egui_windows: ResMut<EguiWindows>,
 ) {
     // The top bar.
@@ -617,6 +625,8 @@ pub fn show_bar(
                 });
             });
 
+            memory.show(ui, &mut query);
+
             // Stuff related to the Polytope Wiki.
             egui::menu::menu(ui, "Wiki", |ui| {
                 // Goes to the wiki main page.
@@ -644,69 +654,80 @@ pub fn show_bar(
             });
         });
 
-        // The cross-section settings.
-        if let SectionState::Active {
-            original_polytope: _,
-            minmax,
-            hyperplane_pos,
-            flatten,
-            lock,
-        } = *section_state
-        {
-            ui.label("Cross section settings:");
-            ui.spacing_mut().slider_width = ui.available_width() / 3.0;
-
-            // Sets the slider range to the range of x coordinates in the polytope.
-            let mut new_hyperplane_pos = hyperplane_pos;
-            ui.add(
-                egui::Slider::new(
-                    &mut new_hyperplane_pos,
-                    (minmax.0 + 0.00001)..=(minmax.1 - 0.00001),
-                )
-                .text("Slice depth")
-                .prefix("pos: "),
-            );
-
-            // Updates the slicing depth.
-            if abs_diff_ne!(hyperplane_pos, new_hyperplane_pos, epsilon = Float::EPS) {
-                section_state.set_pos(new_hyperplane_pos);
-            }
-
-            let mut new_direction = section_direction.0.clone();
-
-            ui.add(UnitPointWidget::new(
-                &mut new_direction,
-                "Cross-section depth:",
-            ));
-
-            // Updates the slicing direction.
-            #[allow(clippy::float_cmp)]
-            if section_direction.0 != new_direction {
-                section_direction.0 = new_direction;
-            }
-
-            ui.horizontal(|ui| {
-                // Makes the current cross-section into the main polytope.
-                if ui.button("Make main").clicked() {
-                    section_state.reset();
-                }
-
-                let mut new_flatten = flatten;
-                ui.add(egui::Checkbox::new(&mut new_flatten, "Flatten"));
-
-                // Updates the flattening setting.
-                if flatten != new_flatten {
-                    section_state.flip_flat();
-                }
-
-                let mut new_lock = lock;
-                ui.add(egui::Checkbox::new(&mut new_lock, "Lock"));
-
-                // Updates the flattening setting.
-                if lock != new_lock {
-                    section_state.flip_lock();
-                }
-            });
-        }
+        // Shows secondary views below the menu bar.
+        show_views(ui, section_state, section_direction);
     });
+}
+
+/// Shows any secondary views that are active. Currently, just shows the
+/// cross-section view.
+fn show_views(
+    ui: &mut Ui,
+    mut section_state: ResMut<SectionState>,
+    mut section_direction: ResMut<SectionDirection>,
+) {
+    // The cross-section settings.
+    if let SectionState::Active {
+        original_polytope: _,
+        minmax,
+        hyperplane_pos,
+        flatten,
+        lock,
+    } = *section_state
+    {
+        ui.label("Cross section settings:");
+        ui.spacing_mut().slider_width = ui.available_width() / 3.0;
+
+        // Sets the slider range to the range of x coordinates in the polytope.
+        let mut new_hyperplane_pos = hyperplane_pos;
+        ui.add(
+            egui::Slider::new(
+                &mut new_hyperplane_pos,
+                (minmax.0 + 0.00001)..=(minmax.1 - 0.00001),
+            )
+            .text("Slice depth")
+            .prefix("pos: "),
+        );
+
+        // Updates the slicing depth.
+        if abs_diff_ne!(hyperplane_pos, new_hyperplane_pos, epsilon = Float::EPS) {
+            section_state.set_pos(new_hyperplane_pos);
+        }
+
+        let mut new_direction = section_direction.0.clone();
+
+        ui.add(UnitPointWidget::new(
+            &mut new_direction,
+            "Cross-section depth:",
+        ));
+
+        // Updates the slicing direction.
+        #[allow(clippy::float_cmp)]
+        if section_direction.0 != new_direction {
+            section_direction.0 = new_direction;
+        }
+
+        ui.horizontal(|ui| {
+            // Makes the current cross-section into the main polytope.
+            if ui.button("Make main").clicked() {
+                section_state.reset();
+            }
+
+            let mut new_flatten = flatten;
+            ui.add(egui::Checkbox::new(&mut new_flatten, "Flatten"));
+
+            // Updates the flattening setting.
+            if flatten != new_flatten {
+                section_state.flip_flat();
+            }
+
+            let mut new_lock = lock;
+            ui.add(egui::Checkbox::new(&mut new_lock, "Lock"));
+
+            // Updates the flattening setting.
+            if lock != new_lock {
+                section_state.flip_lock();
+            }
+        });
+    }
 }

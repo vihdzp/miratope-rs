@@ -9,6 +9,7 @@ pub mod camera;
 pub mod egui_windows;
 pub mod library;
 pub mod main_window;
+pub mod memory;
 pub mod top_panel;
 
 pub struct MiratopePlugins;
