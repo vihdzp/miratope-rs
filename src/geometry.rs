@@ -31,22 +31,23 @@ pub struct Hypersphere {
 }
 
 impl Hypersphere {
+    pub fn new(center: Point, squared_radius: Float) -> Self {
+        Self {
+            center,
+            squared_radius,
+        }
+    }
+
     /// Constructs a hypersphere with a given dimension and radius,
     /// centered at the origin.
     pub fn with_radius(dim: usize, radius: Float) -> Hypersphere {
-        Hypersphere {
-            center: vec![0.0; dim].into(),
-            squared_radius: radius * radius,
-        }
+        Self::new(vec![0.0; dim].into(), radius * radius)
     }
 
     /// Constructs a hypersphere with a given dimension and squared radius,
     /// centered at the origin.
     pub fn with_squared_radius(dim: usize, squared_radius: Float) -> Hypersphere {
-        Hypersphere {
-            center: vec![0.0; dim].into(),
-            squared_radius,
-        }
+        Hypersphere::new(vec![0.0; dim].into(), squared_radius)
     }
 
     /// Represents the unit hypersphere in a certain number of dimensions.

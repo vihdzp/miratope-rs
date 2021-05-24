@@ -638,7 +638,7 @@ mod tests {
 
         // Checks that the polytope can be reloaded correctly.
         assert_eq!(
-            Concrete::from_off(&p.to_off(OffOptions::default()))
+            Concrete::from_off(&p.to_off(Default::default()))
                 .unwrap()
                 .el_counts()
                 .0,

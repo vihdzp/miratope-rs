@@ -58,14 +58,14 @@ use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::EguiPlugin;
-use lang::SelectedLanguage;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
-use polytope::concrete::{file::off::OffOptions, Concrete};
+use polytope::concrete::Concrete;
 use ui::{
     camera::{CameraInputEvent, ProjectionType},
     library::Library,
-    FileDialogState, SectionDirection, SectionState,
+    top_panel::FileDialogState,
+    windows::EguiWindows,
 };
 
 mod geometry;
@@ -112,25 +112,21 @@ fn main() {
     App::build()
         // Adds resources.
         .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
-        .insert_resource(Msaa { samples: 4 })
-        .insert_resource(SectionState::default())
+        .insert_resource(EguiWindows::default())
         .insert_resource(FileDialogState::default())
-        .insert_resource(SectionDirection::default())
-        .insert_resource(ProjectionType::Perspective)
         .insert_resource(Library::new_folder(&"./lib/"))
-        .insert_resource(SelectedLanguage::default())
-        .insert_non_send_resource(ui::MainThreadToken::default())
+        .insert_resource(Msaa { samples: 4 })
         // Adds plugins.
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
+        .add_plugin(ui::windows::EguiWindowPlugin)
         .add_plugin(ui::camera::InputPlugin)
+        // TODO: separate these into stages so that they load in a predetermined order.
+        .add_plugin(ui::library::LibraryPlugin)
+        .add_plugin(ui::top_panel::TopPanelPlugin)
         // Adds systems.
         .add_startup_system(setup.system())
         .add_system(ui::update_scale_factor.system())
-        .add_system(ui::file_dialog.system())
-        .add_system(ui::update_language.system())
-        .add_system(ui::ui.system())
-        .add_system_to_stage(CoreStage::PostUpdate, ui::update_cross_section.system())
         .add_system_to_stage(CoreStage::PostUpdate, ui::update_changed_polytopes.system())
         .run();
 }
@@ -165,8 +161,8 @@ fn setup(
     );
 
     // Camera configuration.
-    let mut cam_anchor = Transform::default();
-    let mut cam = Transform::default();
+    let mut cam_anchor = Default::default();
+    let mut cam = Default::default();
     CameraInputEvent::reset(&mut cam_anchor, &mut cam);
 
     commands

@@ -260,7 +260,7 @@ impl<'a> MeshBuilder<'a> {
                         path.id_iter(),
                         &path,
                         None,
-                        &FillOptions::with_fill_rule(FillOptions::default(), FillRule::EvenOdd),
+                        &FillOptions::with_fill_rule(Default::default(), FillRule::EvenOdd),
                         &mut BuffersBuilder::new(&mut geometry, |vertex: FillVertex| {
                             vertex.sources().next().unwrap()
                         }),

@@ -16,7 +16,7 @@ use self::{
     rank::{Rank, RankVec},
 };
 use super::Polytope;
-use crate::lang::name::{Abs, AbsData, Name};
+use crate::lang::name::{Abs, Name};
 
 use strum_macros::Display;
 
@@ -876,7 +876,7 @@ impl Polytope<Abs> for Abstract {
         poly.push(edges);
         poly.push_max();
 
-        poly.build().with_name(Name::polygon(AbsData::default(), n))
+        poly.build().with_name(Name::polygon(Default::default(), n))
     }
 
     /// Converts a polytope into its dual. Use [`Self::dual`] instead, as this method
@@ -897,7 +897,7 @@ impl Polytope<Abs> for Abstract {
         }
 
         self.ranks.reverse();
-        self.name = self.name.clone().dual(AbsData::default());
+        self.name = self.name.clone().dual(Default::default());
 
         Ok(())
     }

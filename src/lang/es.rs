@@ -311,7 +311,7 @@ impl Language for Es {
                 component,
                 Options {
                     count: rep,
-                    ..Options::default()
+                    ..Default::default()
                 },
             )
         };

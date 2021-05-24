@@ -719,7 +719,7 @@ pub trait Language: Prefix {
                 component,
                 Options {
                     count: rep,
-                    ..Options::default()
+                    ..Default::default()
                 },
             )
         };

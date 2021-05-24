@@ -31,15 +31,13 @@ impl ProjectionType {
     }
 }
 
-/// The plugin handling all input.
-///
-/// This plugin handles just camera controls at the moment, but when we set up
-/// a GUI at some point, this will also handle the input for that.
+/// The plugin handling all camera input.
 pub struct InputPlugin;
 
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_event::<CameraInputEvent>()
+            .insert_resource(ProjectionType::Perspective)
             .add_system_to_stage(CoreStage::PostUpdate, add_cam_input_events.system())
             .add_system(update_cameras_and_anchors.system());
     }

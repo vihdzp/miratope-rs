@@ -399,7 +399,7 @@ impl OrientedFlag {
     pub fn with_capacity(rank: usize) -> Self {
         Self {
             flag: Flag::with_capacity(rank),
-            orientation: Orientation::default(),
+            orientation: Default::default(),
         }
     }
 

@@ -16,15 +16,15 @@ impl Language for Dbg {
     }
 
     fn pyramid_of<T: NameType>(base: &Name<T>, _options: Options) -> String {
-        format!("({}) pyramid", Self::parse(base, Options::default()))
+        format!("({}) pyramid", Self::parse(base, Default::default()))
     }
 
     fn prism_of<T: NameType>(base: &Name<T>, _options: Options) -> String {
-        format!("({}) prism", Self::parse(base, Options::default()))
+        format!("({}) prism", Self::parse(base, Default::default()))
     }
 
     fn tegum_of<T: NameType>(base: &Name<T>, _options: Options) -> String {
-        format!("({}) tegum", Self::parse(base, Options::default()))
+        format!("({}) tegum", Self::parse(base, Default::default()))
     }
 
     fn simplex(rank: Rank, _options: Options) -> String {

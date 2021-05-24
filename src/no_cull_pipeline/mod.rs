@@ -43,7 +43,7 @@ pub fn build_no_cull_pipeline(shaders: &mut Assets<Shader>) -> PipelineDescripto
             },
         }),
         color_target_states: vec![ColorTargetState {
-            format: TextureFormat::default(),
+            format: Default::default(),
             blend: Some(BlendState {
                 alpha: BlendComponent {
                     src_factor: BlendFactor::One,
