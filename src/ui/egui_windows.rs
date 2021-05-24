@@ -503,6 +503,8 @@ impl EguiWindows {
         action_window
     }
 
+    /// Updates the window's settings whenever the rank of the polytope is
+    /// updated.
     pub fn update(&mut self, rank: Rank) {
         for window in self.iter_mut() {
             window.update(rank);

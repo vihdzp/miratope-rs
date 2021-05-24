@@ -51,7 +51,7 @@ impl<'a> Widget for PointWidget<'a> {
     }
 }
 
-/// A widget that sets a point of unit norm.
+/// A widget that sets up a point of unit norm.
 pub struct UnitPointWidget<'a>(PointWidget<'a>);
 
 impl<'a> UnitPointWidget<'a> {
@@ -62,11 +62,12 @@ impl<'a> UnitPointWidget<'a> {
 
 impl<'a> Widget for UnitPointWidget<'a> {
     fn ui(self, ui: &mut Ui) -> egui::Response {
-        let old_point = self.0.point.clone();
-        let mut modified_coord = 0;
-
         ui.horizontal(|ui| {
             ui.label(self.0.label);
+
+            let old_point = self.0.point.clone();
+            let mut modified_coord = 0;
+
             for (idx, coord) in self.0.point.iter_mut().enumerate() {
                 ui.add(egui::DragValue::new(coord).speed(0.01));
 

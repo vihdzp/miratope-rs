@@ -1,4 +1,4 @@
-//! Loads and displays the Miratope library/
+//! Loads and displays the Miratope library.
 
 use std::{
     ffi::{OsStr, OsString},

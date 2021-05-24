@@ -440,7 +440,6 @@ pub fn show_bar(
                     // Converts the active polytope into its antiprism.
                     if ui.button("Antiprism").clicked() {
                         if advanced(&keyboard) {
-                            println!("Advanced antiprism");
                             egui_windows.push(AntiprismWindow::default_with(
                                 query.iter_mut().next().unwrap().rank(),
                             ));
