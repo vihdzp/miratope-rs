@@ -6,15 +6,22 @@ use crate::{lang::En, polytope::concrete::Concrete};
 const MEMORY_SLOTS: usize = 8;
 
 /// Represents the memory slots to store polytopes.
+#[derive(Default)]
 pub struct Memory([Option<Concrete>; MEMORY_SLOTS]);
 
-impl std::default::Default for Memory {
-    fn default() -> Self {
-        Self(Default::default())
+impl std::ops::Index<usize> for Memory {
+    type Output = Option<Concrete>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
     }
 }
 
 impl Memory {
+    pub fn iter(&self) -> std::slice::Iter<Option<Concrete>> {
+        self.0.iter()
+    }
+
     pub fn show(&mut self, ui: &mut Ui, query: &mut Query<&mut Concrete>) {
         use crate::lang::Language;
 

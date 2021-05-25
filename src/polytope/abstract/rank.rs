@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 ///
 /// Externally, it behaves as a number from -1 onwards. Internally, it contains
 /// a signed integer, representing the rank plus 1.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug, Hash, Serialize, Deserialize)]
+#[derive(
+    PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Debug, Hash, Serialize, Deserialize,
+)]
 pub struct Rank(usize);
 
 impl Rank {
@@ -98,13 +100,6 @@ impl Rank {
         } else {
             Some(Self(lhs - rhs))
         }
-    }
-}
-
-/// Default rank.
-impl std::default::Default for Rank {
-    fn default() -> Self {
-        Self(Default::default())
     }
 }
 

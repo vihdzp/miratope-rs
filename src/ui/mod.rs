@@ -56,6 +56,7 @@ impl<'a> Widget for PointWidget<'a> {
 pub struct UnitPointWidget<'a>(PointWidget<'a>);
 
 impl<'a> UnitPointWidget<'a> {
+    /// Initializes a new unit point widget.
     pub fn new(point: &'a mut Point, label: impl ToString) -> Self {
         Self(PointWidget::new(point, label))
     }

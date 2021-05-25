@@ -388,103 +388,109 @@ pub fn show_top_panel(
             // Operations on polytopes.
             egui::menu::menu(ui, "Polytope", |ui| {
                 ui.collapsing("Operations", |ui| {
-                    // Converts the active polytope into its dual.
-                    if ui.button("Dual").clicked() {
-                        if advanced(&keyboard) {
-                            egui_windows.push(DualWindow::default_with(
-                                query.iter_mut().next().unwrap().rank(),
-                            ));
-                        } else {
-                            for mut p in query.iter_mut() {
-                                match p.try_dual_mut() {
-                                    Ok(_) => println!("Dual succeeded."),
-                                    Err(idx) => println!(
+                    ui.collapsing("Simple", |ui| {
+                        // Converts the active polytope into its dual.
+                        if ui.button("Dual").clicked() {
+                            if advanced(&keyboard) {
+                                egui_windows.push(DualWindow::default_with(
+                                    query.iter_mut().next().unwrap().rank(),
+                                ));
+                            } else {
+                                for mut p in query.iter_mut() {
+                                    match p.try_dual_mut() {
+                                        Ok(_) => println!("Dual succeeded."),
+                                        Err(idx) => println!(
                                         "Dual failed: Facet {} passes through inversion center.",
                                         idx
                                     ),
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    ui.separator();
-                    // Makes a pyramid out of the current polytope.
-                    if ui.button("Pyramid").clicked() {
-                        if advanced(&keyboard) {
-                            egui_windows.push(PyramidWindow::default_with(
-                                query.iter_mut().next().unwrap().rank(),
-                            ));
-                        } else {
-                            for mut p in query.iter_mut() {
-                                *p = p.pyramid();
+                        ui.separator();
+                        // Makes a pyramid out of the current polytope.
+                        if ui.button("Pyramid").clicked() {
+                            if advanced(&keyboard) {
+                                egui_windows.push(PyramidWindow::default_with(
+                                    query.iter_mut().next().unwrap().rank(),
+                                ));
+                            } else {
+                                for mut p in query.iter_mut() {
+                                    *p = p.pyramid();
+                                }
                             }
                         }
-                    }
 
-                    // Makes a prism out of the current polytope.
-                    if ui.button("Prism").clicked() {
-                        if advanced(&keyboard) {
-                            egui_windows.push(PrismWindow::default());
-                        } else {
-                            for mut p in query.iter_mut() {
-                                *p = p.prism();
+                        // Makes a prism out of the current polytope.
+                        if ui.button("Prism").clicked() {
+                            if advanced(&keyboard) {
+                                egui_windows.push(PrismWindow::default());
+                            } else {
+                                for mut p in query.iter_mut() {
+                                    *p = p.prism();
+                                }
                             }
                         }
-                    }
 
-                    // Makes a tegum out of the current polytope.
-                    if ui.button("Tegum").clicked() {
-                        if advanced(&keyboard) {
-                            egui_windows.push(TegumWindow::default_with(
-                                query.iter_mut().next().unwrap().rank(),
-                            ));
-                        } else {
-                            for mut p in query.iter_mut() {
-                                *p = p.tegum();
+                        // Makes a tegum out of the current polytope.
+                        if ui.button("Tegum").clicked() {
+                            if advanced(&keyboard) {
+                                egui_windows.push(TegumWindow::default_with(
+                                    query.iter_mut().next().unwrap().rank(),
+                                ));
+                            } else {
+                                for mut p in query.iter_mut() {
+                                    *p = p.tegum();
+                                }
                             }
                         }
-                    }
 
-                    // Converts the active polytope into its antiprism.
-                    if ui.button("Antiprism").clicked() {
-                        if advanced(&keyboard) {
-                            egui_windows.push(AntiprismWindow::default_with(
-                                query.iter_mut().next().unwrap().rank(),
-                            ));
-                        } else {
-                            for mut p in query.iter_mut() {
-                                match p.try_antiprism() {
-                                    Ok(q) => *p = q,
-                                    Err(idx) => println!(
+                        // Converts the active polytope into its antiprism.
+                        if ui.button("Antiprism").clicked() {
+                            if advanced(&keyboard) {
+                                egui_windows.push(AntiprismWindow::default_with(
+                                    query.iter_mut().next().unwrap().rank(),
+                                ));
+                            } else {
+                                for mut p in query.iter_mut() {
+                                    match p.try_antiprism() {
+                                        Ok(q) => *p = q,
+                                        Err(idx) => println!(
                                         "Dual failed: Facet {} passes through inversion center.",
                                         idx
                                     ),
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    // Converts the active polytope into its Petrial.
-                    if ui.button("Petrial").clicked() {
-                        for mut p in query.iter_mut() {
-                            match p.petrial_mut() {
-                                Ok(_) => println!("Petrial succeeded."),
-                                Err(_) => println!("Petrial failed."),
-                            }
-                        }
-                    }
-
-                    // Converts the active polytope into its Petrie polygon.
-                    if ui.button("Petrie polygon").clicked() {
-                        for mut p in query.iter_mut() {
-                            match p.petrie_polygon() {
-                                Some(q) => {
-                                    *p = q;
-                                    println!("Petrie polygon succeeded.")
+                        // Converts the active polytope into its Petrial.
+                        if ui.button("Petrial").clicked() {
+                            for mut p in query.iter_mut() {
+                                match p.petrial_mut() {
+                                    Ok(_) => println!("Petrial succeeded."),
+                                    Err(_) => println!("Petrial failed."),
                                 }
-                                None => println!("Petrie polygon failed."),
                             }
                         }
+
+                        // Converts the active polytope into its Petrie polygon.
+                        if ui.button("Petrie polygon").clicked() {
+                            for mut p in query.iter_mut() {
+                                match p.petrie_polygon() {
+                                    Some(q) => {
+                                        *p = q;
+                                        println!("Petrie polygon succeeded.")
+                                    }
+                                    None => println!("Petrie polygon failed."),
+                                }
+                            }
+                        }
+                    });
+
+                    if ui.button("Multiprism").clicked() {
+                        egui_windows.push(MultiprismWindow::default())
                     }
 
                     ui.separator();

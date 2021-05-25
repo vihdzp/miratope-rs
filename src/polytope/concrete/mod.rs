@@ -378,10 +378,10 @@ impl Concrete {
         Concrete::star_polygon(n, d).prism_with(2.0 * (Float::PI * d as Float / n as Float).sin())
     }
 
-    pub fn tegum_with(&self, apex: Point, zenith: Point) -> Self {
+    pub fn tegum_with(&self, apex1: Point, apex2: Point) -> Self {
         let mut poly = self.tegum();
-        poly.vertices[0] = apex;
-        poly.vertices[1] = zenith;
+        poly.vertices[0] = apex1;
+        poly.vertices[1] = apex2;
         poly
     }
 

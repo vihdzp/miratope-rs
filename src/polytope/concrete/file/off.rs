@@ -21,14 +21,8 @@ use crate::{
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 
 /// Row, column.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct Position(u32, u32);
-
-impl std::default::Default for Position {
-    fn default() -> Self {
-        Self(0, 0)
-    }
-}
 
 impl Position {
     pub fn next(&mut self) {
