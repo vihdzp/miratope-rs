@@ -1,9 +1,10 @@
 //! Sets up the windows that permit more advanced settings.
 
-use super::{memory::Memory, PointWidget};
+use std::marker::PhantomData;
+
+use super::PointWidget;
 use crate::{
     geometry::{Hypersphere, Point},
-    lang::{En, Language},
     polytope::{concrete::Concrete, r#abstract::rank::Rank},
     Float,
 };
@@ -14,17 +15,31 @@ use bevy_egui::{
     EguiContext,
 };
 
+/// The result of showing a window, updated every frame.
+pub enum ShowResult {
+    /// Nothing special happens.
+    None,
+
+    /// A window is closed.
+    Close,
+
+    /// A window is reset to its default state.
+    Reset,
+
+    /// A window runs some action.
+    Ok,
+}
+
 /// The plugin controlling these windows.
 pub struct EguiWindowPlugin;
 
 impl Plugin for EguiWindowPlugin {
     fn build(&self, app: &mut bevy::prelude::AppBuilder) {
-        app.insert_resource(EguiWindows::default())
-            .add_system_to_stage(
-                CoreStage::Update,
-                show_windows.system().label("show_windows"),
-            )
-            .add_system_to_stage(CoreStage::PostUpdate, update_windows.system());
+        app.add_plugin(DualWindow::plugin())
+            .add_plugin(PyramidWindow::plugin())
+            .add_plugin(PrismWindow::plugin())
+            .add_plugin(TegumWindow::plugin())
+            .add_plugin(AntiprismWindow::plugin());
     }
 }
 
@@ -56,53 +71,143 @@ fn resize(point: Point, rank: Rank) -> Point {
     point.resize_vertically(rank.try_usize().unwrap_or(0), 0.0)
 }
 
-/// Trait for a type defining a window.
-pub trait WindowType: Into<WindowTypeId> {
-    /// The unique name for the window, showed as a title.
+/// The base trait for a window, containing the common code. You probably don't
+/// want to implement **only** this.
+pub trait Window: Send + Sync + Sized + Default {
     const NAME: &'static str;
 
-    /// The number of dimensions of the polytope on screen, used to set up the
-    /// window.
-    fn rank(&self) -> Rank;
+    /// Returns whether the window is open.
+    fn is_open(&self) -> bool;
 
-    /// The default state of the window, when the polytope on the screen has a
-    /// given rank.
-    fn default_with(rank: Rank) -> Self;
+    /// Returns a mutable reference to the variable that determines whether the
+    /// window is open.
+    fn is_open_mut(&mut self) -> &mut bool;
 
-    /// Resets a window to its default state.
-    fn reset(&mut self) {
-        *self = Self::default_with(self.rank())
+    /// Opens a window.
+    fn open(&mut self) {
+        *self.is_open_mut() = true;
+    }
+
+    /// Closes a window.   
+    fn close(&mut self) {
+        *self.is_open_mut() = false;
     }
 
     /// Builds the window to be shown on screen.
-    fn build(&mut self, ui: &mut Ui, memory: &Res<Memory>);
+    fn build(&mut self, ui: &mut Ui);
 
     /// Shows the window on screen.
-    fn show(&mut self, ctx: &CtxRef, memory: &Res<Memory>) -> ShowResult {
-        let mut open = true;
+    fn show(&mut self, ctx: &CtxRef) -> ShowResult {
+        let mut open = self.is_open();
         let mut result = ShowResult::None;
 
         egui::Window::new(Self::NAME)
             .open(&mut open)
             .resizable(false)
             .show(ctx, |ui| {
-                self.build(ui, memory);
+                self.build(ui);
                 ui.add(OkReset::new(&mut result));
             });
 
         if open {
+            *self.is_open_mut() = true;
             result
         } else {
             ShowResult::Close
         }
     }
+}
 
-    /// Updates the window's settings after the polytope's dimension is updated.
+/// A window that doesn't depend on any resources other than itself, and that
+/// doesn't need to be updated when the polytope is changed.
+pub trait PlainWindow: Window {
+    /// This should be [`PlainWindowPlugin<Self>`] if the type does not
+    /// implement [`UpdateWindow`], and [`UpdateWindowPlugin<Self>`] otherwise.
+    type PluginType: Default + Plugin;
+
+    /// Applies the action of the window to the polytope.
+    fn action(&self, polytope: &mut Concrete);
+
+    /// The system that shows the window.
+    fn show_system(
+        mut self_: ResMut<Self>,
+        egui_ctx: Res<EguiContext>,
+        mut query: Query<&mut Concrete>,
+    ) where
+        Self: 'static,
+    {
+        if matches!(self_.show(egui_ctx.ctx()), ShowResult::Ok) {
+            for mut polytope in query.iter_mut() {
+                self_.action(&mut *polytope);
+            }
+
+            self_.close();
+        }
+    }
+
+    /// A plugin that adds a resource of type `Self` and the system to show it.
+    fn plugin() -> Self::PluginType {
+        Default::default()
+    }
+}
+
+/// A plugin that adds all of the necessary systems for a [`PlainWindow`].
+#[derive(Default)]
+pub struct PlainWindowPlugin<T: PlainWindow>(PhantomData<T>);
+
+impl<T: PlainWindow + 'static> Plugin for PlainWindowPlugin<T> {
+    fn build(&self, app: &mut AppBuilder) {
+        app.insert_resource(T::default())
+            .add_system(T::show_system.system().label("show_windows"));
+    }
+}
+
+/// A window that doesn't depend on any resources other than itself, but needs
+/// to be updated when the rank of the polytope is changed.
+pub trait UpdateWindow: PlainWindow {
+    /// The rank of the polytope on the screen.
+    fn rank(&self) -> Rank;
+
+    /// The default state of the window, when the polytope on the screen has a
+    /// given rank.
+    fn default_with(rank: Rank) -> Self;
+
+    /// Updates the window when the rank of the polytope is updated.
     fn update(&mut self, rank: Rank);
+
+    /// The system that updates the window when the rank of the polytope is
+    /// updated.
+    fn update_system(
+        mut self_: ResMut<Self>,
+        query: Query<(&Concrete, &Handle<Mesh>, &Children), Changed<Concrete>>,
+    ) where
+        Self: 'static,
+    {
+        use crate::polytope::Polytope;
+
+        if let Some((poly, _, _)) = query.iter().next() {
+            self_.update(poly.rank());
+        }
+    }
+}
+
+/// A plugin that adds all of the necessary systems for an [`UpdateWindow`].
+#[derive(Default)]
+pub struct UpdateWindowPlugin<T: UpdateWindow>(PhantomData<T>);
+
+impl<T: UpdateWindow + 'static> Plugin for UpdateWindowPlugin<T> {
+    fn build(&self, app: &mut AppBuilder) {
+        app.insert_resource(T::default())
+            .add_system(T::show_system.system().label("show_windows"))
+            .add_system(T::update_system.system().label("show_windows"));
+    }
 }
 
 /// A window that allows the user to build a dual with a specified hypersphere.
 pub struct DualWindow {
+    /// Whether the window is open.
+    open: bool,
+
     /// The center of the sphere.
     center: Point,
 
@@ -110,21 +215,28 @@ pub struct DualWindow {
     radius: Float,
 }
 
-impl WindowType for DualWindow {
-    const NAME: &'static str = "Dual";
-
-    fn rank(&self) -> Rank {
-        Rank::from(self.center.len())
-    }
-
-    fn default_with(rank: Rank) -> Self {
+impl Default for DualWindow {
+    fn default() -> Self {
         Self {
-            center: Point::zeros(rank.try_usize().unwrap_or(0)),
+            open: false,
+            center: Point::zeros(3),
             radius: 1.0,
         }
     }
+}
 
-    fn build(&mut self, ui: &mut Ui, _: &Res<Memory>) {
+impl Window for DualWindow {
+    const NAME: &'static str = "Dual";
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.open
+    }
+
+    fn build(&mut self, ui: &mut Ui) {
         ui.add(PointWidget::new(&mut self.center, "Center:"));
 
         ui.horizontal(|ui| {
@@ -136,20 +248,42 @@ impl WindowType for DualWindow {
             );
         });
     }
+}
+
+impl PlainWindow for DualWindow {
+    type PluginType = UpdateWindowPlugin<Self>;
+
+    fn action(&self, polytope: &mut Concrete) {
+        let sphere = Hypersphere::with_radius(self.center.clone(), self.radius);
+
+        if let Err(err) = polytope.try_dual_mut_with(&sphere) {
+            println!("{:?}", err);
+        }
+    }
+}
+
+impl UpdateWindow for DualWindow {
+    fn rank(&self) -> Rank {
+        Rank::from(self.center.len())
+    }
+
+    fn default_with(rank: Rank) -> Self {
+        Self {
+            center: Point::zeros(rank.try_usize().unwrap_or(0)),
+            ..Default::default()
+        }
+    }
 
     fn update(&mut self, rank: Rank) {
         self.center = resize(self.center.clone(), rank);
     }
 }
 
-impl From<DualWindow> for WindowTypeId {
-    fn from(dual: DualWindow) -> Self {
-        WindowTypeId::Dual(dual)
-    }
-}
-
 /// A window that allows the user to build a pyramid with a specified apex.
 pub struct PyramidWindow {
+    /// Whether the window is open.
+    open: bool,
+
     /// How much the apex is offset from the origin.
     offset: Point,
 
@@ -157,21 +291,28 @@ pub struct PyramidWindow {
     height: Float,
 }
 
-impl WindowType for PyramidWindow {
-    const NAME: &'static str = "Pyramid";
-
-    fn rank(&self) -> Rank {
-        Rank::from(self.offset.len())
-    }
-
-    fn default_with(rank: Rank) -> Self {
+impl Default for PyramidWindow {
+    fn default() -> Self {
         Self {
-            offset: Point::zeros(rank.try_usize().unwrap_or(0)),
+            open: false,
+            offset: Point::zeros(3),
             height: 1.0,
         }
     }
+}
 
-    fn build(&mut self, ui: &mut Ui, _: &Res<Memory>) {
+impl Window for PyramidWindow {
+    const NAME: &'static str = "Pyramid";
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.open
+    }
+
+    fn build(&mut self, ui: &mut Ui) {
         ui.add(PointWidget::new(&mut self.offset, "Offset:"));
 
         ui.horizontal(|ui| {
@@ -183,36 +324,54 @@ impl WindowType for PyramidWindow {
             );
         });
     }
+}
+
+impl PlainWindow for PyramidWindow {
+    type PluginType = UpdateWindowPlugin<Self>;
+
+    fn action(&self, polytope: &mut Concrete) {
+        *polytope = polytope.pyramid_with(self.offset.push(self.height));
+    }
+}
+
+impl UpdateWindow for PyramidWindow {
+    fn rank(&self) -> Rank {
+        Rank::from(self.offset.len())
+    }
+
+    fn default_with(rank: Rank) -> Self {
+        Self {
+            offset: Point::zeros(rank.try_usize().unwrap_or(0)),
+            ..Default::default()
+        }
+    }
 
     fn update(&mut self, rank: Rank) {
         self.offset = resize(self.offset.clone(), rank);
     }
 }
 
-impl From<PyramidWindow> for WindowTypeId {
-    fn from(pyramid: PyramidWindow) -> Self {
-        WindowTypeId::Pyramid(pyramid)
-    }
-}
-
 /// Allows the user to build a prism with a given height.
 pub struct PrismWindow {
+    /// Whether the window is open.
+    open: bool,
+
     /// The height of the prism.
     height: Float,
 }
 
-impl WindowType for PrismWindow {
+impl Window for PrismWindow {
     const NAME: &'static str = "Prism";
 
-    fn rank(&self) -> Rank {
-        Default::default()
+    fn is_open(&self) -> bool {
+        self.open
     }
 
-    fn default_with(_: Rank) -> Self {
-        Default::default()
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.open
     }
 
-    fn build(&mut self, ui: &mut Ui, _: &Res<Memory>) {
+    fn build(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {
             ui.label("Height:");
             ui.add(
@@ -222,24 +381,30 @@ impl WindowType for PrismWindow {
             );
         });
     }
-
-    fn update(&mut self, _: Rank) {}
 }
 
-impl From<PrismWindow> for WindowTypeId {
-    fn from(prism: PrismWindow) -> Self {
-        WindowTypeId::Prism(prism)
+impl PlainWindow for PrismWindow {
+    type PluginType = PlainWindowPlugin<Self>;
+
+    fn action(&self, polytope: &mut Concrete) {
+        *polytope = polytope.prism_with(self.height);
     }
 }
 
 impl Default for PrismWindow {
     fn default() -> Self {
-        Self { height: 1.0 }
+        Self {
+            open: false,
+            height: 1.0,
+        }
     }
 }
 
 /// Allows the user to build a tegum with the specified apices and a height.
 pub struct TegumWindow {
+    /// Whether the window is open.
+    open: bool,
+
     /// The offset of the apices from the origin.
     offset: Point,
 
@@ -250,22 +415,29 @@ pub struct TegumWindow {
     height_offset: Float,
 }
 
-impl WindowType for TegumWindow {
-    const NAME: &'static str = "Tegum";
-
-    fn rank(&self) -> Rank {
-        Rank::from(self.offset.len())
-    }
-
-    fn default_with(rank: Rank) -> Self {
+impl Default for TegumWindow {
+    fn default() -> Self {
         Self {
-            offset: Point::zeros(rank.try_usize().unwrap_or(0)),
+            open: false,
+            offset: Point::zeros(3),
             height: 1.0,
             height_offset: 0.0,
         }
     }
+}
 
-    fn build(&mut self, ui: &mut Ui, _: &Res<Memory>) {
+impl Window for TegumWindow {
+    const NAME: &'static str = "Tegum";
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.open
+    }
+
+    fn build(&mut self, ui: &mut Ui) {
         ui.add(PointWidget::new(&mut self.offset, "Offset:"));
 
         ui.horizontal(|ui| {
@@ -282,15 +454,35 @@ impl WindowType for TegumWindow {
             ui.add(egui::DragValue::new(&mut self.height_offset).speed(0.01));
         });
     }
+}
 
-    fn update(&mut self, rank: Rank) {
-        self.offset = resize(self.offset.clone(), rank);
+impl PlainWindow for TegumWindow {
+    type PluginType = UpdateWindowPlugin<Self>;
+
+    fn action(&self, polytope: &mut Concrete) {
+        let half_height = self.height / 2.0;
+
+        *polytope = polytope.tegum_with(
+            self.offset.push(self.height_offset + half_height),
+            self.offset.push(self.height_offset - half_height),
+        );
     }
 }
 
-impl From<TegumWindow> for WindowTypeId {
-    fn from(tegum: TegumWindow) -> Self {
-        Self::Tegum(tegum)
+impl UpdateWindow for TegumWindow {
+    fn rank(&self) -> Rank {
+        Rank::from(self.offset.len())
+    }
+
+    fn default_with(rank: Rank) -> Self {
+        Self {
+            offset: Point::zeros(rank.try_usize().unwrap_or(0)),
+            ..Default::default()
+        }
+    }
+
+    fn update(&mut self, rank: Rank) {
+        self.offset = resize(self.offset.clone(), rank);
     }
 }
 
@@ -302,22 +494,28 @@ pub struct AntiprismWindow {
     retroprism: bool,
 }
 
-impl WindowType for AntiprismWindow {
-    const NAME: &'static str = "Antiprism";
-
-    fn rank(&self) -> Rank {
-        self.dual.rank()
-    }
-
-    fn default_with(rank: Rank) -> Self {
+impl Default for AntiprismWindow {
+    fn default() -> Self {
         Self {
-            dual: DualWindow::default_with(rank),
+            dual: Default::default(),
             height: 1.0,
             retroprism: false,
         }
     }
+}
 
-    fn build(&mut self, ui: &mut Ui, _: &Res<Memory>) {
+impl Window for AntiprismWindow {
+    const NAME: &'static str = "Antiprism";
+
+    fn is_open(&self) -> bool {
+        self.dual.open
+    }
+
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.dual.open
+    }
+
+    fn build(&mut self, ui: &mut Ui) {
         ui.add(PointWidget::new(&mut self.dual.center, "Center:"));
 
         ui.horizontal(|ui| {
@@ -337,316 +535,40 @@ impl WindowType for AntiprismWindow {
             );
         });
     }
+}
+
+impl PlainWindow for AntiprismWindow {
+    type PluginType = UpdateWindowPlugin<Self>;
+
+    fn action(&self, polytope: &mut Concrete) {
+        let radius = self.dual.radius;
+        let mut squared_radius = radius * radius;
+        if self.retroprism {
+            squared_radius *= -1.0;
+        }
+
+        let sphere = Hypersphere::with_squared_radius(self.dual.center.clone(), squared_radius);
+
+        match polytope.try_antiprism_with(&sphere, self.height) {
+            Ok(antiprism) => *polytope = antiprism,
+            Err(err) => println!("{:?}", err),
+        }
+    }
+}
+
+impl UpdateWindow for AntiprismWindow {
+    fn rank(&self) -> Rank {
+        self.dual.rank()
+    }
+
+    fn default_with(rank: Rank) -> Self {
+        Self {
+            dual: DualWindow::default_with(rank),
+            ..Default::default()
+        }
+    }
 
     fn update(&mut self, rank: Rank) {
         self.dual.update(rank);
-    }
-}
-
-impl From<AntiprismWindow> for WindowTypeId {
-    fn from(antiprism: AntiprismWindow) -> Self {
-        WindowTypeId::Antiprism(antiprism)
-    }
-}
-
-pub struct MultiprismWindow {
-    selected_slots: Vec<Option<usize>>,
-}
-
-impl WindowType for MultiprismWindow {
-    const NAME: &'static str = "Multiprism";
-
-    fn rank(&self) -> Rank {
-        Default::default()
-    }
-
-    fn default_with(_: Rank) -> Self {
-        Default::default()
-    }
-
-    fn build(&mut self, ui: &mut Ui, memory: &Res<Memory>) {
-        for (selected_slot_idx, selected_slot) in self.selected_slots.iter_mut().enumerate() {
-            let selected_text = match selected_slot {
-                None => "Select".to_string(),
-                Some(selected_idx) => En::parse(
-                    &memory[*selected_idx].as_ref().unwrap().name,
-                    Default::default(),
-                ),
-            };
-
-            egui::ComboBox::from_label(format!("#{}", selected_slot_idx))
-                .selected_text(selected_text)
-                .show_ui(ui, |ui| {
-                    for (slot_idx, poly) in memory
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(idx, s)| s.as_ref().map(|s| (idx, s)))
-                    {
-                        let mut slot_inner = 69;
-
-                        ui.selectable_value(
-                            &mut slot_inner,
-                            slot_idx,
-                            En::parse(&poly.name, Default::default()),
-                        );
-
-                        if slot_inner != 69 {
-                            *selected_slot = Some(slot_inner);
-                        }
-                    }
-                });
-        }
-    }
-
-    fn update(&mut self, _: Rank) {}
-}
-
-impl Default for MultiprismWindow {
-    fn default() -> Self {
-        Self {
-            selected_slots: vec![None, None],
-        }
-    }
-}
-
-impl From<MultiprismWindow> for WindowTypeId {
-    fn from(multiprism: MultiprismWindow) -> Self {
-        Self::Multiprism(multiprism)
-    }
-}
-
-/// Makes sure that every window type is associated a unique ID (its enum
-/// discriminant), which we can then use to test whether it's already in the
-/// list of windows.
-///
-/// `dyn WindowType` won't work here, so don't bother.
-pub enum WindowTypeId {
-    Dual(DualWindow),
-    Pyramid(PyramidWindow),
-    Prism(PrismWindow),
-    Tegum(TegumWindow),
-    Antiprism(AntiprismWindow),
-    Multiprism(MultiprismWindow),
-}
-
-/// Compares by discriminant.
-impl std::cmp::PartialEq for WindowTypeId {
-    fn eq(&self, other: &Self) -> bool {
-        std::mem::discriminant(self) == std::mem::discriminant(other)
-    }
-}
-
-impl std::cmp::Eq for WindowTypeId {}
-
-/// The result of showing a window, updated every frame.
-pub enum ShowResult {
-    /// Nothing special happens.
-    None,
-
-    /// A window is closed.
-    Close,
-
-    /// A window is reset to its default state.
-    Reset,
-
-    /// A window runs some action.
-    Ok,
-}
-
-impl WindowTypeId {
-    /// Shows a given window on a given context.
-    pub fn show(&mut self, ctx: &CtxRef, memory: &Res<Memory>) -> ShowResult {
-        match self {
-            Self::Dual(window) => window.show(ctx, memory),
-            Self::Pyramid(window) => window.show(ctx, memory),
-            Self::Prism(window) => window.show(ctx, memory),
-            Self::Tegum(window) => window.show(ctx, memory),
-            Self::Antiprism(window) => window.show(ctx, memory),
-            Self::Multiprism(window) => window.show(ctx, memory),
-        }
-    }
-
-    /// Updates the window after the amount of dimensions of the polytope on
-    /// screen changes.
-    pub fn update(&mut self, rank: Rank) {
-        match self {
-            Self::Dual(window) => window.update(rank),
-            Self::Pyramid(window) => window.update(rank),
-            Self::Prism(window) => window.update(rank),
-            Self::Tegum(window) => window.update(rank),
-            Self::Antiprism(window) => window.update(rank),
-            Self::Multiprism(window) => window.update(rank),
-        }
-    }
-
-    /// Resets the window to its default state.
-    pub fn reset(&mut self) {
-        match self {
-            Self::Dual(window) => window.reset(),
-            Self::Prism(window) => window.reset(),
-            Self::Pyramid(window) => window.reset(),
-            Self::Tegum(window) => window.reset(),
-            Self::Antiprism(window) => window.reset(),
-            Self::Multiprism(window) => window.reset(),
-        }
-    }
-}
-
-/// The list of all windows currently shown on screen.
-#[derive(Default)]
-pub struct EguiWindows(Vec<WindowTypeId>);
-
-impl EguiWindows {
-    /// Adds a new window to the list.
-    pub fn push<T: WindowType>(&mut self, value: T) {
-        let value = value.into();
-        if !self.0.contains(&value) {
-            self.0.push(value);
-        }
-    }
-
-    /// Removes a window with a given index and returns it.
-    pub fn swap_remove(&mut self, idx: usize) -> WindowTypeId {
-        self.0.swap_remove(idx)
-    }
-
-    /// The number of windows on the screen.
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Mutably iterates over all windows.
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<WindowTypeId> {
-        self.0.iter_mut()
-    }
-
-    /// Shows all of the windows, and returns one if its action has to run.
-    pub fn show(&mut self, ctx: &CtxRef, memory: &Res<Memory>) -> Option<WindowTypeId> {
-        let window_count = self.len();
-
-        for idx in 0..window_count {
-            let window = &mut self.0[idx];
-
-            match window.show(ctx, memory) {
-                // Closes the window.
-                ShowResult::Close => {
-                    self.swap_remove(idx);
-                    return None;
-                }
-
-                // Runs the action from a given window.
-                ShowResult::Ok => {
-                    return Some(self.swap_remove(idx));
-                }
-
-                // Resets the window to its default state.
-                ShowResult::Reset => {
-                    window.reset();
-                    return None;
-                }
-
-                // Does nothing.
-                ShowResult::None => {}
-            }
-        }
-
-        None
-    }
-
-    /// Updates the window's settings whenever the rank of the polytope is
-    /// updated.
-    pub fn update(&mut self, rank: Rank) {
-        for window in self.iter_mut() {
-            window.update(rank);
-        }
-    }
-}
-
-/// The system that shows the windows on screen.
-fn show_windows(
-    egui_ctx: Res<EguiContext>,
-    memory: Res<Memory>,
-    mut query: Query<&mut Concrete>,
-    mut egui_windows: ResMut<EguiWindows>,
-) {
-    if let Some(result) = egui_windows.show(egui_ctx.ctx(), &memory) {
-        match result {
-            // Takes the dual of the polytope from a given hypersphere.
-            WindowTypeId::Dual(DualWindow { center, radius }) => {
-                let sphere = Hypersphere::with_radius(center, radius);
-
-                for mut p in query.iter_mut() {
-                    if let Err(err) = p.try_dual_mut_with(&sphere) {
-                        println!("{:?}", err);
-                    }
-                }
-            }
-
-            // Builds a pyramid from the polytope with a given apex.
-            WindowTypeId::Pyramid(PyramidWindow { offset, height }) => {
-                for mut p in query.iter_mut() {
-                    *p = p.pyramid_with(offset.push(height));
-                }
-            }
-
-            // Builds a prism from a polytope with a given height.
-            WindowTypeId::Prism(PrismWindow { height }) => {
-                for mut p in query.iter_mut() {
-                    *p = p.prism_with(height);
-                }
-            }
-
-            // Builds a tegum from a polytope with two given apices.
-            WindowTypeId::Tegum(TegumWindow {
-                offset,
-                height,
-                height_offset,
-            }) => {
-                for mut p in query.iter_mut() {
-                    let half_height = height / 2.0;
-
-                    *p = p.tegum_with(
-                        offset.push(height_offset + half_height),
-                        offset.push(height_offset - half_height),
-                    );
-                }
-            }
-
-            // Builds an antiprism from a polytope with a given height, from a
-            // given hypersphere.
-            WindowTypeId::Antiprism(AntiprismWindow {
-                dual: DualWindow { center, radius },
-                height,
-                retroprism: central_inversion,
-            }) => {
-                let mut squared_radius = radius * radius;
-                if central_inversion {
-                    squared_radius *= -1.0;
-                }
-
-                let sphere = Hypersphere::with_squared_radius(center, squared_radius);
-
-                for mut p in query.iter_mut() {
-                    match p.try_antiprism_with(&sphere, height) {
-                        Ok(q) => *p = q,
-                        Err(err) => println!("{:?}", err),
-                    }
-                }
-            }
-
-            WindowTypeId::Multiprism(_) => {}
-        }
-    }
-}
-
-/// Updates the windows after the polytopes change.
-pub fn update_windows(
-    polies: Query<(&Concrete, &Handle<Mesh>, &Children), Changed<Concrete>>,
-    mut egui_windows: ResMut<EguiWindows>,
-) {
-    use crate::polytope::Polytope;
-
-    if let Some((poly, _, _)) = polies.iter().next() {
-        egui_windows.update(poly.rank());
     }
 }

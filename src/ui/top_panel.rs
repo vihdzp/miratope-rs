@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, path::PathBuf};
 
-use super::{camera::ProjectionType, egui_windows::EguiWindows, memory::Memory};
+use super::{camera::ProjectionType, memory::Memory};
 use crate::{
     geometry::{Hyperplane, Point, Vector},
     lang::SelectedLanguage,
@@ -338,7 +338,13 @@ pub fn show_top_panel(
     mut projection_type: ResMut<ProjectionType>,
     mut selected_language: ResMut<SelectedLanguage>,
     mut memory: ResMut<Memory>,
-    mut egui_windows: ResMut<EguiWindows>,
+
+    // The different windows that can be shown.
+    mut dual_window: ResMut<DualWindow>,
+    mut pyramid_window: ResMut<PyramidWindow>,
+    mut prism_window: ResMut<PrismWindow>,
+    mut tegum_window: ResMut<TegumWindow>,
+    mut antiprism_window: ResMut<AntiprismWindow>,
 ) {
     // The top bar.
     egui::TopPanel::top("top_panel").show(egui_ctx.ctx(), |ui| {
@@ -392,9 +398,7 @@ pub fn show_top_panel(
                         // Converts the active polytope into its dual.
                         if ui.button("Dual").clicked() {
                             if advanced(&keyboard) {
-                                egui_windows.push(DualWindow::default_with(
-                                    query.iter_mut().next().unwrap().rank(),
-                                ));
+                                dual_window.open();
                             } else {
                                 for mut p in query.iter_mut() {
                                     match p.try_dual_mut() {
@@ -412,9 +416,7 @@ pub fn show_top_panel(
                         // Makes a pyramid out of the current polytope.
                         if ui.button("Pyramid").clicked() {
                             if advanced(&keyboard) {
-                                egui_windows.push(PyramidWindow::default_with(
-                                    query.iter_mut().next().unwrap().rank(),
-                                ));
+                                pyramid_window.open();
                             } else {
                                 for mut p in query.iter_mut() {
                                     *p = p.pyramid();
@@ -425,7 +427,7 @@ pub fn show_top_panel(
                         // Makes a prism out of the current polytope.
                         if ui.button("Prism").clicked() {
                             if advanced(&keyboard) {
-                                egui_windows.push(PrismWindow::default());
+                                prism_window.open();
                             } else {
                                 for mut p in query.iter_mut() {
                                     *p = p.prism();
@@ -436,9 +438,7 @@ pub fn show_top_panel(
                         // Makes a tegum out of the current polytope.
                         if ui.button("Tegum").clicked() {
                             if advanced(&keyboard) {
-                                egui_windows.push(TegumWindow::default_with(
-                                    query.iter_mut().next().unwrap().rank(),
-                                ));
+                                tegum_window.open();
                             } else {
                                 for mut p in query.iter_mut() {
                                     *p = p.tegum();
@@ -449,9 +449,7 @@ pub fn show_top_panel(
                         // Converts the active polytope into its antiprism.
                         if ui.button("Antiprism").clicked() {
                             if advanced(&keyboard) {
-                                egui_windows.push(AntiprismWindow::default_with(
-                                    query.iter_mut().next().unwrap().rank(),
-                                ));
+                                antiprism_window.open();
                             } else {
                                 for mut p in query.iter_mut() {
                                     match p.try_antiprism() {
@@ -490,7 +488,7 @@ pub fn show_top_panel(
                     });
 
                     if ui.button("Multiprism").clicked() {
-                        egui_windows.push(MultiprismWindow::default())
+                        println!("lol");
                     }
 
                     ui.separator();
