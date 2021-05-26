@@ -335,6 +335,7 @@ pub type EguiWindows<'a> = (
     ResMut<'a, DuopyramidWindow>,
     ResMut<'a, DuoprismWindow>,
     ResMut<'a, DuotegumWindow>,
+    ResMut<'a, DuocombWindow>,
 );
 
 /// The system that shows the top panel.
@@ -360,6 +361,7 @@ pub fn show_top_panel(
         mut duopyramid_window,
         mut duoprism_window,
         mut duotegum_window,
+        mut duocomb_window,
     ): EguiWindows,
 ) {
     // The top bar.
@@ -515,6 +517,10 @@ pub fn show_top_panel(
 
                         if ui.button("Duotegum").clicked() {
                             duotegum_window.open();
+                        }
+
+                        if ui.button("Duocomb").clicked() {
+                            duocomb_window.open();
                         }
                     });
 
@@ -729,7 +735,7 @@ fn show_views(
 
         ui.add(UnitPointWidget::new(
             &mut new_direction,
-            "Cross-section depth:",
+            "Cross-section depth",
         ));
 
         // Updates the slicing direction.

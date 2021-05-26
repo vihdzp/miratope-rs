@@ -6,7 +6,6 @@ use super::{memory::Memory, PointWidget};
 use crate::{
     geometry::{Hypersphere, Point},
     polytope::{concrete::Concrete, Polytope},
-    ui::memory::MEMORY_SLOTS,
     Float,
 };
 
@@ -43,7 +42,8 @@ impl Plugin for EguiWindowPlugin {
             .add_plugin(AntiprismWindow::plugin())
             .add_plugin(DuopyramidWindow::plugin())
             .add_plugin(DuoprismWindow::plugin())
-            .add_plugin(DuotegumWindow::plugin());
+            .add_plugin(DuotegumWindow::plugin())
+            .add_plugin(DuocombWindow::plugin());
     }
 }
 
@@ -61,7 +61,9 @@ impl<'a> OkReset<'a> {
 
 impl<'a> Widget for OkReset<'a> {
     fn ui(self, ui: &mut Ui) -> egui::Response {
-        ui.allocate_ui_with_layout(ui.min_size(), Layout::right_to_left(), |ui| {
+        let size = egui::Vec2::new(ui.min_size().x, 30.0);
+
+        ui.allocate_ui_with_layout(size, Layout::right_to_left(), |ui| {
             if ui.button("Ok").clicked() {
                 *self.result = ShowResult::Ok;
             } else if ui.button("Reset").clicked() {
@@ -306,7 +308,7 @@ pub trait DuoWindow: Window {
     }
 
     /// Builds the window to be shown on screen.
-    fn build(&mut self, ui: &mut Ui, polytope: &Concrete, memory: &Res<Memory>);
+    fn build(&mut self, _: &mut Ui, _: &Concrete, _: &Res<Memory>) {}
 
     fn build_dropdowns(&mut self, ui: &mut Ui, polytope: &Concrete, memory: &Res<Memory>) {
         use crate::lang::{En, Language};
@@ -337,7 +339,7 @@ pub trait DuoWindow: Window {
 
             // The drop-down for selecting polytopes, either from memory or the
             // currently loaded one.
-            egui::ComboBox::from_label(format!("#{}", slot_idx))
+            egui::ComboBox::from_label(format!("#{}", slot_idx + 1))
                 .selected_text(selected_text)
                 .width(200.0)
                 .show_ui(ui, |ui| {
@@ -362,17 +364,17 @@ pub trait DuoWindow: Window {
                         .filter_map(|(idx, s)| s.as_ref().map(|s| (idx, s)))
                     {
                         // This value couldn't be selected by the user.
-                        let mut slot_inner = MEMORY_SLOTS;
+                        let mut slot_inner = None;
 
                         ui.selectable_value(
                             &mut slot_inner,
-                            slot_idx,
+                            Some(slot_idx),
                             En::parse_uppercase(&poly.name, Default::default()),
                         );
 
                         // If the value was changed, update it.
-                        if slot_inner != MEMORY_SLOTS {
-                            *selected = Slot::Memory(slot_inner);
+                        if let Some(idx) = slot_inner {
+                            *selected = Slot::Memory(idx);
                         }
                     }
                 });
@@ -490,15 +492,16 @@ impl UpdateWindow for DualWindow {
     }
 
     fn build(&mut self, ui: &mut Ui) {
-        ui.add(PointWidget::new(&mut self.center, "Center:"));
+        ui.add(PointWidget::new(&mut self.center, "Center"));
 
         ui.horizontal(|ui| {
-            ui.label("Radius:");
             ui.add(
                 egui::DragValue::new(&mut self.radius)
                     .speed(0.01)
                     .clamp_range(0.0..=Float::MAX),
             );
+
+            ui.label("Radius");
         });
     }
 
@@ -509,6 +512,7 @@ impl UpdateWindow for DualWindow {
     fn default_with(dim: usize) -> Self {
         Self {
             center: Point::zeros(dim),
+            radius: 1.0,
             ..Default::default()
         }
     }
@@ -558,15 +562,16 @@ impl UpdateWindow for PyramidWindow {
     }
 
     fn build(&mut self, ui: &mut Ui) {
-        ui.add(PointWidget::new(&mut self.offset, "Offset:"));
+        ui.add(PointWidget::new(&mut self.offset, "Offset"));
 
         ui.horizontal(|ui| {
-            ui.label("Height:");
             ui.add(
                 egui::DragValue::new(&mut self.height)
                     .speed(0.01)
                     .clamp_range(0.0..=Float::MAX),
             );
+
+            ui.label("Height");
         });
     }
 
@@ -577,6 +582,7 @@ impl UpdateWindow for PyramidWindow {
     fn default_with(dim: usize) -> Self {
         Self {
             offset: Point::zeros(dim),
+            height: 1.0,
             ..Default::default()
         }
     }
@@ -682,20 +688,20 @@ impl UpdateWindow for TegumWindow {
     }
 
     fn build(&mut self, ui: &mut Ui) {
-        ui.add(PointWidget::new(&mut self.offset, "Offset:"));
+        ui.add(PointWidget::new(&mut self.offset, "Offset"));
 
         ui.horizontal(|ui| {
-            ui.label("Height:");
             ui.add(
                 egui::DragValue::new(&mut self.height)
                     .speed(0.01)
                     .clamp_range(0.0..=Float::MAX),
             );
+            ui.label("Height");
         });
 
         ui.horizontal(|ui| {
-            ui.label("Height offset:");
             ui.add(egui::DragValue::new(&mut self.height_offset).speed(0.01));
+            ui.label("Height offset");
         });
     }
 
@@ -706,6 +712,7 @@ impl UpdateWindow for TegumWindow {
     fn default_with(dim: usize) -> Self {
         Self {
             offset: Point::zeros(dim),
+            height: 1.0,
             ..Default::default()
         }
     }
@@ -758,22 +765,25 @@ impl UpdateWindow for AntiprismWindow {
     }
 
     fn build(&mut self, ui: &mut Ui) {
-        ui.add(PointWidget::new(&mut self.dual.center, "Center:"));
+        ui.add(PointWidget::new(&mut self.dual.center, "Center"));
 
         ui.horizontal(|ui| {
-            ui.label("Radius:");
             ui.add(
                 egui::DragValue::new(&mut self.dual.radius)
                     .speed(0.01)
                     .clamp_range(0.0..=Float::MAX),
             );
+            ui.label("Radius");
+        });
 
-            ui.label("Height:");
+        ui.horizontal(|ui| {
             ui.add(egui::DragValue::new(&mut self.height).speed(0.01));
+            ui.label("Height");
+        });
 
+        ui.horizontal(|ui| {
             ui.add(
-                egui::Checkbox::new(&mut self.retroprism, "Retroprism:")
-                    .text_style(TextStyle::Body),
+                egui::Checkbox::new(&mut self.retroprism, "Retroprism").text_style(TextStyle::Body),
             );
         });
     }
@@ -785,6 +795,7 @@ impl UpdateWindow for AntiprismWindow {
     fn default_with(dim: usize) -> Self {
         Self {
             dual: DualWindow::default_with(dim),
+            height: 1.0,
             ..Default::default()
         }
     }
@@ -794,8 +805,8 @@ impl UpdateWindow for AntiprismWindow {
     }
 }
 
-/// A window that allows a user to build a duoprism, either using the polytopes
-/// in memory or the currently loaded one.
+/// A window that allows a user to build a duopyramid, either using the
+/// polytopes in memory or the currently loaded one.
 pub struct DuopyramidWindow {
     /// Whether the window is currently open.
     open: bool,
@@ -853,12 +864,12 @@ impl DuoWindow for DuopyramidWindow {
         resize(&mut self.offsets[0], p_dim);
         resize(&mut self.offsets[1], q_dim);
 
-        ui.add(PointWidget::new(&mut self.offsets[0], "Offset #1:"));
-        ui.add(PointWidget::new(&mut self.offsets[1], "Offset #2:"));
+        ui.add(PointWidget::new(&mut self.offsets[0], "Offset #1"));
+        ui.add(PointWidget::new(&mut self.offsets[1], "Offset #2"));
 
         ui.horizontal(|ui| {
-            ui.label("Height:");
             ui.add(egui::DragValue::new(&mut self.height).clamp_range(0.0..=Float::MAX));
+            ui.label("Height");
         });
     }
 }
@@ -898,8 +909,6 @@ impl DuoWindow for DuoprismWindow {
     fn slots_mut(&mut self) -> &mut [Slot; 2] {
         &mut self.slots
     }
-
-    fn build(&mut self, _: &mut Ui, _: &Concrete, _: &Res<Memory>) {}
 }
 
 /// A window that allows a user to build a duotegum, either using the polytopes
@@ -957,7 +966,44 @@ impl DuoWindow for DuotegumWindow {
         resize(&mut self.offsets[0], p_dim);
         resize(&mut self.offsets[1], q_dim);
 
-        ui.add(PointWidget::new(&mut self.offsets[0], "Offset #1:"));
-        ui.add(PointWidget::new(&mut self.offsets[1], "Offset #2:"));
+        ui.add(PointWidget::new(&mut self.offsets[0], "Offset #1"));
+        ui.add(PointWidget::new(&mut self.offsets[1], "Offset #2"));
+    }
+}
+
+/// A window that allows a user to build a duocomb, either using the polytopes
+/// in memory or the currently loaded one.
+#[derive(Default)]
+pub struct DuocombWindow {
+    /// Whether the window is open.
+    open: bool,
+
+    /// The slots that are currently selected.
+    slots: [Slot; 2],
+}
+
+impl Window for DuocombWindow {
+    const NAME: &'static str = "Duocomb";
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.open
+    }
+}
+
+impl DuoWindow for DuocombWindow {
+    fn operation(&self, p: &Concrete, q: &Concrete) -> Concrete {
+        Concrete::duocomb(p, q)
+    }
+
+    fn slots(&self) -> [Slot; 2] {
+        self.slots
+    }
+
+    fn slots_mut(&mut self) -> &mut [Slot; 2] {
+        &mut self.slots
     }
 }

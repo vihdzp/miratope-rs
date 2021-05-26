@@ -43,10 +43,11 @@ impl<'a> PointWidget<'a> {
 impl<'a> Widget for PointWidget<'a> {
     fn ui(self, ui: &mut Ui) -> egui::Response {
         ui.horizontal(|ui| {
-            ui.label(self.label);
             for c in self.point.iter_mut() {
                 ui.add(egui::DragValue::new(c).speed(0.01));
             }
+
+            ui.label(self.label);
         })
         .response
     }
@@ -65,8 +66,6 @@ impl<'a> UnitPointWidget<'a> {
 impl<'a> Widget for UnitPointWidget<'a> {
     fn ui(self, ui: &mut Ui) -> egui::Response {
         ui.horizontal(|ui| {
-            ui.label(self.0.label);
-
             let old_point = self.0.point.clone();
             let mut modified_coord = 0;
 
@@ -97,6 +96,8 @@ impl<'a> Widget for UnitPointWidget<'a> {
                 }
                 self.0.point[modified_coord] = 1.0;
             }
+
+            ui.label(self.0.label);
         })
         .response
     }
