@@ -6,6 +6,7 @@ use super::{memory::Memory, PointWidget};
 use crate::{
     geometry::{Hypersphere, Point},
     polytope::{concrete::Concrete, r#abstract::rank::Rank, Polytope},
+    ui::memory::MEMORY_SLOTS,
     Float,
 };
 
@@ -40,17 +41,20 @@ impl Plugin for EguiWindowPlugin {
             .add_plugin(PrismWindow::plugin())
             .add_plugin(TegumWindow::plugin())
             .add_plugin(AntiprismWindow::plugin())
-            .add_plugin(MultiprismWindow::plugin());
+            .add_plugin(DuopyramidWindow::plugin())
+            .add_plugin(DuoprismWindow::plugin());
     }
 }
 
 /// A widget consisting of a Reset button and an Ok button, right-aligned.
-pub struct OkReset<'a>(&'a mut ShowResult);
+pub struct OkReset<'a> {
+    result: &'a mut ShowResult,
+}
 
 impl<'a> OkReset<'a> {
     /// Initializes the buttons on screen.
     pub fn new(result: &'a mut ShowResult) -> Self {
-        Self(result)
+        Self { result }
     }
 }
 
@@ -58,9 +62,9 @@ impl<'a> Widget for OkReset<'a> {
     fn ui(self, ui: &mut Ui) -> egui::Response {
         ui.allocate_ui_with_layout(ui.min_size(), Layout::right_to_left(), |ui| {
             if ui.button("Ok").clicked() {
-                *self.0 = ShowResult::Ok;
+                *self.result = ShowResult::Ok;
             } else if ui.button("Reset").clicked() {
-                *self.0 = ShowResult::Reset;
+                *self.result = ShowResult::Reset;
             }
         })
         .response
@@ -114,7 +118,7 @@ macro_rules! impl_show {
                 });
 
             if open {
-                *self.is_open_mut() = true;
+                self.open();
                 result
             } else {
                 ShowResult::Close
@@ -190,21 +194,21 @@ pub trait UpdateWindow: Window {
 
     /// The default state of the window, when the polytope on the screen has a
     /// given rank.
-    fn default_with(rank: Rank) -> Self;
+    fn default_with(dim: usize) -> Self;
 
     /// The rank of the polytope on the screen.
-    fn rank(&self) -> Rank;
+    fn dim(&self) -> usize;
 
     /// Resets a window to its default state.
     fn reset(&mut self) {
-        *self = Self::default_with(self.rank());
+        *self = Self::default_with(self.dim());
         self.open();
     }
 
     impl_show!();
 
     /// Updates the window when the rank of the polytope is updated.
-    fn update(&mut self, rank: Rank);
+    fn update(&mut self, dim: Rank);
 
     /// The system that updates the window when the rank of the polytope is
     /// updated.
@@ -237,14 +241,133 @@ impl<T: UpdateWindow + 'static> Plugin for UpdateWindowPlugin<T> {
     }
 }
 
-/// A window that depends on the [`Memory`] but doesn't need to be updated when
-/// the polytope changes.
-pub trait MemoryWindow: Window {
+/// A slot in the dropdown for duo-operations.
+#[derive(Clone, Copy)]
+pub enum Slot {
+    /// No polytope in particular.
+    None,
+
+    /// The polytope currently on screen.
+    Loaded,
+
+    /// A polytope in a given position in memory.
+    Memory(usize),
+}
+
+impl Default for Slot {
+    fn default() -> Self {
+        Slot::None
+    }
+}
+
+/// A window for any duo-something. All of these depend on the [`Memory`] but
+/// don't need to be updated when the polytope changes.
+pub trait DuoWindow: Window {
+    /// The duo-operation to apply.
+    fn duo(p: &Concrete, q: &Concrete) -> Concrete;
+
+    /// The slots in memory.
+    fn slots(&self) -> [Slot; 2];
+
+    /// A mutable reference to the slots in memory.
+    fn slots_mut(&mut self) -> &mut [Slot; 2];
+
     /// Applies the action of the window to the polytope.
-    fn action(&self, polytope: &mut Concrete, memory: &Res<Memory>);
+    fn action(&self, polytope: &mut Concrete, memory: &Res<Memory>) {
+        let [i, j] = self.slots();
+
+        macro_rules! slot_to_poly {
+            ($slot:ident) => {
+                match $slot {
+                    Slot::None => return,
+                    Slot::Memory(idx) => match memory[idx].as_ref() {
+                        None => return,
+                        Some(poly) => poly,
+                    },
+                    Slot::Loaded => &*polytope,
+                }
+            };
+        }
+
+        let p = slot_to_poly!(i);
+        let q = slot_to_poly!(j);
+
+        *polytope = Self::duo(p, q);
+    }
 
     /// Builds the window to be shown on screen.
-    fn build(&mut self, ui: &mut Ui, memory: &Res<Memory>);
+    fn build(&mut self, ui: &mut Ui, polytope: &Concrete, memory: &Res<Memory>);
+
+    fn build_dropdowns(&mut self, ui: &mut Ui, polytope: &Concrete, memory: &Res<Memory>) {
+        use crate::lang::{En, Language};
+
+        const SELECT: &str = "Select";
+
+        // Iterates over both slots.
+        for (slot_idx, selected) in self.slots_mut().iter_mut().enumerate() {
+            // The text for the selected option.
+            let selected_text = match selected {
+                // Nothing has been selected.
+                Slot::None => SELECT.to_string(),
+
+                // The loaded polytope is selected.
+                Slot::Loaded => En::parse_uppercase(&polytope.name, Default::default()),
+
+                // Something is selected from the memory.
+                Slot::Memory(selected_idx) => match memory[*selected_idx].as_ref() {
+                    // Whatever was previously selected got deleted off the memory.
+                    None => {
+                        *selected = Slot::None;
+                        SELECT.to_string()
+                    }
+                    // Shows the name of the selected polytope.
+                    Some(poly) => En::parse_uppercase(&poly.name, Default::default()),
+                },
+            };
+
+            // The drop-down for selecting polytopes, either from memory or the
+            // currently loaded one.
+            egui::ComboBox::from_label(format!("#{}", slot_idx))
+                .selected_text(selected_text)
+                .width(200.0)
+                .show_ui(ui, |ui| {
+                    // The currently loaded polytope.
+                    let mut loaded_selected = false;
+
+                    ui.selectable_value(
+                        &mut loaded_selected,
+                        true,
+                        En::parse_uppercase(&polytope.name, Default::default()),
+                    );
+
+                    // If the value was changed, update it.
+                    if loaded_selected {
+                        *selected = Slot::Loaded;
+                    }
+
+                    // The polytopes in memory.
+                    for (slot_idx, poly) in memory
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(idx, s)| s.as_ref().map(|s| (idx, s)))
+                    {
+                        // This value couldn't be selected by the user.
+                        let mut slot_inner = MEMORY_SLOTS;
+
+                        ui.selectable_value(
+                            &mut slot_inner,
+                            slot_idx,
+                            En::parse_uppercase(&poly.name, Default::default()),
+                        );
+
+                        // If the value was changed, update it.
+                        if slot_inner != MEMORY_SLOTS {
+                            *selected = Slot::Memory(slot_inner);
+                        }
+                    }
+                });
+        }
+    }
 
     /// Resets a window to its default state.
     fn reset(&mut self) {
@@ -253,7 +376,7 @@ pub trait MemoryWindow: Window {
     }
 
     /// Shows the window on screen.
-    fn show(&mut self, ctx: &CtxRef, memory: &Res<Memory>) -> ShowResult {
+    fn show(&mut self, ctx: &CtxRef, polytope: &Concrete, memory: &Res<Memory>) -> ShowResult {
         let mut open = self.is_open();
         let mut result = ShowResult::None;
 
@@ -261,12 +384,12 @@ pub trait MemoryWindow: Window {
             .open(&mut open)
             .resizable(false)
             .show(ctx, |ui| {
-                self.build(ui, &memory);
+                self.build(ui, polytope, memory);
                 ui.add(OkReset::new(&mut result));
             });
 
         if open {
-            *self.is_open_mut() = true;
+            self.open();
             result
         } else {
             ShowResult::Close
@@ -282,31 +405,30 @@ pub trait MemoryWindow: Window {
     ) where
         Self: 'static,
     {
-        match self_.show(egui_ctx.ctx(), &memory) {
-            ShowResult::Ok => {
-                for mut polytope in query.iter_mut() {
+        for mut polytope in query.iter_mut() {
+            match self_.show(egui_ctx.ctx(), &polytope, &memory) {
+                ShowResult::Ok => {
                     self_.action(&mut *polytope, &memory);
+                    self_.close()
                 }
-
-                self_.close()
+                ShowResult::Close => self_.close(),
+                ShowResult::Reset => self_.reset(),
+                ShowResult::None => {}
             }
-            ShowResult::Close => self_.close(),
-            ShowResult::Reset => self_.reset(),
-            ShowResult::None => {}
         }
     }
 
     /// A plugin that adds a resource of type `Self` and the system to show it.
-    fn plugin() -> MemoryWindowPlugin<Self> {
+    fn plugin() -> DuoWindowPlugin<Self> {
         Default::default()
     }
 }
 
-/// A plugin that adds all of the necessary systems for an [`UpdateWindow`].
+/// A plugin that adds all of the necessary systems for a [`DuoWindow`].
 #[derive(Default)]
-pub struct MemoryWindowPlugin<T: MemoryWindow>(PhantomData<T>);
+pub struct DuoWindowPlugin<T: DuoWindow>(PhantomData<T>);
 
-impl<T: MemoryWindow + 'static> Plugin for MemoryWindowPlugin<T> {
+impl<T: DuoWindow + 'static> Plugin for DuoWindowPlugin<T> {
     fn build(&self, app: &mut AppBuilder) {
         app.insert_resource(T::default())
             .add_system(T::show_system.system().label("show_windows"));
@@ -329,7 +451,7 @@ impl Default for DualWindow {
     fn default() -> Self {
         Self {
             open: false,
-            center: Point::zeros(3),
+            center: Point::zeros(0),
             radius: 1.0,
         }
     }
@@ -369,13 +491,13 @@ impl UpdateWindow for DualWindow {
         });
     }
 
-    fn rank(&self) -> Rank {
-        Rank::from(self.center.len())
+    fn dim(&self) -> usize {
+        self.center.len()
     }
 
-    fn default_with(rank: Rank) -> Self {
+    fn default_with(dim: usize) -> Self {
         Self {
-            center: Point::zeros(rank.try_usize().unwrap_or(0)),
+            center: Point::zeros(dim),
             ..Default::default()
         }
     }
@@ -401,7 +523,7 @@ impl Default for PyramidWindow {
     fn default() -> Self {
         Self {
             open: false,
-            offset: Point::zeros(3),
+            offset: Point::zeros(0),
             height: 1.0,
         }
     }
@@ -437,13 +559,13 @@ impl UpdateWindow for PyramidWindow {
         });
     }
 
-    fn rank(&self) -> Rank {
-        Rank::from(self.offset.len())
+    fn dim(&self) -> usize {
+        self.offset.len()
     }
 
-    fn default_with(rank: Rank) -> Self {
+    fn default_with(dim: usize) -> Self {
         Self {
-            offset: Point::zeros(rank.try_usize().unwrap_or(0)),
+            offset: Point::zeros(dim),
             ..Default::default()
         }
     }
@@ -519,7 +641,7 @@ impl Default for TegumWindow {
     fn default() -> Self {
         Self {
             open: false,
-            offset: Point::zeros(3),
+            offset: Point::zeros(0),
             height: 1.0,
             height_offset: 0.0,
         }
@@ -566,13 +688,13 @@ impl UpdateWindow for TegumWindow {
         });
     }
 
-    fn rank(&self) -> Rank {
-        Rank::from(self.offset.len())
+    fn dim(&self) -> usize {
+        self.offset.len()
     }
 
-    fn default_with(rank: Rank) -> Self {
+    fn default_with(dim: usize) -> Self {
         Self {
-            offset: Point::zeros(rank.try_usize().unwrap_or(0)),
+            offset: Point::zeros(dim),
             ..Default::default()
         }
     }
@@ -585,8 +707,13 @@ impl UpdateWindow for TegumWindow {
 /// Allows the user to select an antiprism from a specified hypersphere and a
 /// given height.
 pub struct AntiprismWindow {
+    /// The info about the hypersphere we use to get from one base to another.
     dual: DualWindow,
+
+    /// The height of the antiprism.
     height: Float,
+
+    /// Whether the antiprism is a retroprism.
     retroprism: bool,
 }
 
@@ -649,13 +776,13 @@ impl UpdateWindow for AntiprismWindow {
         });
     }
 
-    fn rank(&self) -> Rank {
-        self.dual.rank()
+    fn dim(&self) -> usize {
+        self.dual.dim()
     }
 
-    fn default_with(rank: Rank) -> Self {
+    fn default_with(dim: usize) -> Self {
         Self {
-            dual: DualWindow::default_with(rank),
+            dual: DualWindow::default_with(dim),
             ..Default::default()
         }
     }
@@ -665,21 +792,74 @@ impl UpdateWindow for AntiprismWindow {
     }
 }
 
-pub struct MultiprismWindow {
+/// A window that allows a user to build a duoprism, either using the polytopes
+/// in memory or the currently loaded one.
+pub struct DuopyramidWindow {
+    /// Whether the window is currently open.
     open: bool,
-    selected_slots: Vec<Option<usize>>,
+
+    /// The slots corresponding to the selected polytopes.
+    slots: [Slot; 2],
+
+    /// The height of the duopyramid.
+    height: Float,
+
+    /// The offset of each base.
+    offsets: [Point; 2],
 }
 
-impl Default for MultiprismWindow {
+impl Default for DuopyramidWindow {
     fn default() -> Self {
         Self {
             open: false,
-            selected_slots: vec![None, None],
+            slots: Default::default(),
+            height: 1.0,
+            offsets: [Point::zeros(0), Point::zeros(0)],
         }
     }
 }
 
-impl Window for MultiprismWindow {
+impl Window for DuopyramidWindow {
+    const NAME: &'static str = "Duopyramid";
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.open
+    }
+}
+
+impl DuoWindow for DuopyramidWindow {
+    fn duo(p: &Concrete, q: &Concrete) -> Concrete {
+        Concrete::duopyramid(p, q)
+    }
+
+    fn slots(&self) -> [Slot; 2] {
+        self.slots
+    }
+
+    fn slots_mut(&mut self) -> &mut [Slot; 2] {
+        &mut self.slots
+    }
+
+    fn build(&mut self, ui: &mut Ui, polytope: &Concrete, memory: &Res<Memory>) {
+        self.build_dropdowns(ui, polytope, memory);
+
+        // ui.add(PointWidget::new())
+    }
+}
+
+/// A window that allows a user to build a duoprism, either using the polytopes
+/// in memory or the currently loaded one.
+#[derive(Default)]
+pub struct DuoprismWindow {
+    open: bool,
+    slots: [Slot; 2],
+}
+
+impl Window for DuoprismWindow {
     const NAME: &'static str = "Duoprism";
 
     fn is_open(&self) -> bool {
@@ -691,54 +871,20 @@ impl Window for MultiprismWindow {
     }
 }
 
-impl MemoryWindow for MultiprismWindow {
-    fn action(&self, polytope: &mut Concrete, memory: &Res<Memory>) {
-        let mut slots = Vec::with_capacity(self.selected_slots.len());
-
-        for slot in &self.selected_slots {
-            match slot {
-                None => return,
-                Some(idx) => slots.push(*idx),
-            }
-        }
-
-        *polytope =
-            Concrete::multiprism_iter(slots.into_iter().map(|idx| memory[idx].as_ref().unwrap()));
+impl DuoWindow for DuoprismWindow {
+    fn duo(p: &Concrete, q: &Concrete) -> Concrete {
+        Concrete::duoprism(p, q)
     }
 
-    fn build(&mut self, ui: &mut Ui, memory: &Res<Memory>) {
-        use crate::lang::{En, Language};
+    fn slots(&self) -> [Slot; 2] {
+        self.slots
+    }
 
-        for (selected_slot_idx, selected_slot) in self.selected_slots.iter_mut().enumerate() {
-            let selected_text = match selected_slot {
-                None => "Select".to_string(),
-                Some(selected_idx) => En::parse_uppercase(
-                    &memory[*selected_idx].as_ref().unwrap().name,
-                    Default::default(),
-                ),
-            };
+    fn slots_mut(&mut self) -> &mut [Slot; 2] {
+        &mut self.slots
+    }
 
-            egui::ComboBox::from_label(format!("#{}", selected_slot_idx))
-                .selected_text(selected_text)
-                .show_ui(ui, |ui| {
-                    for (slot_idx, poly) in memory
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(idx, s)| s.as_ref().map(|s| (idx, s)))
-                    {
-                        let mut slot_inner = 69;
-
-                        ui.selectable_value(
-                            &mut slot_inner,
-                            slot_idx,
-                            En::parse_uppercase(&poly.name, Default::default()),
-                        );
-
-                        if slot_inner != 69 {
-                            *selected_slot = Some(slot_inner);
-                        }
-                    }
-                });
-        }
+    fn build(&mut self, ui: &mut Ui, polytope: &Concrete, memory: &Res<Memory>) {
+        self.build_dropdowns(ui, polytope, memory)
     }
 }

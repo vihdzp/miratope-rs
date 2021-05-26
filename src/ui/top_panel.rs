@@ -345,7 +345,7 @@ pub fn show_top_panel(
     mut prism_window: ResMut<PrismWindow>,
     mut tegum_window: ResMut<TegumWindow>,
     mut antiprism_window: ResMut<AntiprismWindow>,
-    mut multiprism_window: ResMut<MultiprismWindow>,
+    mut multiprism_window: ResMut<DuoprismWindow>,
 ) {
     // The top bar.
     egui::TopPanel::top("top_panel").show(egui_ctx.ctx(), |ui| {
@@ -414,7 +414,7 @@ pub fn show_top_panel(
                         }
 
                         ui.separator();
-                        
+
                         // Makes a pyramid out of the current polytope.
                         if ui.button("Pyramid").clicked() {
                             if advanced(&keyboard) {
