@@ -309,7 +309,7 @@ impl<'a> MeshBuilder<'a> {
             .vertices
             .iter()
             .chain(self.extra_vertices.iter());
-        let dim = self.concrete.dim().unwrap_or(0);
+        let dim = self.concrete.dim_or();
 
         // If the polytope is at most 3D, we just embed it into 3D space.
         if projection_type.is_orthogonal() || dim <= 3 {

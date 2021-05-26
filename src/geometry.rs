@@ -54,7 +54,7 @@ impl Hypersphere {
     /// Reciprocates a point in place. If it's too close to the sphere's center,
     /// it returns `Err(())` and leaves it unmoved.
     pub fn reciprocate_mut(&self, p: &mut Point) -> Result<(), ()> {
-        let mut q = &*p - &self.center;
+        let mut q = p as &Point - &self.center;
         let s = q.norm_squared();
 
         // If any face passes through the dual center, the dual does

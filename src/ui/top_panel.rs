@@ -281,7 +281,7 @@ pub fn update_cross_section(
 
                 if let Some(dim) = r.dim() {
                     let hyperplane = Hyperplane::from_normal(
-                        original_polytope.dim().unwrap_or(0),
+                        original_polytope.dim_or(),
                         section_direction.0.clone(),
                         hyp_pos,
                     );
@@ -326,6 +326,17 @@ pub fn advanced(keyboard: &Res<Input<KeyCode>>) -> bool {
     keyboard.pressed(KeyCode::LControl) || keyboard.pressed(KeyCode::RControl)
 }
 
+pub type EguiWindows<'a> = (
+    ResMut<'a, DualWindow>,
+    ResMut<'a, PyramidWindow>,
+    ResMut<'a, PrismWindow>,
+    ResMut<'a, TegumWindow>,
+    ResMut<'a, AntiprismWindow>,
+    ResMut<'a, DuopyramidWindow>,
+    ResMut<'a, DuoprismWindow>,
+    ResMut<'a, DuotegumWindow>,
+);
+
 /// The system that shows the top panel.
 #[allow(clippy::too_many_arguments)]
 pub fn show_top_panel(
@@ -340,12 +351,16 @@ pub fn show_top_panel(
     mut memory: ResMut<Memory>,
 
     // The different windows that can be shown.
-    mut dual_window: ResMut<DualWindow>,
-    mut pyramid_window: ResMut<PyramidWindow>,
-    mut prism_window: ResMut<PrismWindow>,
-    mut tegum_window: ResMut<TegumWindow>,
-    mut antiprism_window: ResMut<AntiprismWindow>,
-    mut multiprism_window: ResMut<DuoprismWindow>,
+    (
+        mut dual_window,
+        mut pyramid_window,
+        mut prism_window,
+        mut tegum_window,
+        mut antiprism_window,
+        mut duopyramid_window,
+        mut duoprism_window,
+        mut duotegum_window,
+    ): EguiWindows,
 ) {
     // The top bar.
     egui::TopPanel::top("top_panel").show(egui_ctx.ctx(), |ui| {
@@ -395,7 +410,7 @@ pub fn show_top_panel(
             // Operations on polytopes.
             egui::menu::menu(ui, "Polytope", |ui| {
                 ui.collapsing("Operations", |ui| {
-                    ui.collapsing("Simple", |ui| {
+                    ui.collapsing("Single", |ui| {
                         // Converts the active polytope into its dual.
                         if ui.button("Dual").clicked() {
                             if advanced(&keyboard) {
@@ -489,9 +504,19 @@ pub fn show_top_panel(
                         }
                     });
 
-                    if ui.button("Multiprism").clicked() {
-                        multiprism_window.open();
-                    }
+                    ui.collapsing("Double", |ui| {
+                        if ui.button("Duopyramid").clicked() {
+                            duopyramid_window.open();
+                        }
+
+                        if ui.button("Duoprism").clicked() {
+                            duoprism_window.open();
+                        }
+
+                        if ui.button("Duotegum").clicked() {
+                            duotegum_window.open();
+                        }
+                    });
 
                     ui.separator();
 
@@ -525,7 +550,7 @@ pub fn show_top_panel(
                                 p.flatten();
 
                                 // The default direction is in the last coordinate axis.
-                                let dim = p.dim().unwrap_or(0);
+                                let dim = p.dim_or();
                                 let mut direction = Vector::zeros(dim);
                                 if dim > 0 {
                                     direction[dim - 1] = 1.0;

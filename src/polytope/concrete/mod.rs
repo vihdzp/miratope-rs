@@ -77,6 +77,12 @@ impl Concrete {
         Some(self.vertices.get(0)?.len())
     }
 
+    /// Returns the number of dimensions of the space the polytope lives in,
+    /// or 0 in the case of the nullitope.
+    pub fn dim_or(&self) -> usize {
+        self.dim().unwrap_or(0)
+    }
+
     /// Builds a dyad with a specified height.
     pub fn dyad_with(height: Float) -> Self {
         let half_height = height / 2.0;
@@ -463,31 +469,23 @@ impl Concrete {
 
     /// Generates the vertices for either a tegum or a pyramid product with two
     /// given vertex sets and a given height.
-    fn duopyramid_vertices(p: &[Point], q: &[Point], height: Float, tegum: bool) -> Vec<Point> {
-        // The dimension of the points in p.
-        let p_dim = if let Some(p0) = p.get(0) {
-            p0.len()
-        } else {
-            return q.to_owned();
-        };
-
-        // The dimensions of the points in q.
-        let q_dim = if let Some(q0) = q.get(0) {
-            q0.len()
-        } else {
-            return p.to_owned();
-        };
-
+    ///
+    /// The vertices are the padded vertices of `q`, followed by the padded
+    /// vertices of `p`.
+    fn duopyramid_vertices(
+        p: &[Point],
+        q: &[Point],
+        p_pad: &Point,
+        q_pad: &Point,
+        height: Float,
+        tegum: bool,
+    ) -> Vec<Point> {
         let half_height = height / 2.0;
 
         q.iter()
             // To every point in q, we append zeros to the left.
             .map(|vq| {
-                let mut v: Vec<_> = std::iter::repeat(0.0)
-                    .take(p_dim)
-                    .into_iter()
-                    .chain(vq.iter().copied())
-                    .collect();
+                let mut v: Vec<_> = p_pad.iter().copied().chain(vq.iter().copied()).collect();
                 if !tegum {
                     v.push(-half_height);
                 }
@@ -495,11 +493,7 @@ impl Concrete {
             })
             // To every point in p, we append zeros to the right.
             .chain(p.iter().map(|vp| {
-                let mut v: Vec<_> = vp
-                    .iter()
-                    .copied()
-                    .chain(std::iter::repeat(0.0).take(q_dim))
-                    .collect();
+                let mut v: Vec<_> = vp.iter().copied().chain(q_pad.iter().copied()).collect();
                 if !tegum {
                     v.push(half_height);
                 }
@@ -534,13 +528,30 @@ impl Concrete {
             .collect::<Vec<_>>()
     }
 
-    /// Generates a duopyramid from two given polytopes with a given height.
-    pub fn duopyramid_with_height(p: &Self, q: &Self, height: Float) -> Self {
+    /// Generates a duopyramid from two given polytopes with a given height and
+    /// a given offset.
+    pub fn duopyramid_with(
+        p: &Self,
+        q: &Self,
+        p_offset: &Point,
+        q_offset: &Point,
+        height: Float,
+    ) -> Self {
         Self::new(
-            Self::duopyramid_vertices(&p.vertices, &q.vertices, height, false),
+            Self::duopyramid_vertices(&p.vertices, &q.vertices, p_offset, q_offset, height, false),
             Abstract::duopyramid(&p.abs, &q.abs),
         )
         .with_name(Name::multipyramid(vec![p.name.clone(), q.name.clone()]))
+    }
+
+    /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
+    /// from two polytopes.
+    pub fn duotegum_with(p: &Self, q: &Self, p_offset: &Point, q_offset: &Point) -> Self {
+        Self::new(
+            Self::duopyramid_vertices(&p.vertices, &q.vertices, p_offset, q_offset, 0.0, true),
+            Abstract::duotegum(&p.abs, &q.abs),
+        )
+        .with_name(Name::multitegum(vec![p.name.clone(), q.name.clone()]))
     }
 
     /// Computes the volume of a polytope by adding up the contributions of all
@@ -922,7 +933,13 @@ impl Polytope<Con> for Concrete {
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.
     fn duopyramid(p: &Self, q: &Self) -> Self {
-        Self::duopyramid_with_height(p, q, 1.0)
+        Self::duopyramid_with(
+            p,
+            q,
+            &Point::zeros(p.dim_or()),
+            &Point::zeros(q.dim_or()),
+            1.0,
+        )
     }
 
     /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
@@ -938,18 +955,7 @@ impl Polytope<Con> for Concrete {
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
     /// from two polytopes.
     fn duotegum(p: &Self, q: &Self) -> Self {
-        // Point-polytope duotegums are special cases.
-        if p.rank() == Rank::new(0) {
-            q.clone()
-        } else if q.rank() == Rank::new(0) {
-            p.clone()
-        } else {
-            Self::new(
-                Self::duopyramid_vertices(&p.vertices, &q.vertices, 0.0, true),
-                Abstract::duotegum(&p.abs, &q.abs),
-            )
-            .with_name(Name::multitegum(vec![p.name.clone(), q.name.clone()]))
-        }
+        Self::duotegum_with(p, q, &Point::zeros(p.dim_or()), &Point::zeros(q.dim_or()))
     }
 
     /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)

@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use super::{memory::Memory, PointWidget};
 use crate::{
     geometry::{Hypersphere, Point},
-    polytope::{concrete::Concrete, r#abstract::rank::Rank, Polytope},
+    polytope::{concrete::Concrete, Polytope},
     ui::memory::MEMORY_SLOTS,
     Float,
 };
@@ -42,7 +42,8 @@ impl Plugin for EguiWindowPlugin {
             .add_plugin(TegumWindow::plugin())
             .add_plugin(AntiprismWindow::plugin())
             .add_plugin(DuopyramidWindow::plugin())
-            .add_plugin(DuoprismWindow::plugin());
+            .add_plugin(DuoprismWindow::plugin())
+            .add_plugin(DuotegumWindow::plugin());
     }
 }
 
@@ -72,8 +73,8 @@ impl<'a> Widget for OkReset<'a> {
 }
 
 /// Resizes a point so that it has a given number of coordinates.
-fn resize(point: Point, rank: Rank) -> Point {
-    point.resize_vertically(rank.try_usize().unwrap_or(0), 0.0)
+fn resize(point: &mut Point, dim: usize) {
+    *point = point.clone().resize_vertically(dim, 0.0)
 }
 
 /// The base trait for a window, containing the common code. You probably don't
@@ -184,7 +185,7 @@ impl<T: PlainWindow + 'static> Plugin for PlainWindowPlugin<T> {
 }
 
 /// A window that doesn't depend on any resources other than itself, but needs
-/// to be updated when the rank of the polytope is changed.
+/// to be updated when the dimension of the polytope is changed.
 pub trait UpdateWindow: Window {
     /// Applies the action of the window to the polytope.
     fn action(&self, polytope: &mut Concrete);
@@ -207,8 +208,8 @@ pub trait UpdateWindow: Window {
 
     impl_show!();
 
-    /// Updates the window when the rank of the polytope is updated.
-    fn update(&mut self, dim: Rank);
+    /// Updates the window when the dimension of the polytope is updated.
+    fn update(&mut self, dim: usize);
 
     /// The system that updates the window when the rank of the polytope is
     /// updated.
@@ -219,7 +220,7 @@ pub trait UpdateWindow: Window {
         Self: 'static,
     {
         if let Some((poly, _, _)) = query.iter().next() {
-            self_.update(poly.rank());
+            self_.update(poly.dim_or());
         }
     }
 
@@ -264,7 +265,7 @@ impl Default for Slot {
 /// don't need to be updated when the polytope changes.
 pub trait DuoWindow: Window {
     /// The duo-operation to apply.
-    fn duo(p: &Concrete, q: &Concrete) -> Concrete;
+    fn operation(&self, p: &Concrete, q: &Concrete) -> Concrete;
 
     /// The slots in memory.
     fn slots(&self) -> [Slot; 2];
@@ -272,27 +273,36 @@ pub trait DuoWindow: Window {
     /// A mutable reference to the slots in memory.
     fn slots_mut(&mut self) -> &mut [Slot; 2];
 
+    /// Returns the references to the polytopes currently selected.
+    fn polytopes<'a>(
+        &'a self,
+        polytope: &'a Concrete,
+        memory: &'a Res<Memory>,
+    ) -> [Option<&'a Concrete>; 2] {
+        let slot_to_poly = |slot| match slot {
+            Slot::None => None,
+            Slot::Memory(idx) => memory[idx].as_ref(),
+            Slot::Loaded => Some(polytope),
+        };
+
+        let [i, j] = self.slots();
+        [slot_to_poly(i), slot_to_poly(j)]
+    }
+
+    /// Returns the dimensions of the polytopes currently selected, or 0 in case
+    /// of the nullitope.
+    fn dim_or(&self, polytope: &Concrete, memory: &Res<Memory>) -> [usize; 2] {
+        let [p, q] = self.polytopes(polytope, memory);
+        let dim_or = |p: Option<&Concrete>| p.map(Concrete::dim).flatten().unwrap_or(0);
+
+        [dim_or(p), dim_or(q)]
+    }
+
     /// Applies the action of the window to the polytope.
     fn action(&self, polytope: &mut Concrete, memory: &Res<Memory>) {
-        let [i, j] = self.slots();
-
-        macro_rules! slot_to_poly {
-            ($slot:ident) => {
-                match $slot {
-                    Slot::None => return,
-                    Slot::Memory(idx) => match memory[idx].as_ref() {
-                        None => return,
-                        Some(poly) => poly,
-                    },
-                    Slot::Loaded => &*polytope,
-                }
-            };
+        if let [Some(p), Some(q)] = self.polytopes(polytope, memory) {
+            *polytope = self.operation(p, q);
         }
-
-        let p = slot_to_poly!(i);
-        let q = slot_to_poly!(j);
-
-        *polytope = Self::duo(p, q);
     }
 
     /// Builds the window to be shown on screen.
@@ -384,6 +394,7 @@ pub trait DuoWindow: Window {
             .open(&mut open)
             .resizable(false)
             .show(ctx, |ui| {
+                self.build_dropdowns(ui, polytope, memory);
                 self.build(ui, polytope, memory);
                 ui.add(OkReset::new(&mut result));
             });
@@ -502,8 +513,8 @@ impl UpdateWindow for DualWindow {
         }
     }
 
-    fn update(&mut self, rank: Rank) {
-        self.center = resize(self.center.clone(), rank);
+    fn update(&mut self, dim: usize) {
+        resize(&mut self.center, dim);
     }
 }
 
@@ -570,8 +581,8 @@ impl UpdateWindow for PyramidWindow {
         }
     }
 
-    fn update(&mut self, rank: Rank) {
-        self.offset = resize(self.offset.clone(), rank);
+    fn update(&mut self, dim: usize) {
+        resize(&mut self.offset, dim);
     }
 }
 
@@ -699,13 +710,14 @@ impl UpdateWindow for TegumWindow {
         }
     }
 
-    fn update(&mut self, rank: Rank) {
-        self.offset = resize(self.offset.clone(), rank);
+    fn update(&mut self, dim: usize) {
+        resize(&mut self.offset, dim);
     }
 }
 
 /// Allows the user to select an antiprism from a specified hypersphere and a
 /// given height.
+#[derive(Default)]
 pub struct AntiprismWindow {
     /// The info about the hypersphere we use to get from one base to another.
     dual: DualWindow,
@@ -715,16 +727,6 @@ pub struct AntiprismWindow {
 
     /// Whether the antiprism is a retroprism.
     retroprism: bool,
-}
-
-impl Default for AntiprismWindow {
-    fn default() -> Self {
-        Self {
-            dual: Default::default(),
-            height: 1.0,
-            retroprism: false,
-        }
-    }
 }
 
 impl Window for AntiprismWindow {
@@ -787,8 +789,8 @@ impl UpdateWindow for AntiprismWindow {
         }
     }
 
-    fn update(&mut self, rank: Rank) {
-        self.dual.update(rank);
+    fn update(&mut self, dim: usize) {
+        self.dual.update(dim);
     }
 }
 
@@ -832,8 +834,9 @@ impl Window for DuopyramidWindow {
 }
 
 impl DuoWindow for DuopyramidWindow {
-    fn duo(p: &Concrete, q: &Concrete) -> Concrete {
-        Concrete::duopyramid(p, q)
+    fn operation(&self, p: &Concrete, q: &Concrete) -> Concrete {
+        let [p_offset, q_offset] = &self.offsets;
+        Concrete::duopyramid_with(p, q, p_offset, q_offset, self.height)
     }
 
     fn slots(&self) -> [Slot; 2] {
@@ -845,9 +848,18 @@ impl DuoWindow for DuopyramidWindow {
     }
 
     fn build(&mut self, ui: &mut Ui, polytope: &Concrete, memory: &Res<Memory>) {
-        self.build_dropdowns(ui, polytope, memory);
+        let [p_dim, q_dim] = self.dim_or(polytope, memory);
 
-        // ui.add(PointWidget::new())
+        resize(&mut self.offsets[0], p_dim);
+        resize(&mut self.offsets[1], q_dim);
+
+        ui.add(PointWidget::new(&mut self.offsets[0], "Offset #1:"));
+        ui.add(PointWidget::new(&mut self.offsets[1], "Offset #2:"));
+
+        ui.horizontal(|ui| {
+            ui.label("Height:");
+            ui.add(egui::DragValue::new(&mut self.height).clamp_range(0.0..=Float::MAX));
+        });
     }
 }
 
@@ -855,7 +867,10 @@ impl DuoWindow for DuopyramidWindow {
 /// in memory or the currently loaded one.
 #[derive(Default)]
 pub struct DuoprismWindow {
+    /// Whether the window is open.
     open: bool,
+
+    /// The slots that are currently selected.
     slots: [Slot; 2],
 }
 
@@ -872,7 +887,7 @@ impl Window for DuoprismWindow {
 }
 
 impl DuoWindow for DuoprismWindow {
-    fn duo(p: &Concrete, q: &Concrete) -> Concrete {
+    fn operation(&self, p: &Concrete, q: &Concrete) -> Concrete {
         Concrete::duoprism(p, q)
     }
 
@@ -884,7 +899,65 @@ impl DuoWindow for DuoprismWindow {
         &mut self.slots
     }
 
+    fn build(&mut self, _: &mut Ui, _: &Concrete, _: &Res<Memory>) {}
+}
+
+/// A window that allows a user to build a duotegum, either using the polytopes
+/// in memory or the currently loaded one.
+pub struct DuotegumWindow {
+    /// Whether the window is currently open.
+    open: bool,
+
+    /// The slots corresponding to the selected polytopes.
+    slots: [Slot; 2],
+
+    /// The offset of each base.
+    offsets: [Point; 2],
+}
+
+impl Default for DuotegumWindow {
+    fn default() -> Self {
+        Self {
+            open: false,
+            slots: Default::default(),
+            offsets: [Point::zeros(0), Point::zeros(0)],
+        }
+    }
+}
+
+impl Window for DuotegumWindow {
+    const NAME: &'static str = "Duotegum";
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.open
+    }
+}
+
+impl DuoWindow for DuotegumWindow {
+    fn operation(&self, p: &Concrete, q: &Concrete) -> Concrete {
+        let [p_offset, q_offset] = &self.offsets;
+        Concrete::duotegum_with(p, q, p_offset, q_offset)
+    }
+
+    fn slots(&self) -> [Slot; 2] {
+        self.slots
+    }
+
+    fn slots_mut(&mut self) -> &mut [Slot; 2] {
+        &mut self.slots
+    }
+
     fn build(&mut self, ui: &mut Ui, polytope: &Concrete, memory: &Res<Memory>) {
-        self.build_dropdowns(ui, polytope, memory)
+        let [p_dim, q_dim] = self.dim_or(polytope, memory);
+
+        resize(&mut self.offsets[0], p_dim);
+        resize(&mut self.offsets[1], q_dim);
+
+        ui.add(PointWidget::new(&mut self.offsets[0], "Offset #1:"));
+        ui.add(PointWidget::new(&mut self.offsets[1], "Offset #2:"));
     }
 }

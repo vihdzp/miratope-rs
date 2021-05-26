@@ -36,6 +36,10 @@ pub fn update_changed_polytopes(
     orthogonal: Res<ProjectionType>,
 ) {
     for (poly, _mesh_handle, children) in polies.iter() {
+        if cfg!(debug_assertions) {
+            println!("Polytope updated");
+        }
+
         // The mesh is currently hidden, so we don't bother updating it.
         // *meshes.get_mut(_mesh_handle).unwrap() = poly.get_mesh(*orthogonal);
 
