@@ -482,6 +482,8 @@ pub fn show_top_panel(
                             }
                         }
 
+                        ui.separator();
+
                         // Converts the active polytope into its Petrial.
                         if ui.button("Petrial").clicked() {
                             for mut p in query.iter_mut() {

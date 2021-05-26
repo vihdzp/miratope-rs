@@ -30,7 +30,7 @@ pub enum ShowResult {
     Ok,
 }
 
-/// The plugin controlling these windows.
+/// The plugin controlling all of these windows.
 pub struct EguiWindowPlugin;
 
 impl Plugin for EguiWindowPlugin {
@@ -61,6 +61,7 @@ impl<'a> OkReset<'a> {
 
 impl<'a> Widget for OkReset<'a> {
     fn ui(self, ui: &mut Ui) -> egui::Response {
+        // We have to manually set the height of our control, for whatever reason.
         let size = egui::Vec2::new(ui.min_size().x, 30.0);
 
         ui.allocate_ui_with_layout(size, Layout::right_to_left(), |ui| {

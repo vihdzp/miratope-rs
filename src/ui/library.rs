@@ -454,7 +454,7 @@ fn show_library(
 
     // Shows the polytope library.
     if let Some(library) = &mut *library {
-        egui::SidePanel::left("side_panel", 350.0).show(egui_ctx.ctx(), |ui| {
+        egui::SidePanel::left("side_panel", 450.0).show(egui_ctx.ctx(), |ui| {
             // A container that can only be resized horizontally.
             egui::containers::Resize::default()
                 .min_height(ui.available_size().y)
