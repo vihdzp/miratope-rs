@@ -89,7 +89,7 @@ impl<'a> Caret<'a> {
         chars.push(c);
 
         // The index of the new node.
-        let mut new_node = NodeIndex::new(self.graph.node_count() - 1);
+        let mut new_node = NodeIndex::new(self.graph.node_count());
 
         match c {
             // If the node is various characters inside parentheses.

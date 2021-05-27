@@ -1168,7 +1168,7 @@ checksum = "ee2626afccd7561a06cf1367e2950c4718ea04565e20fb5029b6c7d8ad09abcf"
 [[package]]
 name = "egui"
 version = "0.12.0"
-source = "git+https://github.com/emilk/egui#196ddff499e7e27c0abf3119ac93fd5df81cb081"
+source = "git+https://github.com/emilk/egui#e320ef6c64fe85df9c4d793cc73bfabbf7358186"
 dependencies = [
  "epaint",
 ]
@@ -1182,7 +1182,7 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 [[package]]
 name = "emath"
 version = "0.12.0"
-source = "git+https://github.com/emilk/egui#196ddff499e7e27c0abf3119ac93fd5df81cb081"
+source = "git+https://github.com/emilk/egui#e320ef6c64fe85df9c4d793cc73bfabbf7358186"
 
 [[package]]
 name = "env_logger"
@@ -1197,7 +1197,7 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.12.0"
-source = "git+https://github.com/emilk/egui#196ddff499e7e27c0abf3119ac93fd5df81cb081"
+source = "git+https://github.com/emilk/egui#e320ef6c64fe85df9c4d793cc73bfabbf7358186"
 dependencies = [
  "ahash 0.7.4",
  "atomic_refcell",
@@ -1306,20 +1306,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 
 [[package]]
-name = "fsevent"
-version = "2.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97f347202c95c98805c216f9e1df210e8ebaec9fdb2365700a43c10797a35e63"
-dependencies = [
- "bitflags",
- "fsevent-sys",
-]
-
-[[package]]
 name = "fsevent-sys"
-version = "3.1.0"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca6f5e6817058771c10f0eb0f05ddf1e35844266f972004fe8e4b21fda295bd5"
+checksum = "5c0e564d24da983c053beff1bb7178e237501206840a3e6bf4e267b9e8ae734a"
 dependencies = [
  "libc",
 ]
@@ -2029,9 +2019,9 @@ checksum = "b16bd47d9e329435e309c58469fe0791c2d0d1ba96ec0954152a5ae2b04387dc"
 
 [[package]]
 name = "memoffset"
-version = "0.6.3"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f83fb6581e8ed1f85fd45c116db8405483899489e38406156c25eb743554361d"
+checksum = "59accc507f1338036a0477ef61afdae33cde60840f4dfe481319ce3ad116ddf9"
 dependencies = [
  "autocfg",
 ]
@@ -2227,14 +2217,13 @@ checksum = "c44922cb3dbb1c70b5e5f443d63b64363a898564d739ba5198e3a9138442868d"
 
 [[package]]
 name = "notify"
-version = "5.0.0-pre.8"
+version = "5.0.0-pre.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46bbbcd078f1f00ddb7a9abe70b96e91229b44b0b3afdec610f8e5137f8f014b"
+checksum = "b89869d77edd64db917d7903abeadc166f93686b342c56cc0ca51acb68441d09"
 dependencies = [
  "bitflags",
  "crossbeam-channel",
  "filetime",
- "fsevent",
  "fsevent-sys",
  "inotify",
  "libc",

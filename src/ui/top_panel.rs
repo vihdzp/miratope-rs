@@ -365,7 +365,7 @@ pub fn show_top_panel(
     ): EguiWindows,
 ) {
     // The top bar.
-    egui::TopPanel::top("top_panel").show(egui_ctx.ctx(), |ui| {
+    egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx(), |ui| {
         egui::menu::bar(ui, |ui| {
             // Operations on files.
             egui::menu::menu(ui, "File", |ui| {
