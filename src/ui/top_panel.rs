@@ -691,6 +691,13 @@ pub fn show_top_panel(
                     }
                 }
             });
+
+            // General help.
+            egui::menu::menu(ui, "Help", |ui| {
+                if ui.button("File bug").clicked() && webbrowser::open(crate::NEW_ISSUE).is_err() {
+                    println!("Website opening failed!");
+                }
+            });
         });
 
         // Shows secondary views below the menu bar.

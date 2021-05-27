@@ -1,1 +1,1 @@
-[UnloadedFolder(folder_name:"regular",name:Literal("Regular")),UnloadedFolder(folder_name:"uniform",name:Literal("Uniform")),UnloadedFolder(folder_name:"other",name:Literal("Other"))]
+[UnloadedFolder(folder_name:"uniform",name:Literal("Uniform")),UnloadedFolder(folder_name:"other",name:Literal("Other"))]

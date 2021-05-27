@@ -275,7 +275,7 @@ impl<'a> Iterator for FlagIter<'a> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq)]
 /// A flag together with an orientation. Any flag change flips the orientation.
 /// If the polytope associated to the flag is non-orientable, the orientation
 /// will be garbage.
@@ -325,8 +325,6 @@ impl Ord for OrientedFlag {
         self.flag.cmp(&other.flag)
     }
 }
-
-impl Eq for OrientedFlag {}
 
 /// Allows indexing an oriented flag by rank.
 impl std::ops::Index<usize> for OrientedFlag {

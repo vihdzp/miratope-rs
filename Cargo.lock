@@ -8,9 +8,9 @@ checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
 
 [[package]]
 name = "ab_glyph"
-version = "0.2.10"
+version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a933731feda8b460bdad9a9e43bb386baba6ec593d2bc19716ef3c75c09085c"
+checksum = "af0ac006645f86f20f6c6fa4dcaef920bf803df819123626f9440e35835e7d80"
 dependencies = [
  "ab_glyph_rasterizer",
  "owned_ttf_parser 0.12.0",
@@ -1168,7 +1168,7 @@ checksum = "ee2626afccd7561a06cf1367e2950c4718ea04565e20fb5029b6c7d8ad09abcf"
 [[package]]
 name = "egui"
 version = "0.12.0"
-source = "git+https://github.com/emilk/egui#e320ef6c64fe85df9c4d793cc73bfabbf7358186"
+source = "git+https://github.com/emilk/egui#66095b69a707c6db388b127d99697574ab57175a"
 dependencies = [
  "epaint",
 ]
@@ -1182,7 +1182,7 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 [[package]]
 name = "emath"
 version = "0.12.0"
-source = "git+https://github.com/emilk/egui#e320ef6c64fe85df9c4d793cc73bfabbf7358186"
+source = "git+https://github.com/emilk/egui#66095b69a707c6db388b127d99697574ab57175a"
 
 [[package]]
 name = "env_logger"
@@ -1197,7 +1197,7 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.12.0"
-source = "git+https://github.com/emilk/egui#e320ef6c64fe85df9c4d793cc73bfabbf7358186"
+source = "git+https://github.com/emilk/egui#66095b69a707c6db388b127d99697574ab57175a"
 dependencies = [
  "ahash 0.7.4",
  "atomic_refcell",

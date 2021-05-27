@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     lang::{
-        name::{Con, Name as LangName},
+        name::{Con, Name},
         SelectedLanguage,
     },
     polytope::{concrete::Concrete, r#abstract::rank::Rank, Polytope},
@@ -19,10 +19,12 @@ use bevy_egui::{egui, egui::Ui, EguiContext};
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 
+/// The plugin that loads the library.
 pub struct LibraryPlugin;
 
 impl Plugin for LibraryPlugin {
     fn build(&self, app: &mut bevy::prelude::AppBuilder) {
+        // We might want to read the folder path from a config file.
         app.insert_resource(Library::new_folder(&"./lib/"))
             .add_system(show_library.system().after("show_top_panel"));
     }
@@ -35,17 +37,17 @@ impl Plugin for LibraryPlugin {
 /// stored on screen. When the user clicks on the button to load them, they're
 /// sent together with their values as a [`ShowResult`] to the
 /// [`ui`](crate::ui::ui) system, which then actually loads the polytope.
-#[derive(Clone, Serialize, Deserialize, Debug, Display)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, Display)]
 pub enum SpecialLibrary {
     /// A regular polygon.
     #[strum(serialize = "Regular polygon")]
     Polygon(usize, usize),
 
     /// A (uniform 3D) prism.
-    Prism(usize, usize),
+    Prisms(usize, usize),
 
     /// A (uniform 3D) antiprism.
-    Antiprism(usize, usize),
+    Antiprisms(usize, usize),
 
     /// A (4D uniform) duoprism.
     Duoprism(usize, usize, usize, usize),
@@ -80,7 +82,7 @@ impl SpecialLibrary {
 
         match self {
             // An {n / d} regular polygon or uniform polygonal prism.
-            Self::Polygon(n, d) | Self::Prism(n, d) => {
+            Self::Polygon(n, d) | Self::Prisms(n, d) => {
                 let mut clicked = false;
 
                 ui.horizontal(|ui| {
@@ -101,14 +103,14 @@ impl SpecialLibrary {
                 });
 
                 if clicked {
-                    ShowResult::Special(self.clone())
+                    ShowResult::Special(*self)
                 } else {
                     ShowResult::None
                 }
             }
 
             // An {n / d} uniform antiprism.
-            Self::Antiprism(n, d) => {
+            Self::Antiprisms(n, d) => {
                 let mut clicked = false;
 
                 ui.horizontal(|ui| {
@@ -129,7 +131,7 @@ impl SpecialLibrary {
                 });
 
                 if clicked {
-                    ShowResult::Special(self.clone())
+                    ShowResult::Special(*self)
                 } else {
                     ShowResult::None
                 }
@@ -170,7 +172,7 @@ impl SpecialLibrary {
                 });
 
                 if clicked {
-                    ShowResult::Special(self.clone())
+                    ShowResult::Special(*self)
                 } else {
                     ShowResult::None
                 }
@@ -189,7 +191,7 @@ impl SpecialLibrary {
                 });
 
                 if clicked {
-                    ShowResult::Special(self.clone())
+                    ShowResult::Special(*self)
                 } else {
                     ShowResult::None
                 }
@@ -198,16 +200,17 @@ impl SpecialLibrary {
     }
 }
 
+/// The display name for a file or folder.
 #[derive(Clone, Serialize, Deserialize)]
-pub enum Name {
+pub enum DisplayName {
     /// A name in its language-independent representation.
-    Name(LangName<Con>),
+    Name(Name<Con>),
 
     /// A literal string name.
     Literal(String),
 }
 
-impl Name {
+impl DisplayName {
     /// This is running at 60 FPS but name parsing isn't blazing fast. Maybe
     /// do some sort of cacheing in the future?
     pub fn parse(&self, selected_language: SelectedLanguage) -> String {
@@ -219,20 +222,30 @@ impl Name {
 }
 
 /// Represents any of the files or folders that make up the Miratope library.
+///
+/// The library is internally stored is a tree-like structure. Once a folder
+/// loads, it's (currently) never unloaded.
 #[derive(Serialize, Deserialize)]
 pub enum Library {
     /// A folder whose contents have not yet been read.
-    UnloadedFolder { folder_name: String, name: Name },
+    UnloadedFolder {
+        /// The name of the folder in the disk.
+        folder_name: String,
+        name: DisplayName,
+    },
 
     /// A folder whose contents have been read.
     LoadedFolder {
         folder_name: String,
-        name: Name,
+        name: DisplayName,
         contents: Vec<Library>,
     },
 
     /// A file that can be loaded into Miratope.
-    File { file_name: String, name: Name },
+    File {
+        file_name: String,
+        name: DisplayName,
+    },
 
     /// Any special file in the library.
     Special(SpecialLibrary),
@@ -272,9 +285,9 @@ impl Library {
     pub fn new_file(path: &impl AsRef<OsStr>) -> Self {
         let path = PathBuf::from(&path);
         let name = if let Some(name) = Concrete::name_from_off(&path) {
-            Name::Name(name)
+            DisplayName::Name(name)
         } else {
-            Name::Literal(String::from(
+            DisplayName::Literal(String::from(
                 path.file_stem().map(|f| f.to_str()).flatten().unwrap_or(""),
             ))
         };
@@ -307,7 +320,7 @@ impl Library {
             }
             // Else, takes the name from the folder itself.
             else {
-                let name = Name::Literal(String::from(
+                let name = DisplayName::Literal(String::from(
                     path.file_name()
                         .map(|name| name.to_str())
                         .flatten()
@@ -323,8 +336,8 @@ impl Library {
     }
 
     /// Reads a folder's data from the `.folder` file. If it doesn't exist, it
-    /// defaults to loading the folder's name and its data in alphabetical order.
-    /// If that also fails, it returns an `Err`.
+    /// defaults to loading the folder's name and its data in alphabetical
+    /// order. If that also fails, it returns an `Err`.
     pub fn folder_contents(path: &impl AsRef<OsStr>) -> io::Result<Vec<Self>> {
         let path = PathBuf::from(&path);
         assert!(path.is_dir(), "Path {:?} not a directory!", path);
@@ -484,13 +497,13 @@ fn show_library(
                                 }
                             }
                             // Loads a uniform polygonal prism.
-                            SpecialLibrary::Prism(n, d) => {
+                            SpecialLibrary::Prisms(n, d) => {
                                 if let Some(mut p) = query.iter_mut().next() {
                                     *p = Concrete::uniform_prism(n, d);
                                 }
                             }
                             // Loads a uniform polygonal antiprism.
-                            SpecialLibrary::Antiprism(n, d) => {
+                            SpecialLibrary::Antiprisms(n, d) => {
                                 if let Some(mut p) = query.iter_mut().next() {
                                     *p = Concrete::uniform_antiprism(n, d);
                                 }

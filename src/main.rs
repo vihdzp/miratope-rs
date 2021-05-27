@@ -75,6 +75,9 @@ mod ui;
 /// The link to the [Polytope Wiki](https://polytope.miraheze.org/wiki/).
 const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
 
+/// The link to the GitHub issues.
+const NEW_ISSUE: &str = "https://github.com/OfficialURL/miratope-rs/issues/new";
+
 /// A trait containing the constants associated to each floating point type.
 trait Consts {
     type T;
