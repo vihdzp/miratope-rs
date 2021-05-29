@@ -11,6 +11,7 @@ pub mod library;
 pub mod main_window;
 pub mod memory;
 pub mod top_panel;
+pub mod config;
 
 pub struct MiratopePlugins;
 

@@ -31,6 +31,8 @@ strum_macros = "0.20"
 webbrowser = "0.5"
 xml-rs = "0.8"
 zip = "0.5"
+toml = "0.5"
+directories = "3.0"
 
 # Use latest version of Bevy (might cause breakage!)
 [dependencies.bevy]
