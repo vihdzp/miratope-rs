@@ -1,3 +1,5 @@
+//! Reads and loads the configuration file for Miratope.
+
 use std::{
     ffi::{OsStr, OsString},
     fs,

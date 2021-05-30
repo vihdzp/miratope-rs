@@ -359,7 +359,7 @@ impl Library {
     /// Reads a folder's data from the `.folder` file. If it doesn't exist, it
     /// defaults to loading the folder's name and its data in alphabetical
     /// order. If that also fails, it returns an `Err`.
-    pub fn folder_contents(path: &impl AsRef<OsStr>) -> io::Result<Vec<Self>> {
+    pub fn folder_contents<T: AsRef<OsStr>>(path: T) -> io::Result<Vec<Self>> {
         let path = PathBuf::from(&path);
         assert!(path.is_dir(), "Path {:?} not a directory!", path);
 
@@ -405,8 +405,17 @@ impl Library {
     }
 
     /// Shows the library from the root.
-    pub fn show_root(&mut self, ui: &mut Ui, selected_language: SelectedLanguage) -> ShowResult {
-        self.show(ui, PathBuf::new(), selected_language)
+    pub fn show_root(
+        &mut self,
+        ui: &mut Ui,
+        mut lib_path: PathBuf,
+        selected_language: SelectedLanguage,
+    ) -> ShowResult {
+        if !lib_path.pop() {
+            panic!("Library cannot be located in root folder!");
+        }
+
+        self.show(ui, lib_path, selected_language)
     }
 
     /// Shows the library.
@@ -485,6 +494,7 @@ fn show_library(
     egui_ctx: Res<EguiContext>,
     mut query: Query<&mut Concrete>,
     mut library: ResMut<Option<Library>>,
+    config: Res<Config>,
     selected_language: Res<SelectedLanguage>,
 ) {
     // Shows the polytope library.
@@ -494,7 +504,9 @@ fn show_library(
             .max_width(450.0)
             .show(egui_ctx.ctx(), |ui| {
                 egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
-                    match library.show_root(ui, *selected_language) {
+                    let lib_path = PathBuf::from(config.data.lib_path.clone());
+
+                    match library.show_root(ui, lib_path, *selected_language) {
                         // No action needs to be taken.
                         ShowResult::None => {}
 

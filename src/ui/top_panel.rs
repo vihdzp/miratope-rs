@@ -18,6 +18,7 @@ use bevy_egui::{
 use rfd::FileDialog;
 use strum::IntoEnumIterator;
 
+/// The plugin in charge of everything on the top panel.
 pub struct TopPanelPlugin;
 
 impl Plugin for TopPanelPlugin {

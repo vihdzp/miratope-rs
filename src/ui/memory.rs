@@ -48,24 +48,28 @@ impl Memory {
                         ))
                         .id_source(idx)
                         .show(ui, |ui| {
+                            // Clones a polytope from memory.
                             if ui.button("Load").clicked() {
                                 for mut p in query.iter_mut() {
                                     *p = poly.clone();
                                 }
                             }
 
+                            // Swaps the current polytope with the one on memory.
                             if ui.button("Swap").clicked() {
                                 for mut p in query.iter_mut() {
                                     std::mem::swap(p.as_mut(), poly);
                                 }
                             }
 
+                            // Clones a polytope into memory.
                             if ui.button("Save").clicked() {
                                 for p in query.iter_mut() {
                                     *poly = p.clone();
                                 }
                             }
 
+                            // Clears a polytope from memory.
                             if ui.button("Clear").clicked() {
                                 clear = true;
                             }
