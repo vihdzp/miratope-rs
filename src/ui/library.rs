@@ -243,7 +243,7 @@ pub enum Library {
     /// A folder whose contents have not yet been read.
     UnloadedFolder {
         /// The name of the folder in disk.
-        folder_name: String,
+        path_name: String,
 
         /// The display name of the folder.
         name: DisplayName,
@@ -252,7 +252,7 @@ pub enum Library {
     /// A folder whose contents have been read.
     LoadedFolder {
         /// The name of the folder in disk.
-        folder_name: String,
+        path_name: String,
 
         /// The display name of the folder.
         name: DisplayName,
@@ -264,7 +264,7 @@ pub enum Library {
     /// A file that can be loaded into Miratope.
     File {
         /// The name of the file in disk.
-        file_name: String,
+        path_name: String,
 
         /// The display name of the file.
         name: DisplayName,
@@ -304,6 +304,17 @@ pub fn path_to_str(path: PathBuf) -> String {
 }
 
 impl Library {
+    /// Returns either the file name or the folder name of a given component of
+    /// the library. In case that this doesn't apply, returns the empty string.
+    pub fn path_name(&self) -> String {
+        match self {
+            Library::UnloadedFolder { path_name, .. }
+            | Library::LoadedFolder { path_name, .. }
+            | Library::File { path_name, .. } => path_name.clone(),
+            Library::Special(_) => String::new(),
+        }
+    }
+
     /// Loads the data from a file at a given path.
     pub fn new_file(path: &impl AsRef<OsStr>) -> Self {
         let path = PathBuf::from(&path);
@@ -316,7 +327,7 @@ impl Library {
         };
 
         Self::File {
-            file_name: path_to_str(path),
+            path_name: path_to_str(path),
             name,
         }
     }
@@ -335,13 +346,13 @@ impl Library {
                 .map(|file| ron::from_str(&String::from_utf8(file).unwrap()))
             {
                 Self::UnloadedFolder {
-                    folder_name: path_to_str(path),
+                    path_name: path_to_str(path),
                     name,
                 }
             }
             // Else, takes the name from the folder itself.
             else {
-                let folder_name = String::from(
+                let path_name = String::from(
                     path.file_name()
                         .map(|name| name.to_str())
                         .flatten()
@@ -349,8 +360,8 @@ impl Library {
                 );
 
                 Self::UnloadedFolder {
-                    name: DisplayName::Literal(folder_name.clone()),
-                    folder_name,
+                    name: DisplayName::Literal(path_name.clone()),
+                    path_name,
                 }
             },
         )
@@ -404,35 +415,18 @@ impl Library {
         )
     }
 
-    /// Shows the library from the root.
-    pub fn show_root(
-        &mut self,
-        ui: &mut Ui,
-        mut lib_path: PathBuf,
-        selected_language: SelectedLanguage,
-    ) -> ShowResult {
-        if !lib_path.pop() {
-            panic!("Library cannot be located in root folder!");
-        }
-
-        self.show(ui, lib_path, selected_language)
-    }
-
-    /// Shows the library.
+    /// Shows the library in a given `Ui`, starting from a given path.
     pub fn show(
         &mut self,
         ui: &mut Ui,
-        mut path: PathBuf,
+        path: PathBuf,
         selected_language: SelectedLanguage,
     ) -> ShowResult {
         match self {
             // Shows a collapsing drop-down, and loads the folder in case it's clicked.
-            Self::UnloadedFolder { folder_name, name } => {
+            Self::UnloadedFolder { name, .. } => {
                 // Clones so that the closure doesn't require unique access.
-                let folder_name = folder_name.clone();
                 let name = name.clone();
-
-                path.push(folder_name);
                 let mut res = ShowResult::None;
 
                 ui.collapsing(name.parse(selected_language), |ui| {
@@ -440,12 +434,14 @@ impl Library {
 
                     // Contents of drop down.
                     for lib in contents.iter_mut() {
-                        res |= lib.show(ui, path.clone(), selected_language);
+                        let mut new_path = path.clone();
+                        new_path.push(lib.path_name());
+                        res |= lib.show(ui, new_path, selected_language);
                     }
 
                     // Opens the folder.
                     *self = Self::LoadedFolder {
-                        folder_name: path_to_str(path),
+                        path_name: path_to_str(path),
                         name,
                         contents,
                     };
@@ -455,17 +451,14 @@ impl Library {
             }
 
             // Shows a drop-down with all of the files and folders.
-            Self::LoadedFolder {
-                folder_name,
-                name,
-                contents,
-            } => {
-                path.push(&folder_name);
+            Self::LoadedFolder { name, contents, .. } => {
                 let mut res = ShowResult::None;
 
                 ui.collapsing(name.parse(selected_language), |ui| {
                     for lib in contents.iter_mut() {
-                        res |= lib.show(ui, path.clone(), selected_language);
+                        let mut new_path = path.clone();
+                        new_path.push(lib.path_name());
+                        res |= lib.show(ui, new_path, selected_language);
                     }
                 });
 
@@ -473,9 +466,7 @@ impl Library {
             }
 
             // Shows a button that loads the file if clicked.
-            Self::File { file_name, name } => {
-                path.push(file_name);
-
+            Self::File { name, .. } => {
                 if ui.button(name.parse(selected_language)).clicked() {
                     ShowResult::Load(path.into_os_string())
                 } else {
@@ -506,7 +497,7 @@ fn show_library(
                 egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
                     let lib_path = PathBuf::from(config.data.lib_path.clone());
 
-                    match library.show_root(ui, lib_path, *selected_language) {
+                    match library.show(ui, lib_path, *selected_language) {
                         // No action needs to be taken.
                         ShowResult::None => {}
 
