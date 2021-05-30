@@ -105,7 +105,7 @@ impl std::ops::BitOr for Gender {
     }
 }
 
-impl std::default::Default for Gender {
+impl Default for Gender {
     fn default() -> Self {
         Gender::None
     }

@@ -64,7 +64,6 @@ use polytope::concrete::Concrete;
 use ui::{
     camera::{CameraInputEvent, ProjectionType},
     MiratopePlugins,
-    config::ConfigStruct,
 };
 
 mod geometry;
@@ -112,7 +111,6 @@ fn main() {
         // Adds resources.
         .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
         .insert_resource(Msaa { samples: 4 })
-        .insert_resource(ConfigStruct::create())
         // Adds plugins.
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)

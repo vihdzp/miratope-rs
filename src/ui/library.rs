@@ -6,6 +6,7 @@ use std::{
     path::PathBuf,
 };
 
+use super::config::Config;
 use crate::{
     lang::{
         name::{Con, Name as LangName},
@@ -22,10 +23,17 @@ use strum_macros::Display;
 pub struct LibraryPlugin;
 
 impl Plugin for LibraryPlugin {
-    fn build(&self, app: &mut bevy::prelude::AppBuilder) {
-        app.insert_resource(Library::new_folder(&"./lib/"))
-            //.insert_resource(Library::new_folder(
-            //        app.app.world.get_resource_mut::<ConfigStruct>().unwrap().paths.library_path))
+    fn build(&self, app: &mut AppBuilder) {
+        // This must run after the Config resource has been added.
+        let lib_path = app
+            .world()
+            .get_resource::<Config>()
+            .unwrap()
+            .data
+            .lib_path
+            .clone();
+
+        app.insert_resource(Library::new_folder(&lib_path))
             .add_system(show_library.system().after("show_top_panel"));
     }
 }
@@ -266,7 +274,7 @@ impl std::ops::BitOrAssign for ShowResult {
 
 /// Converts the given `PathBuf` into a `String`.
 pub fn path_to_str(path: PathBuf) -> String {
-    String::from(path.file_name().unwrap().to_str().unwrap())
+    path.file_name().unwrap().to_string_lossy().into_owned()
 }
 
 impl Library {
@@ -288,7 +296,7 @@ impl Library {
     }
 
     /// Creates a new unloaded folder from a given path.
-    pub fn new_folder(path: &impl AsRef<OsStr>) -> Option<Self> {
+    pub fn new_folder<T: AsRef<OsStr>>(path: T) -> Option<Self> {
         // If the path doesn't exist, we return `None`.
         let path = PathBuf::from(&path);
         if !path.exists() {
@@ -317,7 +325,7 @@ impl Library {
                 ));
 
                 Self::UnloadedFolder {
-                    folder_name: String::from(path.file_name().unwrap().to_str().unwrap()),
+                    folder_name: path.file_name().unwrap().to_string_lossy().into_owned(),
                     name,
                 }
             },
