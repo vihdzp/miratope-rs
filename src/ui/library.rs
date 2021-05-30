@@ -6,6 +6,7 @@ use std::{
     path::PathBuf,
 };
 
+use super::config::Config;
 use crate::{
     lang::{
         name::{Con, Name},
@@ -24,8 +25,16 @@ pub struct LibraryPlugin;
 
 impl Plugin for LibraryPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        // We might want to read the folder path from a config file.
-        app.insert_resource(Library::new_folder(&"./lib/"))
+        // This must run after the Config resource has been added.
+        let lib_path = app
+            .world()
+            .get_resource::<Config>()
+            .unwrap()
+            .data
+            .lib_path
+            .clone();
+
+        app.insert_resource(Library::new_folder(&lib_path))
             .add_system(show_library.system().after("show_top_panel"));
     }
 }
@@ -291,7 +300,7 @@ impl std::ops::BitOrAssign for ShowResult {
 
 /// Converts the given `PathBuf` into a `String`.
 pub fn path_to_str(path: PathBuf) -> String {
-    String::from(path.file_name().unwrap().to_str().unwrap())
+    path.file_name().unwrap().to_string_lossy().into_owned()
 }
 
 impl Library {

@@ -6,6 +6,7 @@ use bevy_egui::egui::{self, Ui, Widget};
 use crate::{geometry::Point, Consts, Float};
 
 pub mod camera;
+pub mod config;
 pub mod egui_windows;
 pub mod library;
 pub mod main_window;
@@ -18,6 +19,7 @@ impl bevy::prelude::PluginGroup for MiratopePlugins {
     fn build(&mut self, group: &mut bevy::app::PluginGroupBuilder) {
         group
             .add(camera::InputPlugin)
+            .add(config::ConfigPlugin)
             .add(egui_windows::EguiWindowPlugin)
             .add(library::LibraryPlugin)
             .add(main_window::MainWindowPlugin)
