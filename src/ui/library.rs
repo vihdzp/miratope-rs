@@ -3,7 +3,7 @@
 use std::{
     ffi::{OsStr, OsString},
     fs, io,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use super::config::Config;
@@ -332,6 +332,12 @@ impl Library {
         }
     }
 
+    /// Attempts to read the `.name` file in a folder. If it can, it returns the
+    /// name.
+    pub fn read_name<T: AsRef<Path>>(path: T) -> Option<DisplayName> {
+        ron::from_str(&String::from_utf8(fs::read(path.as_ref().join(".name")).ok()?).ok()?).ok()
+    }
+
     /// Creates a new unloaded folder from a given path. If the path doesn't
     /// exist or doesn't refer to a folder, we return `None`.
     pub fn new_folder<T: AsRef<OsStr>>(path: &T) -> Option<Self> {
@@ -341,30 +347,26 @@ impl Library {
         }
 
         // Attempts to read from the .name file.
-        Some(
-            if let Ok(Ok(name)) = fs::read(path.join(".name"))
-                .map(|file| ron::from_str(&String::from_utf8(file).unwrap()))
-            {
-                Self::UnloadedFolder {
-                    path_name: path_to_str(path),
-                    name,
-                }
+        Some(if let Some(name) = Self::read_name(&path) {
+            Self::UnloadedFolder {
+                path_name: path_to_str(path),
+                name,
             }
-            // Else, takes the name from the folder itself.
-            else {
-                let path_name = String::from(
-                    path.file_name()
-                        .map(|name| name.to_str())
-                        .flatten()
-                        .unwrap_or(""),
-                );
+        }
+        // Else, takes the name from the folder itself.
+        else {
+            let path_name = String::from(
+                path.file_name()
+                    .map(|name| name.to_str())
+                    .flatten()
+                    .unwrap_or(""),
+            );
 
-                Self::UnloadedFolder {
-                    name: DisplayName::Literal(path_name.clone()),
-                    path_name,
-                }
-            },
-        )
+            Self::UnloadedFolder {
+                name: DisplayName::Literal(path_name.clone()),
+                path_name,
+            }
+        })
     }
 
     /// Reads a folder's data from the `.folder` file. If it doesn't exist, it
