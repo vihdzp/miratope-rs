@@ -428,6 +428,7 @@ impl Concrete {
         self.try_antiprism_with(sphere, height).unwrap()
     }
 
+    /// Builds a uniform antiprism of unit edge length.
     pub fn uniform_antiprism(n: usize, d: usize) -> Self {
         let polygon = Concrete::star_polygon(n, d);
 

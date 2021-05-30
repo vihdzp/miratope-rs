@@ -1,4 +1,7 @@
 //! Sets up the windows that permit more advanced settings.
+//!
+//! All windows are loaded in parallel, before the top panel and the library are
+//! shown on screen.
 
 use std::marker::PhantomData;
 
@@ -34,7 +37,7 @@ pub enum ShowResult {
 pub struct EguiWindowPlugin;
 
 impl Plugin for EguiWindowPlugin {
-    fn build(&self, app: &mut bevy::prelude::AppBuilder) {
+    fn build(&self, app: &mut AppBuilder) {
         app.add_plugin(DualWindow::plugin())
             .add_plugin(PyramidWindow::plugin())
             .add_plugin(PrismWindow::plugin())

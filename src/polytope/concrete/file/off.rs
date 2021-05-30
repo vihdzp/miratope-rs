@@ -314,7 +314,7 @@ impl Concrete {
 
     /// Gets the name from an OFF file, assuming it's stored in RON in the first
     /// line of the file.
-    pub fn name_from_off(path: &impl AsRef<Path>) -> Option<Name<Con>> {
+    pub fn name_from_off<T: AsRef<Path>>(path: T) -> Option<Name<Con>> {
         use std::io::{BufRead, BufReader};
 
         let file = BufReader::new(fs::File::open(path).ok()?);

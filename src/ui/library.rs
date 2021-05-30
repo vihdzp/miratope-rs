@@ -23,7 +23,7 @@ use strum_macros::Display;
 pub struct LibraryPlugin;
 
 impl Plugin for LibraryPlugin {
-    fn build(&self, app: &mut bevy::prelude::AppBuilder) {
+    fn build(&self, app: &mut AppBuilder) {
         // We might want to read the folder path from a config file.
         app.insert_resource(Library::new_folder(&"./lib/"))
             .add_system(show_library.system().after("show_top_panel"));
@@ -35,13 +35,13 @@ impl Plugin for LibraryPlugin {
 ///
 /// The variants of the special library store whatever value is currently being
 /// stored on screen. When the user clicks on the button to load them, they're
-/// sent together with their values as a [`ShowResult`] to the
-/// [`ui`](crate::ui::ui) system, which then actually loads the polytope.
+/// sent together with their values as a [`ShowResult`] to the [`show_library`]
+/// system, which then actually loads the polytope.
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Display)]
 pub enum SpecialLibrary {
     /// A regular polygon.
     #[strum(serialize = "Regular polygon")]
-    Polygon(usize, usize),
+    Polygons(usize, usize),
 
     /// A (uniform 3D) prism.
     Prisms(usize, usize),
@@ -50,7 +50,11 @@ pub enum SpecialLibrary {
     Antiprisms(usize, usize),
 
     /// A (4D uniform) duoprism.
-    Duoprism(usize, usize, usize, usize),
+    Duoprisms(usize, usize, usize, usize),
+
+    /// A (4D uniform) antiprismatic prism.
+    #[strum(serialize = "Antiprismatic prisms")]
+    AntiprismPrisms(usize, usize),
 
     /// A simplex.
     Simplex(Rank),
@@ -82,7 +86,7 @@ impl SpecialLibrary {
 
         match self {
             // An {n / d} regular polygon or uniform polygonal prism.
-            Self::Polygon(n, d) | Self::Prisms(n, d) => {
+            Self::Polygons(n, d) | Self::Prisms(n, d) => {
                 let mut clicked = false;
 
                 ui.horizontal(|ui| {
@@ -110,7 +114,7 @@ impl SpecialLibrary {
             }
 
             // An {n / d} uniform antiprism.
-            Self::Antiprisms(n, d) => {
+            Self::Antiprisms(n, d) | Self::AntiprismPrisms(n, d) => {
                 let mut clicked = false;
 
                 ui.horizontal(|ui| {
@@ -138,7 +142,7 @@ impl SpecialLibrary {
             }
 
             // An step prism based on two uniform polygons..
-            Self::Duoprism(n1, d1, n2, d2) => {
+            Self::Duoprisms(n1, d1, n2, d2) => {
                 let mut clicked = false;
 
                 ui.horizontal_wrapped(|ui| {
@@ -229,21 +233,31 @@ impl DisplayName {
 pub enum Library {
     /// A folder whose contents have not yet been read.
     UnloadedFolder {
-        /// The name of the folder in the disk.
+        /// The name of the folder in disk.
         folder_name: String,
+
+        /// The display name of the folder.
         name: DisplayName,
     },
 
     /// A folder whose contents have been read.
     LoadedFolder {
+        /// The name of the folder in disk.
         folder_name: String,
+
+        /// The display name of the folder.
         name: DisplayName,
+
+        /// The contents of the folder.
         contents: Vec<Library>,
     },
 
     /// A file that can be loaded into Miratope.
     File {
+        /// The name of the file in disk.
         file_name: String,
+
+        /// The display name of the file.
         name: DisplayName,
     },
 
@@ -298,15 +312,13 @@ impl Library {
         }
     }
 
-    /// Creates a new unloaded folder from a given path.
-    pub fn new_folder(path: &impl AsRef<OsStr>) -> Option<Self> {
-        // If the path doesn't exist, we return `None`.
+    /// Creates a new unloaded folder from a given path. If the path doesn't
+    /// exist or doesn't refer to a folder, we return `None`.
+    pub fn new_folder<T: AsRef<OsStr>>(path: &T) -> Option<Self> {
         let path = PathBuf::from(&path);
-        if !path.exists() {
+        if !(path.exists() && path.is_dir()) {
             return None;
         }
-
-        debug_assert!(path.is_dir(), "Path {:?} not a directory!", path);
 
         // Attempts to read from the .name file.
         Some(
@@ -320,16 +332,16 @@ impl Library {
             }
             // Else, takes the name from the folder itself.
             else {
-                let name = DisplayName::Literal(String::from(
+                let folder_name = String::from(
                     path.file_name()
                         .map(|name| name.to_str())
                         .flatten()
                         .unwrap_or(""),
-                ));
+                );
 
                 Self::UnloadedFolder {
-                    folder_name: String::from(path.file_name().unwrap().to_str().unwrap()),
-                    name,
+                    name: DisplayName::Literal(folder_name.clone()),
+                    folder_name,
                 }
             },
         )
@@ -358,8 +370,8 @@ impl Library {
                     let path = &entry?.path();
 
                     // Adds a new unloaded folder.
-                    if path.is_dir() {
-                        contents.push(Self::new_folder(path).unwrap());
+                    if let Some(unloaded_folder) = Self::new_folder(path) {
+                        contents.push(unloaded_folder);
                     }
                     // Adds a new file.
                     else {
@@ -372,8 +384,11 @@ impl Library {
                 }
 
                 // We cache these contents for future use.
-                fs::write(path.join(".folder"), ron::to_string(&contents).unwrap()).unwrap();
-                println!(".folder file overwritten!");
+                if fs::write(path.join(".folder"), ron::to_string(&contents).unwrap()).is_ok() {
+                    println!(".folder file overwritten!");
+                } else {
+                    println!(".folder file could not be overwritten!");
+                }
 
                 contents
             },
@@ -491,25 +506,28 @@ fn show_library(
                         // Loads a special polytope.
                         ShowResult::Special(special) => match special {
                             // Loads a regular star polygon.
-                            SpecialLibrary::Polygon(n, d) => {
+                            SpecialLibrary::Polygons(n, d) => {
                                 if let Some(mut p) = query.iter_mut().next() {
                                     *p = Concrete::star_polygon(n, d);
                                 }
                             }
+
                             // Loads a uniform polygonal prism.
                             SpecialLibrary::Prisms(n, d) => {
                                 if let Some(mut p) = query.iter_mut().next() {
                                     *p = Concrete::uniform_prism(n, d);
                                 }
                             }
+
                             // Loads a uniform polygonal antiprism.
                             SpecialLibrary::Antiprisms(n, d) => {
                                 if let Some(mut p) = query.iter_mut().next() {
                                     *p = Concrete::uniform_antiprism(n, d);
                                 }
                             }
+
                             // Loads a (uniform 4D) duoprism.
-                            SpecialLibrary::Duoprism(n1, d1, n2, d2) => {
+                            SpecialLibrary::Duoprisms(n1, d1, n2, d2) => {
                                 if let Some(mut p) = query.iter_mut().next() {
                                     let p1 = Concrete::star_polygon(n1, d1);
 
@@ -521,18 +539,28 @@ fn show_library(
                                     }
                                 }
                             }
+
+                            // Loads a uniform polygonal antiprism.
+                            SpecialLibrary::AntiprismPrisms(n, d) => {
+                                if let Some(mut p) = query.iter_mut().next() {
+                                    *p = Concrete::uniform_antiprism(n, d).prism();
+                                }
+                            }
+
                             // Loads a simplex with a given rank.
                             SpecialLibrary::Simplex(rank) => {
                                 if let Some(mut p) = query.iter_mut().next() {
                                     *p = Concrete::simplex(rank);
                                 }
                             }
+
                             // Loads a hypercube with a given rank.
                             SpecialLibrary::Hypercube(rank) => {
                                 if let Some(mut p) = query.iter_mut().next() {
                                     *p = Concrete::hypercube(rank);
                                 }
                             }
+
                             // Loads an orthoplex with a given rank.
                             SpecialLibrary::Orthoplex(rank) => {
                                 if let Some(mut p) = query.iter_mut().next() {

@@ -9,6 +9,7 @@ use std::{
     cmp::Ordering,
     collections::{hash_map::Entry, HashMap, VecDeque},
     hash::{Hash, Hasher},
+    ops::{Index, IndexMut},
 };
 
 use super::{
@@ -327,7 +328,7 @@ impl Ord for OrientedFlag {
 }
 
 /// Allows indexing an oriented flag by rank.
-impl std::ops::Index<usize> for OrientedFlag {
+impl Index<usize> for OrientedFlag {
     type Output = usize;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -336,13 +337,13 @@ impl std::ops::Index<usize> for OrientedFlag {
 }
 
 /// Allows mutably indexing an oriented flag by rank.
-impl std::ops::IndexMut<usize> for OrientedFlag {
+impl IndexMut<usize> for OrientedFlag {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.flag[index]
     }
 }
 
-impl std::ops::Index<Rank> for OrientedFlag {
+impl Index<Rank> for OrientedFlag {
     type Output = usize;
 
     fn index(&self, index: Rank) -> &Self::Output {
@@ -350,7 +351,7 @@ impl std::ops::Index<Rank> for OrientedFlag {
     }
 }
 
-impl std::ops::IndexMut<Rank> for OrientedFlag {
+impl IndexMut<Rank> for OrientedFlag {
     fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
         &mut self.flag[index]
     }

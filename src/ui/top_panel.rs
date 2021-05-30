@@ -72,42 +72,21 @@ impl SectionState {
 
     /// Sets the position of the hyperplane.
     pub fn set_pos(&mut self, pos: Float) {
-        if let Self::Active {
-            original_polytope: _,
-            minmax: _,
-            hyperplane_pos,
-            flatten: _,
-            lock: _,
-        } = self
-        {
+        if let Self::Active { hyperplane_pos, .. } = self {
             *hyperplane_pos = pos;
         }
     }
 
     /// Flips the flattening setting.
     pub fn flip_flat(&mut self) {
-        if let Self::Active {
-            original_polytope: _,
-            minmax: _,
-            hyperplane_pos: _,
-            flatten,
-            lock: _,
-        } = self
-        {
+        if let Self::Active { flatten, .. } = self {
             *flatten = !*flatten;
         }
     }
 
     /// Flips the lock setting.
     pub fn flip_lock(&mut self) {
-        if let Self::Active {
-            original_polytope: _,
-            minmax: _,
-            hyperplane_pos: _,
-            flatten: _,
-            lock,
-        } = self
-        {
+        if let Self::Active { lock, .. } = self {
             *lock = !*lock;
         }
     }
@@ -249,10 +228,8 @@ pub fn update_cross_section(
     if section_direction.is_changed() {
         if let SectionState::Active {
             original_polytope,
-            hyperplane_pos: _,
             minmax,
-            flatten: _,
-            lock: _,
+            ..
         } = &mut *section_state
         {
             *minmax = original_polytope
@@ -542,11 +519,7 @@ pub fn show_top_panel(
                         match &mut *section_state {
                             // The view is active, but will be inactivated.
                             SectionState::Active {
-                                original_polytope,
-                                minmax: _,
-                                hyperplane_pos: _,
-                                flatten: _,
-                                lock: _,
+                                original_polytope, ..
                             } => {
                                 *query.iter_mut().next().unwrap() = original_polytope.clone();
                                 *section_state = SectionState::Inactive;
@@ -714,11 +687,11 @@ fn show_views(
 ) {
     // The cross-section settings.
     if let SectionState::Active {
-        original_polytope: _,
         minmax,
         hyperplane_pos,
         flatten,
         lock,
+        ..
     } = *section_state
     {
         ui.label("Cross section settings:");

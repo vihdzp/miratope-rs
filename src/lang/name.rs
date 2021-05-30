@@ -40,7 +40,7 @@ pub trait NameData<T>: PartialEq + Debug + Clone + Serialize {
 
 /// Phantom data associated with an abstract polytope. Internally stores nothing,
 /// and compares as `true` with anything else.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Copy, Debug, Serialize, Deserialize)]
 pub struct AbsData<T>(PhantomData<T>);
 
 impl<T> Default for AbsData<T> {
@@ -61,8 +61,6 @@ impl<T> Clone for AbsData<T> {
         Default::default()
     }
 }
-
-impl<T> Copy for AbsData<T> {}
 
 impl<T: Debug> NameData<T> for AbsData<T> {
     /// Initializes a new `AbsData` that pretends to hold a given value.

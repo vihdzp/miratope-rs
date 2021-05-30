@@ -17,7 +17,7 @@ use nalgebra::{storage::Storage, Dim, Dynamic, VecStorage, U1};
 #[derive(Debug)]
 /// A hypersphere with a certain center and radius.
 ///
-/// This is mostly used for [duals](crate::polytope::concrete::Concrete::dual_with),
+/// This is mostly used for [duals](crate::polytope::concrete::Concrete::try_dual_with),
 /// where the hypersphere is used to reciprocate polytopes. For convenience, we
 /// allow the hypersphere to have a negative squared radius, which results in
 /// the dualized polytope being reflected about its center.

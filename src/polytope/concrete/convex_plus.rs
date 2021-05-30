@@ -30,17 +30,8 @@ impl<'a> QueueEntry<'a> {
     /// Returns the time associated with an event.
     pub fn time(&self) -> f64 {
         match self {
-            QueueEntry::Point {
-                time: t,
-                normal: _,
-                point: _,
-                vertices: _,
-            } => *t,
-            QueueEntry::Peak {
-                time: t,
-                normal: _,
-                element: _,
-            } => *t,
+            QueueEntry::Point { time: t, .. } => *t,
+            QueueEntry::Peak { time: t, .. } => *t,
         }
     }
 }
