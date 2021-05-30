@@ -230,7 +230,7 @@ pub fn update_cross_section(
             original_polytope,
             minmax,
             ..
-        } = &mut *section_state
+        } = section_state.as_mut()
         {
             *minmax = original_polytope
                 .minmax(&section_direction.0)
@@ -245,7 +245,7 @@ pub fn update_cross_section(
             minmax,
             flatten,
             lock,
-        } = &mut *section_state
+        } = section_state.as_mut()
         {
             // We don't update the view if it's locked.
             if *lock {
@@ -376,12 +376,7 @@ pub fn show_top_panel(
 
                     // Forces an update on all polytopes. (This does have an effect!)
                     for mut p in query.iter_mut() {
-                        // We'll use this code once Clippy Issue #7171 is fixed:
-                        // #[allow(clippy::no_effect)]
-                        // &mut *p;
-
-                        // Workaround:
-                        p.name_mut();
+                        p.as_mut();
                     }
                 }
             });
@@ -516,7 +511,7 @@ pub fn show_top_panel(
 
                     // Toggles cross-section mode.
                     if ui.button("Cross-section").clicked() {
-                        match &mut *section_state {
+                        match section_state.as_mut() {
                             // The view is active, but will be inactivated.
                             SectionState::Active {
                                 original_polytope, ..

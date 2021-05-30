@@ -488,7 +488,7 @@ fn show_library(
     selected_language: Res<SelectedLanguage>,
 ) {
     // Shows the polytope library.
-    if let Some(library) = &mut *library {
+    if let Some(library) = library.as_mut() {
         egui::SidePanel::left("side_panel")
             .default_width(350.0)
             .max_width(450.0)

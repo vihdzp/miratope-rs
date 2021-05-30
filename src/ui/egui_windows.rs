@@ -143,7 +143,7 @@ macro_rules! impl_show {
             match self_.show(egui_ctx.ctx()) {
                 ShowResult::Ok => {
                     for mut polytope in query.iter_mut() {
-                        self_.action(&mut *polytope);
+                        self_.action(polytope.as_mut());
                     }
 
                     self_.close()
@@ -425,7 +425,7 @@ pub trait DuoWindow: Window {
         for mut polytope in query.iter_mut() {
             match self_.show(egui_ctx.ctx(), &polytope, &memory) {
                 ShowResult::Ok => {
-                    self_.action(&mut *polytope, &memory);
+                    self_.action(polytope.as_mut(), &memory);
                     self_.close()
                 }
                 ShowResult::Close => self_.close(),

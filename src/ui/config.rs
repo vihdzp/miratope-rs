@@ -42,7 +42,7 @@ impl Default for ConfigData {
         Self {
             lib_path: fs::canonicalize(DEFAULT_PATH)
                 .map(|path| path.to_string_lossy().into_owned())
-                .unwrap_or(DEFAULT_PATH.to_string()),
+                .unwrap_or_else(|_| DEFAULT_PATH.to_string()),
         }
     }
 }

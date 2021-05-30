@@ -56,7 +56,7 @@ impl Memory {
 
                             if ui.button("Swap").clicked() {
                                 for mut p in query.iter_mut() {
-                                    std::mem::swap(&mut *p, poly);
+                                    std::mem::swap(p.as_mut(), poly);
                                 }
                             }
 
