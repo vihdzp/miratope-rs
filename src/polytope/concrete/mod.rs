@@ -52,7 +52,11 @@ impl Concrete {
     /// underlying abstract polytope. Does some debug assertions on the input.
     pub fn new(vertices: Vec<Point>, abs: Abstract) -> Self {
         // There must be as many abstract vertices as concrete ones.
-        debug_assert_eq!(vertices.len(), abs.vertex_count());
+        debug_assert_eq!(
+            vertices.len(),
+            abs.vertex_count(),
+            "Abstract vertex count doesn't match concrete vertex count!"
+        );
 
         // All vertices must have the same dimension.
         if cfg!(debug_assertions) {
@@ -481,6 +485,13 @@ impl Concrete {
         height: Float,
         tegum: bool,
     ) -> Vec<Point> {
+        // Duotegums with points should just return the original polytopes.
+        if p.get(0).map(|vp| vp.len()) == Some(0) {
+            return q.to_owned();
+        } else if q.get(0).map(|vq| vq.len()) == Some(0) {
+            return p.to_owned();
+        }
+
         let half_height = height / 2.0;
 
         q.iter()

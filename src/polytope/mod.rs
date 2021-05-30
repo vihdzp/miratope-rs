@@ -5,6 +5,8 @@
 pub mod r#abstract;
 pub mod concrete;
 
+use std::iter;
+
 use self::r#abstract::{
     elements::{Element, ElementRef, Section},
     flag::{Flag, FlagEvent, FlagIter, OrientedFlag, OrientedFlagIter},
@@ -419,14 +421,13 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         if rank == Rank::new(-1) {
             Self::nullitope()
         } else {
-            Self::multipyramid(&vec![&Self::point(); rank.plus_one_usize()]).with_name(
-                Name::simplex(
+            Self::multipyramid_iter(iter::repeat(&Self::point()).take(rank.plus_one_usize()))
+                .with_name(Name::simplex(
                     T::DataRegular::new(Regular::Yes {
                         center: Point::zeros(rank.usize()),
                     }),
                     rank,
-                ),
-            )
+                ))
         }
     }
 
@@ -438,12 +439,14 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         } else {
             let rank_u = rank.usize();
 
-            Self::multiprism(&vec![&Self::dyad(); rank_u]).with_name(Name::hyperblock(
-                T::DataRegular::new(Regular::Yes {
-                    center: Point::zeros(rank_u),
-                }),
-                rank,
-            ))
+            Self::multiprism_iter(iter::repeat(&Self::dyad()).take(rank_u)).with_name(
+                Name::hyperblock(
+                    T::DataRegular::new(Regular::Yes {
+                        center: Point::zeros(rank_u),
+                    }),
+                    rank,
+                ),
+            )
         }
     }
 
@@ -455,12 +458,14 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         } else {
             let rank_u = rank.usize();
 
-            Self::multitegum(&vec![&Self::dyad(); rank_u]).with_name(Name::orthoplex(
-                T::DataRegular::new(Regular::Yes {
-                    center: Point::zeros(rank_u),
-                }),
-                rank,
-            ))
+            Self::multitegum_iter(iter::repeat(&Self::dyad()).take(rank_u)).with_name(
+                Name::orthoplex(
+                    T::DataRegular::new(Regular::Yes {
+                        center: Point::zeros(rank_u),
+                    }),
+                    rank,
+                ),
+            )
         }
     }
 }
