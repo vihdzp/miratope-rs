@@ -318,10 +318,13 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// given polytope in place.
     fn hosotope_mut(&mut self);
 
+    /// Attempts to build an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
+    /// based on a given polytope. If it fails, it returns the index of a facet
+    /// through the inversion center.
+    fn try_antiprism(&self) -> DualResult<Self>;
+
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope.
-    fn try_antiprism(&self) -> Result<Self, usize>;
-
     fn antiprism(&self) -> Self {
         self.try_antiprism().unwrap()
     }
@@ -349,59 +352,47 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     }
 
     /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)
-    /// of a set of polytopes.
-    fn multipyramid(factors: &[&Self]) -> Self {
-        Self::multipyramid_iter(factors.iter().copied())
-    }
-
-    /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// of an iterator over polytopes.
-    fn multipyramid_iter<'a, U: Iterator<Item = &'a Self>>(factors: U) -> Self
+    fn multipyramid<'a, U: Iterator<Item = &'a Self>>(mut factors: U) -> Self
     where
         Self: 'a,
     {
-        factors.fold(Self::nullitope(), |p, q| Self::duopyramid(&p, q))
-    }
-
-    /// Takes the [prism product](https://polytope.miraheze.org/wiki/Prism_product)
-    /// of a set of polytopes.
-    fn multiprism(factors: &[&Self]) -> Self {
-        Self::multiprism_iter(factors.iter().copied())
+        if let Some(init) = factors.next().cloned() {
+            factors.fold(init, |p, q| Self::duopyramid(&p, q))
+        } else {
+            Self::nullitope()
+        }
     }
 
     /// Takes the [prism product](https://polytope.miraheze.org/wiki/Prism_product)
     /// of an iterator over polytopes.
-    fn multiprism_iter<'a, U: Iterator<Item = &'a Self>>(factors: U) -> Self
+    fn multiprism<'a, U: Iterator<Item = &'a Self>>(mut factors: U) -> Self
     where
         Self: 'a,
     {
-        factors.fold(Self::point(), |p, q| Self::duoprism(&p, q))
-    }
-
-    /// Takes the [tegum product](https://polytope.miraheze.org/wiki/Tegum_product)
-    /// of a set of polytopes.
-    fn multitegum(factors: &[&Self]) -> Self {
-        Self::multitegum_iter(factors.iter().copied())
+        if let Some(init) = factors.next().cloned() {
+            factors.fold(init, |p, q| Self::duoprism(&p, q))
+        } else {
+            Self::point()
+        }
     }
 
     /// Takes the [tegum product](https://polytope.miraheze.org/wiki/Tegum_product)
     /// of an iterator over polytopes.
-    fn multitegum_iter<'a, U: Iterator<Item = &'a Self>>(factors: U) -> Self
+    fn multitegum<'a, U: Iterator<Item = &'a Self>>(mut factors: U) -> Self
     where
         Self: 'a,
     {
-        factors.fold(Self::point(), |p, q| Self::duotegum(&p, q))
-    }
-
-    /// Takes the [comb product](https://polytope.miraheze.org/wiki/Comb_product)
-    /// of a set of polytopes.
-    fn multicomb(factors: &[&Self]) -> Self {
-        Self::multicomb_iter(factors.iter().copied())
+        if let Some(init) = factors.next().cloned() {
+            factors.fold(init, |p, q| Self::duotegum(&p, q))
+        } else {
+            Self::point()
+        }
     }
 
     /// Takes the [comb product](https://polytope.miraheze.org/wiki/Comb_product)
     /// of an iterator over polytopes.
-    fn multicomb_iter<'a, U: Iterator<Item = &'a Self>>(mut factors: U) -> Self
+    fn multicomb<'a, U: Iterator<Item = &'a Self>>(mut factors: U) -> Self
     where
         Self: 'a,
     {
@@ -421,13 +412,14 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         if rank == Rank::new(-1) {
             Self::nullitope()
         } else {
-            Self::multipyramid_iter(iter::repeat(&Self::point()).take(rank.plus_one_usize()))
-                .with_name(Name::simplex(
+            Self::multipyramid(iter::repeat(&Self::point()).take(rank.plus_one_usize())).with_name(
+                Name::simplex(
                     T::DataRegular::new(Regular::Yes {
                         center: Point::zeros(rank.usize()),
                     }),
                     rank,
-                ))
+                ),
+            )
         }
     }
 
@@ -439,14 +431,12 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         } else {
             let rank_u = rank.usize();
 
-            Self::multiprism_iter(iter::repeat(&Self::dyad()).take(rank_u)).with_name(
-                Name::hyperblock(
-                    T::DataRegular::new(Regular::Yes {
-                        center: Point::zeros(rank_u),
-                    }),
-                    rank,
-                ),
-            )
+            Self::multiprism(iter::repeat(&Self::dyad()).take(rank_u)).with_name(Name::hyperblock(
+                T::DataRegular::new(Regular::Yes {
+                    center: Point::zeros(rank_u),
+                }),
+                rank,
+            ))
         }
     }
 
@@ -458,14 +448,12 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         } else {
             let rank_u = rank.usize();
 
-            Self::multitegum_iter(iter::repeat(&Self::dyad()).take(rank_u)).with_name(
-                Name::orthoplex(
-                    T::DataRegular::new(Regular::Yes {
-                        center: Point::zeros(rank_u),
-                    }),
-                    rank,
-                ),
-            )
+            Self::multitegum(iter::repeat(&Self::dyad()).take(rank_u)).with_name(Name::orthoplex(
+                T::DataRegular::new(Regular::Yes {
+                    center: Point::zeros(rank_u),
+                }),
+                rank,
+            ))
         }
     }
 }

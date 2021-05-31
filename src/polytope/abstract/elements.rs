@@ -257,8 +257,8 @@ impl Element {
 /// A list of [`Elements`](Element) of the same
 /// [rank](https://polytope.miraheze.org/wiki/Rank).
 ///
-/// If you only want to deal with the subelements of a
-/// polytope, use [`SubelementList`] instead.
+/// If you only want to deal with the subelements of a polytope, use
+/// [`SubelementList`] instead.
 #[derive(Debug, Clone)]
 pub struct ElementList(pub Vec<Element>);
 
@@ -469,21 +469,16 @@ impl AbstractBuilder {
     }
 }
 
-/// As a byproduct of calculating either the vertices or the entire polytope
-/// corresponding to a given section, we generate a map from ranks and indices
-/// in the original polytope to ranks and indices in the section. This struct
-/// encodes such a map as a ranked vector of hash maps.
+/// Maps each recursive subelement of an abstract polytope's element to a
+/// `usize`, representing its index in a new polytope. This is used to build the
+/// elements of polytopes (as polytopes), or to find their vertices.
 pub struct ElementHash(RankVec<HashMap<usize, usize>>);
 
 impl ElementHash {
-    /// Gets the hashmap corresponding to elements of a given rank.
-    pub fn get(&self, idx: Rank) -> Option<&HashMap<usize, usize>> {
-        self.0.get(idx)
-    }
-
-    /// Returns a map from elements on the polytope to elements in an element.
-    /// If the element doesn't exist, we return `None`.
-    pub fn from_element(poly: &Abstract, el: &ElementRef) -> Option<Self> {
+    /// Returns a map from elements on a polytope to elements on a new polytope
+    /// representing a particular element (as a polytope). If the element
+    /// doesn't exist, we return `None`.
+    pub fn new(poly: &Abstract, el: &ElementRef) -> Option<Self> {
         poly.get_element(el)?;
 
         // A vector of HashMaps. The k-th entry is a map from k-elements of the
@@ -511,8 +506,14 @@ impl ElementHash {
         Some(Self(hashes))
     }
 
-    /// Gets the indices of the elements of a given rank in a polytope.
-    pub fn to_elements(&self, rank: Rank) -> Vec<usize> {
+    /// Gets the `HashMap` corresponding to elements of a given rank.
+    fn get(&self, idx: Rank) -> Option<&HashMap<usize, usize>> {
+        self.0.get(idx)
+    }
+
+    /// Gets the indices of the elements of a given rank in the original
+    /// polytope.
+    fn to_elements(&self, rank: Rank) -> Vec<usize> {
         if let Some(elements) = self.get(rank) {
             let mut new_elements = Vec::new();
             new_elements.resize(elements.len(), 0);
@@ -527,11 +528,17 @@ impl ElementHash {
         }
     }
 
+    /// Gets the indices of the vertices in the original polytope.
+    pub fn to_vertices(&self) -> Vec<usize> {
+        self.to_elements(Rank::new(0))
+    }
+
     /// Gets the indices of the vertices of a given element in a polytope.
     pub fn to_polytope(&self, poly: &Abstract) -> Abstract {
         let rank = self.0.rank();
         let mut abs = Abstract::with_capacity(rank);
 
+        // For every rank stored in the element map.
         for r in Rank::range_inclusive_iter(Rank::new(-1), rank) {
             let mut elements = ElementList::new();
             let hash = &self.0[r];

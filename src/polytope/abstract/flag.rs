@@ -683,6 +683,7 @@ mod tests {
     use super::*;
     use crate::polytope::Polytope;
 
+    /// Tests that a polytope has an expected number of flags, oriented or not.
     fn test(polytope: &Abstract, expected: usize) {
         let flag_count = polytope.flags().count();
         assert_eq!(

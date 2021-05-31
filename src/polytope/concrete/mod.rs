@@ -582,9 +582,16 @@ impl Concrete {
         let flat_vertices = self.flat_vertices();
         let flat_vertices = flat_vertices.as_ref().unwrap_or(&self.vertices);
 
-        // Skew polytopes don't have a defined volume.
-        if flat_vertices.get(0)?.len() != rank.usize() {
-            return None;
+        match flat_vertices.get(0)?.len().cmp(&rank.usize()) {
+            // Degenerate polytopes have volume 0.
+            std::cmp::Ordering::Less => {
+                return Some(0.0);
+            }
+            // Skew polytopes don't have a defined volume.
+            std::cmp::Ordering::Greater => {
+                return None;
+            }
+            _ => {}
         }
 
         // Maps every element of the polytope to one of its vertices.
@@ -943,7 +950,7 @@ impl Polytope<Con> for Concrete {
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
-    /// from two polytopes.
+    /// with unit height from two polytopes.
     fn duopyramid(p: &Self, q: &Self) -> Self {
         Self::duopyramid_with(
             p,
@@ -1060,5 +1067,186 @@ impl std::ops::IndexMut<Rank> for Concrete {
     /// Gets the list of elements with a given rank.
     fn index_mut(&mut self, rank: Rank) -> &mut Self::Output {
         &mut self.abs[rank]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Concrete;
+    use crate::{
+        lang::{En, Language},
+        polytope::{r#abstract::rank::Rank, Polytope},
+        Consts, Float,
+    };
+
+    use approx::abs_diff_eq;
+    use factorial::Factorial;
+
+    /// Tests that a polytope has an expected volume.
+    fn test(poly: &Concrete, volume: Option<Float>) {
+        if let Some(poly_volume) = poly.volume() {
+            let volume = volume.expect(&format!(
+                "Expected no volume for {}, found volume {}!",
+                En::parse(poly.name(), Default::default()),
+                poly_volume
+            ));
+
+            assert!(
+                abs_diff_eq!(poly_volume, volume, epsilon = Float::EPS),
+                "Expected volume {} for {}, found volume {}.",
+                volume,
+                En::parse(poly.name(), Default::default()),
+                poly_volume
+            );
+        } else if let Some(volume) = volume {
+            panic!(
+                "Expected volume {} for {}, found no volume!",
+                volume,
+                En::parse(poly.name(), Default::default()),
+            );
+        }
+    }
+
+    #[test]
+    fn nullitope() {
+        test(&Concrete::nullitope(), None)
+    }
+
+    #[test]
+    fn point() {
+        test(&Concrete::point(), Some(1.0));
+    }
+
+    #[test]
+    fn dyad() {
+        test(&Concrete::dyad(), Some(1.0));
+    }
+
+    fn polygon_area(n: usize, d: usize) -> Float {
+        let n = n as Float;
+        let d = d as Float;
+        n * (d * Float::TAU / n).sin() / 2.0
+    }
+
+    #[test]
+    fn polygon() {
+        for n in 2..=10 {
+            for d in 1..=n / 2 {
+                let poly = Concrete::star_polygon(n, d);
+                test(&poly, Some(polygon_area(n, d)));
+            }
+        }
+    }
+
+    #[test]
+    fn duopyramid() {
+        let mut polygons = Vec::new();
+        let mut areas = Vec::new();
+        for n in 2..=5 {
+            for d in 1..=n / 2 {
+                polygons.push(Concrete::star_polygon(n, d));
+                areas.push(polygon_area(n, d));
+            }
+        }
+
+        for m in 0..polygons.len() {
+            for n in 0..polygons.len() {
+                test(
+                    &Concrete::duopyramid(&polygons[m], &polygons[n]),
+                    Some(areas[m] * areas[n] / 30.0),
+                )
+            }
+        }
+    }
+
+    #[test]
+    fn duoprism() {
+        let mut polygons = Vec::new();
+        let mut areas = Vec::new();
+        for n in 2..=5 {
+            for d in 1..=n / 2 {
+                polygons.push(Concrete::star_polygon(n, d));
+                areas.push(polygon_area(n, d));
+            }
+        }
+
+        for m in 0..polygons.len() {
+            for n in 0..polygons.len() {
+                test(
+                    &Concrete::duoprism(&polygons[m], &polygons[n]),
+                    Some(areas[m] * areas[n]),
+                )
+            }
+        }
+    }
+
+    #[test]
+    fn duotegum() {
+        let mut polygons = Vec::new();
+        let mut areas = Vec::new();
+        for n in 2..=5 {
+            for d in 1..=n / 2 {
+                polygons.push(Concrete::star_polygon(n, d));
+                areas.push(polygon_area(n, d));
+            }
+        }
+
+        for m in 0..polygons.len() {
+            for n in 0..polygons.len() {
+                test(
+                    &Concrete::duotegum(&polygons[m], &polygons[n]),
+                    Some(areas[m] * areas[n] / 6.0),
+                )
+            }
+        }
+    }
+
+    #[test]
+    fn duocomb() {
+        let mut polygons = Vec::new();
+        let mut areas = Vec::new();
+        for n in 2..=5 {
+            for d in 1..=n / 2 {
+                polygons.push(Concrete::star_polygon(n, d));
+                areas.push(polygon_area(n, d));
+            }
+        }
+
+        for m in 0..polygons.len() {
+            for n in 0..polygons.len() {
+                let volume = if m == 0 || n == 0 { Some(0.0) } else { None };
+                test(&Concrete::duocomb(&polygons[m], &polygons[n]), volume)
+            }
+        }
+    }
+
+    #[test]
+    fn simplex() {
+        for n in 0..=5 {
+            test(
+                &Concrete::simplex(Rank::from(n)),
+                Some(
+                    ((n + 1) as Float / 2u32.pow(n as u32) as Float).sqrt()
+                        / n.factorial() as Float,
+                ),
+            );
+        }
+    }
+
+    #[test]
+    fn hypercube() {
+        for n in 0..=5 {
+            test(&Concrete::hypercube(Rank::new(n)), Some(1.0));
+        }
+    }
+
+    #[test]
+    fn orthoplex() {
+        for n in 0..=5 {
+            test(
+                &Concrete::orthoplex(Rank::from(n)),
+                Some(1.0 / n.factorial() as Float),
+            );
+        }
     }
 }

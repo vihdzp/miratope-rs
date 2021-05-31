@@ -279,18 +279,14 @@ impl Abstract {
     /// Gets the indices of the vertices of an element in the polytope, if it
     /// exists.
     pub fn element_vertices(&self, el: &ElementRef) -> Option<Vec<usize>> {
-        Some(ElementHash::from_element(self, el)?.to_elements(Rank::new(0)))
+        Some(ElementHash::new(self, el)?.to_vertices())
     }
 
     /// Gets both elements with a given rank and index as a polytope and the
     /// indices of its vertices on the original polytope, if it exists.
     pub fn element_and_vertices(&self, el: &ElementRef) -> Option<(Vec<usize>, Self)> {
-        let element_hash = ElementHash::from_element(self, el)?;
-
-        Some((
-            element_hash.to_elements(Rank::new(0)),
-            element_hash.to_polytope(self),
-        ))
+        let element_hash = ElementHash::new(self, el)?;
+        Some((element_hash.to_vertices(), element_hash.to_polytope(self)))
     }
 
     /// Returns the indices of a Petrial polygon in cyclic order, or `None` if
@@ -898,7 +894,6 @@ impl Polytope<Abs> for Abstract {
 
         self.ranks.reverse();
         self.name = self.name.clone().dual(Default::default());
-
         Ok(())
     }
 
@@ -1044,7 +1039,7 @@ impl Polytope<Abs> for Abstract {
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
     fn element(&self, el: &ElementRef) -> Option<Self> {
-        Some(ElementHash::from_element(self, el)?.to_polytope(self))
+        Some(ElementHash::new(self, el)?.to_polytope(self))
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
@@ -1145,6 +1140,7 @@ impl IntoIterator for Abstract {
 #[cfg(test)]
 mod tests {
     use super::{super::Polytope, rank::Rank, Abstract};
+    use crate::lang::{En, Language};
 
     /// Returns a bunch of varied polytopes to run general tests on. Use only
     /// for tests that should work on **everything** you give it!
@@ -1172,64 +1168,52 @@ mod tests {
         ]
     }
 
+    /// Tests whether a polytope's element counts match the expected element
+    /// counts, and whether a polytope is valid.
+    fn test(poly: &Abstract, element_counts: Vec<usize>) {
+        assert_eq!(
+            poly.el_counts().0,
+            element_counts,
+            "{} element counts don't match expected value.",
+            En::parse_uppercase(poly.name(), Default::default())
+        );
+
+        assert!(
+            poly.is_valid().is_ok(),
+            "{} is not a valid polytope.",
+            En::parse_uppercase(poly.name(), Default::default())
+        );
+    }
+
     #[test]
     /// Checks that a nullitope is generated correctly.
-    fn nullitope_check() {
-        let nullitope = Abstract::nullitope();
-
-        assert_eq!(
-            nullitope.el_counts().0,
-            vec![1],
-            "Nullitope element counts don't match expected value."
-        );
-        assert!(nullitope.is_valid().is_ok(), "Nullitope is invalid.");
+    fn nullitope() {
+        test(&Abstract::nullitope(), vec![1]);
     }
 
     #[test]
     /// Checks that a point is generated correctly.
-    fn point_check() {
-        let point = Abstract::point();
-
-        assert_eq!(
-            point.el_counts().0,
-            vec![1, 1],
-            "Point element counts don't match expected value."
-        );
-        assert!(point.is_valid().is_ok(), "Point is invalid.");
+    fn point() {
+        test(&Abstract::point(), vec![1, 1]);
     }
 
     #[test]
     /// Checks that a dyad is generated correctly.
-    fn dyad_check() {
-        let dyad = Abstract::dyad();
-
-        assert_eq!(
-            dyad.el_counts().0,
-            vec![1, 2, 1],
-            "Dyad element counts don't match expected value."
-        );
-        assert!(dyad.is_valid().is_ok(), "Dyad is invalid.");
+    fn dyad() {
+        test(&Abstract::dyad(), vec![1, 2, 1]);
     }
 
     #[test]
     /// Checks that polygons are generated correctly.
-    fn polygon_check() {
+    fn polygon() {
         for n in 2..=10 {
-            let polygon = Abstract::polygon(n);
-
-            assert_eq!(
-                polygon.el_counts().0,
-                vec![1, n, n, 1],
-                "{}-gon element counts don't match expected value.",
-                n
-            );
-            assert!(polygon.is_valid().is_ok(), "{}-gon is invalid.", n);
+            test(&Abstract::polygon(n), vec![1, n, n, 1]);
         }
     }
 
     #[test]
     /// Checks that polygonal duopyramids are generated correctly.
-    fn duopyramid_check() {
+    fn duopyramid() {
         let mut polygons = Vec::new();
         for n in 2..=5 {
             polygons.push(Abstract::polygon(n));
@@ -1237,10 +1221,8 @@ mod tests {
 
         for m in 2..=5 {
             for n in m..=5 {
-                let duopyramid = Abstract::duopyramid(&polygons[m - 2], &polygons[n - 2]);
-
-                assert_eq!(
-                    duopyramid.el_counts().0,
+                test(
+                    &Abstract::duopyramid(&polygons[m - 2], &polygons[n - 2]),
                     vec![
                         1,
                         m + n,
@@ -1248,17 +1230,8 @@ mod tests {
                         2 * m * n + 2,
                         m + n + m * n,
                         m + n,
-                        1
+                        1,
                     ],
-                    "{}-{} duopyramid element counts don't match expected value.",
-                    m,
-                    n
-                );
-                assert!(
-                    duopyramid.is_valid().is_ok(),
-                    "{}-{} duopyramid is invalid.",
-                    m,
-                    n
                 );
             }
         }
@@ -1266,7 +1239,7 @@ mod tests {
 
     #[test]
     /// Checks that polygonal duoprisms are generated correctly.
-    fn duoprism_check() {
+    fn duoprism() {
         let mut polygons = Vec::new();
         for n in 2..=5 {
             polygons.push(Abstract::polygon(n));
@@ -1274,20 +1247,9 @@ mod tests {
 
         for m in 2..=5 {
             for n in m..=5 {
-                let duoprism = Abstract::duoprism(&polygons[m - 2], &polygons[n - 2]);
-
-                assert_eq!(
-                    duoprism.el_counts().0,
+                test(
+                    &Abstract::duoprism(&polygons[m - 2], &polygons[n - 2]),
                     vec![1, m * n, 2 * m * n, m + n + m * n, m + n, 1],
-                    "{}-{} duoprism element counts don't match expected value.",
-                    m,
-                    n
-                );
-                assert!(
-                    duoprism.is_valid().is_ok(),
-                    "{}-{} duoprism is invalid.",
-                    m,
-                    n
                 );
             }
         }
@@ -1295,7 +1257,7 @@ mod tests {
 
     #[test]
     /// Checks that polygonal duotegums are generated correctly.
-    fn duotegum_check() {
+    fn duotegum() {
         let mut polygons = Vec::new();
         for n in 2..=5 {
             polygons.push(Abstract::polygon(n));
@@ -1303,20 +1265,9 @@ mod tests {
 
         for m in 2..=5 {
             for n in m..=5 {
-                let duotegum = Abstract::duotegum(&polygons[m - 2], &polygons[n - 2]);
-
-                assert_eq!(
-                    duotegum.el_counts().0,
+                test(
+                    &Abstract::duotegum(&polygons[m - 2], &polygons[n - 2]),
                     vec![1, m + n, m + n + m * n, 2 * m * n, m * n, 1],
-                    "{}-{} duotegum element counts don't match expected value.",
-                    m,
-                    n
-                );
-                assert!(
-                    duotegum.is_valid().is_ok(),
-                    "{}-{} duotegum is invalid.",
-                    m,
-                    n
                 );
             }
         }
@@ -1324,7 +1275,7 @@ mod tests {
 
     #[test]
     /// Checks that polygonal duocombs are generated correctly.
-    fn duocomb_check() {
+    fn duocomb() {
         let mut polygons = Vec::new();
         for n in 2..=5 {
             polygons.push(Abstract::polygon(n));
@@ -1332,20 +1283,9 @@ mod tests {
 
         for m in 2..=5 {
             for n in m..=5 {
-                let duocomb = Abstract::duocomb(&polygons[m - 2], &polygons[n - 2]);
-
-                assert_eq!(
-                    duocomb.el_counts().0,
+                test(
+                    &Abstract::duocomb(&polygons[m - 2], &polygons[n - 2]),
                     vec![1, m * n, 2 * m * n, m * n, 1],
-                    "{}-{} duocomb element counts don't match expected value.",
-                    m,
-                    n
-                );
-                assert!(
-                    duocomb.is_valid().is_ok(),
-                    "{}-{} duocomb is invalid.",
-                    m,
-                    n
                 );
             }
         }
@@ -1365,73 +1305,70 @@ mod tests {
 
     #[test]
     /// Checks that simplices are generated correctly.
-    fn simplex_check() {
+    fn simplex() {
         for n in Rank::range_inclusive_iter(Rank::new(-1), Rank::new(5)) {
             let simplex = Abstract::simplex(n);
+            let mut element_counts = Vec::with_capacity(n.plus_one_usize());
 
             for k in Rank::range_inclusive_iter(Rank::new(-1), n) {
-                assert_eq!(
-                    simplex.el_count(k),
-                    choose(n.plus_one_usize(), k.plus_one_usize()),
-                    "{}-simplex {}-element counts don't match up",
-                    n,
-                    k
-                );
+                element_counts.push(choose(n.plus_one_usize(), k.plus_one_usize()));
             }
 
-            assert!(simplex.is_valid().is_ok(), "{}-simplex is invalid.", n)
+            test(&simplex, element_counts);
         }
     }
 
     #[test]
     /// Checks that hypercubes are generated correctly.
-    fn hypercube_check() {
+    fn hypercube() {
         for n in Rank::range_inclusive_iter(Rank::new(-1), Rank::new(5)) {
             let hypercube = Abstract::hypercube(n);
+            let mut element_counts = Vec::with_capacity(n.plus_one_usize());
 
+            element_counts.push(1);
             for k in Rank::range_inclusive_iter(Rank::new(0), n) {
-                assert_eq!(
-                    hypercube.el_count(k),
-                    choose(n.usize(), k.usize()) * 2u32.pow((n - k).u32()) as usize,
-                    "{}-hypercube {}-element counts don't match up",
-                    n,
-                    k
-                );
+                element_counts
+                    .push(choose(n.usize(), k.usize()) * 2u32.pow((n - k).u32()) as usize);
             }
 
-            assert!(hypercube.is_valid().is_ok(), "{}-hypercube is invalid.", n)
+            test(&hypercube, element_counts);
         }
     }
 
     #[test]
     /// Checks that orthoplices are generated correctly.
-    fn orthoplex_check() {
+    fn orthoplex() {
         for n in Rank::range_inclusive_iter(Rank::new(-1), Rank::new(5)) {
             let orthoplex = Abstract::orthoplex(n);
+            let mut element_counts = Vec::with_capacity(n.plus_one_usize());
 
-            for k in Rank::range_iter(Rank::new(-1), n) {
-                assert_eq!(
-                    orthoplex.el_count(k),
-                    choose(n.usize(), k.plus_one_usize())
-                        * 2u32.pow(k.plus_one_usize() as u32) as usize,
-                    "{}-orthoplex {}-element counts don't match up",
-                    n,
-                    k
-                );
+            for k in Rank::range_inclusive_iter(Rank::new(0), n) {
+                element_counts
+                    .push(choose(n.usize(), (n - k).usize()) * 2u32.pow(k.u32()) as usize);
             }
+            element_counts.push(1);
 
-            assert!(orthoplex.is_valid().is_ok(), "{}-orthoplex is invalid.", n)
+            test(&orthoplex, element_counts);
+        }
+    }
+
+    #[test]
+    /// Checks that various polytopes are generated correctly.
+    fn general_check() {
+        for poly in test_polytopes().iter_mut() {
+            assert!(
+                poly.is_valid().is_ok(),
+                "{} is not valid.",
+                En::parse(poly.name(), Default::default())
+            );
         }
     }
 
     #[test]
     /// Checks that duals are generated correctly.
     fn dual_check() {
-        use crate::lang::{En, Language};
-
         for poly in test_polytopes().iter_mut() {
             let el_counts = poly.el_counts();
-
             poly.dual_mut();
 
             // The element counts of the dual should be the same as the reversed
@@ -1444,6 +1381,8 @@ mod tests {
                 "Dual element counts of {} don't match expected value.",
                 En::parse(poly.name(), Default::default())
             );
+
+            // The duals should also be valid polytopes.
             assert!(
                 poly.is_valid().is_ok(),
                 "Dual of polytope {} is invalid.",

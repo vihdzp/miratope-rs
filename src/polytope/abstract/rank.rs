@@ -371,5 +371,6 @@ mod tests {
         assert_eq!(Rank::new(-1).try_sub(Rank::new(1)), None);
         assert_eq!(Rank::new(6).plus_one(), Rank::new(7));
         assert_eq!(Rank::new(0).minus_one(), Rank::new(-1));
+        assert_eq!(Rank::new(-1).plus_one_usize(), 0);
     }
 }
