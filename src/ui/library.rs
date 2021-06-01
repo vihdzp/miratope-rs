@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::config::Config;
+use super::config::LibPath;
 use crate::{
     lang::{
         name::{Con, Name},
@@ -26,15 +26,10 @@ pub struct LibraryPlugin;
 impl Plugin for LibraryPlugin {
     fn build(&self, app: &mut AppBuilder) {
         // This must run after the Config resource has been added.
-        let lib_path = app
-            .world()
-            .get_resource::<Config>()
-            .unwrap()
-            .data
-            .lib_path
-            .clone();
+        let lib_path = &app.world().get_resource::<LibPath>().unwrap();
+        let library = Library::new_folder(lib_path);
 
-        app.insert_resource(Library::new_folder(&lib_path))
+        app.insert_resource(library)
             .add_system(show_library.system().after("show_top_panel"));
     }
 }
@@ -487,7 +482,7 @@ fn show_library(
     egui_ctx: Res<EguiContext>,
     mut query: Query<&mut Concrete>,
     mut library: ResMut<Option<Library>>,
-    config: Res<Config>,
+    lib_path: Res<LibPath>,
     selected_language: Res<SelectedLanguage>,
 ) {
     // Shows the polytope library.
@@ -497,7 +492,7 @@ fn show_library(
             .max_width(450.0)
             .show(egui_ctx.ctx(), |ui| {
                 egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
-                    let lib_path = PathBuf::from(config.data.lib_path.clone());
+                    let lib_path = PathBuf::from(lib_path.as_ref());
 
                     match library.show(ui, lib_path, *selected_language) {
                         // No action needs to be taken.

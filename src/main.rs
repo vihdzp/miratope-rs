@@ -112,7 +112,6 @@ type Float = f64;
 fn main() {
     App::build()
         // Adds resources.
-        .insert_resource(ClearColor(Color::rgb(0.0, 0.0, 0.0)))
         .insert_resource(Msaa { samples: 4 })
         // Adds plugins.
         .add_plugins(DefaultPlugins)

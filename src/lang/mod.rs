@@ -84,6 +84,7 @@ use crate::{
     polytope::r#abstract::rank::Rank,
 };
 
+use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 /// The different grammatical genders.
@@ -766,7 +767,7 @@ pub trait Language: Prefix {
 }
 
 /// We should maybe make `dyn Language` work eventually.
-#[derive(Clone, Copy, Debug, EnumIter)]
+#[derive(Clone, Copy, Debug, EnumIter, Serialize, Deserialize)]
 pub enum SelectedLanguage {
     En,
     Es,

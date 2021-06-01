@@ -27,7 +27,6 @@ impl Plugin for TopPanelPlugin {
             .insert_resource(Memory::default())
             .insert_resource(SectionDirection::default())
             .insert_resource(SectionState::default())
-            .insert_resource(SelectedLanguage::default())
             .insert_non_send_resource(MainThreadToken::default())
             .add_system(file_dialog.system())
             .add_system(update_cross_section.system())
@@ -284,6 +283,8 @@ pub fn update_cross_section(
 }
 
 /// Updates the selected language.
+///
+/// Do we even need this? There's only a single place we change the language anyways
 pub fn update_language(
     mut polies: Query<&Concrete>,
     mut windows: ResMut<Windows>,
@@ -326,8 +327,12 @@ pub fn show_top_panel(
     mut section_direction: ResMut<SectionDirection>,
     mut file_dialog_state: ResMut<FileDialogState>,
     mut projection_type: ResMut<ProjectionType>,
-    mut selected_language: ResMut<SelectedLanguage>,
     mut memory: ResMut<Memory>,
+
+    mut background_color: ResMut<ClearColor>,
+    mut selected_language: ResMut<SelectedLanguage>,
+
+    mut visuals: ResMut<egui::Visuals>,
 
     // The different windows that can be shown.
     (
@@ -382,9 +387,11 @@ pub fn show_top_panel(
                 }
             });
 
-            // Operations on polytopes.
+            // Anything related to the polytope on screen.
             egui::menu::menu(ui, "Polytope", |ui| {
+                // Operations on polytopes.
                 ui.collapsing("Operations", |ui| {
+                    // Operations that take a single polytope.
                     ui.collapsing("Single", |ui| {
                         // Converts the active polytope into its dual.
                         if ui.button("Dual").clicked() {
@@ -481,19 +488,24 @@ pub fn show_top_panel(
                         }
                     });
 
+                    // Operations that take two polytopes an arguments.
                     ui.collapsing("Double", |ui| {
+                        // Opens the window to make duopyramids.
                         if ui.button("Duopyramid").clicked() {
                             duopyramid_window.open();
                         }
 
+                        // Opens the window to make duoprisms.
                         if ui.button("Duoprism").clicked() {
                             duoprism_window.open();
                         }
 
+                        // Opens the window to make duotegums.
                         if ui.button("Duotegum").clicked() {
                             duotegum_window.open();
                         }
 
+                        // Opens the window to make duocombs.
                         if ui.button("Duocomb").clicked() {
                             duocomb_window.open();
                         }
@@ -653,12 +665,14 @@ pub fn show_top_panel(
             });
 
             // Switch language.
-            egui::menu::menu(ui, "Language", |ui| {
-                for lang in SelectedLanguage::iter() {
-                    if ui.button(lang.to_string()).clicked() {
-                        *selected_language = lang;
+            egui::menu::menu(ui, "Preferences", |ui| {
+                ui.collapsing("Language", |ui| {
+                    for lang in SelectedLanguage::iter() {
+                        if ui.button(lang.to_string()).clicked() {
+                            *selected_language = lang;
+                        }
                     }
-                }
+                });
             });
 
             // General help.
@@ -667,6 +681,39 @@ pub fn show_top_panel(
                     println!("Website opening failed!");
                 }
             });
+
+            // Background color picker.
+
+            // The current background color.
+            let [r, g, b, a] = background_color.0.as_rgba_f32();
+            let color = egui::Color32::from_rgba_premultiplied(
+                (r * 255.0) as u8,
+                (g * 255.0) as u8,
+                (b * 255.0) as u8,
+                (a * 255.0) as u8,
+            );
+
+            // The new background color.
+            let mut new_color = color;
+            egui::color_picker::color_edit_button_srgba(
+                ui,
+                &mut new_color,
+                egui::color_picker::Alpha::Opaque,
+            );
+
+            // Updates the background color if necessary.
+            if color != new_color {
+                background_color.0 = Color::rgb(
+                    new_color.r() as f32 / 255.0,
+                    new_color.g() as f32 / 255.0,
+                    new_color.b() as f32 / 255.0,
+                );
+            }
+
+            // Light/dark mode toggle.
+            if let Some(new_visuals) = visuals.light_dark_small_toggle_button(ui) {
+                *visuals = new_visuals;
+            }
         });
 
         // Shows secondary views below the menu bar.
