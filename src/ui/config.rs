@@ -37,6 +37,8 @@ impl Plugin for ConfigPlugin {
         // Reads the entire configuration from file.
         let config = Config::read(&config_dir, &config_path);
 
+        // Makes resources from the configuration, which may or may not
+        // correspond to the actual stored values themselves.
         app.insert_resource(config_path)
             .insert_resource(config.lib_path)
             .insert_resource(config.selected_language)
@@ -76,22 +78,25 @@ impl AsRef<OsStr> for LibPath {
     }
 }
 
-/// The background color of the application.
+/// The background color of the application in sRGB. This exists since
+/// `ClearColor` wasn't serializable.
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct BgColor(f32, f32, f32);
 
 impl BgColor {
+    /// Makes a new `BgColor` from the given `ClearColor`.
     pub fn new(clear_color: &ClearColor) -> Self {
         let color = clear_color.0;
         Self(color.r(), color.g(), color.b())
     }
 
+    /// Makes a new `ClearColor` from the given `BgColor`.
     pub fn clear_color(&self) -> ClearColor {
         ClearColor(Color::rgb(self.0, self.1, self.2))
     }
 }
 
-/// Whether dark mode is turned on or off.
+/// Whether light mode is turned on or off.
 #[derive(Default, Serialize, Deserialize)]
 pub struct LightMode(bool);
 
@@ -105,6 +110,8 @@ impl LightMode {
     }
 }
 
+/// Updates the application appearance whenever the visuals are changed. This
+/// occurs at application startup and whenever the user toggles light/dark mode.
 fn update_visuals(egui_ctx: Res<EguiContext>, visuals: Res<egui::Visuals>) {
     if visuals.is_changed() {
         egui_ctx.ctx().set_visuals(visuals.clone());

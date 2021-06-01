@@ -229,7 +229,7 @@ fn add_cam_input_events(
     mouse_wheel: EventReader<MouseWheel>,
     windows: Res<Windows>,
     mut cam_inputs: EventWriter<CameraInputEvent>,
-    egui_ctx: ResMut<EguiContext>,
+    egui_ctx: Res<EguiContext>,
 ) {
     let (width, height) = {
         let primary_win = windows.get_primary().expect("There is no primary window");

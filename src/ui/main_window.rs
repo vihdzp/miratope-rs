@@ -35,7 +35,7 @@ pub fn update_changed_polytopes(
     selected_language: Res<SelectedLanguage>,
     orthogonal: Res<ProjectionType>,
 ) {
-    for (poly, _mesh_handle, children) in polies.iter() {
+    for (poly, _, children) in polies.iter() {
         if cfg!(debug_assertions) {
             println!("Polytope updated");
         }

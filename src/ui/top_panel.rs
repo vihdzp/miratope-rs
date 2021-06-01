@@ -180,7 +180,7 @@ impl FileDialogState {
 /// The system in charge of showing the file dialog.
 pub fn file_dialog(
     mut query: Query<&mut Concrete>,
-    file_dialog_state: ResMut<FileDialogState>,
+    file_dialog_state: Res<FileDialogState>,
     token: NonSend<MainThreadToken>,
 ) {
     if file_dialog_state.is_changed() {
@@ -320,7 +320,7 @@ pub type EguiWindows<'a> = (
 /// The system that shows the top panel.
 #[allow(clippy::too_many_arguments)]
 pub fn show_top_panel(
-    egui_ctx: ResMut<EguiContext>,
+    egui_ctx: Res<EguiContext>,
     mut query: Query<&mut Concrete>,
     keyboard: Res<Input<KeyCode>>,
     mut section_state: ResMut<SectionState>,

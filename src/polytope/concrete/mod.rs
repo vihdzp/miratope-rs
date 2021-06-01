@@ -53,8 +53,8 @@ impl Concrete {
     pub fn new(vertices: Vec<Point>, abs: Abstract) -> Self {
         // There must be as many abstract vertices as concrete ones.
         debug_assert_eq!(
-            vertices.len(),
             abs.vertex_count(),
+            vertices.len(),
             "Abstract vertex count doesn't match concrete vertex count!"
         );
 
@@ -374,20 +374,24 @@ impl Concrete {
         Ok(())
     }
 
+    /// Builds a pyramid with a specified apex.
     pub fn pyramid_with(&self, apex: Point) -> Self {
         let mut poly = self.pyramid();
         poly.vertices[0] = apex;
         poly
     }
 
+    /// Builds a prism with a specified height.
     pub fn prism_with(&self, height: Float) -> Self {
         Self::duoprism(self, &Self::dyad_with(height))
     }
 
+    /// Builds a uniform prism from an {n/d} polygon.
     pub fn uniform_prism(n: usize, d: usize) -> Self {
         Concrete::star_polygon(n, d).prism_with(2.0 * (Float::PI * d as Float / n as Float).sin())
     }
 
+    /// Builds a tegum with two specified apices.
     pub fn tegum_with(&self, apex1: Point, apex2: Point) -> Self {
         let mut poly = self.tegum();
         poly.vertices[0] = apex1;
@@ -486,10 +490,12 @@ impl Concrete {
         tegum: bool,
     ) -> Vec<Point> {
         // Duotegums with points should just return the original polytopes.
-        if p.get(0).map(|vp| vp.len()) == Some(0) {
-            return q.to_owned();
-        } else if q.get(0).map(|vq| vq.len()) == Some(0) {
-            return p.to_owned();
+        if tegum {
+            if p.get(0).map(|vp| vp.len()) == Some(0) {
+                return q.to_owned();
+            } else if q.get(0).map(|vq| vq.len()) == Some(0) {
+                return p.to_owned();
+            }
         }
 
         let half_height = height / 2.0;
