@@ -210,6 +210,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
                 p._append(q);
             }
 
+            // Updates the minimal and maximal elements of the compound.
             *p.abs_mut().min_mut() = Element::min(p.vertex_count());
             *p.abs_mut().max_mut() = Element::max(p.facet_count());
 

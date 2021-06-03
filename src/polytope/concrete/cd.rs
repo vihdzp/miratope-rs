@@ -20,6 +20,7 @@ impl Cd {
         self.0.node_count()
     }
 }
+
 /// Possible types of node values.
 enum NodeVal {
     ///Unringed Nodes (different from Ringed(0))

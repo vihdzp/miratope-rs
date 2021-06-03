@@ -1,1 +1,1 @@
-[UnloadedFolder(folder_name:"normal",name:Literal("Normal truncates")),UnloadedFolder(folder_name:"quasi",name:Literal("Quasitruncates"))]
+[UnloadedFolder(path_name:"normal",name:Literal("Normal truncates")),UnloadedFolder(path_name:"quasi",name:Literal("Quasitruncates"))]
