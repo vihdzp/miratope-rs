@@ -29,6 +29,8 @@ impl Plugin for LibraryPlugin {
         let lib_path = &app.world().get_resource::<LibPath>().unwrap();
         let library = Library::new_folder(lib_path);
 
+        // The library must be shown after the top panel, to avoid incorrect
+        // positioning.
         app.insert_resource(library).add_system(
             show_library
                 .system()

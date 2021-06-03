@@ -606,6 +606,7 @@ impl GenIter {
 mod tests {
     use super::*;
     use gcd::Gcd;
+    use nalgebra::dmatrix;
 
     /// Tests a given symmetry group.
     fn test(group: Group, order: usize, rot_order: usize, name: &str) {
@@ -755,15 +756,14 @@ mod tests {
     #[test]
     fn e6() {
         // In the future, we'll have better code for this, I hope.
-        let e6 = Group::cox_group(CoxMatrix(Matrix::from_data(VecStorage::new(
-            Dynamic::new(6),
-            Dynamic::new(6),
-            vec![
-                1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 3.0,
-                2.0, 3.0, 2.0, 2.0, 3.0, 1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 2.0, 2.0, 2.0,
-                3.0, 2.0, 2.0, 1.0,
-            ],
-        ))))
+        let e6 = Group::cox_group(CoxMatrix(dmatrix![
+            1.0, 3.0, 2.0, 2.0, 2.0, 2.0;
+            3.0, 1.0, 3.0, 2.0, 2.0, 2.0;
+            2.0, 3.0, 1.0, 3.0, 2.0, 3.0;
+            2.0, 2.0, 3.0, 1.0, 3.0, 2.0;
+            2.0, 2.0, 2.0, 3.0, 1.0, 2.0;
+            2.0, 2.0, 3.0, 2.0, 2.0, 1.0
+        ]))
         .unwrap();
 
         test(e6, 51840, 25920, &"E6");
@@ -775,16 +775,15 @@ mod tests {
     #[cfg(not(debug_assertions))]
     fn e7() {
         // In the future, we'll have better code for this, I hope.
-        let e7 = Group::cox_group(CoxMatrix(Matrix::from_data(VecStorage::new(
-            Dynamic::new(7),
-            Dynamic::new(7),
-            vec![
-                1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 2.0, 3.0,
-                1.0, 3.0, 3.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0, 3.0, 2.0,
-                1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 2.0, 3.0,
-                1.0,
-            ],
-        ))))
+        let e7 = Group::cox_group(CoxMatrix(dmatrix![
+            1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 2.0;
+            3.0, 1.0, 3.0, 2.0, 2.0, 2.0, 2.0;
+            2.0, 3.0, 1.0, 3.0, 3.0, 2.0, 2.0;
+            2.0, 2.0, 3.0, 1.0, 2.0, 2.0, 2.0;
+            2.0, 2.0, 3.0, 2.0, 1.0, 3.0, 2.0;
+            2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 3.0;
+            2.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0
+        ]))
         .unwrap();
 
         test(e7, 2903040, 1451520, &"E7");

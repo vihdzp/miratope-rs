@@ -9,6 +9,9 @@ use super::{camera::ProjectionType, top_panel::SectionState};
 
 use bevy::prelude::*;
 use bevy_egui::EguiSettings;
+
+/// The plugin in charge of the Miratope main window, and of drawing the
+/// polytope onto it.
 pub struct MainWindowPlugin;
 
 impl Plugin for MainWindowPlugin {
@@ -38,14 +41,11 @@ pub fn update_changed_polytopes(
     for (poly, _, children) in polies.iter() {
         if cfg!(debug_assertions) {
             println!("Polytope updated");
+            poly.abs.is_valid().unwrap();
         }
 
         // The mesh is currently hidden, so we don't bother updating it.
         // *meshes.get_mut(_mesh_handle).unwrap() = poly.get_mesh(*orthogonal);
-
-        if cfg!(debug_assertions) {
-            poly.abs.is_valid().unwrap();
-        }
 
         // Sets the window's name to the polytope's name.
         windows
@@ -62,7 +62,7 @@ pub fn update_changed_polytopes(
 
         // We reset the cross-section view if we didn't use it to change the polytope.
         if !section_state.is_changed() {
-            section_state.reset();
+            section_state.close();
         }
     }
 }

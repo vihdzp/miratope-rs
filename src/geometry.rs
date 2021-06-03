@@ -14,7 +14,6 @@ use crate::{Consts, Float};
 use approx::{abs_diff_eq, abs_diff_ne};
 use nalgebra::{storage::Storage, Dim, Dynamic, VecStorage, U1};
 
-#[derive(Debug)]
 /// A hypersphere with a certain center and radius.
 ///
 /// This is mostly used for [duals](crate::polytope::concrete::Concrete::try_dual_with),
@@ -390,41 +389,37 @@ mod tests {
     use super::*;
 
     use approx::assert_abs_diff_eq;
+    use nalgebra::dvector;
+
+    fn assert_eq(p: Point, q: Point) {
+        assert_abs_diff_eq!((p - q).norm(), 0.0, epsilon = Float::EPS)
+    }
 
     #[test]
     /// Reciprocates points about spheres.
     pub fn reciprocate() {
-        assert_abs_diff_eq!(
-            (Hypersphere::unit(2)
-                .reciprocate(&vec![3.0, 4.0].into())
-                .unwrap()
-                - Point::from(vec![0.12, 0.16]))
-            .norm(),
-            0.0,
-            epsilon = Float::EPS
+        assert_eq(
+            Hypersphere::unit(2)
+                .reciprocate(&dvector![3.0, 4.0])
+                .unwrap(),
+            dvector![0.12, 0.16],
         );
 
-        assert_abs_diff_eq!(
-            (Hypersphere::with_radius(Point::zeros(3), 13.0)
-                .reciprocate(&vec![3.0, 4.0, 12.0].into())
-                .unwrap()
-                - Point::from(vec![3.0, 4.0, 12.0]))
-            .norm(),
-            0.0,
-            epsilon = Float::EPS
+        assert_eq(
+            Hypersphere::with_radius(Point::zeros(3), 13.0)
+                .reciprocate(&dvector![3.0, 4.0, 12.0])
+                .unwrap(),
+            dvector![3.0, 4.0, 12.0],
         );
 
-        assert_abs_diff_eq!(
-            (Hypersphere {
+        assert_eq(
+            Hypersphere {
                 squared_radius: -4.0,
-                center: vec![1.0; 4].into()
+                center: dvector![1.0, 1.0, 1.0, 1.0],
             }
-            .reciprocate(&vec![-2.0; 4].into())
-            .unwrap()
-                - Point::from(vec![4.0 / 3.0; 4]))
-            .norm(),
-            0.0,
-            epsilon = Float::EPS
+            .reciprocate(&dvector![-2.0, -2.0, -2.0, -2.0])
+            .unwrap(),
+            dvector![4.0 / 3.0, 4.0 / 3.0, 4.0 / 3.0, 4.0 / 3.0],
         );
     }
 }

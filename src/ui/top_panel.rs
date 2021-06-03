@@ -1,3 +1,5 @@
+//! Contains all code related to the top bar.
+
 use std::{marker::PhantomData, path::PathBuf};
 
 use super::{camera::ProjectionType, memory::Memory};
@@ -6,10 +8,9 @@ use crate::{
     lang::SelectedLanguage,
     polytope::{concrete::Concrete, Polytope},
     ui::{egui_windows::*, UnitPointWidget},
-    Consts, Float,
+    Float,
 };
 
-use approx::abs_diff_ne;
 use bevy::prelude::*;
 use bevy_egui::{
     egui::{self, Ui},
@@ -29,8 +30,8 @@ impl Plugin for TopPanelPlugin {
             .insert_resource(SectionState::default())
             .insert_non_send_resource(MainThreadToken::default())
             .add_system(file_dialog.system())
-            .add_system(update_cross_section.system())
             .add_system(update_language.system())
+            // Windows must be the first thing shown.
             .add_system(
                 show_top_panel
                     .system()
@@ -66,29 +67,8 @@ pub enum SectionState {
 
 impl SectionState {
     /// Makes the view inactive.
-    pub fn reset(&mut self) {
+    pub fn close(&mut self) {
         *self = Self::Inactive;
-    }
-
-    /// Sets the position of the hyperplane.
-    pub fn set_pos(&mut self, pos: Float) {
-        if let Self::Active { hyperplane_pos, .. } = self {
-            *hyperplane_pos = pos;
-        }
-    }
-
-    /// Flips the flattening setting.
-    pub fn flip_flat(&mut self) {
-        if let Self::Active { flatten, .. } = self {
-            *flatten = !*flatten;
-        }
-    }
-
-    /// Flips the lock setting.
-    pub fn flip_lock(&mut self) {
-        if let Self::Active { lock, .. } = self {
-            *lock = !*lock;
-        }
     }
 }
 
@@ -215,69 +195,6 @@ pub fn file_dialog(
                 }
             }
             FileDialogMode::Disabled => {}
-        }
-    }
-}
-
-/// Updates the cross-section shown.
-pub fn update_cross_section(
-    mut query: Query<&mut Concrete>,
-    mut section_state: ResMut<SectionState>,
-    section_direction: Res<SectionDirection>,
-) {
-    if section_direction.is_changed() {
-        if let SectionState::Active {
-            original_polytope,
-            minmax,
-            ..
-        } = section_state.as_mut()
-        {
-            *minmax = original_polytope
-                .minmax(&section_direction.0)
-                .unwrap_or((-1.0, 1.0));
-        }
-    }
-
-    if section_state.is_changed() {
-        if let SectionState::Active {
-            original_polytope,
-            hyperplane_pos,
-            minmax,
-            flatten,
-            lock,
-        } = section_state.as_mut()
-        {
-            // We don't update the view if it's locked.
-            if *lock {
-                return;
-            }
-
-            for mut p in query.iter_mut() {
-                let r = original_polytope.clone();
-                let hyp_pos = *hyperplane_pos + 0.0000001; // Botch fix for degeneracies.
-
-                if let Some(dim) = r.dim() {
-                    let hyperplane = Hyperplane::from_normal(
-                        original_polytope.dim_or(),
-                        section_direction.0.clone(),
-                        hyp_pos,
-                    );
-                    *minmax = original_polytope
-                        .minmax(&section_direction.0)
-                        .unwrap_or((-1.0, 1.0));
-
-                    let mut slice = r.cross_section(&hyperplane);
-
-                    if *flatten {
-                        slice.flatten_into(&hyperplane.subspace);
-                        slice.recenter_with(
-                            &hyperplane.flatten(&hyperplane.project(&Point::zeros(dim))),
-                        );
-                    }
-
-                    *p = slice;
-                }
-            }
         }
     }
 }
@@ -717,7 +634,7 @@ pub fn show_top_panel(
         });
 
         // Shows secondary views below the menu bar.
-        show_views(ui, section_state, section_direction);
+        show_views(ui, query, section_state, section_direction);
     });
 }
 
@@ -725,6 +642,7 @@ pub fn show_top_panel(
 /// cross-section view.
 fn show_views(
     ui: &mut Ui,
+    mut query: Query<&mut Concrete>,
     mut section_state: ResMut<SectionState>,
     mut section_direction: ResMut<SectionDirection>,
 ) {
@@ -752,8 +670,14 @@ fn show_views(
         );
 
         // Updates the slicing depth.
-        if abs_diff_ne!(hyperplane_pos, new_hyperplane_pos, epsilon = Float::EPS) {
-            section_state.set_pos(new_hyperplane_pos);
+
+        #[allow(clippy::float_cmp)]
+        if hyperplane_pos != new_hyperplane_pos {
+            if let SectionState::Active { hyperplane_pos, .. } = section_state.as_mut() {
+                *hyperplane_pos = new_hyperplane_pos;
+            } else {
+                unreachable!()
+            }
         }
 
         let mut new_direction = section_direction.0.clone();
@@ -772,7 +696,7 @@ fn show_views(
         ui.horizontal(|ui| {
             // Makes the current cross-section into the main polytope.
             if ui.button("Make main").clicked() {
-                section_state.reset();
+                section_state.close();
             }
 
             let mut new_flatten = flatten;
@@ -780,7 +704,11 @@ fn show_views(
 
             // Updates the flattening setting.
             if flatten != new_flatten {
-                section_state.flip_flat();
+                if let SectionState::Active { flatten, .. } = section_state.as_mut() {
+                    *flatten = new_flatten;
+                } else {
+                    unreachable!()
+                }
             }
 
             let mut new_lock = lock;
@@ -788,8 +716,68 @@ fn show_views(
 
             // Updates the flattening setting.
             if lock != new_lock {
-                section_state.flip_lock();
+                if let SectionState::Active { lock, .. } = section_state.as_mut() {
+                    *lock = new_lock;
+                } else {
+                    unreachable!()
+                }
             }
         });
+    }
+
+    if section_direction.is_changed() {
+        if let SectionState::Active {
+            original_polytope,
+            minmax,
+            ..
+        } = section_state.as_mut()
+        {
+            *minmax = original_polytope
+                .minmax(&section_direction.0)
+                .unwrap_or((-1.0, 1.0));
+        }
+    }
+
+    if section_state.is_changed() {
+        if let SectionState::Active {
+            original_polytope,
+            hyperplane_pos,
+            minmax,
+            flatten,
+            lock,
+        } = section_state.as_mut()
+        {
+            // We don't update the view if it's locked.
+            if *lock {
+                return;
+            }
+
+            for mut p in query.iter_mut() {
+                let r = original_polytope.clone();
+                let hyp_pos = *hyperplane_pos + 0.0000001; // Botch fix for degeneracies.
+
+                if let Some(dim) = r.dim() {
+                    let hyperplane = Hyperplane::from_normal(
+                        original_polytope.dim_or(),
+                        section_direction.0.clone(),
+                        hyp_pos,
+                    );
+                    *minmax = original_polytope
+                        .minmax(&section_direction.0)
+                        .unwrap_or((-1.0, 1.0));
+
+                    let mut slice = r.cross_section(&hyperplane);
+
+                    if *flatten {
+                        slice.flatten_into(&hyperplane.subspace);
+                        slice.recenter_with(
+                            &hyperplane.flatten(&hyperplane.project(&Point::zeros(dim))),
+                        );
+                    }
+
+                    *p = slice;
+                }
+            }
+        }
     }
 }

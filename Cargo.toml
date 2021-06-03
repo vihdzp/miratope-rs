@@ -13,22 +13,22 @@ authors = [
 edition = "2018"
 
 [dependencies]
-approx = "0.4"
+approx = "0.5"
 directories = "3.0"
 dyn-clone = "1.0"
 factorial = "0.2"
 gcd = "2.0"
 itertools = "0.10"
 lyon = "0.17"
-nalgebra = { version = "0.26", features = ["serde-serialize"] }
+nalgebra = { version = "0.27", features = ["serde-serialize"] }
 ordered-float = "2.4"
 petgraph = "0.5"
 rand = "0.8"
 rfd = "0.4"
 ron = "0.6"
 serde = { version = "1.0", features = ["derive"] }
-strum = "0.20"
-strum_macros = "0.20"
+strum = "0.21"
+strum_macros = "0.21"
 webbrowser = "0.5"
 xml-rs = "0.8"
 zip = "0.5"
