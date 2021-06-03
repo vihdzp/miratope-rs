@@ -29,8 +29,12 @@ impl Plugin for LibraryPlugin {
         let lib_path = &app.world().get_resource::<LibPath>().unwrap();
         let library = Library::new_folder(lib_path);
 
-        app.insert_resource(library)
-            .add_system(show_library.system().after("show_top_panel"));
+        app.insert_resource(library).add_system(
+            show_library
+                .system()
+                .label("show_library")
+                .after("show_top_panel"),
+        );
     }
 }
 

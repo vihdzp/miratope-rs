@@ -728,7 +728,6 @@ impl UpdateWindow for TegumWindow {
 
 /// Allows the user to select an antiprism from a specified hypersphere and a
 /// given height.
-#[derive(Default)]
 pub struct AntiprismWindow {
     /// The info about the hypersphere we use to get from one base to another.
     dual: DualWindow,
@@ -738,6 +737,16 @@ pub struct AntiprismWindow {
 
     /// Whether the antiprism is a retroprism.
     retroprism: bool,
+}
+
+impl Default for AntiprismWindow {
+    fn default() -> Self {
+        Self {
+            dual: Default::default(),
+            height: 1.0,
+            retroprism: false,
+        }
+    }
 }
 
 impl Window for AntiprismWindow {

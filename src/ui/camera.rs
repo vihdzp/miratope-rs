@@ -6,7 +6,7 @@ use bevy::{
     prelude::*,
     render::camera::Camera,
 };
-use bevy_egui::{egui::CtxRef, EguiContext, EguiSystem};
+use bevy_egui::{egui::CtxRef, EguiContext};
 
 /// The plugin handling all camera input.
 pub struct InputPlugin;
@@ -15,10 +15,9 @@ impl Plugin for InputPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_event::<CameraInputEvent>()
             .insert_resource(ProjectionType::Perspective)
-            .add_system_to_stage(
-                CoreStage::PreUpdate,
-                add_cam_input_events.system().after(EguiSystem::BeginFrame),
-            )
+            // We register inputs after the library has been shown, so that we
+            // know whether mouse input should register.
+            .add_system(add_cam_input_events.system().after("show_library"))
             .add_system(update_cameras_and_anchors.system());
     }
 }

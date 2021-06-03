@@ -13,6 +13,7 @@ pub mod main_window;
 pub mod memory;
 pub mod top_panel;
 
+/// All of the plugins specific to Miratope.
 pub struct MiratopePlugins;
 
 impl bevy::prelude::PluginGroup for MiratopePlugins {
