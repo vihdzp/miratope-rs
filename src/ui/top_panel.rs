@@ -30,7 +30,6 @@ impl Plugin for TopPanelPlugin {
             .insert_resource(SectionState::default())
             .insert_non_send_resource(MainThreadToken::default())
             .add_system(file_dialog.system())
-            .add_system(update_language.system())
             // Windows must be the first thing shown.
             .add_system(
                 show_top_panel
@@ -199,29 +198,12 @@ pub fn file_dialog(
     }
 }
 
-/// Updates the selected language.
-///
-/// Do we even need this? There's only a single place we change the language anyways
-pub fn update_language(
-    mut polies: Query<&Concrete>,
-    mut windows: ResMut<Windows>,
-    selected_language: Res<SelectedLanguage>,
-) {
-    if selected_language.is_changed() {
-        if let Some(poly) = polies.iter_mut().next() {
-            windows
-                .get_primary_mut()
-                .unwrap()
-                .set_title(selected_language.parse_uppercase(poly.name(), Default::default()));
-        }
-    }
-}
-
 /// Whether the hotkey to enable "advanced" options is enabled.
 pub fn advanced(keyboard: &Res<Input<KeyCode>>) -> bool {
     keyboard.pressed(KeyCode::LControl) || keyboard.pressed(KeyCode::RControl)
 }
 
+/// All of the windows that can be shown on screen, as mutable resources.
 pub type EguiWindows<'a> = (
     ResMut<'a, DualWindow>,
     ResMut<'a, PyramidWindow>,
@@ -239,6 +221,7 @@ pub type EguiWindows<'a> = (
 pub fn show_top_panel(
     egui_ctx: Res<EguiContext>,
     mut query: Query<&mut Concrete>,
+    mut windows: ResMut<Windows>,
     keyboard: Res<Input<KeyCode>>,
     mut section_state: ResMut<SectionState>,
     mut section_direction: ResMut<SectionDirection>,
@@ -587,6 +570,14 @@ pub fn show_top_panel(
                     for lang in SelectedLanguage::iter() {
                         if ui.button(lang.to_string()).clicked() {
                             *selected_language = lang;
+                        }
+                    }
+
+                    if selected_language.is_changed() {
+                        if let Some(poly) = query.iter_mut().next() {
+                            windows.get_primary_mut().unwrap().set_title(
+                                selected_language.parse_uppercase(poly.name(), Default::default()),
+                            );
                         }
                     }
                 });

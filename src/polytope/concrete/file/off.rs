@@ -105,14 +105,16 @@ impl<'a> TokenIter<'a, std::vec::IntoIter<&'a str>> {
 
         TokenIter {
             iter: str::split(src, move |c: char| {
+                let mut position = position_clone.lock().unwrap();
+
                 if c == '#' {
                     comment = true;
-                    position_clone.lock().unwrap().next();
+                    position.next();
                 } else if c == '\n' {
                     comment = false;
-                    position_clone.lock().unwrap().next_line();
+                    position.next_line();
                 } else {
-                    position_clone.lock().unwrap().next();
+                    position.next();
                 }
 
                 comment || c.is_whitespace()
@@ -129,8 +131,7 @@ impl<'a, T: Iterator<Item = &'a str>> TokenIter<'a, T> {
     }
 
     /// Returns the next token from the file, and the position at which it
-    /// starts. Manual implementation of a filter
-    /// over non-empty strings.
+    /// starts. Manual implementation of a filter over non-empty strings.
     pub fn next(&mut self) -> Option<(&str, Position)> {
         loop {
             let pos = self.position();

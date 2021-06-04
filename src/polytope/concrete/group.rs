@@ -206,20 +206,25 @@ impl Group {
     /// Returns a new group whose elements have all been generated already, so
     /// that they can be used multiple times quickly.
     pub fn cache(self) -> Self {
-        self.elements().into()
+        let elements = self.elements();
+
+        Self {
+            dim: elements[0].nrows(),
+            iter: Box::new(elements.into_iter()),
+        }
     }
 
     /// Returns the exact same group, but now asserts that each generated
     /// element has the appropriate dimension. Used for debugging purposes.
     pub fn debug(self) -> Self {
+        const MSG: &str = "Size of matrix does not match expected dimension.";
         let dim = self.dim;
 
         Self {
             dim,
             iter: Box::new(self.map(move |x| {
-                let msg = "Size of matrix does not match expected dimension.";
-                assert_eq!(x.nrows(), dim, "{}", msg);
-                assert_eq!(x.ncols(), dim, "{}", msg);
+                assert_eq!(x.nrows(), dim, "{}", MSG);
+                assert_eq!(x.ncols(), dim, "{}", MSG);
 
                 x
             })),
@@ -252,10 +257,7 @@ impl Group {
 
         Self {
             dim,
-            iter: Box::new(g.map(move |mat| {
-                let clone = mat.clone();
-                direct_sum(clone, f(mat))
-            })),
+            iter: Box::new(g.map(move |mat| direct_sum(mat.clone(), f(mat)))),
         }
     }
 
@@ -387,18 +389,6 @@ impl Group {
     pub fn into_polytope(self, _: Point) -> Concrete {
         todo!()
         // convex::convex_hull(self.orbit(p))
-    }
-}
-
-impl From<Vec<Matrix>> for Group {
-    fn from(elements: Vec<Matrix>) -> Self {
-        Self {
-            dim: elements
-                .get(0)
-                .expect("Group must have at least one element.")
-                .nrows(),
-            iter: Box::new(elements.into_iter()),
-        }
     }
 }
 

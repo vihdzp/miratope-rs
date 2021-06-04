@@ -7,7 +7,7 @@ Miratope can already load polytopes from files and derive various properties fro
 We plan to eventually support all of the following:
 
 * Various families of polytopes to build and render
-  * [x] All [regular polytopes](https://polytope.miraheze.org/wiki/Regular_polytope)
+  * [ ] All [regular polytopes](https://polytope.miraheze.org/wiki/Regular_polytope)
   * [ ] All known 3D and 4D [uniform polytopes](https://polytope.miraheze.org/wiki/Uniform_polytope)
   * [ ] Many of the known [CRFs](https://polytope.miraheze.org/wiki/Convex_regular-faced_polytope)
 * Many operations to apply to these polytopes
@@ -16,7 +16,7 @@ We plan to eventually support all of the following:
   * [x] [Prism products](https://polytope.miraheze.org/wiki/Prism_product)
   * [x] [Tegum products](https://polytope.miraheze.org/wiki/Tegum_product)
   * [x] [Pyramid products](https://polytope.miraheze.org/wiki/Pyramid_product)
-  * [ ] [Antiprisms](https://polytope.miraheze.org/wiki/Antiprism)
+  * [x] [Antiprisms](https://polytope.miraheze.org/wiki/Antiprism)
   * [ ] [Convex hulls](https://polytope.miraheze.org/wiki/Convex_hull)
 * Loading and saving into various formats
   * [x] Support for the [Stella `.off` format](https://www.software3d.com/StellaManual.php?prod=stella4D#import)
@@ -24,7 +24,7 @@ We plan to eventually support all of the following:
 * Localization
   * Automatic name generation in various languages for many shapes
     * [x] English
-    * [x] Spanish
+    * [ ] Spanish
     * [ ] French
     * [ ] Japanese
     * [ ] Proto Indo-Iranian

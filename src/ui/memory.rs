@@ -1,7 +1,7 @@
-use bevy::prelude::Query;
-use bevy_egui::egui::{self, Ui};
-
 use crate::{lang::En, polytope::concrete::Concrete};
+
+use bevy::prelude::Query;
+use bevy_egui::egui;
 
 pub const MEMORY_SLOTS: usize = 8;
 
@@ -18,16 +18,19 @@ impl std::ops::Index<usize> for Memory {
 }
 
 impl Memory {
+    /// Returns an iterator over the memory slots.
     pub fn iter(&self) -> std::slice::Iter<Option<Concrete>> {
         self.0.iter()
     }
 
-    pub fn show(&mut self, ui: &mut Ui, query: &mut Query<&mut Concrete>) {
+    /// Shows the memory menu in a specified Ui.
+    pub fn show(&mut self, ui: &mut egui::Ui, query: &mut Query<&mut Concrete>) {
         use crate::lang::Language;
 
         egui::menu::menu(ui, "Memory", |ui| {
             for (idx, slot) in self.0.iter_mut().enumerate() {
                 match slot {
+                    // Shows an empty slot.
                     None => {
                         egui::CollapsingHeader::new("Empty")
                             .id_source(idx)
@@ -39,6 +42,7 @@ impl Memory {
                                 }
                             });
                     }
+                    // Shows a slot with a polytope on it.
                     Some(poly) => {
                         let mut clear = false;
 
@@ -50,21 +54,21 @@ impl Memory {
                         .show(ui, |ui| {
                             // Clones a polytope from memory.
                             if ui.button("Load").clicked() {
-                                for mut p in query.iter_mut() {
+                                if let Some(mut p) = query.iter_mut().next() {
                                     *p = poly.clone();
                                 }
                             }
 
                             // Swaps the current polytope with the one on memory.
                             if ui.button("Swap").clicked() {
-                                for mut p in query.iter_mut() {
+                                if let Some(mut p) = query.iter_mut().next() {
                                     std::mem::swap(p.as_mut(), poly);
                                 }
                             }
 
                             // Clones a polytope into memory.
                             if ui.button("Save").clicked() {
-                                for p in query.iter_mut() {
+                                if let Some(p) = query.iter_mut().next() {
                                     *poly = p.clone();
                                 }
                             }

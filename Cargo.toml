@@ -54,10 +54,10 @@ git = "https://github.com/jakobhellermann/bevy_egui"
 branch = "bevy-main"
 
 [patch.crates-io]
-# Fixes egui issue #404.
+# Better side bar, some relevant bugfixes like issue #404.
 egui = { git = "https://github.com/emilk/egui" }
 # Fixes winit issue #1779.
-winit = { git = "https://github.com/OfficialURL/winit" }
+winit = { git = "https://github.com/OfficialURL/winit", rev = "06b285d5246210d6cf50e14283b912434d073cf2" }
 
 [profile.release]
 lto = "thin"

@@ -22,7 +22,7 @@ use crate::{polytope::Polytope, Float};
 /// A [flag](https://polytope.miraheze.org/wiki/Flag) in a polytope. Stores the
 /// indices of the elements of each rank, excluding the minimal and maximal
 /// elements.
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Flag(Vec<usize>);
 
 impl Flag {
@@ -201,8 +201,14 @@ impl Default for Orientation {
     }
 }
 
-/// An interator over all [`Flags`](Flag) of a polytope. This iterator works
-/// even if the polytope is a compound polytope. If you also care about the
+/// An iterator over all [`Flags`](Flag) of a polytope. This iterator works even
+/// if the polytope is a compound polytope.
+///
+/// Each flag is associated with a sequence whose k-th entry stores the index of
+/// the k-th element as a subelement of its superelement. We iterate over flags
+/// in the lexicographic order given by these sequences.
+///
+/// If you also care about the
 /// orientation of the flags, you should use an [`OrientedFlagIter`] instead.
 pub struct FlagIter<'a> {
     /// The polytope whose flags we iterate over.
@@ -212,8 +218,9 @@ pub struct FlagIter<'a> {
     /// iterator.
     flag: Option<Flag>,
 
-    /// The indices of each element of the flag, as subelements of their
-    /// superelements.
+    /// The indices of each element of the flag, **as subelements of their
+    /// superelements.** These indices **do not** coincide with the actual
+    /// indices of the elements in their respective `ElementList`s.
     indices: Vec<usize>,
 }
 
@@ -235,11 +242,12 @@ impl<'a> Iterator for FlagIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let flag = self.flag.as_mut()?;
         let prev_flag = flag.clone();
-        let rank = self.polytope.rank();
+        let rank = self.polytope.rank().usize();
 
+        // The largest rank of the elements we'll update.
         let mut r = 0;
         loop {
-            if r == rank.usize() {
+            if r == rank {
                 self.flag = None;
                 return Some(prev_flag);
             }
@@ -257,6 +265,7 @@ impl<'a> Iterator for FlagIter<'a> {
             }
         }
 
+        // Updates all elements in the flag with ranks r down to 0.
         let r_plus_one = Rank::from(r + 1);
         let idx = flag.get(r_plus_one).copied().unwrap_or(0);
         let mut element = &self.polytope[r_plus_one][idx];
@@ -276,7 +285,7 @@ impl<'a> Iterator for FlagIter<'a> {
     }
 }
 
-#[derive(Clone, Debug, Eq)]
+#[derive(Clone, Eq)]
 /// A flag together with an orientation. Any flag change flips the orientation.
 /// If the polytope associated to the flag is non-orientable, the orientation
 /// will be garbage.
@@ -290,6 +299,7 @@ pub struct OrientedFlag {
     pub orientation: Orientation,
 }
 
+/// Makes an oriented flag from a normal flag.
 impl From<Flag> for OrientedFlag {
     fn from(flag: Flag) -> Self {
         Self {
@@ -363,14 +373,8 @@ impl OrientedFlag {
     }
 }
 
-/// Gets the common elements of two lists. There's definitely a better way.
+/// Gets the common elements of two **sorted** lists.
 fn common(vec0: &[usize], vec1: &[usize]) -> Vec<usize> {
-    // Hopefully this isn't much of a bottleneck.
-    let mut vec0 = vec0.to_owned();
-    let mut vec1 = vec1.to_owned();
-    vec0.sort_unstable();
-    vec1.sort_unstable();
-
     let mut common = Vec::new();
     let mut i = 0;
     let mut j = 0;
@@ -414,6 +418,7 @@ impl OrientedFlag {
         self.flag.get_or_zero(rank)
     }
 
+    /// Applies a specified flag change to the flag in place.
     pub fn change_mut(&mut self, polytope: &Abstract, idx: usize) {
         self.flag.change_mut(polytope, idx);
         self.orientation.flip_mut();
@@ -428,6 +433,7 @@ impl OrientedFlag {
     }
 }
 
+/// Represents a set of flag changes.
 pub struct FlagChanges(Vec<usize>);
 
 impl FlagChanges {
@@ -452,17 +458,20 @@ impl std::ops::Index<usize> for FlagChanges {
     }
 }
 
-/// An iterator over all of the "flag events" of a polytope. A flag event is
+/// An iterator over all of the [`FlagEvent`]s of a polytope. A [`FlagEvent`] is
 /// either an [`OrientedFlag`], or an event that determines that a polytope is
 /// non-orientable.
 ///
 /// The reason we don't iterate over flags directly is that sometimes, we
-/// realize a polytope is non-orientable only after traversing every single one
-/// of its flags. Hence, we can't bundle the information that the polytope is
-/// non-orientable with the flags.
-pub struct OrientedFlagIter<'a> {
-    /// The polytope whose flags we iterate over.
-    polytope: &'a Abstract,
+/// realize that a polytope is non-orientable only after traversing every single
+/// one of its flags. Hence, we can't bundle the information that the polytope
+/// is non-orientable with the flags.
+///
+/// If you don't care about orientation, you should use a [`FlagIter`] instead.
+pub struct OrientedFlagIter {
+    /// The polytope whose flags we iterate over. We must sort its elements
+    /// so that the algorithm works.
+    polytope: Abstract,
 
     /// The flags whose adjacencies are being searched.
     queue: VecDeque<OrientedFlag>,
@@ -485,7 +494,6 @@ pub struct OrientedFlagIter<'a> {
 }
 
 /// The result of trying to get the next flag.
-#[derive(Debug)]
 pub enum IterResult {
     /// We found a new flag.
     New(OrientedFlag),
@@ -500,11 +508,11 @@ pub enum IterResult {
     None,
 }
 
-impl<'a> OrientedFlagIter<'a> {
+impl<'a> OrientedFlagIter {
     /// Returns a dummy iterator that returns `None` every single time.
-    pub fn empty(polytope: &'a Abstract) -> Self {
+    pub fn empty() -> Self {
         Self {
-            polytope,
+            polytope: Abstract::nullitope(),
             queue: VecDeque::new(), // This is the important bit.
             flag_changes: FlagChanges::new(),
             flag_idx: 0,
@@ -515,34 +523,39 @@ impl<'a> OrientedFlagIter<'a> {
     }
 
     /// Initializes a new iterator over the flag events of a polytope.
-    pub fn new(polytope: &'a Abstract) -> Self {
+    pub fn new(polytope: &Abstract) -> Self {
         // Initializes with any flag from the polytope and all flag changes.
         if let Some(first_flag) = polytope.first_oriented_flag() {
             Self::with_flags(polytope, FlagChanges::all(polytope.rank()), first_flag)
         }
         // A nullitope has no flags.
         else {
-            Self::empty(polytope)
+            Self::empty()
         }
     }
 
     /// Initializes a new iterator over the flag events of a polytope, given an
     /// initial flag and a set of flag changes to apply.
     pub fn with_flags(
-        polytope: &'a Abstract,
+        polytope: &Abstract,
         flag_changes: FlagChanges,
         first_flag: OrientedFlag,
     ) -> Self {
         if cfg!(debug_assertions) {
             polytope.bounded().unwrap();
         }
-        let rank = polytope.rank();
+
+        // The polytope must have its elements sorted.
+        let mut polytope = polytope.clone();
+        polytope.sort();
+
+        let first = polytope.rank() == Rank::new(-1);
 
         // Initializes found flags.
         let mut found = HashMap::new();
         let mut queue = VecDeque::new();
 
-        if rank != Rank::new(-1) {
+        if !first {
             found.insert(first_flag.clone(), 0);
 
             // Initializes queue.
@@ -554,7 +567,7 @@ impl<'a> OrientedFlagIter<'a> {
             queue,
             flag_changes,
             flag_idx: 0,
-            first: rank == Rank::new(-1),
+            first,
             found,
             orientable: true,
         }
@@ -623,7 +636,6 @@ impl<'a> OrientedFlagIter<'a> {
     }
 }
 
-#[derive(PartialEq)]
 /// Represents either a new found flag, or the event in which the iterator
 /// realizes that the polytope is non-orientable.
 pub enum FlagEvent {
@@ -634,7 +646,7 @@ pub enum FlagEvent {
     NonOrientable,
 }
 
-impl<'a> Iterator for OrientedFlagIter<'a> {
+impl Iterator for OrientedFlagIter {
     type Item = FlagEvent;
 
     /// Gets the next flag event.
@@ -726,7 +738,7 @@ mod tests {
     fn simplex() {
         use factorial::Factorial;
 
-        for n in 0..=5 {
+        for n in 0..=7 {
             test(&Abstract::simplex(Rank::from(n)), (n + 1).factorial());
         }
     }
@@ -735,7 +747,7 @@ mod tests {
     fn hypercube() {
         use factorial::Factorial;
 
-        for n in 0..=5 {
+        for n in 0..=7 {
             test(
                 &Abstract::hypercube(Rank::new(n as isize)),
                 (2u32.pow(n as u32) as usize) * n.factorial(),
@@ -747,7 +759,7 @@ mod tests {
     fn orthoplex() {
         use factorial::Factorial;
 
-        for n in 0..=5 {
+        for n in 0..=7 {
             test(
                 &Abstract::orthoplex(Rank::new(n as isize)),
                 (2u32.pow(n as u32) as usize) * n.factorial(),

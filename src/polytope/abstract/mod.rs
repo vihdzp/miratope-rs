@@ -1102,7 +1102,7 @@ impl Polytope<Abs> for Abstract {
     /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
     fn orientable(&self) -> bool {
         for flag_event in self.flag_events() {
-            if flag_event == FlagEvent::NonOrientable {
+            if matches!(flag_event, FlagEvent::NonOrientable) {
                 return false;
             }
         }
