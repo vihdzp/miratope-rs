@@ -411,6 +411,12 @@ pub fn show_top_panel(
                         }
                     });
 
+                    if ui.button("Omnitruncate").clicked() {
+                        for mut p in query.iter_mut() {
+                            *p = p.omnitruncate();
+                        }
+                    }
+
                     ui.separator();
 
                     // Recenters a polytope.

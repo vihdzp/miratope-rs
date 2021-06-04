@@ -949,10 +949,41 @@ impl Polytope<Con> for Concrete {
         ))
     }
 
-    fn flag_omnitruncate(&self) -> Self {
-        // let rank = self.rank();
+    fn omnitruncate(&self) -> Self {
+        let (abs, flags) = self.abs.omnitruncate_and_flags();
+        let dim = self.dim().unwrap();
 
-        todo!()
+        // Maps each element to the polytope to some vertex.
+        let mut element_vertices = vec![self.vertices.clone()];
+        for r in Rank::range_inclusive_iter(Rank::new(1), self.rank()) {
+            let mut rank_vertices = Vec::new();
+
+            for el in self[r].iter() {
+                let mut p = Point::zeros(dim);
+                let subs = &el.subs;
+
+                for &sub in subs {
+                    p += &element_vertices[r.usize() - 1][sub];
+                }
+
+                rank_vertices.push(p / subs.len() as Float);
+            }
+
+            element_vertices.push(rank_vertices);
+        }
+
+        let vertices: Vec<_> = flags
+            .into_iter()
+            .map(|flag| {
+                flag.0
+                    .into_iter()
+                    .enumerate()
+                    .map(|(r, idx)| &element_vertices[r][idx])
+                    .sum()
+            })
+            .collect();
+
+        Self::new(vertices, abs)
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)

@@ -285,7 +285,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         })
     }
 
-    fn flag_omnitruncate(&self) -> Self;
+    fn omnitruncate(&self) -> Self;
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.

@@ -1,5 +1,5 @@
-//! Helpful methods and structs for operating on the [flags](https://polytope.miraheze.org/wiki/Flag)
-//! of a polytope.
+//! Helpful methods and structs for operating on the
+//! [flags](https://polytope.miraheze.org/wiki/Flag) of a polytope.
 //!
 //! Recall that a flag is a maximal set of pairwise incident elements in a
 //! polytope. For convenience, we omit the minimal and maximal elements from our
@@ -7,7 +7,7 @@
 
 use std::{
     cmp::Ordering,
-    collections::{hash_map::Entry, HashMap, VecDeque},
+    collections::{hash_map::Entry, HashMap, HashSet, VecDeque},
     hash::{Hash, Hasher},
     ops::{Index, IndexMut},
 };
@@ -23,7 +23,7 @@ use crate::{polytope::Polytope, Float};
 /// indices of the elements of each rank, excluding the minimal and maximal
 /// elements.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Flag(Vec<usize>);
+pub struct Flag(pub Vec<usize>);
 
 impl Flag {
     /// Initializes a new `Flag` with a given capacity.
@@ -208,8 +208,8 @@ impl Default for Orientation {
 /// the k-th element as a subelement of its superelement. We iterate over flags
 /// in the lexicographic order given by these sequences.
 ///
-/// If you also care about the
-/// orientation of the flags, you should use an [`OrientedFlagIter`] instead.
+/// If you also care about the orientation of the flags, you should use an
+/// [`OrientedFlagIter`] instead.
 pub struct FlagIter<'a> {
     /// The polytope whose flags we iterate over.
     polytope: &'a Abstract,
@@ -434,6 +434,7 @@ impl OrientedFlag {
 }
 
 /// Represents a set of flag changes.
+#[derive(Debug, Clone)]
 pub struct FlagChanges(Vec<usize>);
 
 impl FlagChanges {
@@ -447,6 +448,20 @@ impl FlagChanges {
 
     pub fn all(rank: Rank) -> Self {
         Self((0..rank.usize()).collect())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn subsets(&self) -> std::iter::Map<std::ops::Range<usize>, impl FnMut(usize) -> Self> {
+        let clone = self.clone();
+
+        (0..self.len()).map(move |i| {
+            let mut subset = clone.clone();
+            subset.0.remove(i);
+            subset
+        })
     }
 }
 
@@ -659,8 +674,9 @@ impl Iterator for OrientedFlagIter {
 
             let flag = Some(FlagEvent::Flag(self.found.keys().next().cloned().unwrap()));
 
-            // If we're dealing with a point, this is the only flag.
-            if rank == Rank::new(0) {
+            // If we're dealing with a point, or if we're performing no flag
+            // changes, this is the only flag.
+            if rank == Rank::new(0) || self.flag_changes.is_empty() {
                 self.queue = VecDeque::new();
             }
 
@@ -687,6 +703,78 @@ impl Iterator for OrientedFlagIter {
                 IterResult::Repeat => {}
             }
         }
+    }
+}
+
+/// Represents a set of flags, created by applying a specific set of flag
+/// changes to a flag in a polytope.
+pub struct FlagSet {
+    pub flags: HashSet<Flag>,
+    pub flag_changes: FlagChanges,
+}
+
+// THIS IS ONLY MEANT FOR OMNITRUNCATES!!!
+impl PartialEq for FlagSet {
+    fn eq(&self, other: &Self) -> bool {
+        if self.flag_changes.0 != other.flag_changes.0 {
+            return false;
+        }
+
+        let flag = self.flags.iter().next().unwrap();
+        other.flags.contains(&flag)
+    }
+}
+
+impl Eq for FlagSet {}
+
+impl FlagSet {
+    pub fn len(&self) -> usize {
+        self.flags.len()
+    }
+
+    pub fn new(polytope: &Abstract) -> Self {
+        Self::with(
+            polytope,
+            FlagChanges::all(polytope.rank()),
+            polytope.first_flag().unwrap(),
+        )
+    }
+
+    pub fn with(polytope: &Abstract, flag_changes: FlagChanges, first_flag: Flag) -> Self {
+        Self {
+            flags: OrientedFlagIter::with_flags(&polytope, flag_changes.clone(), first_flag.into())
+                .filter_map(|flag_event| {
+                    if let FlagEvent::Flag(oriented_flag) = flag_event {
+                        Some(oriented_flag.flag)
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+            flag_changes,
+        }
+    }
+
+    pub fn subsets(&self, polytope: &Abstract) -> Vec<Self> {
+        let mut subsets = Vec::new();
+
+        for flag_changes in self.flag_changes.subsets() {
+            let mut flags = HashSet::new();
+
+            for flag in &self.flags {
+                if flags.insert(flag.clone()) {
+                    let subset = Self::with(polytope, flag_changes.clone(), flag.clone());
+
+                    for flag in &subset.flags {
+                        flags.insert(flag.clone());
+                    }
+
+                    subsets.push(subset);
+                }
+            }
+        }
+
+        subsets
     }
 }
 

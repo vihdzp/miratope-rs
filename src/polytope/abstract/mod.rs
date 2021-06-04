@@ -12,7 +12,7 @@ use self::{
         AbstractBuilder, Element, ElementHash, ElementList, ElementRef, Section, SectionHash,
         SubelementList, Subelements, Subsupelements, Superelements,
     },
-    flag::{Flag, FlagEvent},
+    flag::{Flag, FlagEvent, FlagSet},
     rank::{Rank, RankVec},
 };
 use super::Polytope;
@@ -447,6 +447,72 @@ impl Abstract {
         abs = abs.with_name(Name::antiprism(self.name.clone(), facet_count));
 
         (abs, vertices, dual_vertices)
+    }
+
+    pub fn omnitruncate_and_flags(&self) -> (Self, Vec<Flag>) {
+        let mut flag_sets = vec![FlagSet::new(self)];
+        let mut new_flag_sets = Vec::new();
+        let rank = self.rank();
+
+        // The elements of each rank... backwards.
+        let mut ranks = Vec::with_capacity(rank.plus_one_usize());
+
+        // Adds elements of each rank.
+        for _ in 0..rank.usize() {
+            let mut subelements = SubelementList::new();
+
+            // Gets the subelements of each element.
+            for flag_set in flag_sets {
+                let mut subs = Subelements::new();
+
+                // Each subset represents a new element.
+                for subset in flag_set.subsets(self) {
+                    // We do a brute-force check to see if we've found this
+                    // element before.
+                    //
+                    // TODO: think of something better?
+                    match new_flag_sets
+                        .iter()
+                        .enumerate()
+                        .find(|(_, new_flag_set)| &&subset == new_flag_set)
+                    {
+                        // This is a repeat element.
+                        Some((idx, _)) => {
+                            subs.push(idx);
+                        }
+
+                        // This is a new element.
+                        None => {
+                            subs.push(new_flag_sets.len());
+                            new_flag_sets.push(subset);
+                        }
+                    }
+                }
+
+                subelements.push(subs);
+            }
+
+            ranks.push(subelements);
+            flag_sets = new_flag_sets;
+            new_flag_sets = Vec::new();
+        }
+
+        let mut flags = Vec::new();
+        for flag_set in flag_sets {
+            debug_assert_eq!(flag_set.len(), 1);
+            flags.push(flag_set.flags.into_iter().next().unwrap());
+        }
+
+        ranks.push(SubelementList::vertices(flags.len()));
+        ranks.push(SubelementList::min());
+
+        // TODO: wrap this using an AbstractBuilderRev.
+        let mut abs = AbstractBuilder::with_capacity(rank);
+        for subelements in ranks.into_iter().rev() {
+            abs.push(subelements);
+        }
+
+        (abs.build(), flags)
     }
 
     /// Checks whether the polytope is valid, i.e. whether the polytope is
@@ -979,11 +1045,12 @@ impl Polytope<Abs> for Abstract {
     /// based on a given polytope. Use [`Self::antiprism`] instead, as this method can
     /// never fail.
     fn try_antiprism(&self) -> Result<Self, usize> {
-        Ok(self.antiprism_and_vertices().0)
+        Ok(self.antiprism())
     }
 
-    fn flag_omnitruncate(&self) -> Self {
-        todo!()
+    /// Returns the flag omnitruncate of a polytope.
+    fn omnitruncate(&self) -> Self {
+        self.omnitruncate_and_flags().0
     }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails

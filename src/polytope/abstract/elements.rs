@@ -356,6 +356,7 @@ impl IndexMut<usize> for ElementList {
 }
 
 /// A list of subelements in a polytope.
+#[derive(Debug)]
 pub struct SubelementList(Vec<Subelements>);
 
 impl SubelementList {
