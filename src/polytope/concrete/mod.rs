@@ -17,7 +17,7 @@ use super::{
             AbstractBuilder, Element, ElementList, ElementRef, SubelementList, Subelements,
             Subsupelements,
         },
-        flag::{Flag, FlagChanges, FlagEvent, OrientedFlag, OrientedFlagIter},
+        flag::{Flag, FlagChanges, FlagEvent, OrientedFlagIter},
         rank::{Rank, RankVec},
         Abstract,
     },
@@ -574,7 +574,7 @@ impl Concrete {
 
     /// Computes the volume of a polytope by adding up the contributions of all
     /// flags. Returns `None` if the volume is undefined.
-    pub fn volume(&self) -> Option<Float> {
+    pub fn volume(&mut self) -> Option<Float> {
         use factorial::Factorial;
 
         let rank = self.rank();
@@ -627,6 +627,7 @@ impl Concrete {
 
         // All of the flags we've found so far.
         let mut all_flags = HashSet::new();
+        self.abs.sort();
 
         // We iterate over all flags in the polytope.
         for flag in self.flags() {
@@ -635,10 +636,10 @@ impl Concrete {
             if !all_flags.contains(&flag) {
                 let mut component_volume = 0.0;
 
-                for flag_event in OrientedFlagIter::with_flags(
+                for flag_event in OrientedFlagIter::with_flags_unsorted(
                     &self.abs,
-                    FlagChanges::all(self.rank()),
-                    OrientedFlag::from(flag),
+                    FlagChanges::all(rank),
+                    flag.into(),
                 ) {
                     if let FlagEvent::Flag(oriented_flag) = flag_event {
                         let new = all_flags.insert(oriented_flag.flag.clone());
@@ -949,7 +950,7 @@ impl Polytope<Con> for Concrete {
         ))
     }
 
-    fn omnitruncate(&self) -> Self {
+    fn omnitruncate(&mut self) -> Self {
         let (abs, flags) = self.abs.omnitruncate_and_flags();
         let dim = self.dim().unwrap();
 
@@ -1058,7 +1059,7 @@ impl Polytope<Con> for Concrete {
 
     /// Determines whether a given polytope is
     /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
-    fn orientable(&self) -> bool {
+    fn orientable(&mut self) -> bool {
         self.abs.orientable()
     }
 
@@ -1120,7 +1121,7 @@ mod tests {
     use factorial::Factorial;
 
     /// Tests that a polytope has an expected volume.
-    fn test(poly: &Concrete, volume: Option<Float>) {
+    fn test(poly: &mut Concrete, volume: Option<Float>) {
         if let Some(poly_volume) = poly.volume() {
             let volume = volume.expect(&format!(
                 "Expected no volume for {}, found volume {}!",
@@ -1146,17 +1147,17 @@ mod tests {
 
     #[test]
     fn nullitope() {
-        test(&Concrete::nullitope(), None)
+        test(&mut Concrete::nullitope(), None)
     }
 
     #[test]
     fn point() {
-        test(&Concrete::point(), Some(1.0));
+        test(&mut Concrete::point(), Some(1.0));
     }
 
     #[test]
     fn dyad() {
-        test(&Concrete::dyad(), Some(1.0));
+        test(&mut Concrete::dyad(), Some(1.0));
     }
 
     fn polygon_area(n: usize, d: usize) -> Float {
@@ -1169,8 +1170,8 @@ mod tests {
     fn polygon() {
         for n in 2..=10 {
             for d in 1..=n / 2 {
-                let poly = Concrete::star_polygon(n, d);
-                test(&poly, Some(polygon_area(n, d)));
+                let mut poly = Concrete::star_polygon(n, d);
+                test(&mut poly, Some(polygon_area(n, d)));
             }
         }
     }
@@ -1189,7 +1190,7 @@ mod tests {
         for m in 0..polygons.len() {
             for n in 0..polygons.len() {
                 test(
-                    &Concrete::duopyramid(&polygons[m], &polygons[n]),
+                    &mut Concrete::duopyramid(&polygons[m], &polygons[n]),
                     Some(areas[m] * areas[n] / 30.0),
                 )
             }
@@ -1210,7 +1211,7 @@ mod tests {
         for m in 0..polygons.len() {
             for n in 0..polygons.len() {
                 test(
-                    &Concrete::duoprism(&polygons[m], &polygons[n]),
+                    &mut Concrete::duoprism(&polygons[m], &polygons[n]),
                     Some(areas[m] * areas[n]),
                 )
             }
@@ -1231,7 +1232,7 @@ mod tests {
         for m in 0..polygons.len() {
             for n in 0..polygons.len() {
                 test(
-                    &Concrete::duotegum(&polygons[m], &polygons[n]),
+                    &mut Concrete::duotegum(&polygons[m], &polygons[n]),
                     Some(areas[m] * areas[n] / 6.0),
                 )
             }
@@ -1252,7 +1253,7 @@ mod tests {
         for m in 0..polygons.len() {
             for n in 0..polygons.len() {
                 let volume = if m == 0 || n == 0 { Some(0.0) } else { None };
-                test(&Concrete::duocomb(&polygons[m], &polygons[n]), volume)
+                test(&mut Concrete::duocomb(&polygons[m], &polygons[n]), volume)
             }
         }
     }
@@ -1261,7 +1262,7 @@ mod tests {
     fn simplex() {
         for n in 0..=5 {
             test(
-                &Concrete::simplex(Rank::from(n)),
+                &mut Concrete::simplex(Rank::from(n)),
                 Some(
                     ((n + 1) as Float / 2u32.pow(n as u32) as Float).sqrt()
                         / n.factorial() as Float,
@@ -1273,7 +1274,7 @@ mod tests {
     #[test]
     fn hypercube() {
         for n in 0..=5 {
-            test(&Concrete::hypercube(Rank::new(n)), Some(1.0));
+            test(&mut Concrete::hypercube(Rank::new(n)), Some(1.0));
         }
     }
 
@@ -1281,7 +1282,7 @@ mod tests {
     fn orthoplex() {
         for n in 0..=5 {
             test(
-                &Concrete::orthoplex(Rank::from(n)),
+                &mut Concrete::orthoplex(Rank::from(n)),
                 Some(1.0 / n.factorial() as Float),
             );
         }

@@ -522,7 +522,7 @@ pub fn show_top_panel(
                 ui.collapsing("Properties", |ui| {
                     // Determines whether the polytope is orientable.
                     if ui.button("Orientability").clicked() {
-                        for p in query.iter_mut() {
+                        for mut p in query.iter_mut() {
                             if p.orientable() {
                                 println!("The polytope is orientable.");
                             } else {
@@ -533,7 +533,7 @@ pub fn show_top_panel(
 
                     // Gets the volume of the polytope.
                     if ui.button("Volume").clicked() {
-                        for p in query.iter_mut() {
+                        for mut p in query.iter_mut() {
                             if let Some(vol) = p.volume() {
                                 println!("The volume is {}.", vol);
                             } else {

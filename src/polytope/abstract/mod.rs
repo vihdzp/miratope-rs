@@ -449,8 +449,10 @@ impl Abstract {
         (abs, vertices, dual_vertices)
     }
 
-    pub fn omnitruncate_and_flags(&self) -> (Self, Vec<Flag>) {
-        let mut flag_sets = vec![FlagSet::new(self)];
+    pub fn omnitruncate_and_flags(&mut self) -> (Self, Vec<Flag>) {
+        self.sort();
+
+        let mut flag_sets = vec![FlagSet::new_unsorted(self)];
         let mut new_flag_sets = Vec::new();
         let rank = self.rank();
 
@@ -466,7 +468,7 @@ impl Abstract {
                 let mut subs = Subelements::new();
 
                 // Each subset represents a new element.
-                for subset in flag_set.subsets(self) {
+                for subset in flag_set.subsets_unsorted(self) {
                     // We do a brute-force check to see if we've found this
                     // element before.
                     //
@@ -474,7 +476,7 @@ impl Abstract {
                     match new_flag_sets
                         .iter()
                         .enumerate()
-                        .find(|(_, new_flag_set)| &&subset == new_flag_set)
+                        .find(|(_, new_flag_set)| subset == **new_flag_set)
                     {
                         // This is a repeat element.
                         Some((idx, _)) => {
@@ -1049,7 +1051,7 @@ impl Polytope<Abs> for Abstract {
     }
 
     /// Returns the flag omnitruncate of a polytope.
-    fn omnitruncate(&self) -> Self {
+    fn omnitruncate(&mut self) -> Self {
         self.omnitruncate_and_flags().0
     }
 
@@ -1167,7 +1169,7 @@ impl Polytope<Abs> for Abstract {
 
     /// Determines whether a given polytope is
     /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
-    fn orientable(&self) -> bool {
+    fn orientable(&mut self) -> bool {
         for flag_event in self.flag_events() {
             if matches!(flag_event, FlagEvent::NonOrientable) {
                 return false;

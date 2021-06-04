@@ -270,14 +270,18 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Returns an iterator over all "flag events" of a polytope. For more info,
     /// see [`FlagIter`].
-    fn flag_events(&self) -> OrientedFlagIter {
-        OrientedFlagIter::new(self.abs())
+    fn flag_events(&mut self) -> OrientedFlagIter {
+        OrientedFlagIter::new(self.abs_mut())
+    }
+
+    fn flag_events_unsorted(&self) -> OrientedFlagIter {
+        OrientedFlagIter::new_unsorted(self.abs())
     }
 
     /// Returns an iterator over all [`OrientedFlag`]s of a polytope, assuming
     /// flag-connectedness.
     fn oriented_flags(
-        &self,
+        &mut self,
     ) -> std::iter::FilterMap<OrientedFlagIter, &dyn Fn(FlagEvent) -> Option<OrientedFlag>> {
         self.flag_events().filter_map(&|f: FlagEvent| match f {
             FlagEvent::Flag(f) => Some(f),
@@ -285,7 +289,19 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         })
     }
 
-    fn omnitruncate(&self) -> Self;
+    /// Returns an iterator over all [`OrientedFlag`]s of a polytope, assuming
+    /// flag-connectedness.
+    fn oriented_flags_unsorted(
+        &mut self,
+    ) -> std::iter::FilterMap<OrientedFlagIter, &dyn Fn(FlagEvent) -> Option<OrientedFlag>> {
+        self.flag_events_unsorted()
+            .filter_map(&|f: FlagEvent| match f {
+                FlagEvent::Flag(f) => Some(f),
+                FlagEvent::NonOrientable => None,
+            })
+    }
+
+    fn omnitruncate(&mut self) -> Self;
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.
@@ -332,7 +348,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Determines whether a given polytope is
     /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
-    fn orientable(&self) -> bool;
+    fn orientable(&mut self) -> bool;
 
     /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
     /// given base.

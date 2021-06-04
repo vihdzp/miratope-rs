@@ -483,10 +483,10 @@ impl std::ops::Index<usize> for FlagChanges {
 /// is non-orientable with the flags.
 ///
 /// If you don't care about orientation, you should use a [`FlagIter`] instead.
-pub struct OrientedFlagIter {
+pub struct OrientedFlagIter<'a> {
     /// The polytope whose flags we iterate over. We must sort its elements
     /// so that the algorithm works.
-    polytope: Abstract,
+    polytope: &'a Abstract,
 
     /// The flags whose adjacencies are being searched.
     queue: VecDeque<OrientedFlag>,
@@ -523,11 +523,11 @@ pub enum IterResult {
     None,
 }
 
-impl<'a> OrientedFlagIter {
+impl<'a> OrientedFlagIter<'a> {
     /// Returns a dummy iterator that returns `None` every single time.
-    pub fn empty() -> Self {
+    pub fn empty(polytope: &'a Abstract) -> Self {
         Self {
-            polytope: Abstract::nullitope(),
+            polytope,
             queue: VecDeque::new(), // This is the important bit.
             flag_changes: FlagChanges::new(),
             flag_idx: 0,
@@ -538,31 +538,52 @@ impl<'a> OrientedFlagIter {
     }
 
     /// Initializes a new iterator over the flag events of a polytope.
-    pub fn new(polytope: &Abstract) -> Self {
+    pub fn new(polytope: &'a mut Abstract) -> Self {
         // Initializes with any flag from the polytope and all flag changes.
         if let Some(first_flag) = polytope.first_oriented_flag() {
             Self::with_flags(polytope, FlagChanges::all(polytope.rank()), first_flag)
         }
         // A nullitope has no flags.
         else {
-            Self::empty()
+            Self::empty(polytope)
+        }
+    }
+
+    /// Initializes a new iterator over the flag events of a polytope.
+    pub fn new_unsorted(polytope: &'a Abstract) -> Self {
+        // Initializes with any flag from the polytope and all flag changes.
+        if let Some(first_flag) = polytope.first_oriented_flag() {
+            let rank = polytope.rank();
+            Self::with_flags_unsorted(polytope, FlagChanges::all(rank), first_flag)
+        }
+        // A nullitope has no flags.
+        else {
+            Self::empty(polytope)
         }
     }
 
     /// Initializes a new iterator over the flag events of a polytope, given an
     /// initial flag and a set of flag changes to apply.
     pub fn with_flags(
-        polytope: &Abstract,
+        polytope: &'a mut Abstract,
+        flag_changes: FlagChanges,
+        first_flag: OrientedFlag,
+    ) -> Self {
+        // The polytope must have its elements sorted.
+        polytope.sort();
+        Self::with_flags_unsorted(polytope, flag_changes, first_flag)
+    }
+
+    /// Same as [`with_flags`], but **assumes** that you've already called `.sort()`
+    /// on the polytope.
+    pub fn with_flags_unsorted(
+        polytope: &'a Abstract,
         flag_changes: FlagChanges,
         first_flag: OrientedFlag,
     ) -> Self {
         if cfg!(debug_assertions) {
             polytope.bounded().unwrap();
         }
-
-        // The polytope must have its elements sorted.
-        let mut polytope = polytope.clone();
-        polytope.sort();
 
         let first = polytope.rank() == Rank::new(-1);
 
@@ -661,7 +682,7 @@ pub enum FlagEvent {
     NonOrientable,
 }
 
-impl Iterator for OrientedFlagIter {
+impl<'a> Iterator for OrientedFlagIter<'a> {
     type Item = FlagEvent;
 
     /// Gets the next flag event.
@@ -732,7 +753,7 @@ impl FlagSet {
         self.flags.len()
     }
 
-    pub fn new(polytope: &Abstract) -> Self {
+    pub fn new(polytope: &mut Abstract) -> Self {
         Self::with(
             polytope,
             FlagChanges::all(polytope.rank()),
@@ -740,22 +761,39 @@ impl FlagSet {
         )
     }
 
-    pub fn with(polytope: &Abstract, flag_changes: FlagChanges, first_flag: Flag) -> Self {
+    pub fn new_unsorted(polytope: &Abstract) -> Self {
+        Self::with_unsorted(
+            polytope,
+            FlagChanges::all(polytope.rank()),
+            polytope.first_flag().unwrap(),
+        )
+    }
+
+    pub fn with(polytope: &mut Abstract, flag_changes: FlagChanges, first_flag: Flag) -> Self {
+        polytope.sort();
+        Self::with_unsorted(polytope, flag_changes, first_flag)
+    }
+
+    pub fn with_unsorted(polytope: &Abstract, flag_changes: FlagChanges, first_flag: Flag) -> Self {
         Self {
-            flags: OrientedFlagIter::with_flags(&polytope, flag_changes.clone(), first_flag.into())
-                .filter_map(|flag_event| {
-                    if let FlagEvent::Flag(oriented_flag) = flag_event {
-                        Some(oriented_flag.flag)
-                    } else {
-                        None
-                    }
-                })
-                .collect(),
+            flags: OrientedFlagIter::with_flags_unsorted(
+                polytope,
+                flag_changes.clone(),
+                first_flag.into(),
+            )
+            .filter_map(|flag_event| {
+                if let FlagEvent::Flag(oriented_flag) = flag_event {
+                    Some(oriented_flag.flag)
+                } else {
+                    None
+                }
+            })
+            .collect(),
             flag_changes,
         }
     }
 
-    pub fn subsets(&self, polytope: &Abstract) -> Vec<Self> {
+    pub fn subsets_unsorted(&self, polytope: &Abstract) -> Vec<Self> {
         let mut subsets = Vec::new();
 
         for flag_changes in self.flag_changes.subsets() {
@@ -763,7 +801,7 @@ impl FlagSet {
 
             for flag in &self.flags {
                 if flags.insert(flag.clone()) {
-                    let subset = Self::with(polytope, flag_changes.clone(), flag.clone());
+                    let subset = Self::with_unsorted(&polytope, flag_changes.clone(), flag.clone());
 
                     for flag in &subset.flags {
                         flags.insert(flag.clone());
@@ -784,7 +822,9 @@ mod tests {
     use crate::polytope::Polytope;
 
     /// Tests that a polytope has an expected number of flags, oriented or not.
-    fn test(polytope: &Abstract, expected: usize) {
+    fn test(polytope: &mut Abstract, expected: usize) {
+        polytope.sort();
+
         let flag_count = polytope.flags().count();
         assert_eq!(
             expected, flag_count,
@@ -792,7 +832,7 @@ mod tests {
             expected, flag_count
         );
 
-        let flag_count = polytope.oriented_flags().count();
+        let flag_count = polytope.oriented_flags_unsorted().count();
         assert_eq!(
             expected, flag_count,
             "Expected {} oriented flags, found {}.",
@@ -802,23 +842,23 @@ mod tests {
 
     #[test]
     fn nullitope() {
-        test(&Abstract::nullitope(), 0)
+        test(&mut Abstract::nullitope(), 0)
     }
 
     #[test]
     fn point() {
-        test(&Abstract::point(), 1)
+        test(&mut Abstract::point(), 1)
     }
 
     #[test]
     fn dyad() {
-        test(&Abstract::dyad(), 2)
+        test(&mut Abstract::dyad(), 2)
     }
 
     #[test]
     fn polygon() {
         for n in 2..=10 {
-            test(&Abstract::polygon(n), 2 * n);
+            test(&mut Abstract::polygon(n), 2 * n);
         }
     }
 
@@ -827,7 +867,7 @@ mod tests {
         use factorial::Factorial;
 
         for n in 0..=7 {
-            test(&Abstract::simplex(Rank::from(n)), (n + 1).factorial());
+            test(&mut Abstract::simplex(Rank::from(n)), (n + 1).factorial());
         }
     }
 
@@ -837,7 +877,7 @@ mod tests {
 
         for n in 0..=7 {
             test(
-                &Abstract::hypercube(Rank::new(n as isize)),
+                &mut Abstract::hypercube(Rank::new(n as isize)),
                 (2u32.pow(n as u32) as usize) * n.factorial(),
             );
         }
@@ -849,7 +889,7 @@ mod tests {
 
         for n in 0..=7 {
             test(
-                &Abstract::orthoplex(Rank::new(n as isize)),
+                &mut Abstract::orthoplex(Rank::new(n as isize)),
                 (2u32.pow(n as u32) as usize) * n.factorial(),
             );
         }
