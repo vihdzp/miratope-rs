@@ -995,6 +995,7 @@ impl Polytope<Abs> for Abstract {
         let mut traversed_flags = BTreeSet::new();
         let mut faces = SubelementList::new();
 
+        self.sort();
         for mut flag in self.flags() {
             // If we've found the face associated to this flag before, we skip.
             if !traversed_flags.insert(flag.clone()) {
