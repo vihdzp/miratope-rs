@@ -145,11 +145,18 @@ fn setup(
         Color::rgb_u8(126, 192, 255).into(),
     );
 
-    // Unselected object (default material).
-    let wf_unselected = materials.set(
+    // Wireframe material.
+    let wf_material = materials.set(
         WIREFRAME_UNSELECTED_MATERIAL,
         Color::rgb_u8(255, 255, 255).into(),
     );
+
+    // Mesh material.
+    let mesh_material = materials.add(StandardMaterial {
+        base_color: Color::rgb_u8(200, 200, 200),
+        metallic: 0.2,
+        ..Default::default()
+    });
 
     // Camera configuration.
     let mut cam_anchor = Default::default();
@@ -161,19 +168,14 @@ fn setup(
         // Mesh
         .insert_bundle(PbrNoBackfaceBundle {
             mesh: meshes.add(poly.get_mesh(ProjectionType::Perspective)),
-            material: materials.add(StandardMaterial {
-                base_color: Color::rgb_u8(255, 100, 100),
-                metallic: 0.2,
-                roughness: 0.0,
-                ..Default::default()
-            }),
+            material: mesh_material,
             ..Default::default()
         })
         // Wireframe
         .with_children(|cb| {
             cb.spawn().insert_bundle(PbrNoBackfaceBundle {
                 mesh: meshes.add(poly.get_wireframe(ProjectionType::Perspective)),
-                material: wf_unselected,
+                material: wf_material,
                 ..Default::default()
             });
         })
