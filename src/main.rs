@@ -180,17 +180,6 @@ fn setup(
         // Polytope
         .insert(poly);
 
-    // Light source
-    commands.spawn_bundle(PointLightBundle {
-        transform: Transform::from_translation(Vec3::new(-50.0, 40.0, 30.0)),
-        point_light: PointLight {
-            intensity: 2000.,
-            range: 100.,
-            ..Default::default()
-        },
-        ..Default::default()
-    });
-
     // Camera anchor
     commands
         .spawn()
@@ -201,6 +190,16 @@ fn setup(
                 transform: cam,
                 perspective_projection: PerspectiveProjection {
                     near: 0.0001,
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+            // Light source
+            cb.spawn_bundle(PointLightBundle {
+                transform: Transform::from_translation(Vec3::new(-5.0, 4.0, 3.0)),
+                point_light: PointLight {
+                    intensity: 100.,
+                    range: 100.,
                     ..Default::default()
                 },
                 ..Default::default()

@@ -374,7 +374,7 @@ impl<'a> MeshBuilder<'a> {
         for n in normals.iter_mut() {
             let sq_norm = n[0] * n[0] + n[1] * n[1] + n[2] * n[2];
             if sq_norm < f32::EPS {
-                *n = [1.0, 0.0, 0.0];
+                *n = [0.0, 0.0, 0.0];
             } else {
                 let norm = sq_norm.sqrt();
                 n[0] /= norm;
