@@ -370,10 +370,13 @@ impl<'a> MeshBuilder<'a> {
         }
 
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-        mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 1.0]; vertices.len()]);
+        let len = vertices.len();
+
+        mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 1.0]; len]);
+        mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 1.0]; len]);
         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
-        mesh.compute_flat_normals();
-        
+        // mesh.compute_flat_normals();
+
         mesh.set_indices(Some(Indices::U16(indices)));
 
         mesh
