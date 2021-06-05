@@ -38,15 +38,13 @@ pub fn update_changed_polytopes(
     selected_language: Res<SelectedLanguage>,
     orthogonal: Res<ProjectionType>,
 ) {
-    for (poly, _, children) in polies.iter() {
+    for (poly, mesh_handle, children) in polies.iter() {
         if cfg!(debug_assertions) {
             println!("Polytope updated");
             poly.abs.is_valid().unwrap();
         }
 
-        // The mesh is currently hidden, so we don't bother updating it.
-        // *meshes.get_mut(_mesh_handle).unwrap() = poly.get_mesh(*orthogonal);
-
+        *meshes.get_mut(mesh_handle).unwrap() = poly.get_mesh(*orthogonal);
         // Sets the window's name to the polytope's name.
         windows
             .get_primary_mut()

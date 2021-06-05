@@ -155,15 +155,21 @@ fn setup(
     let mut cam_anchor = Default::default();
     let mut cam = Default::default();
     CameraInputEvent::reset(&mut cam_anchor, &mut cam);
-
+    
     commands
         .spawn()
         // Mesh
         .insert_bundle(PbrNoBackfaceBundle {
             mesh: meshes.add(poly.get_mesh(ProjectionType::Perspective)),
-            material: materials.add(Color::rgb(1.0, 1.0, 1.0).into()),
+            material: materials.add(
+                StandardMaterial {
+                    base_color: Color::rgb_u8(240, 240, 240),
+                    metallic: 0.0,
+                    roughness: 0.0,
+                    ..Default::default()
+                }),
             visible: Visible {
-                is_visible: false,
+                is_visible: true,
                 ..Default::default()
             },
             ..Default::default()
@@ -174,7 +180,7 @@ fn setup(
                 mesh: meshes.add(poly.get_wireframe(ProjectionType::Perspective)),
                 material: wf_unselected,
                 visible: Visible {
-                    is_visible: true,
+                    is_visible: false,
                     ..Default::default()
                 },
                 ..Default::default()
@@ -184,12 +190,17 @@ fn setup(
         .insert(poly);
 
     // Light source
-    /*
+    
     commands.spawn_bundle(PointLightBundle {
-        transform: Transform::from_translation(Vec3::new(-2.0, 2.5, 2.0)),
+        transform: Transform::from_translation(Vec3::new(-50.0, 40.0, 30.0)),
+        point_light: PointLight {
+            intensity: 50000.,
+            range: 100.,
+            ..Default::default()
+        },
         ..Default::default()
     });
-    */
+    
 
     // Camera anchor
     commands
@@ -203,7 +214,7 @@ fn setup(
                     near: 0.0001,
                     ..Default::default()
                 },
-                ..Default::default()
+                ..PerspectiveCameraBundle::new_3d()
             });
         });
 }
