@@ -742,9 +742,9 @@ checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
 name = "bzip2"
-version = "0.3.3"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42b7c3cbf0fa9c1b82308d57191728ca0256cb821220f4e2fd410a72ade26e3b"
+checksum = "abf8012c8a15d5df745fcf258d93e6149dcf102882c8d8702d9cff778eab43a8"
 dependencies = [
  "bzip2-sys",
  "libc",
@@ -1187,7 +1187,7 @@ checksum = "ee2626afccd7561a06cf1367e2950c4718ea04565e20fb5029b6c7d8ad09abcf"
 [[package]]
 name = "egui"
 version = "0.12.0"
-source = "git+https://github.com/emilk/egui#2af86cd2c7a1a1b275034fa6e3f0e3548384154b"
+source = "git+https://github.com/emilk/egui#effd3c7440d9f70c0eff677871a60be539cf1113"
 dependencies = [
  "epaint",
 ]
@@ -1201,7 +1201,7 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 [[package]]
 name = "emath"
 version = "0.12.0"
-source = "git+https://github.com/emilk/egui#2af86cd2c7a1a1b275034fa6e3f0e3548384154b"
+source = "git+https://github.com/emilk/egui#effd3c7440d9f70c0eff677871a60be539cf1113"
 
 [[package]]
 name = "env_logger"
@@ -1216,7 +1216,7 @@ dependencies = [
 [[package]]
 name = "epaint"
 version = "0.12.0"
-source = "git+https://github.com/emilk/egui#2af86cd2c7a1a1b275034fa6e3f0e3548384154b"
+source = "git+https://github.com/emilk/egui#effd3c7440d9f70c0eff677871a60be539cf1113"
 dependencies = [
  "ahash 0.7.4",
  "atomic_refcell",
@@ -2084,9 +2084,9 @@ dependencies = [
 
 [[package]]
 name = "mio-misc"
-version = "1.0.1"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18d9bf3ad929ad9ec136d7bd55f68c62223561423474c21b5e34eb9322018d36"
+checksum = "0ddf05411bb159cdb5801bb10002afb66cb4572be656044315e363460ce69dc2"
 dependencies = [
  "crossbeam",
  "crossbeam-queue",
@@ -2149,9 +2149,9 @@ dependencies = [
 
 [[package]]
 name = "nalgebra"
-version = "0.27.0"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6217061c826a68b3608d96a528705973bd8a21f2bedd8b794b12c633c730d8af"
+checksum = "462fffe4002f4f2e1f6a9dcf12cc1a6fc0e15989014efc02a941d3e0f5dc2120"
 dependencies = [
  "approx",
  "matrixmultiply",
@@ -2249,9 +2249,9 @@ checksum = "c44922cb3dbb1c70b5e5f443d63b64363a898564d739ba5198e3a9138442868d"
 
 [[package]]
 name = "notify"
-version = "5.0.0-pre.9"
+version = "5.0.0-pre.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b89869d77edd64db917d7903abeadc166f93686b342c56cc0ca51acb68441d09"
+checksum = "51f18203a26893ca1d3526cf58084025d5639f91c44f8b70ab3b724f60e819a0"
 dependencies = [
  "bitflags",
  "crossbeam-channel",
@@ -3489,9 +3489,9 @@ checksum = "b07db065a5cf61a7e4ba64f29e67db906fb1787316516c4e6e5ff0fea1efcd8a"
 
 [[package]]
 name = "zip"
-version = "0.5.12"
+version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c83dc9b784d252127720168abd71ea82bf8c3d96b17dc565b5e2a02854f2b27"
+checksum = "93ab48844d61251bb3835145c521d88aa4031d7139e8485990f60ca911fa0815"
 dependencies = [
  "byteorder",
  "bzip2",

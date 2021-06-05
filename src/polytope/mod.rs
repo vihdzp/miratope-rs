@@ -9,7 +9,7 @@ use std::iter;
 
 use self::r#abstract::{
     elements::{Element, ElementRef, Section},
-    flag::{Flag, FlagEvent, FlagIter, OrientedFlag, OrientedFlagIter},
+    flag::{Flag, FlagIter, OrientedFlag, OrientedFlagIter},
     rank::{Rank, RankVec},
     Abstract,
 };
@@ -260,7 +260,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// when we start at the maximal element and repeatedly take the first
     /// subelement.
     fn first_oriented_flag(&self) -> Option<OrientedFlag> {
-        Some(OrientedFlag::from(self.first_flag()?))
+        Some(self.first_flag()?.into())
     }
 
     /// Returns an iterator over all [`Flag`]s of a polytope.
@@ -268,37 +268,8 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         FlagIter::new(self.abs())
     }
 
-    /// Returns an iterator over all "flag events" of a polytope. For more info,
-    /// see [`FlagIter`].
-    fn flag_events(&mut self) -> OrientedFlagIter {
-        OrientedFlagIter::new(self.abs_mut())
-    }
-
-    fn flag_events_unsorted(&self) -> OrientedFlagIter {
-        OrientedFlagIter::new_unsorted(self.abs())
-    }
-
-    /// Returns an iterator over all [`OrientedFlag`]s of a polytope, assuming
-    /// flag-connectedness.
-    fn oriented_flags(
-        &mut self,
-    ) -> std::iter::FilterMap<OrientedFlagIter, &dyn Fn(FlagEvent) -> Option<OrientedFlag>> {
-        self.flag_events().filter_map(&|f: FlagEvent| match f {
-            FlagEvent::Flag(f) => Some(f),
-            FlagEvent::NonOrientable => None,
-        })
-    }
-
-    /// Returns an iterator over all [`OrientedFlag`]s of a polytope, assuming
-    /// flag-connectedness.
-    fn oriented_flags_unsorted(
-        &mut self,
-    ) -> std::iter::FilterMap<OrientedFlagIter, &dyn Fn(FlagEvent) -> Option<OrientedFlag>> {
-        self.flag_events_unsorted()
-            .filter_map(&|f: FlagEvent| match f {
-                FlagEvent::Flag(f) => Some(f),
-                FlagEvent::NonOrientable => None,
-            })
+    fn flag_events(&self) -> OrientedFlagIter {
+        OrientedFlagIter::new(self.abs())
     }
 
     fn omnitruncate(&mut self) -> Self;

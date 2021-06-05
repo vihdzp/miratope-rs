@@ -51,7 +51,7 @@ pub fn update_changed_polytopes(
         windows
             .get_primary_mut()
             .unwrap()
-            .set_title(selected_language.parse_uppercase(poly.name(), Options::default()));
+            .set_title(selected_language.parse(poly.name(), Options::default()));
 
         // Updates all wireframes.
         for child in children.iter() {

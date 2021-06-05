@@ -1,4 +1,4 @@
-use std::{fmt::Display, hash::Hash};
+use std::{fmt::Display, hash::Hash, iter, slice, vec};
 
 use serde::{Deserialize, Serialize};
 
@@ -283,7 +283,7 @@ impl<T> IntoIterator for RankVec<T> {
 
 /// A wrapper around a usual iterator over vectors, which implements a
 /// [`rank_enumerate`](IntoIter::rank_enumerate) convenience method.
-pub struct Iter<'a, T>(std::slice::Iter<'a, T>);
+pub struct Iter<'a, T>(slice::Iter<'a, T>);
 
 impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
@@ -297,17 +297,15 @@ impl<'a, T> Iter<'a, T> {
     /// Wraps around the usual `enumerate` method, offsetting the first entry by 1.
     pub fn rank_enumerate(
         self,
-    ) -> std::iter::Map<
-        std::iter::Enumerate<std::slice::Iter<'a, T>>,
-        impl FnMut((usize, &'a T)) -> (Rank, &'a T),
-    > {
+    ) -> iter::Map<iter::Enumerate<slice::Iter<'a, T>>, impl FnMut((usize, &'a T)) -> (Rank, &'a T)>
+    {
         self.0.enumerate().map(|(idx, t)| (Rank(idx), t))
     }
 }
 
 /// A wrapper around a usual mutable iterator over vectors, which implements a
 /// [`rank_enumerate`](IntoIter::rank_enumerate) convenience method.
-pub struct IterMut<'a, T>(std::slice::IterMut<'a, T>);
+pub struct IterMut<'a, T>(slice::IterMut<'a, T>);
 
 impl<'a, T> Iterator for IterMut<'a, T> {
     type Item = &'a mut T;
@@ -321,8 +319,8 @@ impl<'a, T> IterMut<'a, T> {
     /// Wraps around the usual `enumerate` method, offsetting the first entry by 1.
     pub fn rank_enumerate(
         self,
-    ) -> std::iter::Map<
-        std::iter::Enumerate<std::slice::IterMut<'a, T>>,
+    ) -> iter::Map<
+        iter::Enumerate<slice::IterMut<'a, T>>,
         impl FnMut((usize, &'a mut T)) -> (Rank, &'a mut T),
     > {
         self.0.enumerate().map(|(idx, t)| (Rank(idx), t))
@@ -331,7 +329,7 @@ impl<'a, T> IterMut<'a, T> {
 
 /// A wrapper around a usual iterator over vectors, which implements a
 /// [`rank_enumerate`](IntoIter::rank_enumerate) convenience method.
-pub struct IntoIter<T>(std::vec::IntoIter<T>);
+pub struct IntoIter<T>(vec::IntoIter<T>);
 
 impl<T> Iterator for IntoIter<T> {
     type Item = T;
@@ -351,10 +349,7 @@ impl<T> IntoIter<T> {
     /// Wraps around the usual `enumerate` method, offsetting the first entry by 1.
     pub fn rank_enumerate(
         self,
-    ) -> std::iter::Map<
-        std::iter::Enumerate<std::vec::IntoIter<T>>,
-        impl FnMut((usize, T)) -> (Rank, T),
-    > {
+    ) -> iter::Map<iter::Enumerate<vec::IntoIter<T>>, impl FnMut((usize, T)) -> (Rank, T)> {
         self.0.enumerate().map(|(idx, t)| (Rank(idx), t))
     }
 }

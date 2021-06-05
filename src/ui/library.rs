@@ -229,7 +229,7 @@ impl DisplayName {
     /// do some sort of cacheing in the future?
     pub fn parse(&self, selected_language: SelectedLanguage) -> String {
         match self {
-            Self::Name(name) => selected_language.parse_uppercase(name, Default::default()),
+            Self::Name(name) => selected_language.parse(name, Default::default()),
             Self::Literal(name) => name.clone(),
         }
     }

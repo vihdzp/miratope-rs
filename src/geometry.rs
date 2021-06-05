@@ -30,6 +30,12 @@ pub struct Hypersphere {
 }
 
 impl Hypersphere {
+    /// Returns the radius of the hypersphere, or `NaN` if its squared radius is
+    /// negative.
+    pub fn radius(&self) -> Float {
+        self.squared_radius.sqrt()
+    }
+
     /// Constructs a hypersphere with a given dimension and radius,
     /// centered at the origin.
     pub fn with_radius(center: Point, radius: Float) -> Hypersphere {
@@ -50,8 +56,8 @@ impl Hypersphere {
         Hypersphere::with_squared_radius(Point::zeros(dim), 1.0)
     }
 
-    /// Reciprocates a point in place. If it's too close to the sphere's center,
-    /// it returns `Err(())` and leaves it unmoved.
+    /// Attempts to reciprocate a point in place. If it's too close to the
+    /// sphere's center, it returns `Err(())` and leaves it unchanged.
     pub fn reciprocate_mut(&self, p: &mut Point) -> Result<(), ()> {
         let mut q = p as &Point - &self.center;
         let s = q.norm_squared();
@@ -72,17 +78,11 @@ impl Hypersphere {
         Ok(())
     }
 
-    /// Reciprocates a point.
+    /// Attempts to reciprocate a point. If it's too close to the sphere's
+    /// center, it returns `None`.
     pub fn reciprocate(&self, p: &Point) -> Option<Point> {
         let mut clone = p.clone();
         self.reciprocate_mut(&mut clone).ok().map(|_| clone)
-    }
-
-    /// Returns whether two hyperspheres are "approximately" equal.
-    /// Used for testing.
-    pub fn approx(&self, sphere: &Hypersphere) -> bool {
-        (&self.center - &sphere.center).norm() < Float::EPS
-            && self.squared_radius - sphere.squared_radius < Float::EPS
     }
 }
 
@@ -215,17 +215,18 @@ pub struct Hyperplane {
 }
 
 impl Hyperplane {
-    /// Defines a new oriented hyperplane from a hyperplane and a point outside
-    /// of it.
-    pub fn new(subspace: Subspace, p: &Point) -> Self {
-        debug_assert!(
-            subspace.is_hyperplane(),
-            "An oriented hyperplane needs to be defined on a hyperplane."
-        );
+    /// Generates an oriented hyperplane from its normal vector.
+    pub fn new(normal: Vector, pos: Float) -> Self {
+        let rank = normal.len();
+        let mut subspace = Subspace::new(pos * &normal);
+        let mut e = Vector::zeros(rank);
 
-        let normal = subspace
-            .normal(p)
-            .expect("Specified point not outside the hyperplane.");
+        for i in 0..rank {
+            e[i] = 1.0;
+            e += (pos - e.dot(&normal)) * &normal;
+            subspace.add(&e);
+            e[i] = 0.0;
+        }
 
         Self { subspace, normal }
     }
@@ -268,20 +269,6 @@ impl Hyperplane {
         } else {
             Some(l.at(t))
         }
-    }
-
-    /// Generates an oriented hyperplane from its normal vector.
-    pub fn from_normal(rank: usize, normal: Vector, pos: Float) -> Self {
-        let mut subspace = Subspace::new(pos * &normal);
-
-        for i in 0..rank {
-            let mut e = Vector::zeros(rank);
-            e[i] = 1.0;
-            e += (pos - e.dot(&normal)) * &normal;
-            subspace.add(&e);
-        }
-
-        Self { subspace, normal }
     }
 }
 

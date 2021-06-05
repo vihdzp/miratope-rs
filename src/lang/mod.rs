@@ -779,16 +779,6 @@ pub enum SelectedLanguage {
 impl SelectedLanguage {
     pub fn parse<T: NameType>(&self, name: &Name<T>, options: Options) -> String {
         match self {
-            Self::En => En::parse(name, options),
-            Self::Es => Es::parse(name, options),
-            Self::Fr => Fr::parse(name, options),
-            Self::Ja => Ja::parse(name, options),
-            Self::Pii => Pii::parse(name, options),
-        }
-    }
-
-    pub fn parse_uppercase<T: NameType>(&self, name: &Name<T>, options: Options) -> String {
-        match self {
             Self::En => En::parse_uppercase(name, options),
             Self::Es => Es::parse_uppercase(name, options),
             Self::Fr => Fr::parse_uppercase(name, options),

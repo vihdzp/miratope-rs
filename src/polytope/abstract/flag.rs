@@ -55,11 +55,6 @@ impl Flag {
         self.0.push(value);
     }
 
-    /// Returns the rank of the polytope from which the flag was built.
-    pub fn rank(&self) -> Rank {
-        Rank::from(self.0.len())
-    }
-
     /// Applies a specified flag change to the flag in place.
     pub fn change_mut(&mut self, polytope: &Abstract, r: usize) {
         let rank = polytope.rank();
@@ -179,11 +174,6 @@ impl Orientation {
         }
     }
 
-    /// Flips the parity of a flag in place.
-    pub fn flip_mut(&mut self) {
-        *self = self.flip();
-    }
-
     /// Returns the "sign" associated with a flag, which is either `1.0` or
     /// `-1.0`.
     pub fn sign(&self) -> Float {
@@ -208,8 +198,9 @@ impl Default for Orientation {
 /// the k-th element as a subelement of its superelement. We iterate over flags
 /// in the lexicographic order given by these sequences.
 ///
-/// If you also care about the orientation of the flags, you should use an
-/// [`OrientedFlagIter`] instead.
+/// You should use this iterator instead of an [`OrientedFlagIter`] when
+/// * you don't care about the [`Orientation`] of the flags,
+/// * you want to iterate over all flags.
 pub struct FlagIter<'a> {
     /// The polytope whose flags we iterate over.
     polytope: &'a Abstract,
@@ -367,12 +358,6 @@ impl IndexMut<Rank> for OrientedFlag {
     }
 }
 
-impl OrientedFlag {
-    pub fn push(&mut self, value: usize) {
-        self.flag.push(value);
-    }
-}
-
 /// Gets the common elements of two **sorted** lists.
 fn common(vec0: &[usize], vec1: &[usize]) -> Vec<usize> {
     let mut common = Vec::new();
@@ -398,32 +383,6 @@ fn common(vec0: &[usize], vec1: &[usize]) -> Vec<usize> {
 }
 
 impl OrientedFlag {
-    /// Constructs a new, empty `OrientedFlag` with the specified capacity.
-    pub fn with_capacity(rank: usize) -> Self {
-        Self {
-            flag: Flag::with_capacity(rank),
-            orientation: Default::default(),
-        }
-    }
-
-    /// Gets the index of the element with a given rank, or returns `None` if it
-    /// doesn't exist.
-    pub fn get(&self, rank: Rank) -> Option<&usize> {
-        self.flag.get(rank)
-    }
-
-    /// Gets the index of the element stored at a given rank, whilst pretending
-    /// that the flag contains a minimal and maximal element.
-    pub fn get_or_zero(&self, rank: Rank) -> usize {
-        self.flag.get_or_zero(rank)
-    }
-
-    /// Applies a specified flag change to the flag in place.
-    pub fn change_mut(&mut self, polytope: &Abstract, idx: usize) {
-        self.flag.change_mut(polytope, idx);
-        self.orientation.flip_mut();
-    }
-
     /// Applies a specified flag change to the flag.
     pub fn change(&self, polytope: &Abstract, idx: usize) -> Self {
         Self {
@@ -434,32 +393,43 @@ impl OrientedFlag {
 }
 
 /// Represents a set of flag changes.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FlagChanges(Vec<usize>);
 
 impl FlagChanges {
+    /// Returns a new, empty set of flag changes.
     pub fn new() -> Self {
         Self(Vec::new())
     }
 
+    /// Returns the number of flag changes.
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    /// Returns the set of all flag changes for a polytope of a given rank.
     pub fn all(rank: Rank) -> Self {
         Self((0..rank.usize()).collect())
     }
 
+    /// Returns whether the set of flag changes is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
+    /// Removes a flag change at a given index **without changing their order.**
+    pub fn remove(&mut self, index: usize) -> usize {
+        self.0.remove(index)
+    }
+
+    /// Returns an iterator over all subsets of flag changes created by taking
+    /// out a single flag change.
     pub fn subsets(&self) -> std::iter::Map<std::ops::Range<usize>, impl FnMut(usize) -> Self> {
         let clone = self.clone();
 
         (0..self.len()).map(move |i| {
             let mut subset = clone.clone();
-            subset.0.remove(i);
+            subset.remove(i);
             subset
         })
     }
@@ -477,15 +447,30 @@ impl std::ops::Index<usize> for FlagChanges {
 /// either an [`OrientedFlag`], or an event that determines that a polytope is
 /// non-orientable.
 ///
+/// **All methods assume that the polytope has been [sorted](Abstract::sort)
+/// beforehand.**
+///
+/// We store a queue of all [`Flags`](Flag) whose adjacencies need to be
+/// searched, together with a `HashSet` which store all of the flags that have
+/// been found so far. For each element in the queue, we apply all flag changes
+/// in a given set to it. All new flags that we find are then returned and added
+/// to the queue.
+///
 /// The reason we don't iterate over flags directly is that sometimes, we
 /// realize that a polytope is non-orientable only after traversing every single
 /// one of its flags. Hence, we can't bundle the information that the polytope
 /// is non-orientable with the flags.
 ///
-/// If you don't care about orientation, you should use a [`FlagIter`] instead.
+/// You should use this iterator instead of a [`FlagIter`] when
+/// * you want to apply a specific set of flag changes,
+/// * you care about the orientation of the flags.
 pub struct OrientedFlagIter<'a> {
-    /// The polytope whose flags we iterate over. We must sort its elements
-    /// so that the algorithm works.
+    /// The polytope whose flags we iterate over. For the algorithm that applies
+    /// a flag change to work, **this polytope's subelement and superelement
+    /// lists must be sorted.**
+    ///
+    /// Some associated methods will guarantee this condition by sorting the
+    /// polytope, while others will assume it.
     polytope: &'a Abstract,
 
     /// The flags whose adjacencies are being searched.
@@ -510,14 +495,11 @@ pub struct OrientedFlagIter<'a> {
 
 /// The result of trying to get the next flag.
 pub enum IterResult {
-    /// We found a new flag.
-    New(OrientedFlag),
+    /// We found a new flag event (either a flag or the non-orientable event).
+    New(FlagEvent),
 
     /// We found a flag we had already found before.
     Repeat,
-
-    /// We just realized the polytope is non-orientable.
-    NonOrientable,
 
     /// There are no flags left to find.
     None,
@@ -531,30 +513,22 @@ impl<'a> OrientedFlagIter<'a> {
             queue: VecDeque::new(), // This is the important bit.
             flag_changes: FlagChanges::new(),
             flag_idx: 0,
-            first: true,
+            first: true, // And also this.
             found: HashMap::new(),
             orientable: true,
         }
     }
 
-    /// Initializes a new iterator over the flag events of a polytope.
-    pub fn new(polytope: &'a mut Abstract) -> Self {
-        // Initializes with any flag from the polytope and all flag changes.
-        if let Some(first_flag) = polytope.first_oriented_flag() {
-            Self::with_flags(polytope, FlagChanges::all(polytope.rank()), first_flag)
-        }
-        // A nullitope has no flags.
-        else {
-            Self::empty(polytope)
-        }
-    }
-
-    /// Initializes a new iterator over the flag events of a polytope.
-    pub fn new_unsorted(polytope: &'a Abstract) -> Self {
+    /// Initializes a new iterator over the flag events of a polytope, starting
+    /// from an arbitrary flag and applying all flag changes.
+    ///
+    /// You must [sort](Abstract::sort) the polytope before calling this
+    /// method.
+    pub fn new(polytope: &'a Abstract) -> Self {
         // Initializes with any flag from the polytope and all flag changes.
         if let Some(first_flag) = polytope.first_oriented_flag() {
             let rank = polytope.rank();
-            Self::with_flags_unsorted(polytope, FlagChanges::all(rank), first_flag)
+            Self::with_flags(polytope, FlagChanges::all(rank), first_flag)
         }
         // A nullitope has no flags.
         else {
@@ -562,27 +536,24 @@ impl<'a> OrientedFlagIter<'a> {
         }
     }
 
-    /// Initializes a new iterator over the flag events of a polytope, given an
-    /// initial flag and a set of flag changes to apply.
+    /// Initializes a new iterator over the flag events of a polytope, starting
+    /// from a specified flag and applying a given set of flag changes.
+    ///
+    /// You must [sort](Abstract::sort) the polytope before calling this
+    /// method.
     pub fn with_flags(
-        polytope: &'a mut Abstract,
-        flag_changes: FlagChanges,
-        first_flag: OrientedFlag,
-    ) -> Self {
-        // The polytope must have its elements sorted.
-        polytope.sort();
-        Self::with_flags_unsorted(polytope, flag_changes, first_flag)
-    }
-
-    /// Same as [`with_flags`], but **assumes** that you've already called `.sort()`
-    /// on the polytope.
-    pub fn with_flags_unsorted(
         polytope: &'a Abstract,
         flag_changes: FlagChanges,
         first_flag: OrientedFlag,
     ) -> Self {
         if cfg!(debug_assertions) {
             polytope.bounded().unwrap();
+
+            // This is a very expensive test, but one that's easy to screw up.
+            assert!(
+                polytope.is_sorted(),
+                "You must sort the polytope before calling FlagSet::with_flags!"
+            );
         }
 
         let first = polytope.rank() == Rank::new(-1);
@@ -609,18 +580,25 @@ impl<'a> OrientedFlagIter<'a> {
         }
     }
 
-    /// Returns the index of the current flag change to apply.
-    pub fn flag_change(&self) -> usize {
-        self.flag_changes[self.flag_idx]
+    /// Returns a new iterator over oriented flags, discarding the
+    /// non-orientable event.
+    pub fn filter_flags(
+        self,
+    ) -> std::iter::FilterMap<Self, impl FnMut(FlagEvent) -> Option<OrientedFlag>> {
+        self.filter_map(FlagEvent::flag)
     }
 
     /// Attempts to get the next flag.
     pub fn try_next(&mut self) -> IterResult {
+        // We get the current flag from the queue.
         if let Some(current) = self.queue.front() {
             let rank = self.polytope.rank().usize();
-            let new_flag = current.change(&self.polytope, self.flag_change());
 
-            // Increments flag_idx.
+            // Applies the current flag change to the current flag.
+            let flag_change = self.flag_changes[self.flag_idx];
+            let new_flag = current.change(&self.polytope, flag_change);
+
+            // Increments the flag index.
             self.flag_idx = if self.flag_idx + 1 == self.flag_changes.len() {
                 self.queue.pop_front();
                 0
@@ -639,10 +617,11 @@ impl<'a> OrientedFlagIter<'a> {
                     // orientability, then we know the polytope isn't orientable.
                     if self.orientable && new_orientation != occupied_entry.key().orientation {
                         self.orientable = false;
-                        return IterResult::NonOrientable;
+                        return IterResult::New(FlagEvent::NonOrientable);
                     }
 
-                    // In any case, if we got here, we know this is a repeated flag.
+                    // In any case, if we got here, we know this is a repeated
+                    // flag.
                     //
                     // If we've found it all of the times we'll ever find it,
                     // there's no use in keeping it in the dictionary (profiling
@@ -653,6 +632,7 @@ impl<'a> OrientedFlagIter<'a> {
 
                     IterResult::Repeat
                 }
+
                 // If this flag is new, we just add it and return it.
                 Entry::Vacant(vacant_entry) => {
                     let new_flag = vacant_entry.key().clone();
@@ -661,7 +641,7 @@ impl<'a> OrientedFlagIter<'a> {
                     // We've found the flag one (1) time.
                     vacant_entry.insert(1);
 
-                    IterResult::New(new_flag)
+                    IterResult::New(FlagEvent::Flag(new_flag))
                 }
             }
         }
@@ -680,6 +660,16 @@ pub enum FlagEvent {
 
     /// We just realized the polytope is non-orientable.
     NonOrientable,
+}
+
+impl FlagEvent {
+    /// Returns the flag contained in the event, if any.
+    pub fn flag(self) -> Option<OrientedFlag> {
+        match self {
+            Self::Flag(oriented_flag) => Some(oriented_flag),
+            Self::NonOrientable => None,
+        }
+    }
 }
 
 impl<'a> Iterator for OrientedFlagIter<'a> {
@@ -707,14 +697,9 @@ impl<'a> Iterator for OrientedFlagIter<'a> {
         // Loops until we get a new flag event.
         loop {
             match self.try_next() {
-                // We found a new flag.
-                IterResult::New(f) => {
-                    return Some(FlagEvent::Flag(f));
-                }
-
-                // We just realized the polytope is non-orientable.
-                IterResult::NonOrientable => {
-                    return Some(FlagEvent::NonOrientable);
+                // We found a new flag event.
+                IterResult::New(flag_event) => {
+                    return Some(flag_event);
                 }
 
                 // We already exhausted the flag supply.
@@ -730,7 +715,10 @@ impl<'a> Iterator for OrientedFlagIter<'a> {
 /// Represents a set of flags, created by applying a specific set of flag
 /// changes to a flag in a polytope.
 pub struct FlagSet {
+    /// The flags contained in the set.
     pub flags: HashSet<Flag>,
+
+    /// The flag changes from which these flags were generated.
     pub flag_changes: FlagChanges,
 }
 
@@ -749,51 +737,34 @@ impl PartialEq for FlagSet {
 impl Eq for FlagSet {}
 
 impl FlagSet {
-    pub fn len(&self) -> usize {
-        self.flags.len()
-    }
-
-    pub fn new(polytope: &mut Abstract) -> Self {
-        Self::with(
+    /// Creates a new flag set from any flag of the polytope.
+    pub fn new(polytope: &Abstract) -> Self {
+        Self::with_flags(
             polytope,
             FlagChanges::all(polytope.rank()),
             polytope.first_flag().unwrap(),
         )
     }
 
-    pub fn new_unsorted(polytope: &Abstract) -> Self {
-        Self::with_unsorted(
-            polytope,
-            FlagChanges::all(polytope.rank()),
-            polytope.first_flag().unwrap(),
-        )
-    }
-
-    pub fn with(polytope: &mut Abstract, flag_changes: FlagChanges, first_flag: Flag) -> Self {
-        polytope.sort();
-        Self::with_unsorted(polytope, flag_changes, first_flag)
-    }
-
-    pub fn with_unsorted(polytope: &Abstract, flag_changes: FlagChanges, first_flag: Flag) -> Self {
+    /// Creates a new flag set defined by all flags in a polytope that can be
+    /// obtained by repeatedly applying any in a given set of flag changes to a
+    /// specified flag.
+    pub fn with_flags(polytope: &Abstract, flag_changes: FlagChanges, first_flag: Flag) -> Self {
         Self {
-            flags: OrientedFlagIter::with_flags_unsorted(
-                polytope,
-                flag_changes.clone(),
-                first_flag.into(),
-            )
-            .filter_map(|flag_event| {
-                if let FlagEvent::Flag(oriented_flag) = flag_event {
-                    Some(oriented_flag.flag)
-                } else {
-                    None
-                }
-            })
-            .collect(),
+            flags: OrientedFlagIter::with_flags(polytope, flag_changes.clone(), first_flag.into())
+                .filter_flags()
+                .map(|oriented_flag| oriented_flag.flag)
+                .collect(),
             flag_changes,
         }
     }
 
-    pub fn subsets_unsorted(&self, polytope: &Abstract) -> Vec<Self> {
+    /// Returns the number of flags contained in the flag set.
+    pub fn len(&self) -> usize {
+        self.flags.len()
+    }
+
+    pub fn subsets(&self, polytope: &Abstract) -> Vec<Self> {
         let mut subsets = Vec::new();
 
         for flag_changes in self.flag_changes.subsets() {
@@ -801,7 +772,7 @@ impl FlagSet {
 
             for flag in &self.flags {
                 if flags.insert(flag.clone()) {
-                    let subset = Self::with_unsorted(&polytope, flag_changes.clone(), flag.clone());
+                    let subset = Self::with_flags(&polytope, flag_changes.clone(), flag.clone());
 
                     for flag in &subset.flags {
                         flags.insert(flag.clone());
@@ -823,8 +794,6 @@ mod tests {
 
     /// Tests that a polytope has an expected number of flags, oriented or not.
     fn test(polytope: &mut Abstract, expected: usize) {
-        polytope.sort();
-
         let flag_count = polytope.flags().count();
         assert_eq!(
             expected, flag_count,
@@ -832,7 +801,8 @@ mod tests {
             expected, flag_count
         );
 
-        let flag_count = polytope.oriented_flags_unsorted().count();
+        polytope.sort();
+        let flag_count = polytope.flag_events().filter_flags().count();
         assert_eq!(
             expected, flag_count,
             "Expected {} oriented flags, found {}.",

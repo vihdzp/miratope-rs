@@ -264,6 +264,18 @@ impl Abstract {
         }
     }
 
+    pub fn is_sorted(&self) -> bool {
+        for elements in self.ranks.iter() {
+            for el in elements.iter() {
+                if !el.is_sorted() {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
     /// Returns a reference to an element of the polytope. To actually get the
     /// entire polytope it defines, use [`element`](Self::element).
     pub fn get_element(&self, el: &ElementRef) -> Option<&Element> {
@@ -452,7 +464,7 @@ impl Abstract {
     pub fn omnitruncate_and_flags(&mut self) -> (Self, Vec<Flag>) {
         self.sort();
 
-        let mut flag_sets = vec![FlagSet::new_unsorted(self)];
+        let mut flag_sets = vec![FlagSet::new(self)];
         let mut new_flag_sets = Vec::new();
         let rank = self.rank();
 
@@ -468,7 +480,7 @@ impl Abstract {
                 let mut subs = Subelements::new();
 
                 // Each subset represents a new element.
-                for subset in flag_set.subsets_unsorted(self) {
+                for subset in flag_set.subsets(self) {
                     // We do a brute-force check to see if we've found this
                     // element before.
                     //
@@ -1170,6 +1182,8 @@ impl Polytope<Abs> for Abstract {
     /// Determines whether a given polytope is
     /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
     fn orientable(&mut self) -> bool {
+        self.sort();
+
         for flag_event in self.flag_events() {
             if matches!(flag_event, FlagEvent::NonOrientable) {
                 return false;

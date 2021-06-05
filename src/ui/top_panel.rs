@@ -261,7 +261,7 @@ pub fn show_top_panel(
                 if ui.button("Save").clicked() {
                     if let Some(p) = query.iter_mut().next() {
                         file_dialog_state
-                            .save(selected_language.parse_uppercase(p.name(), Default::default()));
+                            .save(selected_language.parse(p.name(), Default::default()));
                     }
                 }
 
@@ -520,6 +520,20 @@ pub fn show_top_panel(
 
                 // Prints out properties about the loaded polytope.
                 ui.collapsing("Properties", |ui| {
+                    // Determines the circumsphere of the polytope.
+                    if ui.button("Circumsphere").clicked() {
+                        for p in query.iter_mut() {
+                            match p.circumsphere() {
+                                Some(sphere) => println!(
+                                    "The circumradius is {} and the circumcenter is {}.",
+                                    sphere.radius(),
+                                    sphere.center
+                                ),
+                                None => println!("The polytope has no circumsphere."),
+                            }
+                        }
+                    }
+
                     // Determines whether the polytope is orientable.
                     if ui.button("Orientability").clicked() {
                         for mut p in query.iter_mut() {
@@ -582,7 +596,7 @@ pub fn show_top_panel(
                     if selected_language.is_changed() {
                         if let Some(poly) = query.iter_mut().next() {
                             windows.get_primary_mut().unwrap().set_title(
-                                selected_language.parse_uppercase(poly.name(), Default::default()),
+                                selected_language.parse(poly.name(), Default::default()),
                             );
                         }
                     }
@@ -754,11 +768,7 @@ fn show_views(
                 let hyp_pos = *hyperplane_pos + 0.0000001; // Botch fix for degeneracies.
 
                 if let Some(dim) = r.dim() {
-                    let hyperplane = Hyperplane::from_normal(
-                        original_polytope.dim_or(),
-                        section_direction.0.clone(),
-                        hyp_pos,
-                    );
+                    let hyperplane = Hyperplane::new(section_direction.0.clone(), hyp_pos);
                     *minmax = original_polytope
                         .minmax(&section_direction.0)
                         .unwrap_or((-1.0, 1.0));

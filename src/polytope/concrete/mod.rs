@@ -176,29 +176,34 @@ impl Concrete {
     pub fn circumsphere(&self) -> Option<Hypersphere> {
         let mut vertices = self.vertices.iter();
 
-        let v0 = vertices.next()?.clone();
-        let mut o: Point = v0.clone();
-        let mut h = Subspace::new(v0.clone());
+        let first_vertex = vertices.next()?.clone();
+        let mut center: Point = first_vertex.clone();
+        let mut subspace = Subspace::new(first_vertex.clone());
 
-        for v in vertices {
+        for vertex in vertices {
             // If the new vertex does not lie on the hyperplane of the others:
-            if let Some(b) = h.add(&v) {
+            if let Some(basis_vector) = subspace.add(&vertex) {
                 // Calculates the new circumcenter.
-                let k = ((&o - v).norm_squared() - (&o - &v0).norm_squared())
-                    / (2.0 * (v - &v0).dot(&b));
+                let distance = ((&center - vertex).norm_squared()
+                    - (&center - &first_vertex).norm_squared())
+                    / (2.0 * (vertex - &first_vertex).dot(&basis_vector));
 
-                o += k * b;
+                center += distance * basis_vector;
             }
             // If the new vertex lies on the others' hyperplane, but is not at
             // the correct distance from the first vertex:
-            else if abs_diff_ne!((&o - &v0).norm(), (&o - v).norm(), epsilon = Float::EPS) {
+            else if abs_diff_ne!(
+                (&center - &first_vertex).norm(),
+                (&center - vertex).norm(),
+                epsilon = Float::EPS
+            ) {
                 return None;
             }
         }
 
         Some(Hypersphere {
-            squared_radius: (&o - v0).norm(),
-            center: o,
+            squared_radius: (&center - first_vertex).norm(),
+            center,
         })
     }
 
@@ -218,25 +223,17 @@ impl Concrete {
     pub fn minmax(&self, direction: &Vector) -> Option<(Float, Float)> {
         use itertools::{Itertools, MinMaxResult};
 
-        if let Some(dim) = self.dim() {
-            if dim == 0 {
-                return None;
-            }
+        let hyperplane = Hyperplane::new(direction.clone(), 0.0);
 
-            let hyperplane = Hyperplane::from_normal(dim, direction.clone(), 0.0);
-
-            match self
-                .vertices
-                .iter()
-                .map(|v| ordered_float::OrderedFloat(hyperplane.distance(v)))
-                .minmax()
-            {
-                MinMaxResult::NoElements => None,
-                MinMaxResult::OneElement(x) => Some((x.0, x.0)),
-                MinMaxResult::MinMax(x, y) => Some((x.0, y.0)),
-            }
-        } else {
-            None
+        match self
+            .vertices
+            .iter()
+            .map(|v| ordered_float::OrderedFloat(hyperplane.distance(v)))
+            .minmax()
+        {
+            MinMaxResult::NoElements => None,
+            MinMaxResult::OneElement(x) => Some((x.0, x.0)),
+            MinMaxResult::MinMax(x, y) => Some((x.0, y.0)),
         }
     }
 
@@ -636,11 +633,9 @@ impl Concrete {
             if !all_flags.contains(&flag) {
                 let mut component_volume = 0.0;
 
-                for flag_event in OrientedFlagIter::with_flags_unsorted(
-                    &self.abs,
-                    FlagChanges::all(rank),
-                    flag.into(),
-                ) {
+                for flag_event in
+                    OrientedFlagIter::with_flags(&self.abs, FlagChanges::all(rank), flag.into())
+                {
                     if let FlagEvent::Flag(oriented_flag) = flag_event {
                         let new = all_flags.insert(oriented_flag.flag.clone());
                         debug_assert!(new, "A flag is in two different components.");

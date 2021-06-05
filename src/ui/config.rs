@@ -26,9 +26,7 @@ pub struct ConfigPlugin;
 impl Plugin for ConfigPlugin {
     fn build(&self, app: &mut AppBuilder) {
         // The configuration directory.
-        let config_dir = ProjectDirs::from("rs", "Miratope", "Miratope")
-            .map(|proj_dir| proj_dir.config_dir().to_owned())
-            .unwrap_or_default();
+        let config_dir = Config::config_dir();
 
         // The configuration path.
         let mut config_path = ConfigPath(config_dir.clone());
@@ -132,6 +130,7 @@ pub struct Config {
     /// The background color of the application.
     pub background_color: BgColor,
 
+    /// Whether light mode is enabled.
     pub light_mode: LightMode,
 }
 
@@ -211,6 +210,7 @@ fn save_config(
     background_color: Res<ClearColor>,
     visuals: Res<egui::Visuals>,
 ) {
+    // If the application is being exited:
     if exit.iter().next().is_some() {
         let config = Config {
             lib_path: lib_path.clone(),

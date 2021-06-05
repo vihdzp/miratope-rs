@@ -17,7 +17,10 @@ use crate::polytope::Polytope;
 /// abstract polytope.
 #[derive(Clone, Debug, Hash)]
 pub struct ElementRef {
+    /// The rank of the element.
     pub rank: Rank,
+
+    /// The index of the element in its corresponding element list.
     pub idx: usize,
 }
 
@@ -28,6 +31,7 @@ impl std::fmt::Display for ElementRef {
 }
 
 impl ElementRef {
+    /// Creates a new element reference with a given rank and index.
     pub fn new(rank: Rank, idx: usize) -> Self {
         Self { rank, idx }
     }
@@ -74,12 +78,16 @@ pub trait Subsupelements: Sized + Index<usize> + IndexMut<usize> + IntoIterator 
         self.as_vec_mut().sort_unstable()
     }
 
-    /// Sorts the indices by a specified comparison function.
-    fn sort_by<F>(&mut self, compare: F)
-    where
-        F: FnMut(&usize, &usize) -> std::cmp::Ordering,
-    {
-        self.as_vec_mut().sort_unstable_by(compare)
+    /// Returns whether the indices are sorted.
+    fn is_sorted(&self) -> bool {
+        let vec = self.as_vec();
+        for i in 1..vec.len() {
+            if vec[i - 1] > vec[i] {
+                return false;
+            }
+        }
+
+        true
     }
 
     /// Sorts the indices with a key extraction function. The sorting is
@@ -201,10 +209,10 @@ impl_sub_sups!(Superelements, "superelements");
 /// and superlements. These make up the entries of an [`ElementList`].
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Element {
-    /// The indices of the subelements of the element.
+    /// The indices of the subelements of the previous rank.
     pub subs: Subelements,
 
-    /// The indices of the superelements of the element.
+    /// The indices of the superelements of the next rank.
     pub sups: Superelements,
 }
 
@@ -251,6 +259,11 @@ impl Element {
     pub fn sort(&mut self) {
         self.subs.sort();
         self.sups.sort();
+    }
+
+    /// Returns whether the subelements and superelements are sorted.
+    pub fn is_sorted(&self) -> bool {
+        self.subs.is_sorted() && self.sups.is_sorted()
     }
 }
 
@@ -590,7 +603,8 @@ impl ElementHash {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Indices(pub usize, pub usize);
 
-/// A section of an abstract polytope, not to be confused with a cross-section.
+/// Represents the lowest and highest element of a section of an abstract
+/// polytope. Not to be confused with a cross-section.
 #[derive(Hash)]
 pub struct Section {
     /// The lowest element in the section.
@@ -609,19 +623,6 @@ impl std::fmt::Display for Section {
 impl Section {
     pub fn new(lo: ElementRef, hi: ElementRef) -> Self {
         Self { lo, hi }
-    }
-
-    /// The maximal section of a polytope.
-    pub fn max(rank: Rank) -> Self {
-        Self {
-            lo: ElementRef::new(Rank::new(-1), 0),
-            hi: ElementRef::new(rank, 0),
-        }
-    }
-
-    /// The height of a section, i.e. the rank of the polytope it describes.
-    pub fn height(&self) -> Rank {
-        (self.hi.rank - self.lo.rank).minus_one()
     }
 
     /// Returns the indices stored in the section.
