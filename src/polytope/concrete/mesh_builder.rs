@@ -357,6 +357,7 @@ impl<'a> MeshBuilder<'a> {
 
     /// Generates a mesh from the polytope.
     pub fn get_mesh(&mut self, orthogonal: ProjectionType) -> Mesh {
+        use crate::Consts;
         use itertools::Itertools;
 
         self.triangulate();
@@ -369,11 +370,24 @@ impl<'a> MeshBuilder<'a> {
             }
         }
 
+        let mut normals = vertices.clone();
+        for n in normals.iter_mut() {
+            let sq_norm = n[0] * n[0] + n[1] * n[1] + n[2] * n[2];
+            if sq_norm < f32::EPS {
+                *n = [1.0, 0.0, 0.0];
+            } else {
+                let norm = sq_norm.sqrt();
+                n[0] /= norm;
+                n[1] /= norm;
+                n[2] /= norm;
+            }
+        }
+
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
         let len = vertices.len();
 
         mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 1.0]; len]);
-        mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 1.0]; len]);
+        mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
         // mesh.compute_flat_normals();
 

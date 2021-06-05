@@ -148,7 +148,7 @@ fn setup(
     // Unselected object (default material).
     let wf_unselected = materials.set(
         WIREFRAME_UNSELECTED_MATERIAL,
-        Color::rgb_u8(240, 240, 240).into(),
+        Color::rgb_u8(255, 255, 255).into(),
     );
 
     // Camera configuration.
@@ -162,15 +162,11 @@ fn setup(
         .insert_bundle(PbrNoBackfaceBundle {
             mesh: meshes.add(poly.get_mesh(ProjectionType::Perspective)),
             material: materials.add(StandardMaterial {
-                base_color: Color::rgb_u8(240, 240, 240),
-                metallic: 0.0,
+                base_color: Color::rgb_u8(255, 100, 100),
+                metallic: 0.2,
                 roughness: 0.0,
                 ..Default::default()
             }),
-            visible: Visible {
-                is_visible: true,
-                ..Default::default()
-            },
             ..Default::default()
         })
         // Wireframe
@@ -178,10 +174,6 @@ fn setup(
             cb.spawn().insert_bundle(PbrNoBackfaceBundle {
                 mesh: meshes.add(poly.get_wireframe(ProjectionType::Perspective)),
                 material: wf_unselected,
-                visible: Visible {
-                    is_visible: false,
-                    ..Default::default()
-                },
                 ..Default::default()
             });
         })
@@ -189,11 +181,10 @@ fn setup(
         .insert(poly);
 
     // Light source
-
     commands.spawn_bundle(PointLightBundle {
         transform: Transform::from_translation(Vec3::new(-50.0, 40.0, 30.0)),
         point_light: PointLight {
-            intensity: 50000.,
+            intensity: 2000.,
             range: 100.,
             ..Default::default()
         },
