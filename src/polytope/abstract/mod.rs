@@ -181,24 +181,23 @@ impl Abstract {
 
     /// Returns a reference to the minimal element of the polytope.
     pub fn min(&self) -> &Element {
-        self.get_element(&ElementRef::new(Rank::new(-1), 0))
-            .unwrap()
+        self.get_element(ElementRef::new(Rank::new(-1), 0)).unwrap()
     }
 
     /// Returns a mutable reference to the minimal element of the polytope.
     pub fn min_mut(&mut self) -> &mut Element {
-        self.get_element_mut(&ElementRef::new(Rank::new(-1), 0))
+        self.get_element_mut(ElementRef::new(Rank::new(-1), 0))
             .unwrap()
     }
 
     /// Returns a reference to the maximal element of the polytope.
     pub fn max(&self) -> &Element {
-        self.get_element(&ElementRef::new(self.rank(), 0)).unwrap()
+        self.get_element(ElementRef::new(self.rank(), 0)).unwrap()
     }
 
     /// Returns a mutable reference to the maximal element of the polytope.
     pub fn max_mut(&mut self) -> &mut Element {
-        self.get_element_mut(&ElementRef::new(self.rank(), 0))
+        self.get_element_mut(ElementRef::new(self.rank(), 0))
             .unwrap()
     }
 
@@ -267,25 +266,25 @@ impl Abstract {
 
     /// Returns a reference to an element of the polytope. To actually get the
     /// entire polytope it defines, use [`element`](Self::element).
-    pub fn get_element(&self, el: &ElementRef) -> Option<&Element> {
+    pub fn get_element(&self, el: ElementRef) -> Option<&Element> {
         self.ranks.get(el.rank)?.get(el.idx)
     }
 
     /// Returns a mutable reference to an element of the polytope. To actually get the
     /// entire polytope it defines, use [`element`](Self::element).
-    pub fn get_element_mut(&mut self, el: &ElementRef) -> Option<&mut Element> {
+    pub fn get_element_mut(&mut self, el: ElementRef) -> Option<&mut Element> {
         self.ranks.get_mut(el.rank)?.get_mut(el.idx)
     }
 
     /// Gets the indices of the vertices of an element in the polytope, if it
     /// exists.
-    pub fn element_vertices(&self, el: &ElementRef) -> Option<Vec<usize>> {
+    pub fn element_vertices(&self, el: ElementRef) -> Option<Vec<usize>> {
         Some(ElementHash::new(self, el)?.to_vertices())
     }
 
     /// Gets both elements with a given rank and index as a polytope and the
     /// indices of its vertices on the original polytope, if it exists.
-    pub fn element_and_vertices(&self, el: &ElementRef) -> Option<(Vec<usize>, Self)> {
+    pub fn element_and_vertices(&self, el: ElementRef) -> Option<(Vec<usize>, Self)> {
         let element_hash = ElementHash::new(self, el)?;
         Some((element_hash.to_vertices(), element_hash.to_polytope(self)))
     }
@@ -378,7 +377,7 @@ impl Abstract {
                     // Finds all of the subelements of our old section's
                     // lowest element.
                     for &idx_lo in &self
-                        .get_element(&ElementRef::new(rank_lo, indices.0))
+                        .get_element(ElementRef::new(rank_lo, indices.0))
                         .unwrap()
                         .subs
                     {
@@ -395,7 +394,7 @@ impl Abstract {
                     // Finds all of the superelements of our old section's
                     // highest element.
                     for &idx_hi in self
-                        .get_element(&ElementRef::new(rank_hi, indices.1))
+                        .get_element(ElementRef::new(rank_hi, indices.1))
                         .unwrap()
                         .sups
                         .iter()
@@ -568,7 +567,7 @@ impl Abstract {
                 for &sub in &el.subs {
                     // Attempts to get the subelement's superelements.
                     if let Some(r_minus_one) = r.try_sub(Rank::new(1)) {
-                        if let Some(sub_el) = self.get_element(&ElementRef::new(r_minus_one, sub)) {
+                        if let Some(sub_el) = self.get_element(ElementRef::new(r_minus_one, sub)) {
                             if sub_el.sups.contains(&idx) {
                                 continue;
                             } else {
@@ -601,7 +600,7 @@ impl Abstract {
                 // Iterates over the element's superelements.
                 for &sup in &el.sups {
                     // Attempts to get the subelement's superelements.
-                    if let Some(sub_el) = self.get_element(&ElementRef::new(r.plus_one(), sup)) {
+                    if let Some(sub_el) = self.get_element(ElementRef::new(r.plus_one(), sup)) {
                         if sub_el.subs.contains(&idx) {
                             continue;
                         } else {
@@ -1110,7 +1109,7 @@ impl Polytope<Abs> for Abstract {
     }
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
-    fn element(&self, el: &ElementRef) -> Option<Self> {
+    fn element(&self, el: ElementRef) -> Option<Self> {
         Some(ElementHash::new(self, el)?.to_polytope(self))
     }
 

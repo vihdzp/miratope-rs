@@ -15,7 +15,7 @@ use crate::polytope::Polytope;
 
 /// A bundled rank and index, which can be used to refer to an element in an
 /// abstract polytope.
-#[derive(Clone, Debug, Hash)]
+#[derive(Copy, Clone, Debug, Hash)]
 pub struct ElementRef {
     /// The rank of the element.
     pub rank: Rank,
@@ -487,7 +487,7 @@ impl ElementHash {
     /// Returns a map from elements on a polytope to elements on a new polytope
     /// representing a particular element (as a polytope). If the element
     /// doesn't exist, we return `None`.
-    pub fn new(poly: &Abstract, el: &ElementRef) -> Option<Self> {
+    pub fn new(poly: &Abstract, el: ElementRef) -> Option<Self> {
         poly.get_element(el)?;
 
         // A vector of HashMaps. The k-th entry is a map from k-elements of the
@@ -561,7 +561,7 @@ impl ElementHash {
                 // We take the corresponding element in the original polytope
                 // and use the hash map to get its sub and superelements in the
                 // new polytope.
-                let el = poly.get_element(&ElementRef::new(r, idx)).unwrap();
+                let el = poly.get_element(ElementRef::new(r, idx)).unwrap();
                 let mut new_el = Element::new();
 
                 // Gets the subelements.
@@ -600,7 +600,7 @@ pub struct Indices(pub usize, pub usize);
 
 /// Represents the lowest and highest element of a section of an abstract
 /// polytope. Not to be confused with a cross-section.
-#[derive(Hash)]
+#[derive(Copy, Clone, Hash)]
 pub struct Section {
     /// The lowest element in the section.
     pub lo: ElementRef,

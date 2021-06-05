@@ -77,12 +77,12 @@ impl Flag {
         // above and the superelements of the element below.
         let below_idx = self.get_or_zero(r_minus_one);
         let below = polytope
-            .get_element(&ElementRef::new(r_minus_one, below_idx))
+            .get_element(ElementRef::new(r_minus_one, below_idx))
             .unwrap();
 
         let above_idx = self.get_or_zero(r_plus_one);
         let above = polytope
-            .get_element(&ElementRef::new(r_plus_one, above_idx))
+            .get_element(ElementRef::new(r_plus_one, above_idx))
             .unwrap();
 
         let common = common(&below.sups.0, &above.subs.0);

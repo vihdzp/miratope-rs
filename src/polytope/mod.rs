@@ -155,14 +155,14 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     fn append(&mut self, p: Self);
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
-    fn element(&self, el: &ElementRef) -> Option<Self>;
+    fn element(&self, el: ElementRef) -> Option<Self>;
 
     /// Gets the element figure with a given rank and index as a polytope.
-    fn element_fig(&self, el: &ElementRef) -> DualResult<Option<Self>> {
+    fn element_fig(&self, el: ElementRef) -> DualResult<Option<Self>> {
         if let Some(rank) = (self.rank() - el.rank).try_minus_one() {
             Ok(
                 if let Some(mut element_fig) =
-                    self.try_dual()?.element(&ElementRef::new(rank, el.idx))
+                    self.try_dual()?.element(ElementRef::new(rank, el.idx))
                 {
                     element_fig.try_dual_mut()?;
                     Some(element_fig)
@@ -181,8 +181,8 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// a polytope, or returns `None` in case no section is defined by these
     /// elements.
     fn get_section(&self, section: Section) -> DualResult<Option<Self>> {
-        Ok(if let Some(el) = self.element(&section.hi) {
-            el.element_fig(&section.lo)?
+        Ok(if let Some(el) = self.element(section.hi) {
+            el.element_fig(section.lo)?
         } else {
             None
         })
@@ -190,12 +190,12 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Gets the facet associated to the element of a given index as a polytope.
     fn facet(&self, idx: usize) -> Option<Self> {
-        self.element(&ElementRef::new(self.rank().try_minus_one()?, idx))
+        self.element(ElementRef::new(self.rank().try_minus_one()?, idx))
     }
 
     /// Gets the verf associated to the element of a given index as a polytope.
     fn verf(&self, idx: usize) -> Result<Option<Self>, usize> {
-        self.element_fig(&ElementRef::new(Rank::new(0), idx))
+        self.element_fig(ElementRef::new(Rank::new(0), idx))
     }
 
     /// Builds a compound polytope from a set of components.
@@ -247,7 +247,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         for r in Rank::range_iter(Rank::new(1), rank) {
             idx = self
                 .abs()
-                .get_element(&ElementRef::new(r.minus_one(), idx))
+                .get_element(ElementRef::new(r.minus_one(), idx))
                 .unwrap()
                 .sups[0];
             flag.push(idx);

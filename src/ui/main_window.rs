@@ -45,6 +45,7 @@ pub fn update_changed_polytopes(
         }
 
         *meshes.get_mut(mesh_handle).unwrap() = poly.get_mesh(*orthogonal);
+
         // Sets the window's name to the polytope's name.
         windows
             .get_primary_mut()
