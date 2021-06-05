@@ -32,6 +32,7 @@ use crate::{
 
 use approx::{abs_diff_eq, abs_diff_ne};
 use bevy::prelude::Mesh;
+use rayon::prelude::*;
 
 #[derive(Debug, Clone)]
 /// Represents a [concrete polytope](https://polytope.miraheze.org/wiki/Polytope),
@@ -332,22 +333,24 @@ impl Concrete {
         let o = h.project(&sphere.center);
 
         let mut projections;
+        let rank_minus_one = rank.minus_one();
 
         // We project our inversion center onto each of the facets.
         if rank >= Rank::new(2) {
-            let facet_count = self.el_count(rank.minus_one());
-            projections = Vec::with_capacity(facet_count);
+            let facet_count = self.el_count(rank_minus_one);
+            let indices: Vec<_> = (0..facet_count).collect();
 
-            for idx in 0..facet_count {
-                projections.push(
+            projections = indices
+                .into_par_iter()
+                .map(|idx| {
                     Subspace::from_points(
-                        self.element_vertices_ref(ElementRef::new(rank.minus_one(), idx))
+                        self.element_vertices_ref(ElementRef::new(rank_minus_one, idx))
                             .unwrap()
                             .into_iter(),
                     )
-                    .project(&o),
-                );
-            }
+                    .project(&o)
+                })
+                .collect();
         }
         // If our polytope is 1D, the vertices themselves are the facets.
         else {

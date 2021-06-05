@@ -18,6 +18,7 @@ use self::{
 use super::Polytope;
 use crate::lang::name::{Abs, Name};
 
+use rayon::prelude::*;
 use strum_macros::Display;
 
 #[derive(Display)]
@@ -956,9 +957,7 @@ impl Polytope<Abs> for Abstract {
     /// this method can never fail.
     fn try_dual_mut(&mut self) -> Result<(), usize> {
         for elements in self.ranks.iter_mut() {
-            for el in elements.iter_mut() {
-                el.swap_mut();
-            }
+            elements.0.par_iter_mut().for_each(Element::swap_mut);
         }
 
         self.ranks.reverse();

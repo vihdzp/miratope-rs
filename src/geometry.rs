@@ -290,7 +290,7 @@ type MatrixMxN<R, C> = nalgebra::Matrix<Float, R, C, VecStorage<Float, R, C>>;
 /// ordering where two entries that differ by less than an epsilon are
 /// considered equal.
 ///
-/// This struct can be used to build a `HashMap` of points or matrices in a way
+/// This struct can be used to build a `BTreeSet` of points or matrices in a way
 /// that's resistant to floating point errors.
 #[derive(Clone, Debug)]
 pub struct MatrixOrdMxN<R: Dim, C: Dim>(pub MatrixMxN<R, C>)

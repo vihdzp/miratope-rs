@@ -24,6 +24,7 @@ nalgebra = { version = "0.27", features = ["serde-serialize"] }
 ordered-float = "2.4"
 petgraph = "0.5"
 rand = "0.8"
+rayon = "1.5"
 rfd = "0.4"
 ron = "0.6"
 serde = { version = "1.0", features = ["derive"] }
