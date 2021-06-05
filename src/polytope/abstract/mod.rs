@@ -264,18 +264,6 @@ impl Abstract {
         }
     }
 
-    pub fn is_sorted(&self) -> bool {
-        for elements in self.ranks.iter() {
-            for el in elements.iter() {
-                if !el.is_sorted() {
-                    return false;
-                }
-            }
-        }
-
-        true
-    }
-
     /// Returns a reference to an element of the polytope. To actually get the
     /// entire polytope it defines, use [`element`](Self::element).
     pub fn get_element(&self, el: &ElementRef) -> Option<&Element> {

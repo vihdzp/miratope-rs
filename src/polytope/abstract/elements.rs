@@ -260,11 +260,6 @@ impl Element {
         self.subs.sort();
         self.sups.sort();
     }
-
-    /// Returns whether the subelements and superelements are sorted.
-    pub fn is_sorted(&self) -> bool {
-        self.subs.is_sorted() && self.sups.is_sorted()
-    }
 }
 
 /// A list of [`Elements`](Element) of the same

@@ -548,12 +548,6 @@ impl<'a> OrientedFlagIter<'a> {
     ) -> Self {
         if cfg!(debug_assertions) {
             polytope.bounded().unwrap();
-
-            // This is a very expensive test, but one that's easy to screw up.
-            assert!(
-                polytope.is_sorted(),
-                "You must sort the polytope before calling FlagSet::with_flags!"
-            );
         }
 
         let first = polytope.rank() == Rank::new(-1);
