@@ -228,11 +228,11 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         clone.petrial_mut().ok().map(|_| clone)
     }
 
-    fn petrie_polygon(&self) -> Option<Self> {
+    fn petrie_polygon(&mut self) -> Option<Self> {
         self.petrie_polygon_with(self.first_flag()?)
     }
 
-    fn petrie_polygon_with(&self, flag: Flag) -> Option<Self>;
+    fn petrie_polygon_with(&mut self, flag: Flag) -> Option<Self>;
 
     /// Returns the first [`Flag`] of a polytope. This is the flag built when we
     /// start at the maximal element and repeatedly take the first subelement.

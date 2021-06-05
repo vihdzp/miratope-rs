@@ -904,7 +904,7 @@ impl Polytope<Con> for Concrete {
 
     /// Builds the Petrie polygon of a polytope from a given flag, or returns
     /// `None` if it's invalid.
-    fn petrie_polygon_with(&self, flag: Flag) -> Option<Self> {
+    fn petrie_polygon_with(&mut self, flag: Flag) -> Option<Self> {
         let vertices = self.abs.petrie_polygon_vertices(flag)?;
         let n = vertices.len();
 

@@ -255,7 +255,8 @@ impl Abstract {
         self.ranks.pop()
     }
 
-    /// Sorts the subelements and superelements of the entire polytope.
+    /// Sorts the subelements and superelements of the entire polytope. This is
+    /// usually called before iterating over the flags of the polytope.
     pub fn sort(&mut self) {
         for elements in self.ranks.iter_mut() {
             for el in elements.iter_mut() {
@@ -291,14 +292,15 @@ impl Abstract {
 
     /// Returns the indices of a Petrial polygon in cyclic order, or `None` if
     /// it self-intersects.
-    pub fn petrie_polygon_vertices(&self, flag: Flag) -> Option<Vec<usize>> {
+    pub fn petrie_polygon_vertices(&mut self, flag: Flag) -> Option<Vec<usize>> {
         let rank = self.rank().try_usize()?;
         let mut new_flag = flag.clone();
         let first_vertex = flag[0];
-        let mut vertices = Vec::new();
 
-        // Gotta love that O(n log(n)).
+        let mut vertices = Vec::new();
         let mut vertex_hash = HashSet::new();
+
+        self.sort();
 
         loop {
             // Applies 0-changes up to (rank-1)-changes in order.
@@ -1040,7 +1042,7 @@ impl Polytope<Abs> for Abstract {
         self.is_dyadic().map_err(|_| ())
     }
 
-    fn petrie_polygon_with(&self, flag: Flag) -> Option<Self> {
+    fn petrie_polygon_with(&mut self, flag: Flag) -> Option<Self> {
         Some(Self::polygon(self.petrie_polygon_vertices(flag)?.len()))
     }
 
