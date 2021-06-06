@@ -802,6 +802,11 @@ impl Concrete {
             }
 
             for (edge_idx, subs) in edges.iter_mut().enumerate() {
+                debug_assert_eq!(
+                    subs.len() % 2,
+                    0,
+                    "A line should always intersect a polygon an even amount of times!"
+                );
                 let comps = subs.len() / 2;
 
                 if comps > 1 {

@@ -309,9 +309,8 @@ impl Group {
     /// of two symmetry groups.
     pub fn wreath(g: Self, h: Self) -> Self {
         let h = h.elements();
-        let h_len = h.len();
         let g_dim = g.dim;
-        let dim = g_dim * h_len;
+        let dim = g_dim * h.len();
 
         // Indexes each element in h.
         let mut h_indices = BTreeMap::new();
@@ -321,7 +320,7 @@ impl Group {
         }
 
         // Converts h into a permutation group.
-        let mut permutations = Vec::with_capacity(h_len);
+        let mut permutations = Vec::with_capacity(h.len());
 
         for h_el_1 in &h {
             let mut perm = Vec::with_capacity(h.len());
@@ -338,7 +337,7 @@ impl Group {
         }
 
         // Computes the direct product of g with itself |h| times.
-        let g_prod = vec![&g; h_len - 1]
+        let g_prod = vec![&g; h.len() - 1]
             .into_iter()
             .cloned()
             .fold(g.clone(), |acc, g| Group::direct_product(g, acc));

@@ -56,7 +56,9 @@ branch = "bevy-main"
 
 [patch.crates-io]
 # Better side bar, some relevant bugfixes like issue #404.
-egui = { git = "https://github.com/emilk/egui" }
+egui = { git = "https://github.com/emilk/egui", default-features = false, features = [
+    "multi_threaded"
+] }
 # Fixes winit issue #1779.
 winit = { git = "https://github.com/OfficialURL/winit", rev = "06b285d5246210d6cf50e14283b912434d073cf2" }
 
