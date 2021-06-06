@@ -67,7 +67,7 @@ pub fn update_changed_polytopes(
             poly.abs.is_valid().unwrap();
         }
 
-        *meshes.get_mut(mesh_handle).unwrap() = poly.get_mesh(*orthogonal);
+        *meshes.get_mut(mesh_handle).unwrap() = poly.mesh(*orthogonal);
 
         // Sets the window's name to the polytope's name.
         windows
@@ -78,7 +78,7 @@ pub fn update_changed_polytopes(
         // Updates all wireframes.
         for child in children.iter() {
             if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {
-                *meshes.get_mut(wf_handle).unwrap() = poly.get_wireframe(*orthogonal);
+                *meshes.get_mut(wf_handle).unwrap() = poly.wireframe(*orthogonal);
             }
         }
 

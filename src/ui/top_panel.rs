@@ -280,9 +280,9 @@ pub fn show_top_panel(
                 if ui.checkbox(&mut checked, "Orthogonal projection").clicked() {
                     projection_type.flip();
 
-                    // Forces an update on all polytopes. (This does have an effect!)
+                    // Forces an update on all polytopes.
                     for mut p in query.iter_mut() {
-                        p.as_mut();
+                        p.set_changed();
                     }
                 }
             });

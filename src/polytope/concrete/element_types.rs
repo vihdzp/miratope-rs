@@ -107,7 +107,7 @@ const EL_SUFFIXES: [&str; 12] = [
 
 impl Concrete {
     /// Gets the element "types" of a polytope.
-    fn get_element_types(&self) -> Vec<Vec<ElementType>> {
+    fn element_types(&self) -> Vec<Vec<ElementType>> {
         use std::collections::hash_map::Entry;
 
         let rank = self.rank();
@@ -216,7 +216,7 @@ impl Concrete {
 
     pub fn print_element_types(&self) {
         // An iterator over the element types of each rank.
-        let mut type_iter = self.get_element_types().into_iter().enumerate();
+        let mut type_iter = self.element_types().into_iter().enumerate();
 
         // Prints points.
         if let Some((r, types)) = type_iter.next() {

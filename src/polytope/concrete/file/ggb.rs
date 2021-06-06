@@ -39,7 +39,7 @@ enum Element {
     Point3D { label: String },
 }
 
-fn get_attribute(attributes: &[OwnedAttribute], idx: &str) -> Option<String> {
+fn attribute(attributes: &[OwnedAttribute], idx: &str) -> Option<String> {
     for att in attributes {
         if att.name.local_name == idx {
             return Some(att.value.clone());
@@ -92,7 +92,7 @@ fn read_point<R: std::io::Read>(xml: &mut Events<R>, label: String) -> io::Resul
     // Verifies that we're dealing with a point and not something else.
     let attributes = read_until(xml, "element")?;
 
-    if get_attribute(&attributes, "type") != Some("point3d".to_string()) {
+    if attribute(&attributes, "type") != Some("point3d".to_string()) {
         return Ok(None);
     }
 
@@ -103,7 +103,7 @@ fn read_point<R: std::io::Read>(xml: &mut Events<R>, label: String) -> io::Resul
         ($x:ident) => {
             let $x: crate::Float;
 
-            if let Some(c) = get_attribute(&attributes, stringify!($x)) {
+            if let Some(c) = attribute(&attributes, stringify!($x)) {
                 if let Ok(c) = c.parse() {
                     $x = c;
                 } else {
@@ -160,13 +160,13 @@ fn parse_xml(xml: String) -> io::Result<Concrete> {
                     {
                         let name = name.local_name;
                         if name == "expression" {
-                            if let Some(label) = get_attribute(&attributes, "label") {
+                            if let Some(label) = attribute(&attributes, "label") {
                                 if let Ok(Some(vertex)) = read_point(&mut xml, label) {
                                     vertices.push(vertex);
                                 }
                             }
                         } else if name == "element" {
-                            if let Some(label) = get_attribute(&attributes, "label") {
+                            if let Some(label) = attribute(&attributes, "label") {
                                 edges.push(Edge { label });
                             }
                         }

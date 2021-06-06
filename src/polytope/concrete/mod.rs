@@ -31,9 +31,9 @@ use crate::{
 use approx::{abs_diff_eq, abs_diff_ne};
 use rayon::prelude::*;
 
-#[derive(Debug, Clone)]
 /// Represents a [concrete polytope](https://polytope.miraheze.org/wiki/Polytope),
 /// which is an [`Abstract`] together with its corresponding vertices.
+#[derive(Debug, Clone)]
 pub struct Concrete {
     /// The list of vertices as points in Euclidean space.
     pub vertices: Vec<Point>,
@@ -99,8 +99,8 @@ impl Concrete {
     /// Builds the Grünbaumian star polygon `{n / d}` with unit circumradius,
     /// rotated by an angle.
     fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: Float) -> Self {
-        assert!(n >= 2);
-        assert!(d >= 1);
+        debug_assert!(n >= 2);
+        debug_assert!(d >= 1);
 
         let angle = Float::TAU * d as Float / n as Float;
 
@@ -217,7 +217,9 @@ impl Concrete {
         Some(g / (self.vertices.len() as Float))
     }
 
-    /// Gets the least and greatest `x` coordinate of a vertex of the polytope.
+    /// Gets the least and greatest distance of a vertex of the polytope,
+    /// measuring from a specified direction, or returns `None` in the case of
+    /// the nullitope.
     pub fn minmax(&self, direction: &Vector) -> Option<(Float, Float)> {
         use itertools::{Itertools, MinMaxResult};
 
@@ -229,8 +231,13 @@ impl Concrete {
             .map(|v| ordered_float::OrderedFloat(hyperplane.distance(v)))
             .minmax()
         {
+            // The vertex vector is empty.
             MinMaxResult::NoElements => None,
+
+            // The single vertex gives both the minimum and maximum distance.
             MinMaxResult::OneElement(x) => Some((x.0, x.0)),
+
+            // The minimum and maximum distances.
             MinMaxResult::MinMax(x, y) => Some((x.0, y.0)),
         }
     }

@@ -180,7 +180,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// Gets the section defined by two elements with given ranks and indices as
     /// a polytope, or returns `None` in case no section is defined by these
     /// elements.
-    fn get_section(&self, section: Section) -> DualResult<Option<Self>> {
+    fn section(&self, section: Section) -> DualResult<Option<Self>> {
         Ok(if let Some(el) = self.element(section.hi) {
             el.element_fig(section.lo)?
         } else {

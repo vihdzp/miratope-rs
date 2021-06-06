@@ -146,14 +146,11 @@ fn setup(
     );
 
     // Wireframe material.
-    let wf_material = materials.set(
-        WIREFRAME_UNSELECTED_MATERIAL,
-        Color::rgb_u8(255, 255, 255).into(),
-    );
+    let wf_material = materials.set(WIREFRAME_UNSELECTED_MATERIAL, Color::rgb_u8(0, 0, 0).into());
 
     // Mesh material.
     let mesh_material = materials.add(StandardMaterial {
-        base_color: Color::rgb_u8(200, 200, 200),
+        base_color: Color::rgb_u8(255, 255, 255),
         metallic: 0.2,
         ..Default::default()
     });
@@ -167,14 +164,14 @@ fn setup(
         .spawn()
         // Mesh
         .insert_bundle(PbrNoBackfaceBundle {
-            mesh: meshes.add(poly.get_mesh(ProjectionType::Perspective)),
+            mesh: meshes.add(poly.mesh(ProjectionType::Perspective)),
             material: mesh_material,
             ..Default::default()
         })
         // Wireframe
         .with_children(|cb| {
             cb.spawn().insert_bundle(PbrNoBackfaceBundle {
-                mesh: meshes.add(poly.get_wireframe(ProjectionType::Perspective)),
+                mesh: meshes.add(poly.wireframe(ProjectionType::Perspective)),
                 material: wf_material,
                 ..Default::default()
             });

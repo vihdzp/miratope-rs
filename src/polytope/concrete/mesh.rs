@@ -417,7 +417,7 @@ fn empty_mesh() -> Mesh {
 
 impl Concrete {
     /// Gets the coordinates of the vertices, after projecting down into 3D.
-    fn get_vertex_coords<'a, T: Iterator<Item = &'a Point>>(
+    fn vertex_coords<'a, T: Iterator<Item = &'a Point>>(
         &self,
         vertices: T,
         projection_type: ProjectionType,
@@ -461,7 +461,7 @@ impl Concrete {
     }
 
     /// Builds the mesh of a polytope.
-    pub fn get_mesh(&self, projection_type: ProjectionType) -> Mesh {
+    pub fn mesh(&self, projection_type: ProjectionType) -> Mesh {
         // If there's no vertices, returns an empty mesh.
         if self.vertex_count() == 0 {
             return empty_mesh();
@@ -470,7 +470,7 @@ impl Concrete {
         // Triangulates the polytope's faces, projects the vertices of both the
         // polytope and the triangulation.
         let triangulation = Triangulation::new(self);
-        let vertices = self.get_vertex_coords(
+        let vertices = self.vertex_coords(
             self.vertices
                 .iter()
                 .chain(triangulation.extra_vertices.iter()),
@@ -488,7 +488,7 @@ impl Concrete {
     }
 
     /// Builds the wireframe of a polytope.
-    pub fn get_wireframe(&self, projection_type: ProjectionType) -> Mesh {
+    pub fn wireframe(&self, projection_type: ProjectionType) -> Mesh {
         let vertex_count = self.vertex_count();
 
         // If there's no vertices, returns an empty mesh.
@@ -500,7 +500,7 @@ impl Concrete {
         let edge_count = self.el_count(Rank::new(1));
 
         // We add a single vertex so that Miratope doesn't crash.
-        let vertices = self.get_vertex_coords(self.vertices.iter(), projection_type);
+        let vertices = self.vertex_coords(self.vertices.iter(), projection_type);
         let mut indices = Vec::with_capacity(edge_count * 2);
 
         // Adds the edges to the wireframe.

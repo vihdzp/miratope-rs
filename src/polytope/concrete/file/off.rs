@@ -162,7 +162,7 @@ impl<'a, T: Iterator<Item = &'a str>> TokenIter<'a, T> {
 /// Gets the number of elements from the OFF file.
 /// This includes components iff dim ≤ 2, as this makes things easier down the
 /// line.
-fn get_el_nums<'a, T: Iterator<Item = &'a str>>(
+fn el_nums<'a, T: Iterator<Item = &'a str>>(
     rank: Rank,
     toks: &mut TokenIter<'a, T>,
 ) -> OffResult<Vec<usize>> {
@@ -354,7 +354,7 @@ impl Concrete {
             return Ok(Concrete::dyad());
         }
 
-        let num_elems = get_el_nums(rank, &mut toks)?;
+        let num_elems = el_nums(rank, &mut toks)?;
         let vertices = parse_vertices(num_elems[0], rank.usize(), &mut toks)?;
         let mut abs = AbstractBuilder::with_capacity(rank);
 
