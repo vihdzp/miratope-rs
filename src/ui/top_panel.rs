@@ -301,10 +301,7 @@ pub fn show_top_panel(
                                 for mut p in query.iter_mut() {
                                     match p.try_dual_mut() {
                                         Ok(_) => println!("Dual succeeded."),
-                                        Err(idx) => println!(
-                                        "Dual failed: Facet {} passes through inversion center.",
-                                        idx
-                                    ),
+                                        Err(err) => println!("Dual failed: {}", err),
                                     }
                                 }
                             }
@@ -353,10 +350,7 @@ pub fn show_top_panel(
                                 for mut p in query.iter_mut() {
                                     match p.try_antiprism() {
                                         Ok(q) => *p = q,
-                                        Err(idx) => println!(
-                                        "Dual failed: Facet {} passes through inversion center.",
-                                        idx
-                                    ),
+                                        Err(err) => println!("Antiprism failed: {}", err),
                                     }
                                 }
                             }
@@ -367,9 +361,10 @@ pub fn show_top_panel(
                         // Converts the active polytope into its Petrial.
                         if ui.button("Petrial").clicked() {
                             for mut p in query.iter_mut() {
-                                match p.petrial_mut() {
-                                    Ok(_) => println!("Petrial succeeded."),
-                                    Err(_) => println!("Petrial failed."),
+                                if p.petrial_mut() {
+                                    println!("Petrial succeeded.");
+                                } else {
+                                    println!("Petrial failed.");
                                 }
                             }
                         }

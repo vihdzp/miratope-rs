@@ -15,13 +15,13 @@ use self::{
     flag::{Flag, FlagEvent, FlagSet},
     rank::{Rank, RankVec},
 };
-use super::Polytope;
+use super::{DualResult, Polytope};
 use crate::lang::name::{Abs, Name};
 
 use rayon::prelude::*;
 use strum_macros::Display;
 
-#[derive(Display)]
+#[derive(Debug, Display)]
 pub enum IncidenceType {
     #[strum(serialize = "subelement")]
     Subelement,
@@ -31,6 +31,7 @@ pub enum IncidenceType {
 }
 
 /// Represents an error in an abstract polytope.
+#[derive(Debug)]
 pub enum AbstractError {
     /// The polytope is not bounded, i.e. it doesn't have a single minimal and
     /// maximal element.
@@ -68,7 +69,7 @@ pub enum AbstractError {
     Connected(Section),
 }
 
-impl std::fmt::Debug for AbstractError {
+impl std::fmt::Display for AbstractError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             // The polytope is not bounded.
@@ -126,6 +127,8 @@ impl std::fmt::Debug for AbstractError {
         }
     }
 }
+
+impl std::error::Error for AbstractError {}
 
 /// The return value for [`Abstract::is_valid`].
 pub type AbstractResult<T> = Result<T, AbstractError>;
@@ -949,7 +952,7 @@ impl Polytope<Abs> for Abstract {
 
     /// Converts a polytope into its dual. Use [`Self::dual`] instead, as this method
     /// can never fail.
-    fn try_dual(&self) -> Result<Self, usize> {
+    fn try_dual(&self) -> DualResult<Self> {
         let mut clone = self.clone();
         clone.dual_mut();
         Ok(clone)
@@ -957,7 +960,7 @@ impl Polytope<Abs> for Abstract {
 
     /// Converts a polytope into its dual in place. Use [`Self::dual_mut`] instead, as
     /// this method can never fail.
-    fn try_dual_mut(&mut self) -> Result<(), usize> {
+    fn try_dual_mut(&mut self) -> DualResult<()> {
         for elements in self.ranks.iter_mut() {
             elements.0.par_iter_mut().for_each(Element::swap_mut);
         }
@@ -969,10 +972,10 @@ impl Polytope<Abs> for Abstract {
 
     /// Builds the [Petrial](https://polytope.miraheze.org/wiki/Petrial) of a
     /// polyhedron in place.
-    fn petrial_mut(&mut self) -> Result<(), ()> {
+    fn petrial_mut(&mut self) -> bool {
         // Petrials only really make sense for polyhedra.
         if self.rank() != Rank::new(3) {
-            return Err(());
+            return false;
         }
 
         // Consider a flag in a polytope. It has an associated edge. It turns
@@ -1015,7 +1018,7 @@ impl Polytope<Abs> for Abstract {
             // not already in the face, this means that the Petrial loop
             // self-intersects, and hence the Petrial is not a valid polytope.
             if !face.contains(&edge) {
-                return Err(());
+                return false;
             }
 
             faces.push(Subelements(face.into_iter().collect()));
@@ -1039,7 +1042,7 @@ impl Polytope<Abs> for Abstract {
         self.name = name.petrial(self.facet_count());
 
         // Checks for dyadicity, since that sometimes fails.
-        self.is_dyadic().map_err(|_| ())
+        self.is_dyadic().is_ok()
     }
 
     fn petrie_polygon_with(&mut self, flag: Flag) -> Option<Self> {
@@ -1047,9 +1050,9 @@ impl Polytope<Abs> for Abstract {
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
-    /// based on a given polytope. Use [`Self::antiprism`] instead, as this method can
-    /// never fail.
-    fn try_antiprism(&self) -> Result<Self, usize> {
+    /// based on a given polytope. Use [`Self::antiprism`] instead, as this
+    /// method can never fail.
+    fn try_antiprism(&self) -> DualResult<Self> {
         Ok(self.antiprism())
     }
 
@@ -1060,7 +1063,7 @@ impl Polytope<Abs> for Abstract {
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks. *Updates neither the name nor the
-    /// min/max elements.**
+    /// min/max elements.*
     fn _append(&mut self, p: Self) {
         let rank = self.rank();
 

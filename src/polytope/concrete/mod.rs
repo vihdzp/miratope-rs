@@ -13,14 +13,14 @@ use std::{
 use super::{
     r#abstract::{
         elements::{
-            AbstractBuilder, Element, ElementList, ElementRef, SubelementList, Subelements,
-            Subsupelements,
+            AbstractBuilder, ElementList, ElementRef, SubelementList, Subelements, Subsupelements,
+            Superelements,
         },
         flag::{Flag, FlagChanges, FlagEvent, OrientedFlagIter},
         rank::{Rank, RankVec},
         Abstract,
     },
-    Polytope,
+    DualResult, FacetIndex, Polytope,
 };
 use crate::{
     geometry::{Hyperplane, Hypersphere, Matrix, Point, PointOrd, Segment, Subspace, Vector},
@@ -180,11 +180,11 @@ impl Concrete {
 
         for vertex in vertices {
             // If the new vertex does not lie on the hyperplane of the others:
-            if let Some(basis_vector) = subspace.add(&vertex) {
+            if let Some(basis_vector) = subspace.add_basis(&vertex) {
                 // Calculates the new circumcenter.
                 let distance = ((&center - vertex).norm_squared()
                     - (&center - &first_vertex).norm_squared())
-                    / (2.0 * (vertex - &first_vertex).dot(&basis_vector));
+                    / (2.0 * (vertex - &first_vertex).dot(basis_vector));
 
                 center += distance * basis_vector;
             }
@@ -309,7 +309,7 @@ impl Concrete {
 
     /// Returns the dual of a polytope with a given reciprocation sphere, or
     /// `None` if any facets pass through the reciprocation center.
-    pub fn try_dual_with(&self, sphere: &Hypersphere) -> Result<Self, usize> {
+    pub fn try_dual_with(&self, sphere: &Hypersphere) -> DualResult<Self> {
         let mut clone = self.clone();
         clone.try_dual_mut_with(sphere).map(|_| clone)
     }
@@ -318,7 +318,7 @@ impl Concrete {
     /// place, or does nothing in case any facets go through the reciprocation
     /// center. In case of failure, returns the index of the facet through the
     /// projection center.
-    pub fn try_dual_mut_with(&mut self, sphere: &Hypersphere) -> Result<(), usize> {
+    pub fn try_dual_mut_with(&mut self, sphere: &Hypersphere) -> DualResult<()> {
         // If we're dealing with a nullitope, the dual is itself.
         let rank = self.rank();
         if rank == Rank::new(-1) {
@@ -327,7 +327,9 @@ impl Concrete {
         // In the case of points, we reciprocate them.
         else if rank == Rank::new(0) {
             for (idx, v) in self.vertices.iter_mut().enumerate() {
-                sphere.reciprocate_mut(v).map_err(|_| idx)?;
+                if !sphere.reciprocate_mut(v) {
+                    return Err(FacetIndex(idx));
+                }
             }
         }
 
@@ -363,7 +365,9 @@ impl Concrete {
 
         // Reciprocates the projected points.
         for (idx, v) in projections.iter_mut().enumerate() {
-            sphere.reciprocate_mut(v).map_err(|_| idx)?;
+            if !sphere.reciprocate_mut(v) {
+                return Err(FacetIndex(idx));
+            }
         }
 
         self.vertices = projections;
@@ -427,7 +431,7 @@ impl Concrete {
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope.
-    pub fn try_antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Result<Self, usize> {
+    pub fn try_antiprism_with(&self, sphere: &Hypersphere, height: Float) -> DualResult<Self> {
         let half_height = height / 2.0;
         let vertices = self.vertices.iter().map(|v| v.push(-half_height));
         let dual = self.try_dual_with(sphere)?;
@@ -719,7 +723,7 @@ impl Concrete {
             "Sections can only be taken from hyperplanes!"
         );
         let mut vertices = Vec::new();
-        let mut abs = AbstractBuilder::new();
+        let mut ranks = RankVec::with_capacity(self.rank().minus_one());
 
         // We map all indices of k-elements in the original polytope to the
         // indices of the new (k-1)-elements resulting from taking their
@@ -747,8 +751,8 @@ impl Concrete {
             return Self::nullitope();
         }
 
-        abs.push(SubelementList::min());
-        abs.push(SubelementList::vertices(vertex_count));
+        ranks.push(SubelementList::min());
+        ranks.push(SubelementList::vertices(vertex_count));
 
         // Takes care of building everything else.
         for r in Rank::range_iter(Rank::new(2), self.rank()) {
@@ -770,61 +774,66 @@ impl Concrete {
                 }
             }
 
-            abs.push(new_els);
+            ranks.push(new_els);
             hash_element = new_hash_element;
         }
 
         // Adds a maximal element manually.
-        abs.push_max();
-
-        // There's a better way, too lazy rn tho
-        let mut abs = abs.build();
+        ranks.push(SubelementList::max(ranks.0.last().unwrap().len()));
 
         // Splits compounds of dyads.
-        if let Some(mut faces) = abs.ranks.get(Rank::new(2)).cloned() {
-            let mut i = abs[Rank::new(1)].len();
-            let mut new_edges = ElementList::new();
+        let (first, last) = ranks.split_at_mut(Rank::new(2));
 
-            for (idx, edge) in abs[Rank::new(1)].0.iter_mut().enumerate() {
-                let edge_sub = &mut edge.subs;
-                let comps = edge_sub.len() / 2;
+        if let (Some(edges), Some(faces)) = (first.last_mut(), last.first_mut()) {
+            // Keeps track of the indices of our new edges.
+            let mut edge_num = edges.len();
+            let mut new_edges = SubelementList::new();
+
+            // The superelements of all edges.
+            let mut edge_sups = Vec::new();
+            for _ in 0..edge_num {
+                edge_sups.push(Superelements::new());
+            }
+
+            for (idx, face) in faces.iter().enumerate() {
+                for &sub in face {
+                    edge_sups[sub].push(idx);
+                }
+            }
+
+            for (edge_idx, subs) in edges.iter_mut().enumerate() {
+                let comps = subs.len() / 2;
 
                 if comps > 1 {
-                    edge_sub.sort_unstable_by_key(|&x| PointOrd::new(vertices[x].clone()));
-                }
+                    // Sorts the component's vertices lexicographically.
+                    subs.sort_unstable_by_key(|&x| PointOrd::new(vertices[x].clone()));
 
-                for comp in 1..comps {
-                    let new_subs =
-                        Subelements::from_vec(edge_sub.0[2 * comp..2 * comp + 2].to_vec());
-                    new_edges.push(Element::from_subs(new_subs));
+                    // Splits the edge, adds the new split edges as subelements
+                    // to the edge's superelements.
+                    for _ in 1..comps {
+                        let v0 = subs.pop().unwrap();
+                        let v1 = subs.pop().unwrap();
+                        new_edges.push(Subelements(vec![v0, v1]));
 
-                    for face in faces.0.iter_mut() {
-                        if face.subs.contains(&idx) {
-                            face.subs.push(i);
+                        for &sup in &edge_sups[edge_idx] {
+                            faces[sup].push(edge_num);
                         }
+
+                        edge_num += 1;
                     }
-
-                    i += 1;
                 }
-
-                let new_subs = Subelements::from_vec(edge_sub.0[..2].to_vec());
-                *edge = Element::from_subs(new_subs);
             }
 
-            // This can definitely be optimized: we don't need to copy
-            // everything into a new polytope.
-            abs[Rank::new(1)].append(&mut new_edges);
-            abs[Rank::new(2)] = faces;
-
-            let mut abs2 = Abstract::new();
-            for elements in abs {
-                abs2.push_subs(elements.subelements());
-            }
-
-            Self::new(vertices, abs2)
-        } else {
-            Self::new(vertices, abs)
+            // Adds the new edges.
+            edges.append(&mut new_edges);
         }
+
+        let mut abs = AbstractBuilder::new();
+        for elements in ranks {
+            abs.push(elements.into());
+        }
+
+        Self::new(vertices, abs.build())
     }
 }
 
@@ -877,7 +886,7 @@ impl Polytope<Con> for Concrete {
 
     /// Returns the dual of a polytope, or `None` if any facets pass through the
     /// origin.
-    fn try_dual(&self) -> Result<Self, usize> {
+    fn try_dual(&self) -> DualResult<Self> {
         let mut clone = self.clone();
         clone.try_dual_mut().map(|_| clone)
     }
@@ -885,14 +894,14 @@ impl Polytope<Con> for Concrete {
     /// Builds the dual of a polytope in place, or does nothing in case any
     /// facets go through the origin. Returns the dual if successful, and `None`
     /// otherwise.
-    fn try_dual_mut(&mut self) -> Result<(), usize> {
+    fn try_dual_mut(&mut self) -> DualResult<()> {
         self.try_dual_mut_with(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
-    fn petrial_mut(&mut self) -> Result<(), ()> {
+    fn petrial_mut(&mut self) -> bool {
         let res = self.abs.petrial_mut();
 
-        if res.is_ok() {
+        if res {
             let name = mem::replace(&mut self.name, Name::Nullitope);
             self.name = name.petrial(self.facet_count());
         }
@@ -1046,7 +1055,7 @@ impl Polytope<Con> for Concrete {
         self.abs.hosotope_mut();
     }
 
-    fn try_antiprism(&self) -> Result<Self, usize> {
+    fn try_antiprism(&self) -> DualResult<Self> {
         Self::try_antiprism_with(&self, &Hypersphere::unit(self.dim().unwrap_or(1)), 1.0)
     }
 

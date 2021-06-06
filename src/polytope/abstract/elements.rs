@@ -105,6 +105,10 @@ pub trait Subsupelements: Sized + Index<usize> + IndexMut<usize> + IntoIterator 
         self.as_vec_mut().push(value)
     }
 
+    fn pop(&mut self) -> Option<usize> {
+        self.as_vec_mut().pop()
+    }
+
     /// Returns `true` if the list of indices contains an index with the given
     /// value.
     fn contains(&self, x: &usize) -> bool {
@@ -327,12 +331,14 @@ impl ElementList {
     pub fn push(&mut self, value: Element) {
         self.0.push(value)
     }
+}
 
-    pub fn subelements(&self) -> SubelementList {
+impl Into<SubelementList> for ElementList {
+    fn into(self) -> SubelementList {
         let mut subelements = SubelementList::with_capacity(self.len());
 
-        for el in self.iter() {
-            subelements.push(el.subs.clone());
+        for el in self.into_iter() {
+            subelements.push(el.subs);
         }
 
         subelements
@@ -391,6 +397,18 @@ impl SubelementList {
     /// Returns the subelement list for the minimal element in a polytope.
     pub fn min() -> Self {
         Self(vec![Subelements::new()])
+    }
+
+    pub fn append(&mut self, other: &mut Self) {
+        self.0.append(&mut other.0)
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<Subelements> {
+        self.0.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<Subelements> {
+        self.0.iter_mut()
     }
 
     /// Returns the subelement list for a set number of vertices in a polytope.
@@ -600,7 +618,7 @@ pub struct Indices(pub usize, pub usize);
 
 /// Represents the lowest and highest element of a section of an abstract
 /// polytope. Not to be confused with a cross-section.
-#[derive(Copy, Clone, Hash)]
+#[derive(Copy, Clone, Debug, Hash)]
 pub struct Section {
     /// The lowest element in the section.
     pub lo: ElementRef,

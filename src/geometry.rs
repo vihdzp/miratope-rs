@@ -57,15 +57,15 @@ impl Hypersphere {
     }
 
     /// Attempts to reciprocate a point in place. If it's too close to the
-    /// sphere's center, it returns `Err(())` and leaves it unchanged.
-    pub fn reciprocate_mut(&self, p: &mut Point) -> Result<(), ()> {
+    /// sphere's center, it returns `false` and leaves it unchanged.
+    pub fn reciprocate_mut(&self, p: &mut Point) -> bool {
         let mut q = p as &Point - &self.center;
         let s = q.norm_squared();
 
         // If any face passes through the dual center, the dual does
         // not exist, and we return early.
         if s < Float::EPS {
-            return Err(());
+            return false;
         }
 
         // Rescales q.
@@ -75,14 +75,13 @@ impl Hypersphere {
         // Recenters q.
         *p = q + &self.center;
 
-        Ok(())
+        true
     }
 
     /// Attempts to reciprocate a point. If it's too close to the sphere's
     /// center, it returns `None`.
-    pub fn reciprocate(&self, p: &Point) -> Option<Point> {
-        let mut clone = p.clone();
-        self.reciprocate_mut(&mut clone).ok().map(|_| clone)
+    pub fn reciprocate(&self, mut p: Point) -> Option<Point> {
+        self.reciprocate_mut(&mut p).then(|| p)
     }
 }
 
@@ -132,25 +131,46 @@ impl Subspace {
         self.dim() == self.rank()
     }
 
-    /// Adds a point to the subspace. If the rank increases, returns a new
-    /// basis vector for the subspace.
+    /// Adds a point to the subspace. If it already lies in the subspace, the
+    /// subspace remains unchanged. Otherwise, a new basis vector is added.
+    /// Returns whether the rank increases.
     ///
     /// # Todo:
-    /// Implement [this](https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process#Numerical_stability).
-    pub fn add(&mut self, p: &Point) -> Option<Point> {
+    /// Implement the [Gram-Schmidt process](https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process#Numerical_stability).
+    pub fn add(&mut self, p: &Point) -> bool {
+        let mut v = p - self.project(p);
+        let res = v.normalize_mut() > Float::EPS;
+
+        if res {
+            self.basis.push(v);
+        }
+
+        res
+    }
+
+    /// Adds a point to the subspace. If it already lies in the subspace, the
+    /// subspace remains unchanged and we return `None`. Otherwise, a new basis
+    /// vector is added, and we return a reference to it.
+    ///
+    /// # Todo:
+    /// Implement the [Gram-Schmidt process](https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process#Numerical_stability).
+    pub fn add_basis(&mut self, p: &Point) -> Option<&Point> {
         let mut v = p - self.project(p);
 
         if v.normalize_mut() > Float::EPS {
-            self.basis.push(v.clone());
-            Some(v)
+            self.basis.push(v);
+            self.basis.last()
         } else {
             None
         }
     }
 
-    /// Creates a subspace from an iterator over points.
+    /// Creates a subspace from an iterator over points. If we find a subspace
+    /// of full rank, we return it early. Otherwise, we traverse through the
+    /// entire iterator.
     ///
-    /// If we ever obtain a subspace of full rank, we return it early.
+    /// Consider using [`from_points_with`] if you expect your subspace to have
+    /// an exact rank.
     pub fn from_points<'a, T: Iterator<Item = &'a Point>>(mut points: T) -> Self {
         let mut subspace = Self::new(
             points
@@ -162,7 +182,7 @@ impl Subspace {
         for p in points {
             // If the subspace is of full rank, we don't need to check any
             // more points.
-            if subspace.add(p).is_some() && subspace.is_full_rank() {
+            if subspace.add(p) && subspace.is_full_rank() {
                 return subspace;
             }
         }
@@ -191,7 +211,7 @@ impl Subspace {
         );
 
         for p in points {
-            if subspace.add(p).is_some() && subspace.rank() > rank {
+            if subspace.add(p) && subspace.rank() > rank {
                 return None;
             }
         }
@@ -418,14 +438,14 @@ mod tests {
     pub fn reciprocate() {
         assert_eq(
             Hypersphere::unit(2)
-                .reciprocate(&dvector![3.0, 4.0])
+                .reciprocate(dvector![3.0, 4.0])
                 .unwrap(),
             dvector![0.12, 0.16],
         );
 
         assert_eq(
             Hypersphere::with_radius(Point::zeros(3), 13.0)
-                .reciprocate(&dvector![3.0, 4.0, 12.0])
+                .reciprocate(dvector![3.0, 4.0, 12.0])
                 .unwrap(),
             dvector![3.0, 4.0, 12.0],
         );
@@ -435,7 +455,7 @@ mod tests {
                 squared_radius: -4.0,
                 center: dvector![1.0, 1.0, 1.0, 1.0],
             }
-            .reciprocate(&dvector![-2.0, -2.0, -2.0, -2.0])
+            .reciprocate(dvector![-2.0, -2.0, -2.0, -2.0])
             .unwrap(),
             dvector![4.0 / 3.0, 4.0 / 3.0, 4.0 / 3.0, 4.0 / 3.0],
         );

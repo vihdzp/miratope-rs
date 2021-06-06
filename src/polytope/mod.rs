@@ -32,7 +32,19 @@ const COMPONENTS: &str = "Components";
 
 /// The result of taking a dual: can either be a success value of `T`, or the
 /// index of a facet through the inversion center.
-type DualResult<T> = Result<T, usize>;
+pub type DualResult<T> = Result<T, FacetIndex>;
+
+/// Represents the index of a facet through the inversion center.
+#[derive(Debug)]
+pub struct FacetIndex(usize);
+
+impl std::fmt::Display for FacetIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "facet {} passes through inversion center", self.0)
+    }
+}
+
+impl std::error::Error for FacetIndex {}
 
 /// The trait for methods common to all polytopes.
 pub trait Polytope<T: NameType>: Sized + Clone {
@@ -173,7 +185,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         } else {
             // TODO: this isn't one of the usual inversion through a facet
             // errors. Fix this.
-            Err(123456789)
+            Err(FacetIndex(123456789))
         }
     }
 
@@ -194,7 +206,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     }
 
     /// Gets the verf associated to the element of a given index as a polytope.
-    fn verf(&self, idx: usize) -> Result<Option<Self>, usize> {
+    fn verf(&self, idx: usize) -> DualResult<Option<Self>> {
         self.element_fig(ElementRef::new(Rank::new(0), idx))
     }
 
@@ -221,11 +233,10 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         }
     }
 
-    fn petrial_mut(&mut self) -> Result<(), ()>;
+    fn petrial_mut(&mut self) -> bool;
 
-    fn petrial(&self) -> Option<Self> {
-        let mut clone = self.clone();
-        clone.petrial_mut().ok().map(|_| clone)
+    fn petrial(mut self) -> Option<Self> {
+        self.petrial_mut().then(|| self)
     }
 
     fn petrie_polygon(&mut self) -> Option<Self> {
