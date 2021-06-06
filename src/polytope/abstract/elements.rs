@@ -333,18 +333,6 @@ impl ElementList {
     }
 }
 
-impl Into<SubelementList> for ElementList {
-    fn into(self) -> SubelementList {
-        let mut subelements = SubelementList::with_capacity(self.len());
-
-        for el in self.into_iter() {
-            subelements.push(el.subs);
-        }
-
-        subelements
-    }
-}
-
 impl IntoIterator for ElementList {
     type Item = Element;
 

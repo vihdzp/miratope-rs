@@ -828,9 +828,10 @@ impl Concrete {
             edges.append(&mut new_edges);
         }
 
+        // Builds the polytope.
         let mut abs = AbstractBuilder::new();
-        for elements in ranks {
-            abs.push(elements.into());
+        for subelements in ranks {
+            abs.push(subelements);
         }
 
         Self::new(vertices, abs.build())
