@@ -850,11 +850,13 @@ impl Abstract {
         // Sets the name of the polytope.
         let bases = vec![p.name.clone(), q.name.clone()];
 
-        product.build().with_name(if min && max {
-            Name::multipyramid(bases)
-        } else if !min && max {
-            Name::multiprism(bases)
-        } else if min && !max {
+        product.build().with_name(if max {
+            if min {
+                Name::multipyramid(bases)
+            } else {
+                Name::multiprism(bases)
+            }
+        } else if min {
             Name::multitegum(bases)
         } else {
             Name::multicomb(bases)

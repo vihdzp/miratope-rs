@@ -149,8 +149,10 @@ impl Subspace {
     }
 
     /// Creates a subspace from an iterator over points.
+    ///
+    /// If we ever obtain a subspace of full rank, we return it early.
     pub fn from_points<'a, T: Iterator<Item = &'a Point>>(mut points: T) -> Self {
-        let mut h = Self::new(
+        let mut subspace = Self::new(
             points
                 .next()
                 .expect("A hyperplane can't be created from an empty point array!")
@@ -160,12 +162,41 @@ impl Subspace {
         for p in points {
             // If the subspace is of full rank, we don't need to check any
             // more points.
-            if h.add(p).is_some() && h.is_full_rank() {
-                return h;
+            if subspace.add(p).is_some() && subspace.is_full_rank() {
+                return subspace;
             }
         }
 
-        h
+        subspace
+    }
+
+    /// Attempts to create a subspace from an iterator over points with a
+    /// specified rank.
+    ///
+    /// If the points have a higher rank than expected, the method will return
+    /// `None` early. If the points have a lower rank, the method will return
+    /// `None` after traversing all of them.
+    ///
+    /// This method is only faster than the usual one when the specified rank
+    /// isn't equal to the dimension of the points.
+    pub fn from_points_with<'a, T: Iterator<Item = &'a Point>>(
+        mut points: T,
+        rank: usize,
+    ) -> Option<Self> {
+        let mut subspace = Self::new(
+            points
+                .next()
+                .expect("A hyperplane can't be created from an empty point array!")
+                .clone(),
+        );
+
+        for p in points {
+            if subspace.add(p).is_some() && subspace.rank() > rank {
+                return None;
+            }
+        }
+
+        Some(subspace)
     }
 
     /// Projects a point onto the subspace.

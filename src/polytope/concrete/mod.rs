@@ -3,14 +3,13 @@ pub mod cox;
 pub mod element_types;
 pub mod file;
 pub mod group;
-pub mod mesh_builder;
+pub mod mesh;
 
 use std::{
     collections::{HashMap, HashSet},
     mem,
 };
 
-use self::mesh_builder::MeshBuilder;
 use super::{
     r#abstract::{
         elements::{
@@ -26,12 +25,10 @@ use super::{
 use crate::{
     geometry::{Hyperplane, Hypersphere, Matrix, Point, PointOrd, Segment, Subspace, Vector},
     lang::name::{Con, ConData, Name, NameData, Regular},
-    ui::camera::ProjectionType,
     Consts, Float,
 };
 
 use approx::{abs_diff_eq, abs_diff_ne};
-use bevy::prelude::Mesh;
 use rayon::prelude::*;
 
 #[derive(Debug, Clone)]
@@ -821,15 +818,6 @@ impl Concrete {
         } else {
             Self::new(vertices, abs)
         }
-    }
-    /// Builds the mesh of a polytope.
-    pub fn get_mesh(&self, projection_type: ProjectionType) -> Mesh {
-        MeshBuilder::new(self).get_mesh(projection_type)
-    }
-
-    /// Builds the wireframe of a polytope.
-    pub fn get_wireframe(&self, projection_type: ProjectionType) -> Mesh {
-        MeshBuilder::new(self).get_wireframe(projection_type)
     }
 }
 
