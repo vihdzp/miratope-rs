@@ -32,19 +32,20 @@ const COMPONENTS: &str = "Components";
 
 /// The result of taking a dual: can either be a success value of `T`, or the
 /// index of a facet through the inversion center.
-pub type DualResult<T> = Result<T, FacetIndex>;
+pub type DualResult<T> = Result<T, DualError>;
 
-/// Represents the index of a facet through the inversion center.
+/// Represents an error in a concrete dual, in which a facet with a given index
+/// passes through the inversion center.
 #[derive(Debug)]
-pub struct FacetIndex(usize);
+pub struct DualError(usize);
 
-impl std::fmt::Display for FacetIndex {
+impl std::fmt::Display for DualError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "facet {} passes through inversion center", self.0)
     }
 }
 
-impl std::error::Error for FacetIndex {}
+impl std::error::Error for DualError {}
 
 /// The trait for methods common to all polytopes.
 pub trait Polytope<T: NameType>: Sized + Clone {
@@ -185,7 +186,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         } else {
             // TODO: this isn't one of the usual inversion through a facet
             // errors. Fix this.
-            Err(FacetIndex(123456789))
+            Err(DualError(123456789))
         }
     }
 

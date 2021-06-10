@@ -20,7 +20,7 @@ use super::{
         rank::{Rank, RankVec},
         Abstract,
     },
-    DualResult, FacetIndex, Polytope,
+    DualError, DualResult, Polytope,
 };
 use crate::{
     geometry::{Hyperplane, Hypersphere, Matrix, Point, PointOrd, Segment, Subspace, Vector},
@@ -328,7 +328,7 @@ impl Concrete {
         else if rank == Rank::new(0) {
             for (idx, v) in self.vertices.iter_mut().enumerate() {
                 if !sphere.reciprocate_mut(v) {
-                    return Err(FacetIndex(idx));
+                    return Err(DualError(idx));
                 }
             }
         }
@@ -366,7 +366,7 @@ impl Concrete {
         // Reciprocates the projected points.
         for (idx, v) in projections.iter_mut().enumerate() {
             if !sphere.reciprocate_mut(v) {
-                return Err(FacetIndex(idx));
+                return Err(DualError(idx));
             }
         }
 

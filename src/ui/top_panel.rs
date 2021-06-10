@@ -28,7 +28,7 @@ impl Plugin for TopPanelPlugin {
             .insert_resource(Memory::default())
             .insert_resource(SectionDirection::default())
             .insert_resource(SectionState::default())
-            .insert_non_send_resource(MainThreadToken::default())
+            .insert_non_send_resource(FileDialogToken::default())
             .add_system(file_dialog.system())
             // Windows must be the first thing shown.
             .add_system(
@@ -92,9 +92,9 @@ impl Default for SectionDirection {
 /// circumvent a MacOS limitation that all GUI operations must be done on the
 /// main thread.
 #[derive(Default)]
-pub struct MainThreadToken(PhantomData<*const ()>);
+pub struct FileDialogToken(PhantomData<*const ()>);
 
-impl MainThreadToken {
+impl FileDialogToken {
     /// Auxiliary function to create a new file dialog.
     fn new_file_dialog() -> FileDialog {
         FileDialog::new()
@@ -160,7 +160,7 @@ impl FileDialogState {
 pub fn file_dialog(
     mut query: Query<&mut Concrete>,
     file_dialog_state: Res<FileDialogState>,
-    token: NonSend<MainThreadToken>,
+    token: NonSend<FileDialogToken>,
 ) {
     if file_dialog_state.is_changed() {
         match file_dialog_state.mode {
@@ -219,19 +219,20 @@ pub type EguiWindows<'a> = (
 /// The system that shows the top panel.
 #[allow(clippy::too_many_arguments)]
 pub fn show_top_panel(
+    // Info about the application state.
     egui_ctx: Res<EguiContext>,
     mut query: Query<&mut Concrete>,
     mut windows: ResMut<Windows>,
     keyboard: Res<Input<KeyCode>>,
+
+    // The Miratope resources controlled by the top panel.
     mut section_state: ResMut<SectionState>,
     mut section_direction: ResMut<SectionDirection>,
     mut file_dialog_state: ResMut<FileDialogState>,
     mut projection_type: ResMut<ProjectionType>,
     mut memory: ResMut<Memory>,
-
     mut background_color: ResMut<ClearColor>,
     mut selected_language: ResMut<SelectedLanguage>,
-
     mut visuals: ResMut<egui::Visuals>,
 
     // The different windows that can be shown.
@@ -497,10 +498,7 @@ pub fn show_top_panel(
                                 Ok(None) => {
                                     println!("Verf failed: no vertices.")
                                 }
-                                Err(idx) => println!(
-                                    "Verf failed: facet {} passes through inversion center.",
-                                    idx
-                                ),
+                                Err(err) => println!("Verf failed: {:?}", err),
                             }
                         }
                     }
