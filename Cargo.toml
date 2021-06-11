@@ -20,7 +20,9 @@ factorial = "0.2"
 gcd = "2.0"
 itertools = "0.10"
 lyon = "0.17"
-nalgebra = { version = "0.27", features = ["serde-serialize"] }
+nalgebra = { git = "https://github.com/OfficialURL/nalgebra", branch = "dev", version = "0.27", features = [
+    "serde-serialize"
+] }
 ordered-float = "2.4"
 petgraph = "0.5"
 rand = "0.8"

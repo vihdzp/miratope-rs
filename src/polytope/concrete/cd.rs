@@ -132,11 +132,11 @@ impl CoxMatrix {
         // Builds each generator from the top down as a triangular matrix, so
         // that the dot products match the values in the Coxeter matrix.
         for i in 0..dim {
-            let (prev_gens, mut n_i) = mat.columns_range_pair_mut(0..i, i..(i + 1));
+            let (prev_gens, mut n_i) = mat.columns_range_pair_mut(0..i, i);
 
             for (j, n_j) in prev_gens.column_iter().enumerate() {
                 // All other entries in the dot product are zero.
-                let dot = n_i.rows_range(0..(j + 1)).dot(&n_j.rows_range(0..(j + 1)));
+                let dot = n_i.rows_range(0..=j).dot(&n_j.rows_range(0..=j));
 
                 n_i[j] = ((Float::PI / self[(i, j)]).cos() - dot) / n_j[j];
             }

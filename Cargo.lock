@@ -2151,8 +2151,7 @@ dependencies = [
 [[package]]
 name = "nalgebra"
 version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "462fffe4002f4f2e1f6a9dcf12cc1a6fc0e15989014efc02a941d3e0f5dc2120"
+source = "git+https://github.com/OfficialURL/nalgebra?branch=dev#6b6054efc99fca63101f9352feb4440f996bd0cd"
 dependencies = [
  "approx",
  "matrixmultiply",
@@ -2168,8 +2167,7 @@ dependencies = [
 [[package]]
 name = "nalgebra-macros"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01fcc0b8149b4632adc89ac3b7b31a12fb6099a0317a4eb2ebff574ef7de7218"
+source = "git+https://github.com/OfficialURL/nalgebra?branch=dev#6b6054efc99fca63101f9352feb4440f996bd0cd"
 dependencies = [
  "proc-macro2",
  "quote",
