@@ -1,15 +1,14 @@
+use std::{f64::consts::PI, fmt::Display, iter, mem};
+
 use crate::{
-    geometry::{MatrixOrd, Vector},
-    Float, FloatOrd,
+    geometry::{Matrix, MatrixOrd, Point, Vector},
+    Consts, Float, FloatOrd,
 };
 use nalgebra::{dmatrix, Dynamic, VecStorage};
 use petgraph::{
     graph::{Graph, Node as GraphNode, NodeIndex},
     Undirected,
 };
-use std::{f64::consts::PI, fmt::Display, iter::Enumerate, iter::Peekable, mem, str::Chars};
-
-use crate::geometry::Matrix;
 
 pub type CdResult<T> = Result<T, CdError>;
 
@@ -47,9 +46,9 @@ impl std::error::Error for CdError {}
 /// Represents a Coxeter diagram as a matrix, so that the (i, j) entry
 /// corresponds to the value of the edge between the ith and jth node.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CdMatrix(MatrixOrd);
+pub struct CoxMatrix(MatrixOrd);
 
-impl CdMatrix {
+impl CoxMatrix {
     /// Initializes a new CD matrix from a vector of nodes and a matrix.
     pub fn new(matrix: Matrix) -> Self {
         Self(MatrixOrd::new(matrix))
@@ -123,9 +122,37 @@ impl CdMatrix {
             }
         }))
     }
+
+    /// Returns an upper triangular matrix whose columns are unit normal vectors
+    /// for the hyperplanes described by the Coxeter matrix.
+    pub fn normals(&self) -> Option<Matrix> {
+        let dim = self.dim();
+        let mut mat = Matrix::zeros(dim, dim);
+
+        // Builds each generator from the top down as a triangular matrix, so
+        // that the dot products match the values in the Coxeter matrix.
+        for i in 0..dim {
+            let (prev_gens, mut gen_i) = mat.columns_range_pair_mut(0..i, i..(i + 1));
+
+            for (j, gen_j) in prev_gens.column_iter().enumerate() {
+                let dot = gen_i.dot(&gen_j);
+                gen_i[j] = ((Float::PI / self[(i, j)]).cos() - dot) / gen_j[j];
+            }
+
+            // If the vector doesn't fit in spherical space.
+            let norm_sq = gen_i.norm_squared();
+            if norm_sq >= 1.0 - Float::EPS {
+                return None;
+            } else {
+                gen_i[i] = (1.0 - norm_sq).sqrt();
+            }
+        }
+
+        Some(mat)
+    }
 }
 
-impl std::ops::Index<(usize, usize)> for CdMatrix {
+impl std::ops::Index<(usize, usize)> for CoxMatrix {
     type Output = Float;
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
@@ -144,7 +171,7 @@ pub enum Node {
     /// hyperplane.
     Ringed(FloatOrd),
 
-    /// A anub node, at half the specified distance from a corresponding
+    /// A snub node, at half the specified distance from a corresponding
     /// hyperplane.
     Snub(FloatOrd),
 }
@@ -235,7 +262,8 @@ impl Node {
         } else {
             // Maybe return an error if there was a minus sign?
 
-            // Check shortchord values
+            // Check shortchord values. Perhaps we should rethink hardcoding so
+            // many values?
             Ok(Node::ringed(match c {
                 'o' => return Ok(Node::Unringed),
                 's' => return Ok(Node::snub(1.0)),
@@ -275,31 +303,18 @@ impl Display for Node {
 
 /// Represents the value of an edge in a [`Cd`].
 #[derive(Clone, Copy)]
-enum Edge {
-    /// Any edge that represents a rational number, including integer edges.
-    Rational(i64, i64),
+pub struct Edge {
+    /// The numerator of the edge.
+    num: i32,
 
-    /// Represents an ∞ symbol for prograde infinity.
-    Inf,
-
-    /// Represents an ∞' symbol for retrograde infinity.
-    RetInf,
-
-    /// No intersection Ø.
-    Non,
+    /// The denominator of the edge.
+    den: i32,
 }
 
 impl Edge {
     /// Returns the numerical value of the edge.
-    pub fn value(&self) -> f64 {
-        match *self {
-            Self::Rational(n, d) => n as f64 / d as f64,
-            Self::Inf => f64::INFINITY,
-            Self::RetInf => 1.0,
-
-            // This is probably a very bad idea.
-            Self::Non => f64::NAN,
-        }
+    pub fn value(&self) -> Float {
+        self.num as Float / self.den as Float
     }
 
     /// Converts a slice of characters into a wrapped edge value.
@@ -335,24 +350,16 @@ impl Edge {
                 edge.push(c);
             }
 
-            // When you're at the end
-            // Parse the end value
-            let den = parse(&edge, idx)?;
+            // Parse the last value (either the denominator in case of a
+            // fraction, or the single number otherwise).
+            let last = parse(&edge, idx)?;
 
-            // If this was a Rational edge, the end value would be the denominator
-            // If this wasn't a Rational edge, the end value would be the numerator
-            match numerator {
-                Some(num) => Ok(Edge::Rational(num, den)),
-                None => Ok(Edge::Rational(den, 1i64)),
-            }
+            Ok(match numerator {
+                Some(num) => Edge { num, den: last },
+                None => Edge { num: last, den: 1 },
+            })
         } else {
-            // Special hardcoded cases.
-            match edge.as_str() {
-                "∞" => Ok(Edge::Inf),
-                "∞'" | "'∞" => Ok(Edge::RetInf),
-                "Ø" => Ok(Edge::Non),
-                _ => Err(CdError::InvalidSymbol(idx)),
-            }
+            Err(CdError::InvalidSymbol(idx))
         }
     }
 }
@@ -360,12 +367,7 @@ impl Edge {
 impl Display for Edge {
     /// Prints the value contained in an edge.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Edge::Rational(n, d) => writeln!(f, "{} / {}", n, d),
-            Edge::Inf => writeln!(f, "∞"),
-            Edge::RetInf => writeln!(f, "∞"),
-            Edge::Non => writeln!(f, "Ø"),
-        }
+        write!(f, "{} / {}", self.num, self.den)
     }
 }
 
@@ -381,7 +383,7 @@ pub struct CdBuilder<'a> {
 
     /// A peekable iterator over the characters of the diagram and their
     /// indices.
-    diagram: Peekable<Enumerate<Chars<'a>>>,
+    diagram: iter::Peekable<iter::Enumerate<std::str::Chars<'a>>>,
 
     /// The next edge that's currently being read.
     next_edge: NextEdge,
@@ -574,12 +576,13 @@ impl Cd {
         self.0.raw_nodes().iter().map(|node| node.weight).collect()
     }
 
+    /// Returns the vector whose values represent the node values.
     pub fn node_vector(&self) -> Vector {
         Vector::from_iterator(self.dim(), self.node_iter().map(|node| node.value()))
     }
 
-    /// Creates a [`CdMatrix`] from a Coxeter diagram.
-    pub fn cox(&self) -> CdMatrix {
+    /// Creates a [`CoxMatrix`] from a Coxeter diagram.
+    pub fn cox(&self) -> CoxMatrix {
         let dim = self.dim();
 
         let matrix = Matrix::from_fn(dim, dim, |i, j| {
@@ -597,19 +600,47 @@ impl Cd {
             }
         });
 
-        CdMatrix::new(matrix)
+        CoxMatrix::new(matrix)
     }
 
-    pub fn circumradius(&self) -> Float {
+    /// Returns the circumradius of the polytope specified by the matrix, or
+    /// `None` if this doesn't apply. This may or may not be faster than just
+    /// calling [`Self::generator`] and taking the norm.
+    pub fn circumradius(&self) -> Option<Float> {
         let mut schlafli = self.cox();
+        let schlafli_ref = schlafli.as_matrix_mut();
         let node_vec = self.node_vector();
 
         // Converts the Coxeter matrix into the Schläfli matrix.
-        for v in schlafli.as_matrix_mut().iter_mut() {
+        for v in schlafli_ref.iter_mut() {
             *v = (PI / *v).cos();
         }
 
-        (node_vec.transpose() * schlafli.as_matrix() * node_vec)[(0, 0)].sqrt()
+        if !schlafli_ref.try_inverse_mut() {
+            return None;
+        }
+
+        let sq_radius = (node_vec.transpose() * schlafli.as_matrix() * node_vec)[(0, 0)] / -4.0;
+        if dbg!(sq_radius) < -Float::EPS {
+            None
+        } else if sq_radius > Float::EPS {
+            Some(sq_radius.sqrt())
+        } else {
+            Some(0.0)
+        }
+    }
+
+    /// Returns a point in the position specified by the Coxeter diagram,
+    /// using the set of mirrors generated by [`CoxMatrix::normals`].    
+    pub fn generator(&self) -> Option<Point> {
+        let normals = self.cox().normals()?;
+        let mut vector = self.node_vector();
+
+        if normals.solve_upper_triangular_mut(&mut vector) {
+            Some(vector)
+        } else {
+            None
+        }
     }
 
     /// Returns the number of edges in the CD.
@@ -623,7 +654,7 @@ impl Cd {
     }
 }
 
-impl From<Cd> for CdMatrix {
+impl From<Cd> for CoxMatrix {
     fn from(cd: Cd) -> Self {
         cd.cox()
     }
@@ -673,7 +704,7 @@ mod tests {
     fn test(input: &str, nodes: Vec<Node>, matrix: Matrix) {
         let cd = Cd::new(input).unwrap();
         assert_eq!(cd.nodes(), nodes, "Node mismatch!");
-        assert_eq!(cd.cox(), CdMatrix::new(matrix), "Coxeter matrix mismatch!");
+        assert_eq!(cd.cox(), CoxMatrix::new(matrix), "Coxeter matrix mismatch!");
     }
 
     #[test]

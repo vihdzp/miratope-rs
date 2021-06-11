@@ -115,7 +115,7 @@ impl Flag {
 }
 
 /// Allows indexing a flag by rank.
-impl std::ops::Index<Rank> for Flag {
+impl Index<Rank> for Flag {
     type Output = usize;
 
     fn index(&self, index: Rank) -> &Self::Output {
@@ -124,13 +124,13 @@ impl std::ops::Index<Rank> for Flag {
 }
 
 /// Allows mutably indexing a flag by rank.
-impl std::ops::IndexMut<Rank> for Flag {
+impl IndexMut<Rank> for Flag {
     fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
         self.get_mut(index).unwrap()
     }
 }
 
-impl std::ops::Index<usize> for Flag {
+impl Index<usize> for Flag {
     type Output = usize;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -138,7 +138,7 @@ impl std::ops::Index<usize> for Flag {
     }
 }
 
-impl std::ops::IndexMut<usize> for Flag {
+impl IndexMut<usize> for Flag {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self[Rank::from(index)]
     }

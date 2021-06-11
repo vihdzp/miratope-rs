@@ -1,12 +1,16 @@
 //! Contains methods to generate many symmetry groups.
 
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::{
+    collections::{BTreeMap, BTreeSet, VecDeque},
+    iter,
+};
 
-use super::cd::{Cd, CdMatrix, CdResult};
-use super::Concrete;
-
+use super::{
+    cd::{Cd, CdResult, CoxMatrix},
+    Concrete,
+};
 use crate::{
-    geometry::{Matrix, MatrixOrd, Point, PointOrd, Vector},
+    geometry::{Matrix, MatrixOrd, Point, PointOrd, VectorSlice},
     Consts, Float,
 };
 
@@ -197,7 +201,7 @@ impl Group {
             itertools::iproduct!(g.quaternions(true), h.quaternions(false))
                 .map(|(mat1, mat2)| {
                     let mat = mat1 * mat2;
-                    std::iter::once(mat.clone()).chain(std::iter::once(-mat))
+                    iter::once(mat.clone()).chain(iter::once(-mat))
                 })
                 .flatten(),
         )
@@ -238,7 +242,7 @@ impl Group {
 
     /// Generates the trivial group of a certain dimension.
     pub fn trivial(dim: usize) -> Self {
-        Self::new(dim, std::iter::once(Matrix::identity(dim, dim)))
+        Self::new(dim, iter::once(Matrix::identity(dim, dim)))
     }
 
     /// Generates the group with the identity and a central inversion of a
@@ -252,17 +256,17 @@ impl Group {
 
     /// Returns the I2(x) symmetry group.
     pub fn i2(x: Float) -> Self {
-        Self::cox_group(CdMatrix::i2(x)).unwrap()
+        Self::cox_group(CoxMatrix::i2(x)).unwrap()
     }
 
     /// Returns the An symmetry group.
     pub fn a(n: usize) -> Self {
-        Self::cox_group(CdMatrix::a(n)).unwrap()
+        Self::cox_group(CoxMatrix::a(n)).unwrap()
     }
 
     /// Returns the Bn symmetry group.
     pub fn b(n: usize) -> Self {
-        Self::cox_group(CdMatrix::b(n)).unwrap()
+        Self::cox_group(CoxMatrix::b(n)).unwrap()
     }
 
     /// Generates a step prism group from a base group and a homomorphism into
@@ -278,8 +282,8 @@ impl Group {
 
     /// Generates a Coxeter group from its [`CdMatrix`], or returns `None` if
     /// the group doesn't fit as a matrix group in spherical space.
-    pub fn cox_group(cox: CdMatrix) -> Option<Self> {
-        Some(Self::new(cox.dim(), GenIter::from_cox_mat(cox)?))
+    pub fn cox_group(cox: CoxMatrix) -> Option<Self> {
+        Some(Self::new(cox.dim(), GenIter::from_cox(cox)?))
     }
 
     /// Generates the direct product of two groups. Uses the specified function
@@ -467,15 +471,16 @@ fn matrix_approx(mat1: &Matrix, mat2: &Matrix) -> bool {
 }
 
 /// Builds a reflection matrix from a given vector.
-pub fn refl_mat(n: Vector) -> Matrix {
+pub fn refl_mat(n: VectorSlice) -> Matrix {
     let dim = n.nrows();
     let nn = n.norm_squared();
+    let identity = Matrix::identity(dim, dim);
 
     // Reflects every basis vector, builds a matrix from all of their images.
     Matrix::from_columns(
-        &Matrix::identity(dim, dim)
+        &identity
             .column_iter()
-            .map(|v| v - (2.0 * v.dot(&n) / nn) * &n)
+            .map(|e| e - (2.0 * e.dot(&n) / nn) * n)
             .collect::<Vec<_>>(),
     )
 }
@@ -527,8 +532,8 @@ impl GenIter {
         }
     }
 
-    /// Gets the next element and the next generator to attempt to multiply.
-    /// Advances the iterator.
+    /// Gets the next element and the next generator to attempt to multiply
+    /// with. Advances the iterator.
     fn next_el_gen(&mut self) -> Option<[Matrix; 2]> {
         let el = self.queue.front()?.0.clone();
         let gen = self.gens[self.gen_idx].clone();
@@ -565,35 +570,18 @@ impl GenIter {
         }
     }
 
-    pub fn from_cox_mat(cox: CdMatrix) -> Option<Self> {
-        let dim = cox.dim();
-        let mut generators = Vec::with_capacity(dim);
+    /// Builds a Coxeter group from the matrix of normal vectors that describes
+    /// its mirrors.
+    pub fn from_normals(normals: Matrix) -> Self {
+        Self::new(
+            normals.ncols(),
+            normals.column_iter().map(refl_mat).collect(),
+        )
+    }
 
-        // Builds each generator from the top down as a triangular matrix, so
-        // that the dot products match the values in the Coxeter matrix.
-        for i in 0..dim {
-            let mut gen_i = Vector::from_element(dim, 0.0);
-
-            for (j, gen_j) in generators.iter().enumerate() {
-                let dot = gen_i.dot(gen_j);
-                gen_i[j] = ((Float::PI / cox[(i, j)] as Float).cos() - dot) / gen_j[j];
-            }
-
-            // The vector doesn't fit in spherical space.
-            let norm_sq = gen_i.norm_squared();
-            if norm_sq >= 1.0 - Float::EPS {
-                return None;
-            } else {
-                gen_i[i] = (1.0 - norm_sq).sqrt();
-            }
-
-            generators.push(gen_i);
-        }
-
-        Some(Self::new(
-            dim,
-            generators.into_iter().map(refl_mat).collect(),
-        ))
+    /// Builds a Coxeter group from a Coxeter matrix.
+    pub fn from_cox(cox: CoxMatrix) -> Option<Self> {
+        Some(Self::from_normals(cox.normals()?))
     }
 }
 

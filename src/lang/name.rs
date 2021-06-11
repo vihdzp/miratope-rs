@@ -45,7 +45,7 @@ pub struct AbsData<T>(PhantomData<T>);
 
 impl<T> Default for AbsData<T> {
     fn default() -> Self {
-        Self(Default::default())
+        Self(PhantomData)
     }
 }
 

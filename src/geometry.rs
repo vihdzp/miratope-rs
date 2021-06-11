@@ -6,6 +6,9 @@ pub type Point = nalgebra::DVector<Float>;
 /// A vector in *n*-dimensional space.
 pub type Vector = Point;
 
+/// A non-owned form of [`Vector`].
+pub type VectorSlice<'a> = nalgebra::DVectorSlice<'a, Float>;
+
 /// An *n* by *n* matrix.
 pub type Matrix = nalgebra::DMatrix<Float>;
 
