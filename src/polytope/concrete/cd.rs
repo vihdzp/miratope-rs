@@ -304,7 +304,7 @@ impl Display for Node {
 }
 
 /// Represents the value of an edge in a [`Cd`].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Edge {
     /// The numerator of the edge.
     num: i32,
@@ -346,6 +346,7 @@ impl Edge {
 
                     // Reset what's being read.
                     edge = String::new();
+                    continue;
                 };
 
                 // Wasn't a special character, can continue
@@ -623,7 +624,7 @@ impl Cd {
         }
 
         let sq_radius = (node_vec.transpose() * schlafli.as_matrix() * node_vec)[(0, 0)] / -4.0;
-        if dbg!(sq_radius) < -Float::EPS {
+        if sq_radius < -Float::EPS {
             None
         } else if sq_radius > Float::EPS {
             Some(sq_radius.sqrt())
@@ -663,7 +664,7 @@ impl From<Cd> for CoxMatrix {
 }
 
 impl Display for Cd {
-    ///Prints the node and edge count, along with the value each node and edge contains
+    /// Prints the node and edge count, along with the value each node and edge contains
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Prints node and edge counts.
         writeln!(f, "{} Nodes", self.dim())?;
