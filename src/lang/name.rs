@@ -95,7 +95,7 @@ impl NameType for Abs {
 }
 
 /// Data associated with a concrete polytope.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ConData<T>(T);
 
 impl<T: PartialEq> PartialEq for ConData<T> {
@@ -103,8 +103,6 @@ impl<T: PartialEq> PartialEq for ConData<T> {
         self.0 == other.0
     }
 }
-
-impl<T: Copy> Copy for ConData<T> {}
 
 impl<T: PartialEq + Debug + Clone + Serialize> NameData<T> for ConData<T> {
     /// Initializes a new `ConData` that holds a given value.
