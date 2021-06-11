@@ -1,10 +1,13 @@
+use crate::{
+    geometry::{MatrixOrd, Vector},
+    Float, FloatOrd,
+};
+use nalgebra::{dmatrix, Dynamic, VecStorage};
 use petgraph::{
-    graph::{Graph, NodeIndex},
+    graph::{Graph, Node as GraphNode, NodeIndex},
     Undirected,
 };
-use std::f64::consts::PI;
-use std::iter::Enumerate;
-use std::{f64, fmt::Display, iter::Peekable, str::Chars};
+use std::{f64::consts::PI, fmt::Display, iter::Enumerate, iter::Peekable, mem, str::Chars};
 
 use crate::geometry::Matrix;
 
@@ -41,12 +44,92 @@ impl Display for CdError {
 
 impl std::error::Error for CdError {}
 
-/// Represents a Coxeter diagram as a matrix and a vector of nodes. Each row and
-/// column of the matrix corresponds to the node with the same index in the
-/// `nodes` vector.
-pub struct CdMatrix {
-    matrix: Matrix,
-    nodes: Vec<NodeVal>,
+/// Represents a Coxeter diagram as a matrix.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CdMatrix(MatrixOrd);
+
+impl CdMatrix {
+    /// Initializes a new CD matrix from a vector of nodes and a matrix.
+    pub fn new(matrix: Matrix) -> Self {
+        Self(MatrixOrd::new(matrix))
+    }
+
+    /// Returns a reference to the inner matrix.
+    pub fn as_matrix(&self) -> &Matrix {
+        self.0.as_matrix()
+    }
+
+    /// Returns a mutable reference to the inner matrix.
+    pub fn as_matrix_mut(&mut self) -> &mut Matrix {
+        self.0.as_matrix_mut()
+    }
+
+    /// Returns the dimensions of the matrix.
+    pub fn dim(&self) -> usize {
+        self.as_matrix().nrows()
+    }
+
+    /// Parses a [`Cd`] and turns it into a Coxeter matrix.
+    pub fn parse(input: &str) -> CdResult<Self> {
+        Cd::new(input).map(|cd| cd.cox())
+    }
+
+    /// Returns the Coxeter matrix for the trivial 1D group.
+    pub fn trivial() -> Self {
+        Self::new(dmatrix![1.0])
+    }
+
+    /// Returns the Coxeter matrix for the I2(x) group.
+    pub fn i2(x: Float) -> Self {
+        Self::from_lin_diagram(vec![x])
+    }
+
+    /// Returns the Coxeter matrix for the An group.
+    pub fn a(n: usize) -> Self {
+        Self::from_lin_diagram(vec![3.0; n - 1])
+    }
+
+    /// Returns the Coxeter matrix for the Bn group.
+    pub fn b(n: usize) -> Self {
+        let mut diagram = vec![3.0; n - 1];
+        diagram[0] = 4.0;
+        Self::from_lin_diagram(diagram)
+    }
+
+    /// Returns a mutable reference to the elements of the matrix.
+    pub fn iter_mut(
+        &mut self,
+    ) -> nalgebra::iter::MatrixIterMut<Float, Dynamic, Dynamic, VecStorage<Float, Dynamic, Dynamic>>
+    {
+        self.0.iter_mut()
+    }
+
+    /// Creates a Coxeter matrix from a linear diagram, whose edges are
+    /// described by the vector.
+    pub fn from_lin_diagram(diagram: Vec<Float>) -> Self {
+        let dim = diagram.len() + 1;
+
+        Self::new(Matrix::from_fn(dim, dim, |mut i, mut j| {
+            // Makes i ≤ j.
+            if i > j {
+                mem::swap(&mut i, &mut j);
+            }
+
+            match j - i {
+                0 => 1.0,
+                1 => diagram[i],
+                _ => 2.0,
+            }
+        }))
+    }
+}
+
+impl std::ops::Index<(usize, usize)> for CdMatrix {
+    type Output = Float;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        &self.0[index]
+    }
 }
 
 /// Stores the indices of the node and edge of the next edge in the graph. This
@@ -56,13 +139,13 @@ pub struct CdMatrix {
 #[derive(Default)]
 struct EdgeMem {
     node: Option<NodeIndex>,
-    edge: Option<EdgeVal>,
+    edge: Option<Edge>,
 }
 
 /// Possible types of CD
 pub struct Cd(
     // Single {
-    Graph<NodeVal, EdgeVal, Undirected>,
+    Graph<Node, Edge, Undirected>,
     // },
     /*
     Compound{count: u32, graphs: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
@@ -86,17 +169,42 @@ impl Cd {
         loop {
             caret.create_node()?;
 
-            // TODO: make more specific
+            // We continue until we find that there's no further edges.
             if let Ok(None) = caret.read_edge() {
                 return Ok(Cd(caret.graph));
             }
         }
     }
 
-    pub fn coxeter(&self) -> CdMatrix {
-        let dim = self.node_count();
+    /// Returns an iterator over the nodes in the Coxeter Diagram, in the order
+    /// in which they were found.
+    pub fn node_iter<'a>(
+        &'a self,
+    ) -> std::iter::Map<std::slice::Iter<GraphNode<Node>>, impl Fn(&'a GraphNode<Node>) -> Node>
+    {
+        let closure = |node: &GraphNode<Node>| node.weight;
+        self.0.raw_nodes().iter().map(closure)
+    }
+
+    /// Returns the nodes in the Coxeter Diagram, in the order in which they
+    /// were found.
+    pub fn nodes(&self) -> Vec<Node> {
+        self.0.raw_nodes().iter().map(|node| node.weight).collect()
+    }
+
+    pub fn node_vector(&self) -> Vector {
+        Vector::from_iterator(self.dim(), self.node_iter().map(|node| node.value()))
+    }
+
+    /// Creates a [`CdMatrix`] from a Coxeter diagram.
+    pub fn cox(&self) -> CdMatrix {
+        let dim = self.dim();
 
         let matrix = Matrix::from_fn(dim, dim, |i, j| {
+            if i == j {
+                return 1.0;
+            }
+
             let node_i = NodeIndex::new(i);
             let node_j = NodeIndex::new(j);
 
@@ -107,23 +215,19 @@ impl Cd {
             }
         });
 
-        let nodes: Vec<_> = self.0.raw_nodes().iter().map(|node| node.weight).collect();
-        CdMatrix { matrix, nodes }
+        CdMatrix::new(matrix)
     }
 
-    pub fn schlafli(&self) -> CdMatrix {
-        let mut mat = self.coxeter();
+    pub fn circumradius(&self) -> Float {
+        let mut schlafli = self.cox();
+        let node_vec = self.node_vector();
 
-        for v in mat.matrix.iter_mut() {
-            *v = -2.0 * (PI / *v).cos();
+        // Converts the Coxeter matrix into the Schläfli matrix.
+        for v in schlafli.as_matrix_mut().iter_mut() {
+            *v = (PI / *v).cos();
         }
 
-        mat
-    }
-
-    /// Returns the number of nodes in the CD.
-    pub fn node_count(&self) -> usize {
-        self.0.node_count()
+        (node_vec.transpose() * schlafli.as_matrix() * node_vec)[(0, 0)].sqrt()
     }
 
     /// Returns the number of edges in the CD.
@@ -131,9 +235,15 @@ impl Cd {
         self.0.edge_count()
     }
 
-    /// The dimension of the polytope the CD describers.
-    pub fn dimension(&self) -> usize {
+    /// The dimension of the polytope the CD describes.
+    pub fn dim(&self) -> usize {
         self.0.node_count()
+    }
+}
+
+impl From<Cd> for CdMatrix {
+    fn from(cd: Cd) -> Self {
+        cd.cox()
     }
 }
 
@@ -141,7 +251,7 @@ impl Display for Cd {
     ///Prints the node and edge count, along with the value each node and edge contains
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Prints node and edge counts.
-        writeln!(f, "{} Nodes", self.node_count())?;
+        writeln!(f, "{} Nodes", self.dim())?;
         writeln!(f, "{} Edges", self.edge_count())?;
 
         // Prints out nodes.
@@ -158,35 +268,47 @@ impl Display for Cd {
     }
 }
 
-/// Possible types of node values.
-#[derive(Clone, Copy)]
-enum NodeVal {
+/// A node in a [`Cd`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Node {
     ///Unringed Nodes (different from Ringed(0))
     Unringed,
 
-    ///Ringed Nodes, can hold any float
-    Ringed(f64),
+    /// Ringed Nodes, can hold any float
+    Ringed(FloatOrd),
 
     ///Snub Nodes, should definitely make this hold a float
     ///TODO: Agree on a way to specify the length in a snub node
     Snub,
 }
 
-impl Display for NodeVal {
+impl Node {
+    pub fn value(&self) -> Float {
+        match self {
+            Self::Unringed | Self::Snub => 0.0,
+            Self::Ringed(val) => val.0,
+        }
+    }
+    /// Shorthand for `NodeVal::Ringed(FloatOrd::from(x))`.
+    pub fn ringed(x: Float) -> Self {
+        Self::Ringed(FloatOrd::from(x))
+    }
+}
+
+impl Display for Node {
     /// Prints the value that a node contains.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            NodeVal::Unringed => writeln!(f, "Node is unringed"),
-            NodeVal::Ringed(x) => writeln!(f, "Node carries {}", x),
-            NodeVal::Snub => writeln!(f, "Node is snub"),
+            Node::Unringed => writeln!(f, "Node is unringed"),
+            Node::Ringed(x) => writeln!(f, "Node carries {}", x.0),
+            Node::Snub => writeln!(f, "Node is snub"),
         }
     }
 }
 
-/// Represents any of the possible values that may be stored in an edge of a
-/// [`Cd`].
+/// An edge in a [`Cd`].
 #[derive(Clone, Copy)]
-enum EdgeVal {
+enum Edge {
     /// Any edge that represents a rational number, including integer edges.
     Rational(i64, i64),
 
@@ -200,7 +322,7 @@ enum EdgeVal {
     Non,
 }
 
-impl EdgeVal {
+impl Edge {
     pub fn value(&self) -> f64 {
         match *self {
             Self::Rational(n, d) => n as f64 / d as f64,
@@ -211,14 +333,14 @@ impl EdgeVal {
     }
 }
 
-impl Display for EdgeVal {
+impl Display for Edge {
     ///Prints the value an edge contains
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EdgeVal::Rational(n, d) => writeln!(f, "Edge carries {}/{}", n, d),
-            EdgeVal::Inf => writeln!(f, "Edge carries prograde ∞"),
-            EdgeVal::RetInf => writeln!(f, "Edge carries retrograde ∞"),
-            EdgeVal::Non => writeln!(f, "Edge carries Ø"),
+            Edge::Rational(n, d) => writeln!(f, "Edge carries {}/{}", n, d),
+            Edge::Inf => writeln!(f, "Edge carries prograde ∞"),
+            Edge::RetInf => writeln!(f, "Edge carries retrograde ∞"),
+            Edge::Non => writeln!(f, "Edge carries Ø"),
         }
     }
 }
@@ -229,7 +351,7 @@ pub struct CdBuilder<'a> {
     diagram: Peekable<Enumerate<Chars<'a>>>,
 
     /// Represents the CD itself.
-    graph: Graph<NodeVal, EdgeVal, Undirected>,
+    graph: Graph<Node, Edge, Undirected>,
     edge_mem: EdgeMem,
 
     /// The length of the diagram.
@@ -353,7 +475,7 @@ fn parse<R: std::str::FromStr>(string: &str, idx: usize) -> CdResult<R> {
 /// Converts a slice of characters into a wrapped edge value.
 ///
 /// `idx` is the index of the last character in `raw`.
-fn edge_to_val(raw: Vec<char>, idx: usize) -> CdResult<EdgeVal> {
+fn edge_to_val(raw: Vec<char>, idx: usize) -> CdResult<Edge> {
     let len = raw.len();
     let mut raw_iter = raw
         .into_iter()
@@ -391,16 +513,16 @@ fn edge_to_val(raw: Vec<char>, idx: usize) -> CdResult<EdgeVal> {
         // If this was a Rational edge, the end value would be the denominator
         // If this wasn't a Rational edge, the end value would be the numerator
         match numerator {
-            Some(num) => Ok(EdgeVal::Rational(num, den)),
-            None => Ok(EdgeVal::Rational(den, 1i64)),
+            Some(num) => Ok(Edge::Rational(num, den)),
+            None => Ok(Edge::Rational(den, 1i64)),
         }
     } else {
         // For miscellaneous edge symbols,
         // just read the whole thing as a string
         match edge.as_str() {
-            "∞" => Ok(EdgeVal::Inf),
-            "∞'" | "'∞" => Ok(EdgeVal::RetInf),
-            "Ø" => Ok(EdgeVal::Non),
+            "∞" => Ok(Edge::Inf),
+            "∞'" | "'∞" => Ok(Edge::RetInf),
+            "Ø" => Ok(Edge::Non),
             _ => Err(CdError::InvalidSymbol(idx)),
         }
     }
@@ -409,7 +531,7 @@ fn edge_to_val(raw: Vec<char>, idx: usize) -> CdResult<EdgeVal> {
 /// Converts Vecs of chars to wrapped NodeVals
 ///
 /// `idx` is the index of the last character in `raw`.
-fn node_to_val(raw: Vec<char>, idx: usize) -> CdResult<NodeVal> {
+fn node_to_val(raw: Vec<char>, idx: usize) -> CdResult<Node> {
     let len = raw.len();
     let mut raw_iter = raw
         .into_iter()
@@ -455,7 +577,11 @@ fn node_to_val(raw: Vec<char>, idx: usize) -> CdResult<NodeVal> {
                 // Parse the value
                 let val: f64 = parse(&node.into_iter().collect::<String>(), idx)?;
 
-                return Ok(NodeVal::Ringed(sign * val));
+                return if val.is_nan() {
+                    Err(CdError::InvalidSymbol(idx))
+                } else {
+                    Ok(Node::ringed(sign * val))
+                };
             }
 
             // This character was normal, can continue
@@ -466,9 +592,9 @@ fn node_to_val(raw: Vec<char>, idx: usize) -> CdResult<NodeVal> {
         Err(CdError::MismatchedParenthesis(idx))
     } else {
         // Check shortchord values
-        Ok(NodeVal::Ringed(match c {
-            'o' => return Ok(NodeVal::Unringed),
-            's' => return Ok(NodeVal::Snub),
+        Ok(Node::ringed(match c {
+            'o' => return Ok(Node::Unringed),
+            's' => return Ok(Node::Snub),
             'v' => (5f64.sqrt() - 1f64) / 2f64,
             'x' => 1f64,
             'q' => 2f64.sqrt(),
@@ -492,8 +618,8 @@ fn node_to_val(raw: Vec<char>, idx: usize) -> CdResult<NodeVal> {
 }
 
 /// Inverts the value held by a EdgeVal
-fn num_retro(val: EdgeVal) -> EdgeVal {
-    use EdgeVal::*;
+fn num_retro(val: Edge) -> Edge {
+    use Edge::*;
 
     match val {
         Rational(n, d) => Rational(n, n - d),
@@ -506,46 +632,110 @@ fn num_retro(val: EdgeVal) -> EdgeVal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use nalgebra::dmatrix;
+
+    fn x() -> Node {
+        Node::ringed(1.0)
+    }
+
+    fn o() -> Node {
+        Node::Unringed
+    }
+
+    fn s() -> Node {
+        Node::Snub
+    }
+
+    fn test(input: &str, nodes: Vec<Node>, matrix: Matrix) {
+        let cd = Cd::new(input).unwrap();
+        assert_eq!(cd.nodes(), nodes, "Node mismatch!");
+        assert_eq!(cd.cox(), CdMatrix::new(matrix), "Coxeter matrix mismatch!");
+    }
 
     #[test]
     fn i2_10() {
-        let i2 = Cd::new("x10x").unwrap();
-        assert_eq!(i2.node_count(), 2);
-        assert_eq!(i2.edge_count(), 1);
+        test(
+            "x10x",
+            vec![x(), x()],
+            dmatrix![
+                1.0, 10.0;
+                10.0, 1.0
+            ],
+        )
     }
 
     #[test]
     fn a3() {
-        let a3 = Cd::new("x3o3x").unwrap();
-        assert_eq!(a3.node_count(), 3);
-        assert_eq!(a3.edge_count(), 2);
+        test(
+            "x3o3x",
+            vec![x(), o(), x()],
+            dmatrix![
+                1.0, 3.0, 2.0;
+                3.0, 1.0, 3.0;
+                2.0, 3.0, 1.0
+            ],
+        )
     }
 
     #[test]
     fn e6() {
-        let e6 = Cd::new("x3o3o3o3o *c3o").unwrap();
-        assert_eq!(e6.node_count(), 6);
-        assert_eq!(e6.edge_count(), 5);
+        test(
+            "x3o3o3o3o *c3o",
+            vec![x(), o(), o(), o(), o(), o()],
+            dmatrix![
+                1.0, 3.0, 2.0, 2.0, 2.0, 2.0;
+                3.0, 1.0, 3.0, 2.0, 2.0, 2.0;
+                2.0, 3.0, 1.0, 3.0, 2.0, 3.0;
+                2.0, 2.0, 3.0, 1.0, 3.0, 2.0;
+                2.0, 2.0, 2.0, 3.0, 1.0, 2.0;
+                2.0, 2.0, 3.0, 2.0, 2.0, 1.0
+            ],
+        )
     }
 
     #[test]
     fn node_lengths() {
-        let b3 = Cd::new("(1)4(2.2)3(-3.0)").unwrap();
-        assert_eq!(b3.node_count(), 3);
-        assert_eq!(b3.edge_count(), 2);
+        test(
+            "(1.0)4(2.2)3(-3.0)",
+            vec![Node::ringed(1.0), Node::ringed(2.2), Node::ringed(-3.0)],
+            dmatrix![
+                1.0, 4.0, 2.0;
+                4.0, 1.0, 3.0;
+                2.0, 3.0, 1.0
+            ],
+        )
     }
 
     #[test]
     fn snubs() {
-        let f4 = Cd::new("s4s3o4o").unwrap();
-        assert_eq!(f4.node_count(), 4);
-        assert_eq!(f4.edge_count(), 3);
+        test(
+            "s4s3o4o",
+            vec![s(), s(), o(), o()],
+            dmatrix![
+                1.0, 4.0, 2.0, 2.0;
+                4.0, 1.0, 3.0, 2.0;
+                2.0, 3.0, 1.0, 4.0;
+                2.0, 2.0, 4.0, 1.0
+            ],
+        )
     }
 
     #[test]
     fn shortchords() {
-        let b3 = Cd::new("v4x3F4f").unwrap();
-        assert_eq!(b3.node_count(), 4);
-        assert_eq!(b3.edge_count(), 3);
+        test(
+            "v4x3F4f",
+            vec![
+                Node::ringed((5f64.sqrt() - 1f64) / 2f64),
+                x(),
+                Node::ringed((5f64.sqrt() + 3f64) / 2f64),
+                Node::ringed((5f64.sqrt() + 1f64) / 2f64),
+            ],
+            dmatrix![
+                1.0, 4.0, 2.0, 2.0;
+                4.0, 1.0, 3.0, 2.0;
+                2.0, 3.0, 1.0, 4.0;
+                2.0, 2.0, 4.0, 1.0
+            ],
+        )
     }
 }

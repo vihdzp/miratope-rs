@@ -108,6 +108,9 @@ impl Consts for f64 {
 /// The floating point type used for all calculations.
 type Float = f64;
 
+/// A wrapper around [`Float`] to allow for ordering and equality.
+type FloatOrd = ordered_float::OrderedFloat<Float>;
+
 /// Loads all of the necessary systems for the application to run.
 fn main() {
     App::build()

@@ -173,21 +173,13 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// Gets the element figure with a given rank and index as a polytope.
     fn element_fig(&self, el: ElementRef) -> DualResult<Option<Self>> {
         if let Some(rank) = (self.rank() - el.rank).try_minus_one() {
-            Ok(
-                if let Some(mut element_fig) =
-                    self.try_dual()?.element(ElementRef::new(rank, el.idx))
-                {
-                    element_fig.try_dual_mut()?;
-                    Some(element_fig)
-                } else {
-                    None
-                },
-            )
-        } else {
-            // TODO: this isn't one of the usual inversion through a facet
-            // errors. Fix this.
-            Err(DualError(123456789))
+            if let Some(mut element_fig) = self.try_dual()?.element(ElementRef::new(rank, el.idx)) {
+                element_fig.try_dual_mut()?;
+                return Ok(Some(element_fig));
+            }
         }
+
+        Ok(None)
     }
 
     /// Gets the section defined by two elements with given ranks and indices as

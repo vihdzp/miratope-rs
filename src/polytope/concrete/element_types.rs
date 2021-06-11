@@ -4,11 +4,10 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::{
     polytope::{concrete::Concrete, r#abstract::rank::Rank, Polytope},
-    Consts, Float,
+    Consts, Float, FloatOrd,
 };
 
 use approx::abs_diff_eq;
-use ordered_float::OrderedFloat as FloatOrd;
 
 #[derive(PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub struct ElementCount {
@@ -52,7 +51,7 @@ pub enum ElementData {
     Point,
 
     /// An edge's type is given by its length.
-    Edge(FloatOrd<Float>),
+    Edge(FloatOrd),
 
     /// Any other element's type is given by the number of subelements of each
     /// type that it contains.
@@ -129,11 +128,11 @@ impl Concrete {
         }
 
         // Gets the edge lengths of all edges in the polytope.
-        let mut edge_lengths: BTreeMap<FloatOrd<Float>, Vec<usize>> = BTreeMap::new();
+        let mut edge_lengths: BTreeMap<FloatOrd, Vec<usize>> = BTreeMap::new();
         let edge_count = self.el_count(Rank::new(1));
 
         for edge_idx in 0..edge_count {
-            let len = FloatOrd(self.edge_len(edge_idx).unwrap());
+            let len = FloatOrd::from(self.edge_len(edge_idx).unwrap());
 
             // Searches for the greatest length smaller than the current one.
             if let Some((prev_len, indices)) = edge_lengths.range_mut(..len).next_back() {

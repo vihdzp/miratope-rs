@@ -2,12 +2,13 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use super::{cox::CoxMatrix, Concrete};
+use super::cd::{Cd, CdMatrix, CdResult};
+use super::Concrete;
 
-#[allow(unused_imports)] // Circumvents rust-analyzer bug.
-use crate::cox;
-use crate::geometry::{Matrix, MatrixOrd, Point, PointOrd, Vector};
-use crate::{Consts, Float};
+use crate::{
+    geometry::{Matrix, MatrixOrd, Point, PointOrd, Vector},
+    Consts, Float,
+};
 
 use approx::{abs_diff_ne, relative_eq};
 use nalgebra::{Dynamic, Quaternion, VecStorage};
@@ -115,7 +116,7 @@ fn direct_sum(mat1: Matrix, mat2: Matrix) -> Matrix {
 
 /// An iterator such that `dyn` objects using it can be cloned. Used to get
 /// around orphan rules.
-trait GroupIter: Iterator<Item = Matrix> + dyn_clone::DynClone {}
+pub trait GroupIter: Iterator<Item = Matrix> + dyn_clone::DynClone {}
 impl<T: Iterator<Item = Matrix> + dyn_clone::DynClone> GroupIter for T {}
 dyn_clone::clone_trait_object!(GroupIter);
 
@@ -123,8 +124,8 @@ dyn_clone::clone_trait_object!(GroupIter);
 /// acting on a space of a certain dimension.
 #[derive(Clone)]
 pub struct Group {
-    /// The dimension of the matrices of the group. Stored separately so that
-    /// the iterator doesn't have to be peekable.
+    /// The dimension of the matrices of the group. Stored separately, since
+    /// making the iterator peekable doesn't seem to work.
     dim: usize,
 
     /// The underlying iterator, which actually outputs the matrices.
@@ -140,6 +141,13 @@ impl Iterator for Group {
 }
 
 impl Group {
+    pub fn new<T: 'static + GroupIter>(dim: usize, iter: T) -> Self {
+        Self {
+            dim,
+            iter: Box::new(iter),
+        }
+    }
+
     /// Gets all of the elements of the group. Consumes the iterator.
     pub fn elements(self) -> Vec<Matrix> {
         self.collect()
@@ -151,20 +159,14 @@ impl Group {
     }
 
     pub fn from_gens(dim: usize, gens: Vec<Matrix>) -> Self {
-        Self {
-            dim,
-            iter: Box::new(GenIter::new(dim, gens)),
-        }
+        Self::new(dim, Box::new(GenIter::new(dim, gens)))
     }
 
     /// Buils the rotation subgroup of a group.
     pub fn rotations(self) -> Self {
         // The determinant might not be exactly 1, so we're extra lenient and
         // just test for positive determinants.
-        Self {
-            dim: self.dim,
-            iter: Box::new(self.filter(|el| el.determinant() > 0.0)),
-        }
+        Self::new(self.dim, self.filter(|el| el.determinant() > 0.0))
     }
 
     /// Builds an iterator over the set of either left or a right quaternions
@@ -190,28 +192,22 @@ impl Group {
             panic!("h must be a group of 3D matrices.");
         }
 
-        Self {
-            dim: 4,
-            iter: Box::new(
-                itertools::iproduct!(g.quaternions(true), h.quaternions(false))
-                    .map(|(mat1, mat2)| {
-                        let mat = mat1 * mat2;
-                        std::iter::once(mat.clone()).chain(std::iter::once(-mat))
-                    })
-                    .flatten(),
-            ),
-        }
+        Self::new(
+            4,
+            itertools::iproduct!(g.quaternions(true), h.quaternions(false))
+                .map(|(mat1, mat2)| {
+                    let mat = mat1 * mat2;
+                    std::iter::once(mat.clone()).chain(std::iter::once(-mat))
+                })
+                .flatten(),
+        )
     }
 
     /// Returns a new group whose elements have all been generated already, so
     /// that they can be used multiple times quickly.
     pub fn cache(self) -> Self {
         let elements = self.elements();
-
-        Self {
-            dim: elements[0].nrows(),
-            iter: Box::new(elements.into_iter()),
-        }
+        Self::new(elements[0].nrows(), elements.into_iter())
     }
 
     /// Returns the exact same group, but now asserts that each generated
@@ -220,34 +216,53 @@ impl Group {
         const MSG: &str = "Size of matrix does not match expected dimension.";
         let dim = self.dim;
 
-        Self {
+        Self::new(
             dim,
-            iter: Box::new(self.map(move |x| {
+            self.map(move |x| {
                 assert_eq!(x.nrows(), dim, "{}", MSG);
                 assert_eq!(x.ncols(), dim, "{}", MSG);
-
                 x
-            })),
-        }
+            }),
+        )
+    }
+
+    /// Parses a [`Cd`] and turns it into a group.
+    pub fn parse(input: &str) -> CdResult<Option<Self>> {
+        Cd::new(input).map(|cd| Self::cox_group(cd.cox()))
+    }
+
+    /// Shorthand for `Self::parse(input).unwrap().unwrap()`.
+    pub fn parse_unwrap(input: &str) -> Self {
+        Self::parse(input).unwrap().unwrap()
     }
 
     /// Generates the trivial group of a certain dimension.
     pub fn trivial(dim: usize) -> Self {
-        Self {
-            dim,
-            iter: Box::new(std::iter::once(Matrix::identity(dim, dim))),
-        }
+        Self::new(dim, std::iter::once(Matrix::identity(dim, dim)))
     }
 
     /// Generates the group with the identity and a central inversion of a
     /// certain dimension.
     pub fn central_inv(dim: usize) -> Self {
-        Self {
+        Self::new(
             dim,
-            iter: Box::new(
-                vec![Matrix::identity(dim, dim), -Matrix::identity(dim, dim)].into_iter(),
-            ),
-        }
+            vec![Matrix::identity(dim, dim), -Matrix::identity(dim, dim)].into_iter(),
+        )
+    }
+
+    /// Returns the I2(x) symmetry group.
+    pub fn i2(x: Float) -> Self {
+        Self::cox_group(CdMatrix::i2(x)).unwrap()
+    }
+
+    /// Returns the An symmetry group.
+    pub fn a(n: usize) -> Self {
+        Self::cox_group(CdMatrix::a(n)).unwrap()
+    }
+
+    /// Returns the Bn symmetry group.
+    pub fn b(n: usize) -> Self {
+        Self::cox_group(CdMatrix::b(n)).unwrap()
     }
 
     /// Generates a step prism group from a base group and a homomorphism into
@@ -261,13 +276,10 @@ impl Group {
         }
     }
 
-    /// Generates a Coxeter group from its [`CoxMatrix`], or returns `None` if
+    /// Generates a Coxeter group from its [`CdMatrix`], or returns `None` if
     /// the group doesn't fit as a matrix group in spherical space.
-    pub fn cox_group(cox: CoxMatrix) -> Option<Self> {
-        Some(Self {
-            dim: cox.nrows(),
-            iter: Box::new(GenIter::from_cox_mat(cox)?),
-        })
+    pub fn cox_group(cox: CdMatrix) -> Option<Self> {
+        Some(Self::new(cox.dim(), GenIter::from_cox_mat(cox)?))
     }
 
     /// Generates the direct product of two groups. Uses the specified function
@@ -278,10 +290,7 @@ impl Group {
         dim: usize,
         product: (impl Fn((Matrix, Matrix)) -> Matrix + Clone + 'static),
     ) -> Self {
-        Self {
-            dim,
-            iter: Box::new(itertools::iproduct!(g, h).map(product)),
-        }
+        Self::new(dim, itertools::iproduct!(g, h).map(product))
     }
 
     /// Returns the group determined by all products between elements of the
@@ -301,7 +310,6 @@ impl Group {
     /// mapped to their direct sum.
     pub fn direct_product(g: Self, h: Self) -> Self {
         let dim = g.dim + h.dim;
-
         Self::fn_product(g, h, dim, |(mat1, mat2)| direct_sum(mat1, mat2))
     }
 
@@ -342,34 +350,32 @@ impl Group {
             .cloned()
             .fold(g.clone(), |acc, g| Group::direct_product(g, acc));
 
-        Self {
+        Self::new(
             dim,
-            iter: Box::new(
-                g_prod
-                    .map(move |g_el| {
-                        let mut matrices = Vec::new();
+            g_prod
+                .map(move |g_el| {
+                    let mut matrices = Vec::new();
 
-                        for perm in &permutations {
-                            let mut new_el = Matrix::zeros(dim, dim);
+                    for perm in &permutations {
+                        let mut new_el = Matrix::zeros(dim, dim);
 
-                            // Permutes the blocks on the diagonal of g_el.
-                            for (i, &j) in perm.iter().enumerate() {
-                                for x in 0..g_dim {
-                                    for y in 0..g_dim {
-                                        new_el[(i * g_dim + x, j * g_dim + y)] =
-                                            g_el[(i * g_dim + x, i * g_dim + y)];
-                                    }
+                        // Permutes the blocks on the diagonal of g_el.
+                        for (i, &j) in perm.iter().enumerate() {
+                            for x in 0..g_dim {
+                                for y in 0..g_dim {
+                                    new_el[(i * g_dim + x, j * g_dim + y)] =
+                                        g_el[(i * g_dim + x, i * g_dim + y)];
                                 }
                             }
-
-                            matrices.push(new_el);
                         }
 
-                        matrices.into_iter()
-                    })
-                    .flatten(),
-            ),
-        }
+                        matrices.push(new_el);
+                    }
+
+                    matrices.into_iter()
+                })
+                .flatten(),
+        )
     }
 
     /// Generates the orbit of a point under a given symmetry group.
@@ -559,8 +565,8 @@ impl GenIter {
         }
     }
 
-    pub fn from_cox_mat(cox: CoxMatrix) -> Option<Self> {
-        let dim = cox.nrows();
+    pub fn from_cox_mat(cox: CdMatrix) -> Option<Self> {
+        let dim = cox.dim();
         let mut generators = Vec::with_capacity(dim);
 
         // Builds each generator from the top down as a triangular matrix, so
@@ -595,7 +601,6 @@ impl GenIter {
 mod tests {
     use super::*;
     use gcd::Gcd;
-    use nalgebra::dmatrix;
 
     /// Tests a given symmetry group.
     fn test(group: Group, order: usize, rot_order: usize, name: &str) {
@@ -652,7 +657,7 @@ mod tests {
                 }
 
                 test(
-                    cox!(n as Float / d as Float),
+                    Group::i2(n as Float / d as Float),
                     2 * n,
                     n,
                     &format!("I2({})", n),
@@ -670,8 +675,8 @@ mod tests {
 
             test(
                 Group::swirl(
-                    cox!(3.0, 3.0),
-                    Group::direct_product(cox!(n), Group::trivial(1)),
+                    Group::a(3),
+                    Group::direct_product(Group::i2(n as Float), Group::trivial(1)),
                 ),
                 order,
                 order,
@@ -689,7 +694,7 @@ mod tests {
         for n in 2..=6 {
             order *= n + 1;
 
-            test(cox!(3; n - 1), order, order / 2, &format!("A{}", n))
+            test(Group::a(n), order, order / 2, &format!("A{}", n))
         }
     }
     /// Tests the ±A*n* symmetries, which correspond to the symmetries of the
@@ -702,7 +707,7 @@ mod tests {
             order *= n + 1;
 
             test(
-                Group::matrix_product(cox!(3; n - 1), Group::central_inv(n)).unwrap(),
+                Group::matrix_product(Group::a(n), Group::central_inv(n)).unwrap(),
                 order,
                 order / 2,
                 &format!("±A{}", n),
@@ -713,23 +718,13 @@ mod tests {
     /// Tests the BC*n* symmetries, which correspond to the symmetries of the
     /// regular hypercube and orthoplex.
     #[test]
-    fn bc() {
+    fn b() {
         let mut order = 2;
 
         for n in 2..=6 {
-            // A better cox! macro would make this unnecessary.
-            let mut cox = vec![3.0; n - 1];
-            cox[0] = 4.0;
-            let cox = CoxMatrix::from_lin_diagram(cox);
-
             order *= n * 2;
 
-            test(
-                Group::cox_group(cox).unwrap(),
-                order,
-                order / 2,
-                &format!("BC{}", n),
-            )
+            test(Group::b(n), order, order / 2, &format!("BC{}", n))
         }
     }
 
@@ -737,25 +732,14 @@ mod tests {
     /// regular dodecahedron and a regular hecatonicosachoron.
     #[test]
     fn h() {
-        test(cox!(5, 3), 120, 60, &"H3");
-        test(cox!(5, 3, 3), 14400, 7200, &"H4");
+        test(Group::parse_unwrap("o5o3o"), 120, 60, &"H3");
+        test(Group::parse_unwrap("o5o3o3o"), 14400, 7200, &"H4");
     }
 
     /// Tests the E6 symmetry group.
     #[test]
     fn e6() {
-        // In the future, we'll have better code for this, I hope.
-        let e6 = Group::cox_group(CoxMatrix(dmatrix![
-            1.0, 3.0, 2.0, 2.0, 2.0, 2.0;
-            3.0, 1.0, 3.0, 2.0, 2.0, 2.0;
-            2.0, 3.0, 1.0, 3.0, 2.0, 3.0;
-            2.0, 2.0, 3.0, 1.0, 3.0, 2.0;
-            2.0, 2.0, 2.0, 3.0, 1.0, 2.0;
-            2.0, 2.0, 3.0, 2.0, 2.0, 1.0
-        ]))
-        .unwrap();
-
-        test(e6, 51840, 25920, &"E6");
+        test(Group::parse_unwrap("o3o3o3o3o *c3o"), 51840, 25920, &"E6");
     }
 
     /// Tests the E7 symmetry group. This is very expensive, so we enable it
@@ -763,25 +747,18 @@ mod tests {
     #[test]
     #[cfg(not(debug_assertions))]
     fn e7() {
-        // In the future, we'll have better code for this, I hope.
-        let e7 = Group::cox_group(CoxMatrix(dmatrix![
-            1.0, 3.0, 2.0, 2.0, 2.0, 2.0, 2.0;
-            3.0, 1.0, 3.0, 2.0, 2.0, 2.0, 2.0;
-            2.0, 3.0, 1.0, 3.0, 3.0, 2.0, 2.0;
-            2.0, 2.0, 3.0, 1.0, 2.0, 2.0, 2.0;
-            2.0, 2.0, 3.0, 2.0, 1.0, 3.0, 2.0;
-            2.0, 2.0, 2.0, 2.0, 3.0, 1.0, 3.0;
-            2.0, 2.0, 2.0, 2.0, 2.0, 3.0, 1.0
-        ]))
-        .unwrap();
-
-        test(e7, 2903040, 1451520, &"E7");
+        test(
+            Group::parse_unwrap("o3o3o3o3o3o *c3o"),
+            2903040,
+            1451520,
+            &"E7",
+        );
     }
 
     #[test]
     /// Tests the direct product of A3 with itself.
     fn a3xa3() {
-        let a3 = cox!(3, 3);
+        let a3 = Group::parse_unwrap("o3o3o");
         let g = Group::direct_product(a3.clone(), a3.clone());
         test(g, 576, 288, &"A3×A3");
     }
@@ -789,7 +766,12 @@ mod tests {
     #[test]
     /// Tests the wreath product of A3 with A1.
     fn a3_wr_a1() {
-        test(Group::wreath(cox!(3, 3), cox!()), 1152, 576, &"A3 ≀ A1");
+        test(
+            Group::wreath(Group::a(3), Group::a(1)),
+            1152,
+            576,
+            &"A3 ≀ A1",
+        );
     }
 
     #[test]
@@ -798,7 +780,9 @@ mod tests {
         for n in 1..10 {
             for d in 1..n {
                 test(
-                    Group::step(cox!(n).rotations(), move |mat| mat.pow(d).unwrap()),
+                    Group::step(Group::i2(n as Float).rotations(), move |mat| {
+                        mat.pow(d).unwrap()
+                    }),
                     n,
                     n,
                     "Step prismatic n-d",

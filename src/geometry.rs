@@ -12,7 +12,10 @@ pub type Matrix = nalgebra::DMatrix<Float>;
 use crate::{Consts, Float};
 
 use approx::{abs_diff_eq, abs_diff_ne};
-use nalgebra::{storage::Storage, Dim, Dynamic, VecStorage, U1};
+use nalgebra::{
+    storage::{Storage, StorageMut},
+    Dim, Dynamic, VecStorage, U1,
+};
 
 /// A hypersphere with a certain center and radius.
 ///
@@ -399,6 +402,17 @@ where
     }
 }
 
+impl<R: Dim, C: Dim> std::ops::Index<(usize, usize)> for MatrixOrdMxN<R, C>
+where
+    VecStorage<Float, R, C>: Storage<Float, R, C>,
+{
+    type Output = Float;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
 impl<R: Dim, C: Dim> MatrixOrdMxN<R, C>
 where
     VecStorage<Float, R, C>: Storage<Float, R, C>,
@@ -408,9 +422,29 @@ where
         Self(mat)
     }
 
+    /// Returns a reference to the inner matrix.
+    pub fn as_matrix(&self) -> &MatrixMxN<R, C> {
+        &self.0
+    }
+
+    /// Returns a mutable reference to the inner matrix.
+    pub fn as_matrix_mut(&mut self) -> &mut MatrixMxN<R, C> {
+        &mut self.0
+    }
+
     /// Iterates over the entries of the `MatrixOrd`.
     pub fn iter(&self) -> nalgebra::iter::MatrixIter<Float, R, C, VecStorage<Float, R, C>> {
         self.0.iter()
+    }
+
+    /// Mutably iterates over the entries of the `MatrixOrd`.
+    pub fn iter_mut(
+        &mut self,
+    ) -> nalgebra::iter::MatrixIterMut<Float, R, C, VecStorage<Float, R, C>>
+    where
+        VecStorage<Float, R, C>: StorageMut<Float, R, C>,
+    {
+        self.0.iter_mut()
     }
 }
 
