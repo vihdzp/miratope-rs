@@ -133,7 +133,8 @@ impl std::ops::Index<(usize, usize)> for CdMatrix {
     }
 }
 
-/// A node in a [`Cd`].
+/// A node in a [`Cd`]. Represents a mirror in hyperspace, and specifies where
+/// a generator point should be located with respect to it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Node {
     /// An unringed node.
@@ -166,6 +167,98 @@ impl Node {
     /// Shorthand for `NodeVal::Snub(FloatOrd::from(x))`.
     pub fn snub(x: Float) -> Self {
         Self::Snub(FloatOrd::from(x))
+    }
+
+    /// Parses a string slice ending at a given index as a node.
+    fn parse(raw: &str, idx: usize) -> CdResult<Self> {
+        let len = raw.len();
+
+        // We make sure that the indices are the indices of the original string
+        // instead of those in the slice.
+        let mut raw_iter = raw
+            .chars()
+            .enumerate()
+            .map(|(str_idx, c)| (idx + str_idx + 1 - len, c));
+
+        let mut node = String::new();
+        let mut sign = 1.0;
+
+        let (mut idx, mut c) = raw_iter.next().expect("Node can't be empty!");
+
+        /// Skips a character from the string, returns a mismatched parenthesis
+        /// error if there's no subsequent character.
+        macro_rules! skip_char {
+            () => {
+                idx += 1;
+                c = raw_iter
+                    .next()
+                    .ok_or(CdError::MismatchedParenthesis(idx))?
+                    .1;
+            };
+        }
+
+        // Skips any opening parenthesis.
+        if c == '(' {
+            skip_char!();
+        }
+
+        // Skips a minus sign.
+        if c == '-' {
+            sign = -1.0;
+            skip_char!();
+        }
+
+        // Starting character
+        node.push(c);
+
+        // If the node has a custom value:
+        if c.is_digit(10) {
+            for (idx, c) in raw_iter {
+                // We read it until we find the closing parenthesis.
+                if c == ')' {
+                    let val: Float = parse(&node, idx)?;
+
+                    // In case the user tries to literally write "NaN" (real funny)
+                    return if val.is_nan() {
+                        Err(CdError::InvalidSymbol(idx))
+                    } else {
+                        Ok(Node::ringed(sign * val))
+                    };
+                }
+
+                // This character was normal, we can continue.
+                node.push(c);
+            }
+
+            // We never found the matching parenthesis.
+            Err(CdError::MismatchedParenthesis(idx))
+        } else {
+            // Maybe return an error if there was a minus sign?
+
+            // Check shortchord values
+            Ok(Node::ringed(match c {
+                'o' => return Ok(Node::Unringed),
+                's' => return Ok(Node::snub(1.0)),
+                'v' => (5f64.sqrt() - 1f64) / 2f64,
+                'x' => 1f64,
+                'q' => 2f64.sqrt(),
+                'f' => (5f64.sqrt() + 1f64) / 2f64,
+                'h' => 3f64.sqrt(),
+                'k' => (2f64.sqrt() + 2f64).sqrt(),
+                'u' => 2f64,
+                'w' => 2f64.sqrt() + 1f64,
+                'F' => (5f64.sqrt() + 3f64) / 2f64,
+                'e' => 3f64.sqrt() + 1f64,
+                'Q' => 2f64.sqrt() * 2f64,
+                'd' => 3f64,
+                'V' => 5f64.sqrt() + 1f64,
+                'U' => 2f64.sqrt() + 2f64,
+                'A' => (5f64.sqrt() + 5f64) / 4f64,
+                'X' => 2f64.sqrt() * 2f64 + 1f64,
+                'B' => 5f64.sqrt() + 2f64,
+                _ => return Err(CdError::InvalidSymbol(idx)),
+            }))
+        }
     }
 }
 
@@ -208,6 +301,60 @@ impl Edge {
             Self::Non => f64::NAN,
         }
     }
+
+    /// Converts a slice of characters into a wrapped edge value.
+    ///
+    /// `idx` is the index of the last character in `raw`.
+    fn parse(raw: &str, idx: usize) -> CdResult<Self> {
+        let len = raw.len();
+        let mut raw_iter = raw
+            .chars()
+            .enumerate()
+            .map(|(str_idx, c)| (idx + str_idx + 1 - len, c));
+
+        let mut edge = String::new();
+        let mut numerator = None;
+        let (_, c) = raw_iter.next().expect("Slice can't be empty!");
+
+        // Starting character
+        edge.push(c);
+
+        // If the value is Rational or an Integer
+        if c.is_digit(10) {
+            for (idx, c) in raw_iter {
+                // If the "/" is encountered
+                if c == '/' {
+                    // Parse and save the numerator
+                    numerator = Some(parse(&edge, idx)?);
+
+                    // Reset what's being read.
+                    edge = String::new();
+                };
+
+                // Wasn't a special character, can continue
+                edge.push(c);
+            }
+
+            // When you're at the end
+            // Parse the end value
+            let den = parse(&edge, idx)?;
+
+            // If this was a Rational edge, the end value would be the denominator
+            // If this wasn't a Rational edge, the end value would be the numerator
+            match numerator {
+                Some(num) => Ok(Edge::Rational(num, den)),
+                None => Ok(Edge::Rational(den, 1i64)),
+            }
+        } else {
+            // Special hardcoded cases.
+            match edge.as_str() {
+                "∞" => Ok(Edge::Inf),
+                "∞'" | "'∞" => Ok(Edge::RetInf),
+                "Ø" => Ok(Edge::Non),
+                _ => Err(CdError::InvalidSymbol(idx)),
+            }
+        }
+    }
 }
 
 impl Display for Edge {
@@ -220,6 +367,11 @@ impl Display for Edge {
             Edge::Non => writeln!(f, "Ø"),
         }
     }
+}
+
+/// Attempts to parse a `String`, returns a [`CdError`] if it fails.
+fn parse<R: std::str::FromStr>(string: &str, idx: usize) -> CdResult<R> {
+    string.parse().map_err(|_| CdError::ParseError(idx))
 }
 
 /// Packages important information needed to interpret CDs
@@ -240,18 +392,23 @@ pub struct CdBuilder<'a> {
 
 /// Operations that are commonly done to parse CDs.
 impl<'a> CdBuilder<'a> {
+    /// Gets the next index-character pair, or returns `None` if we've run out.
+    pub fn next(&mut self) -> Option<(usize, char)> {
+        self.diagram.next()
+    }
+
     /// Either gets the next index-character pair, or returns a
     /// [`CdError::UnexpectedEnding`] error.
     pub fn next_or(&mut self) -> CdResult<(usize, char)> {
-        self.diagram
-            .next()
-            .ok_or(CdError::UnexpectedEnding(self.len))
+        self.next().ok_or(CdError::UnexpectedEnding(self.len))
     }
 
     /// Reads the next node in the diagram and adds it to the graph. Returns
     /// `Ok(())` if succesful, and a [`CdResult`] otherwise.
     pub fn create_node(&mut self) -> CdResult<()> {
+        // TODO: build a string slice instead?
         let mut chars = String::new();
+
         let (idx, c) = self.next_or()?;
         chars.push(c);
 
@@ -269,7 +426,7 @@ impl<'a> CdBuilder<'a> {
                         if c == ')' {
                             // Converts the read characters into a value and
                             // adds the node to the graph.
-                            self.cd.add_node(node_to_val(chars, idx)?);
+                            self.cd.add_node(Node::parse(&chars, idx)?);
                             break;
                         }
                     } else {
@@ -297,7 +454,7 @@ impl<'a> CdBuilder<'a> {
             // If the node is a single character.
             _ => {
                 // Converts the read characters into a value and adds the node to the graph.
-                self.cd.add_node(node_to_val(chars, idx)?);
+                self.cd.add_node(Node::parse(&chars, idx)?);
             }
         }
 
@@ -321,6 +478,7 @@ impl<'a> CdBuilder<'a> {
 
     /// Reads an edge from a CD and stores into the next edge.
     pub fn create_edge(&mut self) -> CdResult<Option<()>> {
+        // TODO: build a string slice instead?
         let mut chars = String::new();
 
         // We read through the diagram until we encounter something that looks
@@ -328,13 +486,14 @@ impl<'a> CdBuilder<'a> {
         while let Some(&(idx, d)) = self.diagram.peek() {
             if d == '(' || d == '*' || d.is_alphabetic() {
                 // Adds the edge value to edge_mem
-                self.next_edge.edge = Some(edge_to_val(chars, idx)?);
+                self.next_edge.edge = Some(Edge::parse(&chars, idx)?);
                 return Ok(Some(()));
             }
 
             // Here, we want to look ahead before adding characters,
-            // so we don't add the first character of the next node
-            chars.push(self.next_or()?.1);
+            // so we don't add the first character of the next node.
+            self.next();
+            chars.push(d);
         }
 
         //If we unexpectedly hit the end of the iterator, exit and return None
@@ -345,166 +504,6 @@ impl<'a> CdBuilder<'a> {
     ///Reads a lace suffix
     fn read_suff(&self) -> Option<Caret> {}
     */
-}
-
-/// Attempts to parse a `String`, returns a [`CdError`] if it fails.
-fn parse<R: std::str::FromStr>(string: &str, idx: usize) -> CdResult<R> {
-    string.parse().map_err(|_| CdError::ParseError(idx))
-}
-
-/// Converts a slice of characters into a wrapped edge value.
-///
-/// `idx` is the index of the last character in `raw`.
-fn edge_to_val(raw: String, idx: usize) -> CdResult<Edge> {
-    let len = raw.len();
-    let mut raw_iter = raw
-        .chars()
-        .enumerate()
-        .map(|(str_idx, c)| (idx + str_idx + 1 - len, c));
-
-    let mut edge = String::new();
-    let mut numerator = None;
-    let (_, c) = raw_iter.next().expect("Slice can't be empty!");
-
-    // Starting character
-    edge.push(c);
-
-    // If the value is Rational or an Integer
-    if c.is_digit(10) {
-        for (idx, c) in raw_iter {
-            // If the "/" is encountered
-            if c == '/' {
-                // Parse and save the numerator
-                numerator = Some(parse(&edge, idx)?);
-
-                // Reset what's being read.
-                edge = String::new();
-            };
-
-            // Wasn't a special character, can continue
-            edge.push(c);
-        }
-
-        // When you're at the end
-        // Parse the end value
-        let den = parse(&edge, idx)?;
-
-        // If this was a Rational edge, the end value would be the denominator
-        // If this wasn't a Rational edge, the end value would be the numerator
-        match numerator {
-            Some(num) => Ok(Edge::Rational(num, den)),
-            None => Ok(Edge::Rational(den, 1i64)),
-        }
-    } else {
-        // Special hardcoded cases.
-        match edge.as_str() {
-            "∞" => Ok(Edge::Inf),
-            "∞'" | "'∞" => Ok(Edge::RetInf),
-            "Ø" => Ok(Edge::Non),
-            _ => Err(CdError::InvalidSymbol(idx)),
-        }
-    }
-}
-
-/// Converts Vecs of chars to wrapped NodeVals
-///
-/// `idx` is the index of the last character in `raw`.
-fn node_to_val(raw: String, idx: usize) -> CdResult<Node> {
-    let len = raw.len();
-    let mut raw_iter = raw
-        .chars()
-        .enumerate()
-        .map(|(str_idx, c)| (idx + str_idx + 1 - len, c));
-
-    let mut node = String::new();
-    let mut sign = 1.0;
-
-    let (mut idx, mut c) = raw_iter.next().expect("Node can't be empty!");
-
-    /// Skips a character from the string, returns a mismatched parenthesis
-    /// error if there's no subsequent character.
-    macro_rules! skip_char {
-        () => {
-            idx += 1;
-            c = raw_iter
-                .next()
-                .ok_or(CdError::MismatchedParenthesis(idx))?
-                .1;
-        };
-    }
-
-    // Skips any opening parenthesis.
-    if c == '(' {
-        skip_char!();
-    }
-
-    // Skips a minus sign.
-    if c == '-' {
-        sign = -1.0;
-        skip_char!();
-    }
-
-    // Starting character
-    node.push(c);
-
-    // If the node has a custom value:
-    if c.is_digit(10) {
-        for (idx, c) in raw_iter {
-            // We read it until we find the closing parenthesis.
-            if c == ')' {
-                let val: Float = parse(&node, idx)?;
-
-                // In case the user tries to literally write "NaN" (real funny)
-                return if val.is_nan() {
-                    Err(CdError::InvalidSymbol(idx))
-                } else {
-                    Ok(Node::ringed(sign * val))
-                };
-            }
-
-            // This character was normal, we can continue.
-            node.push(c);
-        }
-
-        // We never found the matching parenthesis.
-        Err(CdError::MismatchedParenthesis(idx))
-    } else {
-        // Check shortchord values
-        Ok(Node::ringed(match c {
-            'o' => return Ok(Node::Unringed),
-            's' => return Ok(Node::snub(1.0)),
-            'v' => (5f64.sqrt() - 1f64) / 2f64,
-            'x' => 1f64,
-            'q' => 2f64.sqrt(),
-            'f' => (5f64.sqrt() + 1f64) / 2f64,
-            'h' => 3f64.sqrt(),
-            'k' => (2f64.sqrt() + 2f64).sqrt(),
-            'u' => 2f64,
-            'w' => 2f64.sqrt() + 1f64,
-            'F' => (5f64.sqrt() + 3f64) / 2f64,
-            'e' => 3f64.sqrt() + 1f64,
-            'Q' => 2f64.sqrt() * 2f64,
-            'd' => 3f64,
-            'V' => 5f64.sqrt() + 1f64,
-            'U' => 2f64.sqrt() + 2f64,
-            'A' => (5f64.sqrt() + 5f64) / 4f64,
-            'X' => 2f64.sqrt() * 2f64 + 1f64,
-            'B' => 5f64.sqrt() + 2f64,
-            _ => return Err(CdError::InvalidSymbol(idx)),
-        }))
-    }
-}
-
-/// Inverts the value held by a EdgeVal
-fn num_retro(val: Edge) -> Edge {
-    use Edge::*;
-
-    match val {
-        Rational(n, d) => Rational(n, n - d),
-        Inf => RetInf,
-        RetInf => Inf,
-        Non => Non,
-    }
 }
 
 /// Stores the value of the next edge in the graph, along with the index of its
