@@ -94,14 +94,16 @@ impl ElementType {
 }
 
 // We'll move this over to the translation module... some day.
-const EL_NAMES: [&str; 12] = [
+const EL_NAMES: [&str; 24] = [
     "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta", "Xenna",
-    "Daka", "Henda",
+    "Daka", "Henda", "Doka", "Tradaka", "Tedaka", "Pedaka", "Exdaka", "Zedaka", "Yodaka",
+    "Nedaka", "Ika", "Ikena", "Ikoda", "Iktra",
 ];
 
-const EL_SUFFIXES: [&str; 12] = [
+const EL_SUFFIXES: [&str; 24] = [
     "", "", "gon", "hedron", "choron", "teron", "peton", "exon", "zetton", "yotton", "xennon",
-    "dakon",
+    "dakon", "hendon", "dokon", "tradakon", "tedakon", "pedakon", "exdakon", "zedakon",
+    "yodakon", "nedakon", "ikon", "ikenon", "ikodon",
 ];
 
 impl Concrete {
