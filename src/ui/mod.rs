@@ -7,10 +7,10 @@ use crate::{geometry::Point, Consts, Float};
 
 pub mod camera;
 pub mod config;
-pub mod egui_windows;
 pub mod library;
 pub mod main_window;
 pub mod memory;
+pub mod operations;
 pub mod top_panel;
 
 /// All of the plugins specific to Miratope.
@@ -21,7 +21,7 @@ impl bevy::prelude::PluginGroup for MiratopePlugins {
         group
             .add(camera::InputPlugin)
             .add(config::ConfigPlugin)
-            .add(egui_windows::EguiWindowPlugin)
+            .add(operations::OperationsPlugin)
             .add(library::LibraryPlugin)
             .add(main_window::MainWindowPlugin)
             .add(top_panel::TopPanelPlugin);

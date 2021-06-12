@@ -1,4 +1,4 @@
-//! Sets up the windows that permit more advanced settings.
+//! Sets up the windows for operations on a polytope.
 //!
 //! All windows are loaded in parallel, before the top panel and the library are
 //! shown on screen.
@@ -34,9 +34,9 @@ pub enum ShowResult {
 }
 
 /// The plugin controlling all of these windows.
-pub struct EguiWindowPlugin;
+pub struct OperationsPlugin;
 
-impl Plugin for EguiWindowPlugin {
+impl Plugin for OperationsPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_plugin(DualWindow::plugin())
             .add_plugin(PyramidWindow::plugin())

@@ -4,6 +4,7 @@
 
 pub mod r#abstract;
 pub mod concrete;
+pub mod group;
 
 use std::iter;
 

@@ -7,7 +7,7 @@ use crate::{
     geometry::{Hyperplane, Point, Vector},
     lang::SelectedLanguage,
     polytope::{concrete::Concrete, Polytope},
-    ui::{egui_windows::*, UnitPointWidget},
+    ui::{operations::*, UnitPointWidget},
     Float,
 };
 

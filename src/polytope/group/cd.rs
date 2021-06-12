@@ -1,15 +1,19 @@
-use std::{f64::consts::PI, fmt::Display, iter, mem};
+use std::{
+    f64::consts::PI, fmt::Display, iter, mem, ops::RangeBounds, slice::SliceIndex, str::FromStr,
+};
 
 use crate::{
     geometry::{Matrix, MatrixOrd, Point, Vector},
     Consts, Float, FloatOrd,
 };
+
 use nalgebra::{dmatrix, Dynamic, VecStorage};
 use petgraph::{
     graph::{Graph, Node as GraphNode, NodeIndex},
     Undirected,
 };
 
+/// The result of an operation involving Coxeter diagram parsing.
 pub type CdResult<T> = Result<T, CdError>;
 
 /// Represents an error while parsing a CD.
@@ -43,8 +47,8 @@ impl Display for CdError {
 
 impl std::error::Error for CdError {}
 
-/// Represents a Coxeter diagram as a matrix, so that the (i, j) entry
-/// corresponds to the value of the edge between the ith and jth node.
+/// Represents a [`Cd`] as a matrix, so that the (i, j) entry corresponds to the
+/// value of the edge between the ith and jth node.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CoxMatrix(MatrixOrd);
 
@@ -129,8 +133,8 @@ impl CoxMatrix {
         let dim = self.dim();
         let mut mat = Matrix::zeros(dim, dim);
 
-        // Builds each generator from the top down as a triangular matrix, so
-        // that the dot products match the values in the Coxeter matrix.
+        // Builds each column from the top down, so that each of the succesive
+        // dot products we check matcht he values in the Coxeter matrix.
         for i in 0..dim {
             let (prev_gens, mut n_i) = mat.columns_range_pair_mut(0..i, i);
 
@@ -198,96 +202,36 @@ impl Node {
         Self::Snub(FloatOrd::from(x))
     }
 
-    /// Parses a string slice ending at a given index as a node.
-    fn parse(raw: &str, idx: usize) -> CdResult<Self> {
-        let len = raw.len();
+    pub fn from_char(c: char) -> Option<Self> {
+        Some(Node::ringed(match c {
+            'o' => return Some(Node::Unringed),
+            's' => return Some(Node::snub(1.0)),
+            'v' => (5f64.sqrt() - 1f64) / 2f64,
+            'x' => 1f64,
+            'q' => 2f64.sqrt(),
+            'f' => (5f64.sqrt() + 1f64) / 2f64,
+            'h' => 3f64.sqrt(),
+            'k' => (2f64.sqrt() + 2f64).sqrt(),
+            'u' => 2f64,
+            'w' => 2f64.sqrt() + 1f64,
+            'F' => (5f64.sqrt() + 3f64) / 2f64,
+            'e' => 3f64.sqrt() + 1f64,
+            'Q' => 2f64.sqrt() * 2f64,
+            'd' => 3f64,
+            'V' => 5f64.sqrt() + 1f64,
+            'U' => 2f64.sqrt() + 2f64,
+            'A' => (5f64.sqrt() + 5f64) / 4f64,
+            'X' => 2f64.sqrt() * 2f64 + 1f64,
+            'B' => 5f64.sqrt() + 2f64,
+            _ => return None,
+        }))
+    }
 
-        // We make sure that the indices are the indices of the original string
-        // instead of those in the slice.
-        let mut raw_iter = raw
-            .chars()
-            .enumerate()
-            .map(|(str_idx, c)| (idx + str_idx + 1 - len, c));
-
-        let mut node = String::new();
-        let mut sign = 1.0;
-
-        let (mut idx, mut c) = raw_iter.next().expect("Node can't be empty!");
-
-        /// Skips a character from the string, returns a mismatched parenthesis
-        /// error if there's no subsequent character.
-        macro_rules! skip_char {
-            () => {
-                idx += 1;
-                c = raw_iter
-                    .next()
-                    .ok_or(CdError::MismatchedParenthesis(idx))?
-                    .1;
-            };
-        }
-
-        // Skips any opening parenthesis.
-        if c == '(' {
-            skip_char!();
-        }
-
-        // Skips a minus sign.
-        if c == '-' {
-            sign = -1.0;
-            skip_char!();
-        }
-
-        // Starting character
-        node.push(c);
-
-        // If the node has a custom value:
-        if c.is_digit(10) {
-            for (idx, c) in raw_iter {
-                // We read it until we find the closing parenthesis.
-                if c == ')' {
-                    let val: Float = parse(&node, idx)?;
-
-                    // In case the user tries to literally write "NaN" (real funny)
-                    return if val.is_nan() {
-                        Err(CdError::InvalidSymbol(idx))
-                    } else {
-                        Ok(Node::ringed(sign * val))
-                    };
-                }
-
-                // This character was normal, we can continue.
-                node.push(c);
-            }
-
-            // We never found the matching parenthesis.
-            Err(CdError::MismatchedParenthesis(idx))
+    pub fn from_char_or(c: char, idx: usize) -> CdResult<Self> {
+        if let Some(node) = Self::from_char(c) {
+            Ok(node)
         } else {
-            // Maybe return an error if there was a minus sign?
-
-            // Check shortchord values. Perhaps we should rethink hardcoding so
-            // many values?
-            Ok(Node::ringed(match c {
-                'o' => return Ok(Node::Unringed),
-                's' => return Ok(Node::snub(1.0)),
-                'v' => (5f64.sqrt() - 1f64) / 2f64,
-                'x' => 1f64,
-                'q' => 2f64.sqrt(),
-                'f' => (5f64.sqrt() + 1f64) / 2f64,
-                'h' => 3f64.sqrt(),
-                'k' => (2f64.sqrt() + 2f64).sqrt(),
-                'u' => 2f64,
-                'w' => 2f64.sqrt() + 1f64,
-                'F' => (5f64.sqrt() + 3f64) / 2f64,
-                'e' => 3f64.sqrt() + 1f64,
-                'Q' => 2f64.sqrt() * 2f64,
-                'd' => 3f64,
-                'V' => 5f64.sqrt() + 1f64,
-                'U' => 2f64.sqrt() + 2f64,
-                'A' => (5f64.sqrt() + 5f64) / 4f64,
-                'X' => 2f64.sqrt() * 2f64 + 1f64,
-                'B' => 5f64.sqrt() + 2f64,
-                _ => return Err(CdError::InvalidSymbol(idx)),
-            }))
+            Err(CdError::InvalidSymbol(idx))
         }
     }
 }
@@ -298,7 +242,7 @@ impl Display for Node {
         match self {
             Node::Unringed => writeln!(f, "o"),
             Node::Ringed(x) => writeln!(f, "x({})", x.0),
-            Node::Snub(x) => writeln!(f, "s({})", x.0),
+            Node::Snub(s) => writeln!(f, "s({})", s.0),
         }
     }
 }
@@ -314,56 +258,17 @@ pub struct Edge {
 }
 
 impl Edge {
+    pub fn rational(num: i32, den: i32) -> Self {
+        Self { num, den }
+    }
+
+    pub fn int(num: i32) -> Self {
+        Self::rational(num, 1)
+    }
+
     /// Returns the numerical value of the edge.
     pub fn value(&self) -> Float {
         self.num as Float / self.den as Float
-    }
-
-    /// Converts a slice of characters into a wrapped edge value.
-    ///
-    /// `idx` is the index of the last character in `raw`.
-    fn parse(raw: &str, idx: usize) -> CdResult<Self> {
-        let len = raw.len();
-        let mut raw_iter = raw
-            .chars()
-            .enumerate()
-            .map(|(str_idx, c)| (idx + str_idx + 1 - len, c));
-
-        let mut edge = String::new();
-        let mut numerator = None;
-        let (_, c) = raw_iter.next().expect("Slice can't be empty!");
-
-        // Starting character
-        edge.push(c);
-
-        // If the value is Rational or an Integer
-        if c.is_digit(10) {
-            for (idx, c) in raw_iter {
-                // If the "/" is encountered
-                if c == '/' {
-                    // Parse and save the numerator
-                    numerator = Some(parse(&edge, idx)?);
-
-                    // Reset what's being read.
-                    edge = String::new();
-                    continue;
-                };
-
-                // Wasn't a special character, can continue
-                edge.push(c);
-            }
-
-            // Parse the last value (either the denominator in case of a
-            // fraction, or the single number otherwise).
-            let last = parse(&edge, idx)?;
-
-            Ok(match numerator {
-                Some(num) => Edge { num, den: last },
-                None => Edge { num: last, den: 1 },
-            })
-        } else {
-            Err(CdError::InvalidSymbol(idx))
-        }
     }
 }
 
@@ -374,22 +279,22 @@ impl Display for Edge {
     }
 }
 
-/// Attempts to parse a `String`, returns a [`CdError`] if it fails.
-fn parse<R: std::str::FromStr>(string: &str, idx: usize) -> CdResult<R> {
-    string.parse().map_err(|_| CdError::ParseError(idx))
-}
-
 /// Packages important information needed to interpret CDs
 pub struct CdBuilder<'a> {
     /// Represents the CD itself.
     cd: Graph<Node, Edge, Undirected>,
 
+    diagram: &'a str,
+
     /// A peekable iterator over the characters of the diagram and their
     /// indices.
-    diagram: iter::Peekable<iter::Enumerate<std::str::Chars<'a>>>,
+    diagram_iter: iter::Peekable<std::str::CharIndices<'a>>,
 
-    /// The next edge that's currently being read.
-    next_edge: NextEdge,
+    /// The previously found node.
+    prev_node: Option<NodeIndex>,
+
+    /// The value of the next edge.
+    next_edge: Option<Edge>,
 
     /// The length of the diagram.
     len: usize,
@@ -397,9 +302,21 @@ pub struct CdBuilder<'a> {
 
 /// Operations that are commonly done to parse CDs.
 impl<'a> CdBuilder<'a> {
+    /// Initializes a new CD builder from a string.
+    pub fn new(diagram: &'a str) -> Self {
+        Self {
+            diagram,
+            diagram_iter: diagram.char_indices().peekable(),
+            cd: Graph::new_undirected(),
+            prev_node: None,
+            next_edge: None,
+            len: diagram.len(),
+        }
+    }
+
     /// Gets the next index-character pair, or returns `None` if we've run out.
     pub fn next(&mut self) -> Option<(usize, char)> {
-        self.diagram.next()
+        self.diagram_iter.next()
     }
 
     /// Either gets the next index-character pair, or returns a
@@ -408,14 +325,66 @@ impl<'a> CdBuilder<'a> {
         self.next().ok_or(CdError::UnexpectedEnding(self.len))
     }
 
+    /// Gets the next index-character pair, or returns `None` if we've run out.
+    pub fn peek(&mut self) -> Option<(usize, char)> {
+        self.diagram_iter.peek().copied()
+    }
+
+    /// Either gets the next index-character pair, or returns a
+    /// [`CdError::UnexpectedEnding`] error.
+    pub fn peek_or(&mut self) -> CdResult<(usize, char)> {
+        self.peek().ok_or(CdError::UnexpectedEnding(self.len))
+    }
+
+    /// Attempts to parse a subslice of characters, determined by the specified
+    /// range. Returns a [`CdError::ParseError`] if it fails.
+    pub fn parse<T: FromStr, U: RangeBounds<usize> + SliceIndex<str, Output = str>>(
+        &self,
+        range: U,
+    ) -> CdResult<T> {
+        use std::ops::Bound::*;
+
+        let end = match range.end_bound() {
+            Included(&e) => e,
+            Excluded(&e) => e - 1,
+            Unbounded => self.len - 1,
+        };
+
+        self.diagram[range]
+            .parse()
+            .map_err(|_| CdError::ParseError(end))
+    }
+
+    /// Parses a multi-character node. This contains a floating point literal
+    /// inside of a set of parentheses.
+    ///
+    /// By the time this method is called, we've already skipped the opening
+    /// parenthesis.
+    pub fn parse_node(&mut self) -> CdResult<Node> {
+        let (init_idx, _) = self.next().expect("Node can't be empty!");
+
+        // We read the number until we find the closing parenthesis.
+        while let Some((idx, c)) = self.next() {
+            if c == ')' {
+                let val: Float = self.parse(init_idx..idx)?;
+
+                // In case the user tries to literally write "NaN" (real funny).
+                return if val.is_nan() {
+                    Err(CdError::InvalidSymbol(idx))
+                } else {
+                    Ok(Node::ringed(val))
+                };
+            }
+        }
+
+        // We never found the matching parenthesis.
+        Err(CdError::MismatchedParenthesis(self.len))
+    }
+
     /// Reads the next node in the diagram and adds it to the graph. Returns
     /// `Ok(())` if succesful, and a [`CdResult`] otherwise.
     pub fn create_node(&mut self) -> CdResult<()> {
-        // TODO: build a string slice instead?
-        let mut chars = String::new();
-
         let (idx, c) = self.next_or()?;
-        chars.push(c);
 
         // The index of the new node.
         let mut new_node = NodeIndex::new(self.cd.node_count());
@@ -423,94 +392,106 @@ impl<'a> CdBuilder<'a> {
         match c {
             // If the node is various characters inside parentheses.
             '(' => {
-                // We read through the diagram until we find ')'.
-                loop {
-                    if let Ok((idx, c)) = self.next_or() {
-                        chars.push(c);
-
-                        if c == ')' {
-                            // Converts the read characters into a value and
-                            // adds the node to the graph.
-                            self.cd.add_node(Node::parse(&chars, idx)?);
-                            break;
-                        }
-                    } else {
-                        return Err(CdError::MismatchedParenthesis(self.len));
-                    }
-                }
+                let node = self.parse_node()?;
+                self.cd.add_node(node);
             }
 
             // If the node is a virtual node.
             '*' => {
                 // Reads the index the virtual node refers to.
                 let (idx, c) = self.next_or()?;
-                let v_idx = NodeIndex::new(match u8::from_str_radix(&c.to_string(), 36) {
-                    // Invalid syntax.
-                    Ok(0..=9) | Err(_) => return Err(CdError::InvalidSymbol(idx)),
+                let c = c as usize;
 
+                const A: usize = 'a' as usize;
+                const Z: usize = 'z' as usize;
+
+                match c {
                     // A virtual node, from *a to *z.
-                    Ok(c) => (c - 10) as usize,
-                });
+                    A..=Z => new_node = NodeIndex::new(c - A),
 
-                // Sets the index of the new node to be where the virtual node is refering to.
-                new_node = v_idx;
+                    // Any other character is invalid.
+                    _ => return Err(CdError::InvalidSymbol(idx)),
+                }
             }
 
             // If the node is a single character.
             _ => {
-                // Converts the read characters into a value and adds the node to the graph.
-                self.cd.add_node(Node::parse(&chars, idx)?);
+                self.cd.add_node(Node::from_char_or(c, idx)?);
             }
         }
 
-        // If the next edge has been completely build, we add a new edge to the graph.
-        if let NextEdge {
-            node: Some(prev_node),
-            edge: Some(edge),
-        } = &self.next_edge
-        {
-            self.cd.add_edge(*prev_node, new_node, *edge);
-        };
+        // If the next edge has been completely built, we add a new edge to the graph.
+        if let Some(prev_node) = self.prev_node {
+            if let Some(next_edge) = self.next_edge {
+                self.cd.add_edge(prev_node, new_node, next_edge);
+            }
+        }
 
         // Resets the next edge so that it only has the node that was just found.
-        self.next_edge = NextEdge {
-            node: Some(new_node),
-            edge: None,
-        };
+        self.prev_node = Some(new_node);
+        self.next_edge = None;
 
         Ok(())
     }
 
-    /// Reads an edge from a CD and stores into the next edge.
-    pub fn create_edge(&mut self) -> CdResult<Option<()>> {
-        // TODO: build a string slice instead?
-        let mut chars = String::new();
+    pub fn parse_edge(&mut self) -> CdResult<Edge> {
+        let mut numerator = None;
+        let (mut init_idx, _) = self.next().expect("Slice can't be empty!");
 
-        // We read through the diagram until we encounter something that looks
-        // like the start of a node.
-        while let Some(&(idx, d)) = self.diagram.peek() {
-            if d == '(' || d == '*' || d.is_alphabetic() {
-                // Adds the edge value to edge_mem
-                self.next_edge.edge = Some(Edge::parse(&chars, idx)?);
-                return Ok(Some(()));
+        // We read through the diagram until we encounter something that
+        // looks like the start of a node.
+        loop {
+            let (idx, c) = self.peek_or()?;
+
+            // If we're dealing with a fraction:
+            if c == '/' {
+                // Parse and save the numerator.
+                numerator = Some(self.parse(init_idx..idx)?);
+
+                // Reset what's being read.
+                init_idx = idx + 1;
+            }
+            // We reached the next node.
+            else if c == '(' || c == '*' || c.is_alphabetic() {
+                // Parse the last value (either the denominator in case of a
+                // fraction, or the single number otherwise).
+                let last = self.parse(init_idx..idx)?;
+
+                return Ok(match numerator {
+                    Some(num) => Edge::rational(num, last),
+                    None => Edge::int(last),
+                });
             }
 
-            // Here, we want to look ahead before adding characters,
-            // so we don't add the first character of the next node.
             self.next();
-            chars.push(d);
         }
-
-        //If we unexpectedly hit the end of the iterator, exit and return None
-        Ok(None)
     }
 
-    /*
-    ///Reads a lace suffix
-    fn read_suff(&self) -> Option<Caret> {}
-    */
+    /// Reads an edge from a CD and stores into the next edge.
+    pub fn create_edge(&mut self) -> CdResult<Option<()>> {
+        if self.peek() == None {
+            return Ok(None);
+        }
+
+        self.next_edge = Some(self.parse_edge()?);
+        Ok(self.next_edge.map(|_| ()))
+    }
 }
 
+/// Encodes a
+/// [Coxeter diagram](https://polytope.miraheze.org/wiki/Coxeter_diagram) or CD,
+/// which is an undirected labeled graph that doubles as a representation for
+/// certain polytopes called
+/// [Wythoffians](https://polytope.miraheze.org/wiki/Wythoffian), and certain
+/// symmetry groups called
+/// [Coxeter groups](https://polytope.miraheze.org/wiki/Coxeter_group).
+///
+/// Each [`Node`] in the graph represents a mirror (or hyperplane) in
+/// *n*-dimensional space. If two nodes are joined by an [`Edge`] with a value
+/// of *x*, it means that the angle between the mirrors they represent is given
+/// by π / *x*. If two nodes aren't joined by any edge, it means that they are
+/// perpendicular.
+///
 /// Stores the value of the next edge in the graph, along with the index of its
 /// first node. This is used in order to handle virtual nodes. A new edge will
 /// be added to the graph only when both conditions are met:
@@ -520,50 +501,25 @@ impl<'a> CdBuilder<'a> {
 ///
 /// The node added will have the `EdgeMem`'s node as a first node, the currently
 /// read node as the last node, and an edge value given by the `EdgeMem`.
-#[derive(Default)]
-struct NextEdge {
-    /// The index of the first node of the next edge.
-    node: Option<NodeIndex>,
-
-    /// The value of the next edge.
-    edge: Option<Edge>,
-}
-
-/// Possible types of CD
-pub struct Cd(
-    // Single {
-    Graph<Node, Edge, Undirected>,
-    // },
-    /*
-    Compound{count: u32, graphs: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
-    LaceSimp{lace_len: f64, count: u32, graph: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
-    LaceTower{lace_len: f64, count: u32, graphs: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
-    LaceRing{lace_len: f64, count: u32, graphs: Vec<Graph<NodeVal, EdgeVal, Undirected>>},
-    */
-);
+pub struct Cd(Graph<Node, Edge, Undirected>);
 
 impl Cd {
     /// Main function for parsing CDs from strings.
     pub fn new(input: &str) -> CdResult<Self> {
-        let mut caret = CdBuilder {
-            diagram: input.chars().enumerate().peekable(),
-            cd: Graph::new_undirected(),
-            next_edge: Default::default(),
-            len: input.len(),
-        };
+        let mut builder = CdBuilder::new(input);
 
         // Reads through the diagram.
         loop {
-            caret.create_node()?;
+            builder.create_node()?;
 
             // We continue until we find that there's no further edges.
-            if let Ok(None) = caret.create_edge() {
-                return Ok(Cd(caret.cd));
+            if let Ok(None) = builder.create_edge() {
+                return Ok(Cd(builder.cd));
             }
         }
     }
 
-    /// Returns an iterator over the nodes in the Coxeter Diagram, in the order
+    /// Returns an iterator over the nodes in the Coxeter diagram, in the order
     /// in which they were found.
     pub fn node_iter<'a>(
         &'a self,
@@ -573,7 +529,7 @@ impl Cd {
         self.0.raw_nodes().iter().map(closure)
     }
 
-    /// Returns the nodes in the Coxeter Diagram, in the order in which they
+    /// Returns the nodes in the Coxeter diagram, in the order in which they
     /// were found.
     pub fn nodes(&self) -> Vec<Node> {
         self.0.raw_nodes().iter().map(|node| node.weight).collect()

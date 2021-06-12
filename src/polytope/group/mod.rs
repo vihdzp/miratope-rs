@@ -1,18 +1,18 @@
 //! Contains methods to generate many symmetry groups.
 
+pub mod cd;
+
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     iter,
 };
 
-use super::{
-    cd::{Cd, CdResult, CoxMatrix},
-    Concrete,
-};
+use super::concrete::Concrete;
 use crate::{
     geometry::{Matrix, MatrixOrd, Point, PointOrd, VectorSlice},
     Consts, Float,
 };
+use cd::{Cd, CdResult, CoxMatrix};
 
 use approx::{abs_diff_ne, relative_eq};
 use nalgebra::{Dynamic, Quaternion, VecStorage};
