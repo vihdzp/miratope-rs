@@ -7,7 +7,7 @@ use crate::{
 
 use nalgebra::{dmatrix, Dynamic, VecStorage};
 use petgraph::{
-    graph::{EdgeIndex, Graph, Node as GraphNode, NodeIndex},
+    graph::{Graph, Node as GraphNode, NodeIndex},
     Undirected,
 };
 
@@ -17,10 +17,10 @@ pub type CdResult<T> = Result<T, CdError>;
 /// Represents an error while parsing a CD.
 #[derive(Clone, Copy, Debug)]
 pub enum CdError {
-    /// A parenthesis was opened but not closed when it should have been.
+    /// A parenthesis was opened but not closed.
     MismatchedParenthesis { pos: usize },
 
-    /// The CD ended unexpectedly.
+    /// The diagram ended unexpectedly.
     UnexpectedEnding { pos: usize },
 
     /// A number couldn't be parsed.
@@ -29,23 +29,40 @@ pub enum CdError {
     /// An invalid symbol was found.
     InvalidSymbol { pos: usize },
 
-    /// An edge was specified twice (possible using virtual nodes).
+    /// An invalid edge was found.
+    InvalidEdge { num: u32, den: u32, pos: usize },
+
+    /// An edge was specified twice.
     RepeatEdge { a: usize, b: usize },
 }
 
 impl Display for CdError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
+            // A parenthesis was opened but not closed.
             Self::MismatchedParenthesis { pos } => {
                 write!(f, "mismatched parenthesis at position {}", pos)
             }
+
+            // The diagram ended unexpectedly.
             Self::UnexpectedEnding { pos } => {
                 write!(f, "CD ended unexpectedly at position {}", pos)
             }
+
+            // A number couldn't be parsed.
             Self::ParseError { pos } => {
                 write!(f, "parsing failed at position {}", pos)
             }
+
+            // An invalid symbol was found.
             Self::InvalidSymbol { pos } => write!(f, "invalid symbol found at position {}", pos),
+
+            // An invalid edge was found.
+            Self::InvalidEdge { num, den, pos } => {
+                write!(f, "invalid edge {}/{} at position {}", num, den, pos)
+            }
+
+            // An edge was specified twice.
             Self::RepeatEdge { a, b } => {
                 write!(f, "repeat edge between {} and {}", a, b)
             }
@@ -277,19 +294,25 @@ pub struct Edge {
 }
 
 impl Edge {
-    pub fn rational(num: u32, den: u32) -> Self {
-        // TODO: add some checking.
-        Self { num, den }
+    pub fn rational(num: u32, den: u32, pos: usize) -> CdResult<Self> {
+        if num > 1 && den != 0 && den < num {
+            Ok(Self { num, den })
+        } else {
+            Err(CdError::InvalidEdge { num, den, pos })
+        }
     }
 
-    pub fn int(num: u32) -> Self {
-        // TODO: add some checking.
-        Self::rational(num, 1)
+    pub fn int(num: u32, pos: usize) -> CdResult<Self> {
+        Self::rational(num, 1, pos)
     }
 
     /// Returns the numerical value of the edge.
     pub fn value(&self) -> Float {
         self.num as Float / self.den as Float
+    }
+
+    pub fn eq_two(&self) -> bool {
+        self.num == self.den * 2
     }
 }
 
@@ -341,12 +364,12 @@ impl NodeRef {
 pub struct EdgeRef {
     first: NodeRef,
     last: NodeRef,
-    value: Edge,
+    edge: Edge,
 }
 
 impl EdgeRef {
-    pub fn new(first: NodeRef, last: NodeRef, value: Edge) -> Self {
-        Self { first, last, value }
+    pub fn new(first: NodeRef, last: NodeRef, edge: Edge) -> Self {
+        Self { first, last, edge }
     }
 
     /// Returns the index in the graph of both node references. Requires knowing
@@ -617,12 +640,16 @@ impl<'a> CdBuilder<'a> {
                     let last = self.parse_slice(init_idx, end_idx)?;
 
                     return Ok(Some(match numerator {
-                        Some(num) => Edge::rational(num, last),
-                        None => Edge::int(last),
+                        Some(num) => Edge::rational(num, last, end_idx)?,
+                        None => Edge::int(last, end_idx)?,
                     }));
                 }
 
-                _ => {}
+                // Business as usual.
+                '0'..='9' => {}
+
+                // We found an unexpected symbol.
+                _ => return Err(CdError::InvalidSymbol { pos: idx }),
             }
 
             end_idx = idx;
@@ -644,9 +671,9 @@ impl<'a> CdBuilder<'a> {
     fn build(mut self) -> CdResult<Cd> {
         let len = self.cd.node_count();
 
-        for edge in self.edge_queue.into_iter() {
-            let [a, b] = edge.indices(len);
-            self.cd.add_edge(a, b, edge.value)?;
+        for edge_ref in self.edge_queue.into_iter() {
+            let [a, b] = edge_ref.indices(len);
+            self.cd.add_edge(a, b, edge_ref.edge)?;
         }
 
         Ok(self.cd)
@@ -718,15 +745,19 @@ impl Cd {
     }
 
     /// Adds an edge into the Coxeter diagram.
-    pub fn add_edge(&mut self, a: NodeIndex, b: NodeIndex, edge: Edge) -> CdResult<EdgeIndex> {
-        if self.0.contains_edge(a, b) {
-            Err(CdError::RepeatEdge {
-                a: a.index(),
-                b: b.index(),
-            })
-        } else {
-            Ok(self.0.add_edge(a, b, edge))
+    pub fn add_edge(&mut self, a: NodeIndex, b: NodeIndex, edge: Edge) -> CdResult<()> {
+        if !edge.eq_two() {
+            if self.0.contains_edge(a, b) {
+                return Err(CdError::RepeatEdge {
+                    a: a.index(),
+                    b: b.index(),
+                });
+            }
+
+            self.0.add_edge(a, b, edge);
         }
+
+        Ok(())
     }
 
     /// Returns an iterator over the nodes in the Coxeter diagram, in the order
@@ -969,7 +1000,7 @@ mod tests {
     /// Tests some virtual node shenanigans.
     fn virtual_nodes() {
         test(
-            "*a4*b3*c3*-a o o x x",
+            "*a4*b3*c3*-aooxx",
             vec![o(), o(), x(), x()],
             dmatrix![
                 1.0, 4.0, 2.0, 2.0;
@@ -1006,5 +1037,41 @@ mod tests {
                 2.0, 3.0, 1.0
             ],
         )
+    }
+
+    #[test]
+    #[should_panic(expected = "MismatchedParenthesis { pos: 6 }")]
+    fn mismatched_parenthesis() {
+        Cd::parse("x(1.0x").unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "UnexpectedEnding { pos: 6 }")]
+    fn unexpected_ending() {
+        Cd::parse("x4x3x3").unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "InvalidSymbol { pos: 2 }")]
+    fn invalid_symbol() {
+        Cd::parse("x3∞5o").unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "ParseError { pos: 5 }")]
+    fn parse_error() {
+        Cd::parse("(1.1.1)3(2.0)").unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "InvalidEdge { num: 1, den: 0, pos: 3 }")]
+    fn invalid_edge() {
+        Cd::parse("s1/0s").unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "RepeatEdge { a: 0, b: 1 }")]
+    fn repeat_edge() {
+        Cd::parse("x3x xx *c3*d *a3*b").unwrap();
     }
 }
