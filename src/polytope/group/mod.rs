@@ -232,7 +232,7 @@ impl Group {
 
     /// Parses a [`Cd`] and turns it into a group.
     pub fn parse(input: &str) -> CdResult<Option<Self>> {
-        Cd::new(input).map(|cd| Self::cox_group(cd.cox()))
+        Cd::parse(input).map(|cd| Self::cox_group(cd.cox()))
     }
 
     /// Shorthand for `Self::parse(input).unwrap().unwrap()`.

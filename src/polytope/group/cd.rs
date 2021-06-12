@@ -1,4 +1,4 @@
-use std::{f64::consts::PI, fmt::Display, iter, mem, str::FromStr};
+use std::{collections::VecDeque, f64::consts::PI, fmt::Display, iter, mem, str::FromStr};
 
 use crate::{
     geometry::{Matrix, MatrixOrd, Point, Vector},
@@ -7,7 +7,7 @@ use crate::{
 
 use nalgebra::{dmatrix, Dynamic, VecStorage};
 use petgraph::{
-    graph::{Graph, Node as GraphNode, NodeIndex},
+    graph::{EdgeIndex, Graph, Node as GraphNode, NodeIndex},
     Undirected,
 };
 
@@ -15,7 +15,7 @@ use petgraph::{
 pub type CdResult<T> = Result<T, CdError>;
 
 /// Represents an error while parsing a CD.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum CdError {
     /// A parenthesis was opened but not closed when it should have been.
     MismatchedParenthesis { pos: usize },
@@ -28,11 +28,14 @@ pub enum CdError {
 
     /// An invalid symbol was found.
     InvalidSymbol { pos: usize },
+
+    /// An edge was specified twice (possible using virtual nodes).
+    RepeatEdge { a: usize, b: usize },
 }
 
 impl Display for CdError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
+        match *self {
             Self::MismatchedParenthesis { pos } => {
                 write!(f, "mismatched parenthesis at position {}", pos)
             }
@@ -43,6 +46,9 @@ impl Display for CdError {
                 write!(f, "parsing failed at position {}", pos)
             }
             Self::InvalidSymbol { pos } => write!(f, "invalid symbol found at position {}", pos),
+            Self::RepeatEdge { a, b } => {
+                write!(f, "repeat edge between {} and {}", a, b)
+            }
         }
     }
 }
@@ -82,7 +88,7 @@ impl CoxMatrix {
 
     /// Parses a [`Cd`] and turns it into a Coxeter matrix.
     pub fn parse(input: &str) -> CdResult<Self> {
-        Cd::new(input).map(|cd| cd.cox())
+        Cd::parse(input).map(|cd| cd.cox())
     }
 
     /// Returns the Coxeter matrix for the trivial 1D group.
@@ -178,15 +184,19 @@ impl std::ops::Index<(usize, usize)> for CoxMatrix {
 /// should interact with it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Node {
-    /// An unringed node.
+    /// An unringed node. Represents a mirror that contains the generator point.
+    /// Crucially, reflecting the generator through this mirror doesn't create a
+    /// new edge.
     Unringed,
 
-    /// A ringed node, at half the specified distance from a corresponding
-    /// hyperplane.
+    /// A ringed node. Represents a mirror at (half) a certain distance from the
+    /// generator. Reflecting the generator through this mirror creates an edge.
     Ringed(FloatOrd),
 
-    /// A snub node, at half the specified distance from a corresponding
-    /// hyperplane.
+    /// A snub node. Represents a mirror at (half) a certain distance from the
+    /// generator. In contrast to [`Self::Ringed`] nodes, the generator point
+    /// and its reflection through this mirror can't simultaneously be in the
+    /// polytope.
     Snub(FloatOrd),
 }
 
@@ -255,22 +265,25 @@ impl Display for Node {
     }
 }
 
-/// Represents the value of an edge in a [`Cd`].
+/// Represents the value of an edge in a [`Cd`]. An edge with a value of `x`
+/// represents an angle of π / *x* between two hyperplanes.
 #[derive(Clone, Copy, Debug)]
 pub struct Edge {
     /// The numerator of the edge.
-    num: i32,
+    num: u32,
 
     /// The denominator of the edge.
-    den: i32,
+    den: u32,
 }
 
 impl Edge {
-    pub fn rational(num: i32, den: i32) -> Self {
+    pub fn rational(num: u32, den: u32) -> Self {
+        // TODO: add some checking.
         Self { num, den }
     }
 
-    pub fn int(num: i32) -> Self {
+    pub fn int(num: u32) -> Self {
+        // TODO: add some checking.
         Self::rational(num, 1)
     }
 
@@ -283,24 +296,104 @@ impl Edge {
 impl Display for Edge {
     /// Prints the value contained in an edge.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} / {}", self.num, self.den)
+        if self.den == 1 {
+            write!(f, "{}", self.num)
+        } else {
+            write!(f, "{} / {}", self.num, self.den)
+        }
     }
 }
 
-/// Helper struct that parses a [`Cd`] from a modified [inline ASCII notation]
+/// Stores the position of a node, which can either be its index in the array or
+/// its offset from the end of the array.
 ///
-/// Stores the value of the next edge in the graph, along with the index of its
-/// first node. This is used in order to handle virtual nodes. A new edge will
-/// be added to the graph only when both conditions are met:
+/// This is necessary since we can't figure out what node a virtual node like
+/// `*-a` is referring to unless we've read the entire diagram already.
+#[derive(Clone, Copy)]
+pub enum NodeRef {
+    /// The index of a node.
+    Absolute(usize),
+
+    /// The offset of the node from the array's ending.
+    Negative(usize),
+}
+
+impl NodeRef {
+    pub fn new(neg: bool, idx: usize) -> Self {
+        if neg {
+            Self::Negative(idx)
+        } else {
+            Self::Absolute(idx)
+        }
+    }
+
+    /// Returns the index in the graph that the node reference represents.
+    /// Requires knowing the number of nodes in the graph.
+    pub fn index(&self, len: usize) -> NodeIndex {
+        NodeIndex::new(match *self {
+            Self::Absolute(idx) => idx,
+            Self::Negative(idx) => len - 1 - idx,
+        })
+    }
+}
+
+/// Stores the [`NodeRef`]s of both ends of an edge, along with its value.
+pub struct EdgeRef {
+    first: NodeRef,
+    last: NodeRef,
+    value: Edge,
+}
+
+impl EdgeRef {
+    pub fn new(first: NodeRef, last: NodeRef, value: Edge) -> Self {
+        Self { first, last, value }
+    }
+
+    /// Returns the index in the graph of both node references. Requires knowing
+    /// the number of nodes in the graph.
+    pub fn indices(&self, len: usize) -> [NodeIndex; 2] {
+        [self.first.index(len), self.last.index(len)]
+    }
+}
+
+/// Helper struct that parses a [`Cd`] based on a textual notation, adapted from
+/// [Krieger (year)](https://bendwavy.org/klitzing/pdf/Stott_v8.pdf).
 ///
-/// * Both fields of the `EdgeMem` are full.
-/// * We're reading a new node.
+/// Nodes in the Coxeter diagram are guaranteed to be in the order in which they
+/// were added.
 ///
-/// The node added will have the `EdgeMem`'s node as a first node, the currently
-/// read node as the last node, and an edge value given by the `EdgeMem`.
-pub struct CdBuilder<'a> {
-    /// Represents the Coxeter diagram itself.
-    graph: Graph<Node, Edge, Undirected>,
+/// # Formal specification
+///
+/// A Coxeter diagram in inline ASCII notation consists of a sequence of tokens:
+///
+/// ```txt
+/// [node]  [edge]?  [node]  ...  [node]
+/// ```
+///
+/// The diagram must start and end with a node, to be later specified. Every
+/// node may be followed by either an edge or another node. Every edge must be
+/// immediately followed by another node. There may be optional whitespace in
+/// between tokens.
+///
+/// Nodes come in three different types:
+///
+/// * One character nodes, like `x` or `F`.
+/// * Parenthesized lengths, líke `(1.0)` or `(-3.5)`.
+/// * Virtual nodes, like `*a` or `*c`.
+///
+/// Edges come in two different types:
+///
+/// * A single integer, like `3` or `15`.
+/// * Two integers separated by a backslash, like `5/2` or `7/3`.
+struct CdBuilder<'a> {
+    /// Represents the Coxeter diagram itself. However, we don't add any edges
+    /// to it until the very last step. These are provisionally stored in
+    /// [`edge_queue`] instead.
+    cd: Cd,
+
+    /// A provisional queue in which the edge references are stored up and until
+    /// [`Self::build`] is called, when they're added to the `Cd`.
+    edge_queue: VecDeque<EdgeRef>,
 
     /// The Coxeter diagram in inline ASCII notation.
     diagram: &'a str,
@@ -310,7 +403,7 @@ pub struct CdBuilder<'a> {
     iter: iter::Peekable<std::str::CharIndices<'a>>,
 
     /// The previously found node.
-    prev_node: Option<NodeIndex>,
+    prev_node: Option<NodeRef>,
 
     /// The value of the next edge.
     next_edge: Option<Edge>,
@@ -319,11 +412,12 @@ pub struct CdBuilder<'a> {
 /// Operations that are commonly done to parse CDs.
 impl<'a> CdBuilder<'a> {
     /// Initializes a new CD builder from a string.
-    pub fn new(diagram: &'a str) -> Self {
+    fn new(diagram: &'a str) -> Self {
         Self {
             diagram,
             iter: diagram.char_indices().peekable(),
-            graph: Graph::new_undirected(),
+            cd: Cd::new(),
+            edge_queue: VecDeque::new(),
 
             prev_node: None,
             next_edge: None,
@@ -331,41 +425,42 @@ impl<'a> CdBuilder<'a> {
     }
 
     /// Returns the length of the Coxeter diagram.
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         self.diagram.len()
     }
 
     /// Returns a [`CdError::UnexpectedEnding`]. Such an error always occurs at
     /// the end of the diagram.
-    pub fn unexpected_ending(&self) -> CdError {
+    fn unexpected_ending(&self) -> CdError {
         CdError::UnexpectedEnding { pos: self.len() }
     }
 
     /// Gets the next index-character pair, or returns `None` if we've run out
     /// of them.
-    pub fn next(&mut self) -> Option<(usize, char)> {
+    fn next(&mut self) -> Option<(usize, char)> {
         self.iter.next()
     }
 
     /// Either gets the next index-character pair, or returns a
     /// [`CdError::UnexpectedEnding`] error.
-    pub fn next_or(&mut self) -> CdResult<(usize, char)> {
+    fn next_or(&mut self) -> CdResult<(usize, char)> {
         self.next().ok_or_else(|| self.unexpected_ending())
     }
 
     /// Peeks at the next index-character pair, or returns `None` if we've run
     /// out of them.
-    pub fn peek(&mut self) -> Option<(usize, char)> {
+    fn peek(&mut self) -> Option<(usize, char)> {
         self.iter.peek().copied()
     }
 
     /// Either peeks at the next index-character pair, or returns a
     /// [`CdError::UnexpectedEnding`] error.
-    pub fn peek_or(&mut self) -> CdResult<(usize, char)> {
+    fn peek_or(&mut self) -> CdResult<(usize, char)> {
         self.peek().ok_or_else(|| self.unexpected_ending())
     }
 
-    pub fn skip_whitespace(&mut self) {
+    /// Skips until the next non-whitespace character.
+    fn skip_whitespace(&mut self) {
         while let Some((_, c)) = self.peek() {
             if !c.is_whitespace() {
                 return;
@@ -375,10 +470,20 @@ impl<'a> CdBuilder<'a> {
         }
     }
 
+    /// Adds a node to the diagram.
+    fn add_node(&mut self, node: Node) -> NodeIndex {
+        self.cd.add_node(node)
+    }
+
+    /// Enqueues an edge, so that it's added when the diagram is built.
+    fn enqueue_edge(&mut self, edge: EdgeRef) {
+        self.edge_queue.push_back(edge);
+    }
+
     /// Attempts to parse a subslice of characters, determined by the range
-    /// `init_idx..end_idx`. Returns a [`CdError::ParseError`] if it fails.
-    pub fn parse<T: FromStr>(&self, init_idx: usize, end_idx: usize) -> CdResult<T> {
-        self.diagram[init_idx..end_idx]
+    /// `init_idx..=end_idx`. Returns a [`CdError::ParseError`] if it fails.
+    fn parse_slice<T: FromStr>(&mut self, init_idx: usize, end_idx: usize) -> CdResult<T> {
+        self.diagram[init_idx..=end_idx]
             .parse()
             .map_err(|_| CdError::ParseError { pos: end_idx })
     }
@@ -388,21 +493,24 @@ impl<'a> CdBuilder<'a> {
     ///
     /// By the time this method is called, we've already skipped the opening
     /// parenthesis.
-    pub fn parse_node(&mut self) -> CdResult<Node> {
-        let (init_idx, _) = self.next().expect("Node can't be empty!");
+    fn parse_node(&mut self) -> CdResult<Node> {
+        let (init_idx, _) = self.peek().expect("Node can't be empty!");
+        let mut end_idx = init_idx;
 
         // We read the number until we find the closing parenthesis.
         while let Some((idx, c)) = self.next() {
             if c == ')' {
-                let val: Float = self.parse(init_idx, idx)?;
+                let val: Float = self.parse_slice(init_idx, end_idx)?;
 
                 // In case the user tries to literally write "NaN" (real funny).
                 return if val.is_nan() {
-                    Err(CdError::InvalidSymbol { pos: idx })
+                    Err(CdError::InvalidSymbol { pos: end_idx })
                 } else {
                     Ok(Node::ringed(val))
                 };
             }
+
+            end_idx = idx;
         }
 
         // We never found the matching parenthesis.
@@ -414,28 +522,39 @@ impl<'a> CdBuilder<'a> {
     ///
     /// This method positions the iterator so that the next call to
     /// [`Self::next`] will yield the first character of the next edge.
-    pub fn create_node(&mut self) -> CdResult<()> {
+    fn create_node(&mut self) -> CdResult<()> {
         self.skip_whitespace();
         let (idx, c) = self.next_or()?;
 
         // The index of the new node.
-        let mut new_node = NodeIndex::new(self.graph.node_count());
+        let mut new_node = NodeRef::Absolute(self.cd.node_count());
 
         match c {
             // If the node is various characters inside parentheses.
             '(' => {
                 let node = self.parse_node()?;
-                self.graph.add_node(node);
+                self.add_node(node);
             }
 
             // If the node is a virtual node.
             '*' => {
                 // Reads the index the virtual node refers to.
-                let (idx, c) = self.next_or()?;
+                let (mut idx, mut c) = self.next_or()?;
+
+                // If we have a negative virtual node, we advance the iterator
+                // and set the neg flag.
+                let neg = if c == '-' {
+                    let (new_idx, new_c) = self.next_or()?;
+                    idx = new_idx;
+                    c = new_c;
+                    true
+                } else {
+                    false
+                };
 
                 match c {
                     // A virtual node, from *a to *z.
-                    'a'..='z' => new_node = NodeIndex::new(c as usize - 'a' as usize),
+                    'a'..='z' => new_node = NodeRef::new(neg, c as usize - 'a' as usize),
 
                     // Any other character is invalid.
                     _ => return Err(CdError::InvalidSymbol { pos: idx }),
@@ -444,7 +563,7 @@ impl<'a> CdBuilder<'a> {
 
             // If the node is a single character.
             _ => {
-                self.graph.add_node(Node::from_char_or(c, idx)?);
+                self.add_node(Node::from_char_or(c, idx)?);
             }
         }
 
@@ -452,7 +571,7 @@ impl<'a> CdBuilder<'a> {
         // the graph.
         if let Some(prev_node) = self.prev_node {
             if let Some(next_edge) = self.next_edge {
-                self.graph.add_edge(prev_node, new_node, next_edge);
+                self.enqueue_edge(EdgeRef::new(prev_node, new_node, next_edge));
             }
 
             self.next_edge = None;
@@ -464,7 +583,7 @@ impl<'a> CdBuilder<'a> {
         Ok(())
     }
 
-    pub fn parse_edge(&mut self) -> CdResult<Option<Edge>> {
+    fn parse_edge(&mut self) -> CdResult<Option<Edge>> {
         let mut numerator = None;
         let (mut init_idx, c) = self.peek().expect("Slice can't be empty!");
 
@@ -473,6 +592,8 @@ impl<'a> CdBuilder<'a> {
         if !matches!(c, '0'..='9') {
             return Ok(None);
         }
+
+        let mut end_idx = init_idx;
 
         // We read through the diagram until we encounter something that
         // looks like the start of a node.
@@ -483,17 +604,17 @@ impl<'a> CdBuilder<'a> {
                 // If we're dealing with a fraction:
                 '/' => {
                     // Parse and save the numerator.
-                    numerator = Some(self.parse(init_idx, idx)?);
+                    numerator = Some(self.parse_slice(init_idx, end_idx)?);
 
                     // Reset what's being read.
                     init_idx = idx + 1;
                 }
 
                 // If we reached the next node.
-                '(' | '*' | 'A'..='z' => {
+                '(' | '*' | ' ' | 'A'..='z' => {
                     // Parse the last value (either the denominator in case of a
                     // fraction, or the single number otherwise).
-                    let last = self.parse(init_idx, idx)?;
+                    let last = self.parse_slice(init_idx, end_idx)?;
 
                     return Ok(Some(match numerator {
                         Some(num) => Edge::rational(num, last),
@@ -504,6 +625,7 @@ impl<'a> CdBuilder<'a> {
                 _ => {}
             }
 
+            end_idx = idx;
             self.next();
         }
     }
@@ -512,37 +634,54 @@ impl<'a> CdBuilder<'a> {
     ///
     /// This method positions the iterator so that the next call to
     /// [`Self::next`] will yield the first character of the next edge.
-    pub fn create_edge(&mut self) -> CdResult<()> {
+    fn create_edge(&mut self) -> CdResult<()> {
         self.skip_whitespace();
-        dbg!(self.peek().unwrap());
         self.next_edge = self.parse_edge()?;
         Ok(())
     }
 
     /// Finishes building the CD and returns it.
-    pub fn build(self) -> Cd {
-        Cd(self.graph)
+    fn build(mut self) -> CdResult<Cd> {
+        let len = self.cd.node_count();
+
+        for edge in self.edge_queue.into_iter() {
+            let [a, b] = edge.indices(len);
+            self.cd.add_edge(a, b, edge.value)?;
+        }
+
+        Ok(self.cd)
     }
 }
 
-/// Encodes a
-/// [Coxeter diagram](https://polytope.miraheze.org/wiki/Coxeter_diagram) or CD,
-/// which is an undirected labeled graph that doubles as a representation for
-/// certain polytopes called
-/// [Wythoffians](https://polytope.miraheze.org/wiki/Wythoffian), and certain
-/// symmetry groups called
-/// [Coxeter groups](https://polytope.miraheze.org/wiki/Coxeter_group).
+/// Encodes a [Coxeter diagram](https://polytope.miraheze.org/wiki/Coxeter_diagram)
+/// or CD as an undirected labeled graph.
 ///
-/// Each [`Node`] in the graph represents a mirror (or hyperplane) in
+/// A Coxeter diagram serves two main functions. It serves as a representation
+/// for certain polytopes called [Wythoffians](https://polytope.miraheze.org/wiki/Wythoffian),
+/// and as a representation for certain symmetry groups called
+/// [Coxeter groups](https://polytope.miraheze.org/wiki/Coxeter_group). In code,
+/// these correspond to [`Concrete::truncate`] and [`Group::cox_group`],
+/// respectively.
+///
+/// Each [`Node`] a Coxeter diagram represents a mirror (or hyperplane) in
 /// *n*-dimensional space. If two nodes are joined by an [`Edge`] with a value
-/// of *x*, it means that the angle between the mirrors they represent is given
-/// by π / *x*. If two nodes aren't joined by any edge, it means that they are
+/// of x, it means that the angle between the mirrors they represent is given
+/// by π / x. If two nodes aren't joined by any edge, it means that they are
 /// perpendicular.
+///
+/// To actually build a Coxeter diagram, we use a [`CdBuilder`].
+#[derive(Default)]
 pub struct Cd(Graph<Node, Edge, Undirected>);
 
 impl Cd {
-    /// Main function for parsing CDs from strings.
-    pub fn new(input: &str) -> CdResult<Self> {
+    /// Initializes a new Coxeter diagram with no nodes nor edges.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Parses a Coxeter diagram from ASCII inline notation. For more
+    /// information, see [`CdBuilder`].
+    pub fn parse(input: &str) -> CdResult<Self> {
         let mut builder = CdBuilder::new(input);
 
         // Reads through the diagram.
@@ -551,10 +690,42 @@ impl Cd {
 
             // We continue until we find that there's no further edges.
             if builder.peek().is_none() {
-                return Ok(builder.build());
+                return builder.build();
             }
 
             builder.create_edge()?;
+        }
+    }
+
+    /// Returns the number of nodes in the Coxeter diagram.
+    pub fn node_count(&self) -> usize {
+        self.0.node_count()
+    }
+
+    /// Returns the number of edges in the Coxeter diagram.
+    pub fn edge_count(&self) -> usize {
+        self.0.edge_count()
+    }
+
+    /// The dimension of the polytope the Coxeter diagram describes.
+    pub fn dim(&self) -> usize {
+        self.node_count()
+    }
+
+    /// Adds a node into the Coxeter diagram.
+    pub fn add_node(&mut self, node: Node) -> NodeIndex {
+        self.0.add_node(node)
+    }
+
+    /// Adds an edge into the Coxeter diagram.
+    pub fn add_edge(&mut self, a: NodeIndex, b: NodeIndex, edge: Edge) -> CdResult<EdgeIndex> {
+        if self.0.contains_edge(a, b) {
+            Err(CdError::RepeatEdge {
+                a: a.index(),
+                b: b.index(),
+            })
+        } else {
+            Ok(self.0.add_edge(a, b, edge))
         }
     }
 
@@ -638,16 +809,6 @@ impl Cd {
             None
         }
     }
-
-    /// Returns the number of edges in the CD.
-    pub fn edge_count(&self) -> usize {
-        self.0.edge_count()
-    }
-
-    /// The dimension of the polytope the CD describes.
-    pub fn dim(&self) -> usize {
-        self.0.node_count()
-    }
 }
 
 impl From<Cd> for CoxMatrix {
@@ -700,7 +861,7 @@ mod tests {
     /// Tests that a parsed diagram's nodes and Coxeter matrix match expected
     /// values.
     fn test(diagram: &str, nodes: Vec<Node>, matrix: Matrix) {
-        let cd = Cd::new(diagram).unwrap();
+        let cd = Cd::parse(diagram).unwrap();
         assert_eq!(cd.nodes(), nodes, "Node mismatch!");
         assert_eq!(cd.cox(), CoxMatrix::new(matrix), "Coxeter matrix mismatch!");
     }
@@ -770,19 +931,7 @@ mod tests {
     }
 
     #[test]
-    fn node_lengths() {
-        test(
-            "(1.0)4(2.2)3(-3.0)",
-            vec![Node::ringed(1.0), Node::ringed(2.2), Node::ringed(-3.0)],
-            dmatrix![
-                1.0, 4.0, 2.0;
-                4.0, 1.0, 3.0;
-                2.0, 3.0, 1.0
-            ],
-        )
-    }
-
-    #[test]
+    /// Tests snub nodes.
     fn snubs() {
         test(
             "s4s3o4o",
@@ -797,6 +946,7 @@ mod tests {
     }
 
     #[test]
+    /// Tests some shortchords.
     fn shortchords() {
         test(
             "v4x3F4f",
@@ -811,6 +961,49 @@ mod tests {
                 4.0, 1.0, 3.0, 2.0;
                 2.0, 3.0, 1.0, 4.0;
                 2.0, 2.0, 4.0, 1.0
+            ],
+        )
+    }
+
+    #[test]
+    /// Tests some virtual node shenanigans.
+    fn virtual_nodes() {
+        test(
+            "*a4*b3*c3*-a o o x x",
+            vec![o(), o(), x(), x()],
+            dmatrix![
+                1.0, 4.0, 2.0, 2.0;
+                4.0, 1.0, 3.0, 2.0;
+                2.0, 3.0, 1.0, 3.0;
+                2.0, 2.0, 3.0, 1.0
+            ],
+        )
+    }
+
+    #[test]
+    /// Tests that CDs with spaces parse properly.
+    fn spaces() {
+        test(
+            "   x   3   o   x",
+            vec![x(), o(), x()],
+            dmatrix![
+                1.0, 3.0, 2.0;
+                3.0, 1.0, 2.0;
+                2.0, 2.0, 1.0
+            ],
+        )
+    }
+
+    #[test]
+    /// Tests custom node lengths.
+    fn node_lengths() {
+        test(
+            "(1.0)4(2.2)3(-3.0)",
+            vec![Node::ringed(1.0), Node::ringed(2.2), Node::ringed(-3.0)],
+            dmatrix![
+                1.0, 4.0, 2.0;
+                4.0, 1.0, 3.0;
+                2.0, 3.0, 1.0
             ],
         )
     }
