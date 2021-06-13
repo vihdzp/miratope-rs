@@ -402,28 +402,28 @@ impl EdgeRef {
 ///
 /// * One character nodes, like `x` or `F`.
 /// * Parenthesized lengths, líke `(1.0)` or `(-3.5)`.
-/// * Virtual nodes, like `*a` or `*c`.
+/// * Virtual nodes, like `*a` or `*-c`.
 ///
 /// Edges come in two different types:
 ///
 /// * A single integer, like `3` or `15`.
 /// * Two integers separated by a backslash, like `5/2` or `7/3`.
 struct CdBuilder<'a> {
-    /// Represents the Coxeter diagram itself. However, we don't add any edges
-    /// to it until the very last step. These are provisionally stored in
-    /// [`edge_queue`] instead.
-    cd: Cd,
-
-    /// A provisional queue in which the edge references are stored up and until
-    /// [`Self::build`] is called, when they're added to the `Cd`.
-    edge_queue: VecDeque<EdgeRef>,
-
     /// The Coxeter diagram in inline ASCII notation.
     diagram: &'a str,
 
     /// A peekable iterator over the characters of the diagram and their
     /// indices. Used to keep track of where we're reading.
     iter: iter::Peekable<std::str::CharIndices<'a>>,
+
+    /// Represents the Coxeter diagram itself. However, we don't add any edges
+    /// to it until the very last step. These are provisionally stored in
+    /// [`edge_queue`] instead.
+    cd: Cd,
+
+    /// A provisional queue in which the [`EdgeRef`]s are stored up and until
+    /// [`Self::build`] is called, when they're added to the `Cd`.
+    edge_queue: VecDeque<EdgeRef>,
 
     /// The previously found node.
     prev_node: Option<NodeRef>,
@@ -439,6 +439,7 @@ impl<'a> CdBuilder<'a> {
         Self {
             diagram,
             iter: diagram.char_indices().peekable(),
+
             cd: Cd::new(),
             edge_queue: VecDeque::new(),
 

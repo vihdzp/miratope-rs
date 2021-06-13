@@ -483,6 +483,7 @@ fn write_faces(
     }
 
     // TODO: write components instead of faces in 2D case.
+    // ALSO TODO: reuse code from mesh builder.
     for face in faces.iter() {
         off.push_str(&face.subs.len().to_string());
 
