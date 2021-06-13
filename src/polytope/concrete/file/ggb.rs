@@ -1,7 +1,7 @@
 use std::io::{self, Error, ErrorKind, Read};
 
-use crate::{geometry::Point, Concrete};
 use super::IoResult;
+use crate::{geometry::Point, Concrete};
 
 use nalgebra::dvector;
 use xml::{
