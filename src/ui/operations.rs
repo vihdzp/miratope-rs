@@ -491,7 +491,7 @@ impl UpdateWindow for DualWindow {
         let sphere = Hypersphere::with_radius(self.center.clone(), self.radius);
 
         if let Err(err) = polytope.try_dual_mut_with(&sphere) {
-            println!("{:?}", err);
+            eprintln!("Dual failed: {}", err);
         }
     }
 
@@ -773,7 +773,7 @@ impl UpdateWindow for AntiprismWindow {
 
         match polytope.try_antiprism_with(&sphere, self.height) {
             Ok(antiprism) => *polytope = antiprism,
-            Err(err) => println!("{:?}", err),
+            Err(err) => eprintln!("Antiprism failed: {}", err),
         }
     }
 

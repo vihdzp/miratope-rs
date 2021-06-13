@@ -157,7 +157,7 @@ impl Config {
                     .write(ron::to_string(self).unwrap().as_bytes())
                     .is_err()
                 {
-                    println!("Could not write to the configuration file!");
+                    eprintln!("Could not write to the configuration file!");
                 } else {
                     println!("Saved new config!");
                 }
@@ -165,7 +165,7 @@ impl Config {
 
             // Otherwise, we print the error.
             Err(err) => {
-                println!("Could not create the configuration file: {}", err);
+                eprintln!("Could not create the configuration file: {}", err);
             }
         }
     }
@@ -180,7 +180,7 @@ impl Config {
         if !config_dir.exists() {
             println!("Could not find the configuration directory, creating it!");
             if let Err(err) = fs::create_dir_all(&config_dir) {
-                println!("Could not create the configuration directory: {}", err);
+                eprintln!("Could not create the configuration directory: {}", err);
                 return Default::default();
             }
         }

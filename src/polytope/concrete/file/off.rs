@@ -1,15 +1,16 @@
 use std::{
     collections::HashMap,
-    fs, io,
+    fs,
     path::Path,
     str::FromStr,
     sync::{Arc, Mutex},
 };
 
-use super::super::{Concrete, ElementList, Point, Polytope, RankVec, Subelements};
+use super::IoResult;
 use crate::{
     lang::name::{Con, Name},
     polytope::{
+        concrete::{Concrete, ElementList, Point, Polytope, RankVec, Subelements},
         r#abstract::{
             elements::{AbstractBuilder, SubelementList, Subsupelements},
             rank::Rank,
@@ -20,36 +21,46 @@ use crate::{
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 
-/// Row, column.
-#[derive(Clone, Copy, Default)]
-pub struct Position(u32, u32);
+/// A position in a file.
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Position {
+    /// The row index.
+    row: u32,
+
+    /// The column index.
+    column: u32,
+}
 
 impl Position {
+    /// Increments the column number by 1.
     pub fn next(&mut self) {
-        self.1 += 1;
+        self.column += 1;
     }
 
+    /// Increments the row number by 1, resets the column number.
     pub fn next_line(&mut self) {
-        self.0 += 1;
-        self.1 = 0;
+        self.row += 1;
+        self.column = 0;
     }
 }
 
 impl std::fmt::Display for Position {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "row {}, column {}", self.0 + 1, self.1)
+        write!(f, "row {}, column {}", self.row + 1, self.column + 1)
     }
 }
 
+/// Any error encountered while parsing an OFF file.
+#[derive(Clone, Copy, Debug)]
 pub enum OffError {
+    /// Empty file.
+    Empty,
+
     /// The OFF file ended unexpectedly.
     UnexpectedEnding(Position),
 
     /// Could not parse a number.
     Parsing(Position),
-
-    /// Empty file.
-    Empty,
 
     /// Could not parse rank.
     Rank(Position),
@@ -61,19 +72,22 @@ pub enum OffError {
     InvalidFile,
 }
 
-impl std::fmt::Debug for OffError {
+impl std::fmt::Display for OffError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Empty => write!(f, "file is empty."),
             Self::UnexpectedEnding(pos) => write!(f, "file ended unexpectedly at {}", pos),
             Self::Parsing(pos) => write!(f, "could not parse number at {}", pos),
-            Self::Empty => write!(f, "file is empty."),
             Self::Rank(pos) => write!(f, "could not read rank at {}", pos),
             Self::MagicWord(pos) => write!(f, "no \"OFF\" detected at {}", pos),
-            Self::InvalidFile => write!(f, "invalid file"),
+            Self::InvalidFile => write!(f, "could not parse file as UTF-8"),
         }
     }
 }
 
+impl std::error::Error for OffError {}
+
+/// The result of parsing an OFF file.
 pub type OffResult<T> = Result<T, OffError>;
 
 /// Gets the name for an element with a given rank.
@@ -618,7 +632,7 @@ impl Concrete {
     }
 
     /// Writes a polytope's OFF file in a specified file path.
-    pub fn to_path(&self, fp: &impl AsRef<Path>, opt: OffOptions) -> io::Result<()> {
+    pub fn to_path(&self, fp: &impl AsRef<Path>, opt: OffOptions) -> IoResult<()> {
         std::fs::write(fp, self.to_off(opt))
     }
 }
@@ -735,25 +749,25 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "file is empty")]
+    #[should_panic(expected = "Empty")]
     fn empty() {
         Concrete::from_off("").unwrap();
     }
 
     #[test]
-    #[should_panic(expected = "could not read rank at row 1, column 3")]
+    #[should_panic(expected = "Rank(Position { row: 0, column: 3 })")]
     fn rank() {
         Concrete::from_off("   fooOFF").unwrap();
     }
 
     #[test]
-    #[should_panic(expected = "no \"OFF\" detected at row 2, column 3")]
+    #[should_panic(expected = "MagicWord(Position { row: 1, column: 3 })")]
     fn magic_num() {
         Concrete::from_off("# comment\n   foo bar").unwrap();
     }
 
     #[test]
-    #[should_panic(expected = "could not parse number at row 2, column 3")]
+    #[should_panic(expected = "Parsing(Position { row: 1, column: 3 })")]
     fn parse() {
         Concrete::from_off("OFF\n10 foo bar").unwrap();
     }

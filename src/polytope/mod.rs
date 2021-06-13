@@ -273,6 +273,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         FlagIter::new(self.abs())
     }
 
+    /// Returns an iterator over all [`OrientedFlag`]s of a polytope.
     fn flag_events(&self) -> OrientedFlagIter {
         OrientedFlagIter::new(self.abs())
     }

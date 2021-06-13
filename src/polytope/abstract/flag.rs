@@ -279,7 +279,7 @@ impl<'a> Iterator for FlagIter<'a> {
 #[derive(Clone, Eq)]
 /// A flag together with an orientation. Any flag change flips the orientation.
 /// If the polytope associated to the flag is non-orientable, the orientation
-/// will be garbage.
+/// will be garbage data.
 pub struct OrientedFlag {
     /// The indices of the elements the flag contains, excluding the null and
     /// maximal elements.
@@ -393,13 +393,13 @@ impl OrientedFlag {
 }
 
 /// Represents a set of flag changes.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct FlagChanges(Vec<usize>);
 
 impl FlagChanges {
     /// Returns a new, empty set of flag changes.
     pub fn new() -> Self {
-        Self(Vec::new())
+        Default::default()
     }
 
     /// Returns the number of flag changes.

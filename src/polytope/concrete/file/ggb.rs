@@ -1,6 +1,7 @@
 use std::io::{self, Error, ErrorKind, Read};
 
 use crate::{geometry::Point, Concrete};
+use super::IoResult;
 
 use nalgebra::dvector;
 use xml::{
@@ -32,7 +33,7 @@ impl<'a> XmlReader<'a> {
 
     /// Reads an XML file until an XML element with a given name is found.
     /// Returns its attributes.
-    fn read_until(&mut self, search: &str) -> io::Result<Vec<OwnedAttribute>> {
+    fn read_until(&mut self, search: &str) -> IoResult<Vec<OwnedAttribute>> {
         for xml_result in self.as_iter_mut() {
             match xml_result {
                 // The next XML event to process:
@@ -64,7 +65,7 @@ impl<'a> XmlReader<'a> {
     /// ```xml
     /// <element type="point3d" label="A">
     /// ```
-    fn read_point(&mut self, attributes: &[OwnedAttribute]) -> io::Result<Vertex> {
+    fn read_point(&mut self, attributes: &[OwnedAttribute]) -> IoResult<Vertex> {
         let label = attribute(&attributes, "label").unwrap_or_default();
         let coord_attributes = self.read_until("coords")?;
 
@@ -97,7 +98,7 @@ impl<'a> XmlReader<'a> {
         })
     }
 
-    fn read_edge(&self) -> io::Result<Edge> {
+    fn read_edge(&self) -> IoResult<Edge> {
         todo!()
     }
 }
@@ -121,8 +122,8 @@ enum GgbErrors {
 }
 
 impl GgbErrors {
-    /// Creates a new [`io::Result`] out of this error.
-    pub fn to_err<T>(&self) -> io::Result<T> {
+    /// Creates a new [`IoResult`] out of this error.
+    pub fn to_err<T>(&self) -> IoResult<T> {
         use GgbErrors::*;
 
         Err(match self {
@@ -178,7 +179,7 @@ fn read_face() -> Face {
 }
 
 /// Parses the `geogebra.xml` file to produce a polytope.
-fn parse_xml(xml: &str) -> io::Result<Concrete> {
+fn parse_xml(xml: &str) -> IoResult<Concrete> {
     let mut vertices = Vec::new();
     let mut edges = Vec::new();
     let mut xml = XmlReader::new(xml);
@@ -226,7 +227,7 @@ fn parse_xml(xml: &str) -> io::Result<Concrete> {
 impl Concrete {
     /// Attempts to read a GGB file. If succesful, outputs a polytope in at most
     /// 3D.
-    pub fn from_ggb<R: io::Read + io::Seek>(mut zip: ZipArchive<R>) -> io::Result<Self> {
+    pub fn from_ggb<R: io::Read + io::Seek>(mut zip: ZipArchive<R>) -> IoResult<Self> {
         if let Ok(xml) = String::from_utf8(
             zip.by_name("geogebra.xml")?
                 .bytes()

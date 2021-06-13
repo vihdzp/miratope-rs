@@ -375,7 +375,11 @@ impl Library {
     /// order. If that also fails, it returns an `Err`.
     pub fn folder_contents<T: AsRef<OsStr>>(path: T) -> io::Result<Vec<Self>> {
         let path = PathBuf::from(&path);
-        assert!(path.is_dir(), "Path {:?} not a directory!", path);
+        assert!(
+            path.is_dir(),
+            "Path {} not a directory!",
+            path.to_str().unwrap_or_default()
+        );
 
         // Attempts to read from the .folder file.
         Ok(
@@ -510,10 +514,10 @@ fn show_library(
                                 if let Ok(res) = Concrete::from_path(&file) {
                                     match res {
                                         Ok(q) => *p = q,
-                                        Err(err) => println!("{:?}", err),
+                                        Err(err) => eprintln!("File read failed: {}", err),
                                     }
                                 } else {
-                                    println!("File open failed!");
+                                    eprintln!("File open failed!");
                                 }
                             }
                         }

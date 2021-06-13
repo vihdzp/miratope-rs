@@ -13,7 +13,7 @@ use crate::{
 
 use bevy::prelude::*;
 use bevy_egui::{
-    egui::{self, Ui},
+    egui::{self, menu, Ui},
     EguiContext,
 };
 use rfd::FileDialog;
@@ -160,16 +160,17 @@ impl FileDialogState {
 pub fn file_dialog(
     mut query: Query<&mut Concrete>,
     file_dialog_state: Res<FileDialogState>,
-    token: NonSend<FileDialogToken>,
+    file_dialog: NonSend<FileDialogToken>,
 ) {
     if file_dialog_state.is_changed() {
         match file_dialog_state.mode {
             // We want to save a file.
             FileDialogMode::Save => {
-                if let Some(path) = token.save_file(file_dialog_state.name.as_ref().unwrap()) {
+                if let Some(path) = file_dialog.save_file(file_dialog_state.name.as_ref().unwrap())
+                {
                     if let Some(p) = query.iter_mut().next() {
-                        if p.to_path(&path, Default::default()).is_err() {
-                            println!("File saving failed!");
+                        if let Err(err) = p.to_path(&path, Default::default()) {
+                            eprintln!("File saving failed: {}", err);
                         }
                     }
                 }
@@ -177,22 +178,23 @@ pub fn file_dialog(
 
             // We want to open a file.
             FileDialogMode::Open => {
-                if let Some(path) = token.pick_file() {
-                    for mut p in query.iter_mut() {
-                        if let Ok(res) = Concrete::from_path(&path) {
-                            match res {
+                if let Some(path) = file_dialog.pick_file() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        match Concrete::from_path(&path) {
+                            Ok(res) => match res {
                                 Ok(q) => {
                                     *p = q;
                                     p.recenter();
                                 }
-                                Err(err) => println!("{:?}", err),
-                            }
-                        } else {
-                            println!("File open failed!");
+                                Err(err) => eprintln!("File parsing failed: {}", err),
+                            },
+                            Err(err) => eprintln!("File open failed: {}", err),
                         }
                     }
                 }
             }
+
+            // There's nothing to do with the file dialog this frame.
             FileDialogMode::Disabled => {}
         }
     }
@@ -250,9 +252,9 @@ pub fn show_top_panel(
 ) {
     // The top bar.
     egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx(), |ui| {
-        egui::menu::bar(ui, |ui| {
+        menu::bar(ui, |ui| {
             // Operations on files.
-            egui::menu::menu(ui, "File", |ui| {
+            menu::menu(ui, "File", |ui| {
                 // Loads a file.
                 if ui.button("Open").clicked() {
                     file_dialog_state.open();
@@ -275,21 +277,21 @@ pub fn show_top_panel(
             });
 
             // Configures the view.
-            egui::menu::menu(ui, "View", |ui| {
+            menu::menu(ui, "View", |ui| {
                 let mut checked = projection_type.is_orthogonal();
 
                 if ui.checkbox(&mut checked, "Orthogonal projection").clicked() {
                     projection_type.flip();
 
                     // Forces an update on all polytopes.
-                    for mut p in query.iter_mut() {
+                    if let Some(mut p) = query.iter_mut().next() {
                         p.set_changed();
                     }
                 }
             });
 
             // Anything related to the polytope on screen.
-            egui::menu::menu(ui, "Polytope", |ui| {
+            menu::menu(ui, "Polytope", |ui| {
                 // Operations on polytopes.
                 ui.collapsing("Operations", |ui| {
                     // Operations that take a single polytope.
@@ -298,12 +300,10 @@ pub fn show_top_panel(
                         if ui.button("Dual").clicked() {
                             if advanced(&keyboard) {
                                 dual_window.open();
-                            } else {
-                                for mut p in query.iter_mut() {
-                                    match p.try_dual_mut() {
-                                        Ok(_) => println!("Dual succeeded."),
-                                        Err(err) => println!("Dual failed: {}", err),
-                                    }
+                            } else if let Some(mut p) = query.iter_mut().next() {
+                                match p.try_dual_mut() {
+                                    Ok(_) => println!("Dual succeeded."),
+                                    Err(err) => eprintln!("Dual failed: {}", err),
                                 }
                             }
                         }
@@ -314,10 +314,8 @@ pub fn show_top_panel(
                         if ui.button("Pyramid").clicked() {
                             if advanced(&keyboard) {
                                 pyramid_window.open();
-                            } else {
-                                for mut p in query.iter_mut() {
-                                    *p = p.pyramid();
-                                }
+                            } else if let Some(mut p) = query.iter_mut().next() {
+                                *p = p.pyramid();
                             }
                         }
 
@@ -325,10 +323,8 @@ pub fn show_top_panel(
                         if ui.button("Prism").clicked() {
                             if advanced(&keyboard) {
                                 prism_window.open();
-                            } else {
-                                for mut p in query.iter_mut() {
-                                    *p = p.prism();
-                                }
+                            } else if let Some(mut p) = query.iter_mut().next() {
+                                *p = p.prism();
                             }
                         }
 
@@ -336,10 +332,8 @@ pub fn show_top_panel(
                         if ui.button("Tegum").clicked() {
                             if advanced(&keyboard) {
                                 tegum_window.open();
-                            } else {
-                                for mut p in query.iter_mut() {
-                                    *p = p.tegum();
-                                }
+                            } else if let Some(mut p) = query.iter_mut().next() {
+                                *p = p.tegum();
                             }
                         }
 
@@ -347,12 +341,10 @@ pub fn show_top_panel(
                         if ui.button("Antiprism").clicked() {
                             if advanced(&keyboard) {
                                 antiprism_window.open();
-                            } else {
-                                for mut p in query.iter_mut() {
-                                    match p.try_antiprism() {
-                                        Ok(q) => *p = q,
-                                        Err(err) => println!("Antiprism failed: {}", err),
-                                    }
+                            } else if let Some(mut p) = query.iter_mut().next() {
+                                match p.try_antiprism() {
+                                    Ok(q) => *p = q,
+                                    Err(err) => eprintln!("Antiprism failed: {}", err),
                                 }
                             }
                         }
@@ -361,24 +353,24 @@ pub fn show_top_panel(
 
                         // Converts the active polytope into its Petrial.
                         if ui.button("Petrial").clicked() {
-                            for mut p in query.iter_mut() {
+                            if let Some(mut p) = query.iter_mut().next() {
                                 if p.petrial_mut() {
                                     println!("Petrial succeeded.");
                                 } else {
-                                    println!("Petrial failed.");
+                                    eprintln!("Petrial failed.");
                                 }
                             }
                         }
 
                         // Converts the active polytope into its Petrie polygon.
                         if ui.button("Petrie polygon").clicked() {
-                            for mut p in query.iter_mut() {
+                            if let Some(mut p) = query.iter_mut().next() {
                                 match p.petrie_polygon() {
                                     Some(q) => {
                                         *p = q;
                                         println!("Petrie polygon succeeded.")
                                     }
-                                    None => println!("Petrie polygon failed."),
+                                    None => eprintln!("Petrie polygon failed."),
                                 }
                             }
                         }
@@ -408,7 +400,7 @@ pub fn show_top_panel(
                     });
 
                     if ui.button("Omnitruncate").clicked() {
-                        for mut p in query.iter_mut() {
+                        if let Some(mut p) = query.iter_mut().next() {
                             *p = p.omnitruncate();
                         }
                     }
@@ -417,7 +409,7 @@ pub fn show_top_panel(
 
                     // Recenters a polytope.
                     if ui.button("Recenter").clicked() {
-                        for mut p in query.iter_mut() {
+                        if let Some(mut p) = query.iter_mut().next() {
                             p.recenter();
                         }
                     }
@@ -467,7 +459,7 @@ pub fn show_top_panel(
                 ui.collapsing("Elements", |ui| {
                     // Converts the active polytope into any of its facets.
                     if ui.button("Facet").clicked() {
-                        for mut p in query.iter_mut() {
+                        if let Some(mut p) = query.iter_mut().next() {
                             println!("Facet");
 
                             if let Some(mut facet) = p.facet(0) {
@@ -477,14 +469,14 @@ pub fn show_top_panel(
 
                                 println!("Facet succeeded.")
                             } else {
-                                println!("Facet failed: no facets.")
+                                eprintln!("Facet failed: no facets.")
                             }
                         }
                     }
 
                     // Converts the active polytope into any of its verfs.
                     if ui.button("Verf").clicked() {
-                        for mut p in query.iter_mut() {
+                        if let Some(mut p) = query.iter_mut().next() {
                             println!("Verf");
 
                             match p.verf(0) {
@@ -495,10 +487,8 @@ pub fn show_top_panel(
 
                                     println!("Verf succeeded.")
                                 }
-                                Ok(None) => {
-                                    println!("Verf failed: no vertices.")
-                                }
-                                Err(err) => println!("Verf failed: {:?}", err),
+                                Ok(None) => eprintln!("Verf failed: no vertices."),
+                                Err(err) => eprintln!("Verf failed: {}", err),
                             }
                         }
                     }
@@ -529,7 +519,7 @@ pub fn show_top_panel(
 
                     // Determines whether the polytope is orientable.
                     if ui.button("Orientability").clicked() {
-                        for mut p in query.iter_mut() {
+                        if let Some(mut p) = query.iter_mut().next() {
                             if p.orientable() {
                                 println!("The polytope is orientable.");
                             } else {
@@ -540,7 +530,7 @@ pub fn show_top_panel(
 
                     // Gets the volume of the polytope.
                     if ui.button("Volume").clicked() {
-                        for mut p in query.iter_mut() {
+                        if let Some(mut p) = query.iter_mut().next() {
                             if let Some(vol) = p.volume() {
                                 println!("The volume is {}.", vol);
                             } else {
@@ -561,24 +551,26 @@ pub fn show_top_panel(
             memory.show(ui, &mut query);
 
             // Stuff related to the Polytope Wiki.
-            egui::menu::menu(ui, "Wiki", |ui| {
+            menu::menu(ui, "Wiki", |ui| {
                 // Goes to the wiki main page.
-                if ui.button("Main Page").clicked() && webbrowser::open(crate::WIKI_LINK).is_err() {
-                    println!("Website opening failed!")
+                if ui.button("Main Page").clicked() {
+                    if let Err(err) = webbrowser::open(crate::WIKI_LINK) {
+                        eprintln!("Website opening failed: {}", err);
+                    }
                 }
 
                 // Searches the current polytope on the wiki.
                 if ui.button("Current").clicked() {
                     if let Some(p) = query.iter_mut().next() {
                         if let Err(err) = webbrowser::open(&p.wiki_link()) {
-                            println!("Website opening failed: {}", err)
+                            eprintln!("Website opening failed: {}", err)
                         }
                     }
                 }
             });
 
             // Switch language.
-            egui::menu::menu(ui, "Preferences", |ui| {
+            menu::menu(ui, "Preferences", |ui| {
                 ui.collapsing("Language", |ui| {
                     for lang in SelectedLanguage::iter() {
                         if ui.button(lang.to_string()).clicked() {
@@ -597,9 +589,11 @@ pub fn show_top_panel(
             });
 
             // General help.
-            egui::menu::menu(ui, "Help", |ui| {
-                if ui.button("File bug").clicked() && webbrowser::open(crate::NEW_ISSUE).is_err() {
-                    println!("Website opening failed!");
+            menu::menu(ui, "Help", |ui| {
+                if ui.button("File bug").clicked() {
+                    if let Err(err) = webbrowser::open(crate::NEW_ISSUE) {
+                        eprintln!("Website opening failed: {}", err);
+                    }
                 }
             });
 
@@ -756,7 +750,7 @@ fn show_views(
                 return;
             }
 
-            for mut p in query.iter_mut() {
+            if let Some(mut p) = query.iter_mut().next() {
                 let r = original_polytope.clone();
                 let hyp_pos = *hyperplane_pos + 0.0000001; // Botch fix for degeneracies.
 
