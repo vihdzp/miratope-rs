@@ -424,11 +424,11 @@ impl FlagChanges {
 
     /// Returns an iterator over all subsets of flag changes created by taking
     /// out a single flag change.
-    pub fn subsets(&self) -> std::iter::Map<std::ops::Range<usize>, impl FnMut(usize) -> Self> {
-        let clone = self.clone();
-
+    pub fn subsets(
+        &self,
+    ) -> std::iter::Map<std::ops::Range<usize>, impl FnMut(usize) -> Self + '_> {
         (0..self.len()).map(move |i| {
-            let mut subset = clone.clone();
+            let mut subset = self.clone();
             subset.remove(i);
             subset
         })

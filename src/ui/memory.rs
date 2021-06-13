@@ -36,7 +36,7 @@ impl Memory {
                             .id_source(idx)
                             .show(ui, |ui| {
                                 if ui.button("Save").clicked() {
-                                    for p in query.iter_mut() {
+                                    if let Some(p) = query.iter_mut().next() {
                                         *slot = Some(p.clone());
                                     }
                                 }

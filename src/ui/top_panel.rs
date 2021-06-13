@@ -167,7 +167,7 @@ pub fn file_dialog(
             // We want to save a file.
             FileDialogMode::Save => {
                 if let Some(path) = token.save_file(file_dialog_state.name.as_ref().unwrap()) {
-                    for p in query.iter_mut() {
+                    if let Some(p) = query.iter_mut().next() {
                         if p.to_path(&path, Default::default()).is_err() {
                             println!("File saving failed!");
                         }
@@ -505,7 +505,7 @@ pub fn show_top_panel(
 
                     // Outputs the element types, currently just prints to console.
                     if ui.button("Counts").clicked() {
-                        for p in query.iter_mut() {
+                        if let Some(p) = query.iter_mut().next() {
                             p.print_element_types();
                         }
                     }
@@ -515,7 +515,7 @@ pub fn show_top_panel(
                 ui.collapsing("Properties", |ui| {
                     // Determines the circumsphere of the polytope.
                     if ui.button("Circumsphere").clicked() {
-                        for p in query.iter_mut() {
+                        if let Some(p) = query.iter_mut().next() {
                             match p.circumsphere() {
                                 Some(sphere) => println!(
                                     "The circumradius is {} and the circumcenter is {}.",
@@ -551,7 +551,7 @@ pub fn show_top_panel(
 
                     // Gets the number of flags of the polytope.
                     if ui.button("Flag count").clicked() {
-                        for p in query.iter_mut() {
+                        if let Some(p) = query.iter_mut().next() {
                             println!("The polytope has {} flags.", p.flags().count())
                         }
                     }
@@ -569,9 +569,9 @@ pub fn show_top_panel(
 
                 // Searches the current polytope on the wiki.
                 if ui.button("Current").clicked() {
-                    for p in query.iter_mut() {
-                        if webbrowser::open(&p.wiki_link()).is_err() {
-                            println!("Website opening failed!")
+                    if let Some(p) = query.iter_mut().next() {
+                        if let Err(err) = webbrowser::open(&p.wiki_link()) {
+                            println!("Website opening failed: {}", err)
                         }
                     }
                 }

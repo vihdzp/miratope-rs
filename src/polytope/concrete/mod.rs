@@ -160,7 +160,8 @@ impl Concrete {
     /// Applies a linear transformation to all vertices of a polytope.
     pub fn apply(mut self, m: &Matrix) -> Self {
         for v in &mut self.vertices {
-            *v = m * v.clone();
+            let new_v = m * v as &_;
+            *v = new_v;
         }
 
         self
