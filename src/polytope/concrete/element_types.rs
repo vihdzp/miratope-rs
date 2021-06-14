@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::{
     polytope::{concrete::Concrete, r#abstract::rank::Rank, Polytope},
+    vec_like::VecLike,
     Consts, Float, FloatOrd,
 };
 

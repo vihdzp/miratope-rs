@@ -71,6 +71,7 @@ mod lang;
 mod no_cull_pipeline;
 mod polytope;
 mod ui;
+pub mod vec_like;
 
 /// The link to the [Polytope Wiki](https://polytope.miraheze.org/wiki/).
 const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";

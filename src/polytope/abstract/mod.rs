@@ -10,13 +10,16 @@ use std::{
 use self::{
     elements::{
         AbstractBuilder, Element, ElementHash, ElementList, ElementRef, Section, SectionHash,
-        SubelementList, Subelements, Subsupelements, Superelements,
+        SubelementList, Subelements, Superelements,
     },
     flag::{Flag, FlagEvent, FlagSet},
     rank::{Rank, RankVec},
 };
 use super::{DualResult, Polytope};
-use crate::lang::name::{Abs, Name};
+use crate::{
+    lang::name::{Abs, Name},
+    vec_like::VecLike,
+};
 
 use rayon::prelude::*;
 use strum_macros::Display;
@@ -170,7 +173,7 @@ impl Abstract {
         Self::from_vec(RankVec::with_capacity(rank))
     }
 
-    pub fn reserve(&mut self, additional: usize)  {
+    pub fn reserve(&mut self, additional: usize) {
         self.ranks.reserve(additional)
     }
 
@@ -966,7 +969,7 @@ impl Polytope<Abs> for Abstract {
     /// this method can never fail.
     fn try_dual_mut(&mut self) -> DualResult<()> {
         for elements in self.ranks.iter_mut() {
-            elements.0.par_iter_mut().for_each(Element::swap_mut);
+            elements.par_iter_mut().for_each(Element::swap_mut);
         }
 
         self.ranks.reverse();

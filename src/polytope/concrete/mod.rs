@@ -1,3 +1,4 @@
+pub mod cycle;
 pub mod element_types;
 pub mod file;
 pub mod mesh;
@@ -10,8 +11,7 @@ use std::{
 use super::{
     r#abstract::{
         elements::{
-            AbstractBuilder, ElementList, ElementRef, SubelementList, Subelements, Subsupelements,
-            Superelements,
+            AbstractBuilder, ElementList, ElementRef, SubelementList, Subelements, Superelements,
         },
         flag::{Flag, FlagChanges, FlagEvent, OrientedFlagIter},
         rank::{Rank, RankVec},
@@ -22,6 +22,7 @@ use super::{
 use crate::{
     geometry::{Hyperplane, Hypersphere, Matrix, Point, PointOrd, Segment, Subspace, Vector},
     lang::name::{Con, ConData, Name, NameData, Regular},
+    vec_like::VecLike,
     Consts, Float,
 };
 

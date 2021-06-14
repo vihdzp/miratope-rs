@@ -1,11 +1,8 @@
 //! A bunch of wrappers and helper structs that make dealing with abstract
 //! polytopes much less confusing.
 
-use std::{
-    collections::HashMap,
-    iter::IntoIterator,
-    ops::{Index, IndexMut},
-};
+use crate::{impl_veclike, vec_like::VecLike};
+use std::{collections::HashMap, iter::IntoIterator};
 
 use super::{
     rank::{Rank, RankVec},
@@ -38,49 +35,10 @@ impl ElementRef {
 }
 
 /// Common boilerplate code for [`Subelements`] and [`Superelements`].
-pub trait Subsupelements: Sized + Index<usize> + IndexMut<usize> + IntoIterator {
-    /// Builds a list of either subelements or superelements from a vector.
-    fn from_vec(vec: Vec<usize>) -> Self;
-
-    /// Returns a reference to the internal vector.
-    fn as_vec(&self) -> &Vec<usize>;
-
-    /// Returns a mutable reference to the internal vector.
-    fn as_vec_mut(&mut self) -> &mut Vec<usize>;
-
-    /// Constructs a new, empty subelement or superelement list.
-    fn new() -> Self {
-        Self::from_vec(Vec::new())
-    }
-
-    /// Returns `true` if the vector contains no elements.
-    fn is_empty(&self) -> bool {
-        self.as_vec().is_empty()
-    }
-
-    /// Returns the number of indices stored.
-    fn len(&self) -> usize {
-        self.as_vec().len()
-    }
-
-    /// Returns an iterator over the element indices.
-    fn iter(&self) -> std::slice::Iter<usize> {
-        self.as_vec().iter()
-    }
-
-    /// Returns an iterator that allows modifying each index.
-    fn iter_mut(&mut self) -> std::slice::IterMut<usize> {
-        self.as_vec_mut().iter_mut()
-    }
-
-    /// Sorts the indices.
-    fn sort(&mut self) {
-        self.as_vec_mut().sort_unstable()
-    }
-
+pub trait Subsupelements: Sized + VecLike<VecItem = usize> {
     /// Returns whether the indices are sorted.
     fn is_sorted(&self) -> bool {
-        let vec = self.as_vec();
+        let vec = self.as_ref();
         for i in 1..vec.len() {
             if vec[i - 1] > vec[i] {
                 return false;
@@ -88,37 +46,6 @@ pub trait Subsupelements: Sized + Index<usize> + IndexMut<usize> + IntoIterator 
         }
 
         true
-    }
-
-    /// Sorts the indices with a key extraction function. The sorting is
-    /// unstable.
-    fn sort_unstable_by_key<K, F>(&mut self, f: F)
-    where
-        F: FnMut(&usize) -> K,
-        K: Ord,
-    {
-        self.as_vec_mut().sort_unstable_by_key(f)
-    }
-
-    /// Appends an index to the back of the list of indices.
-    fn push(&mut self, value: usize) {
-        self.as_vec_mut().push(value)
-    }
-
-    fn pop(&mut self) -> Option<usize> {
-        self.as_vec_mut().pop()
-    }
-
-    /// Returns `true` if the list of indices contains an index with the given
-    /// value.
-    fn contains(&self, x: &usize) -> bool {
-        self.as_vec().contains(x)
-    }
-
-    /// Constructs a new, empty subelement or superelement list with the
-    /// capacity to store a given amount of indices.
-    fn with_capacity(capacity: usize) -> Self {
-        Self::from_vec(Vec::with_capacity(capacity))
     }
 
     /// Constructs a subelement or superelement list consisting of the indices
@@ -130,88 +57,23 @@ pub trait Subsupelements: Sized + Index<usize> + IndexMut<usize> + IntoIterator 
             vec.push(i);
         }
 
-        Self::from_vec(vec)
+        vec.into()
     }
 }
 
-/// Implements all remaining common code between `Subelements` and `Superelements`.
-macro_rules! impl_sub_sups {
-    ($T: ident, $name: expr) => {
-        /// The indices of the
-        #[doc = $name]
-        /// of a polytope, which make up the entries of an [`Element`].
-        #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-        pub struct $T(pub Vec<usize>);
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct Subelements(pub Vec<usize>);
+impl_veclike!(Subelements, usize);
+impl Subsupelements for Subelements {}
 
-        /// Allows indexing by an `usize`.
-        impl Index<usize> for $T {
-            type Output = usize;
-
-            fn index(&self, index: usize) -> &Self::Output {
-                &self.as_vec()[index]
-            }
-        }
-
-        /// Allows mutable indexing by an `usize`.
-        impl IndexMut<usize> for $T {
-            fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-                &mut self.as_vec_mut()[index]
-            }
-        }
-
-        /// Iterates over the slice while moving out.
-        impl IntoIterator for $T {
-            type Item = usize;
-
-            type IntoIter = std::vec::IntoIter<usize>;
-
-            fn into_iter(self) -> Self::IntoIter {
-                self.0.into_iter()
-            }
-        }
-
-        /// Iterates over references in the slice.
-        impl<'a> IntoIterator for &'a $T {
-            type Item = &'a usize;
-
-            type IntoIter = std::slice::Iter<'a, usize>;
-
-            fn into_iter(self) -> Self::IntoIter {
-                self.iter()
-            }
-        }
-
-        impl Subsupelements for $T {
-            /// Builds a list of
-            #[doc = $name]
-            /// from a vector. Provided only for the [`Subsupelements`] trait.
-            /// Use `Self` instead.
-            fn from_vec(vec: Vec<usize>) -> Self {
-                Self(vec)
-            }
-
-            /// Returns a reference to the internal vector. Provided only for
-            /// the [`Subsupelements`] trait. Use `.0` instead.
-            fn as_vec(&self) -> &Vec<usize> {
-                &self.0
-            }
-
-            /// Returns a mutable reference to the internal vector. Provided
-            /// only for the [`Subsupelements`] trait. Use `.0` instead.
-            fn as_vec_mut(&mut self) -> &mut Vec<usize> {
-                &mut self.0
-            }
-        }
-    };
-}
-
-// Blanket implementations wouldn't work here.
-impl_sub_sups!(Subelements, "subelements");
-impl_sub_sups!(Superelements, "superelements");
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct Superelements(pub Vec<usize>);
+impl_veclike!(Superelements, usize);
+impl Subsupelements for Superelements {}
 
 /// An element in a polytope, which stores the indices of both its subelements
 /// and superlements. These make up the entries of an [`ElementList`].
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Element {
     /// The indices of the subelements of the previous rank.
     pub subs: Subelements,
@@ -223,10 +85,7 @@ pub struct Element {
 impl Element {
     /// Initializes a new element with no subelements and no superelements.
     pub fn new() -> Self {
-        Self {
-            subs: Subelements::new(),
-            sups: Superelements::new(),
-        }
+        Default::default()
     }
 
     /// Builds a minimal element adjacent to a given amount of vertices.
@@ -261,8 +120,8 @@ impl Element {
 
     /// Sorts both the subelements and superelements by index.
     pub fn sort(&mut self) {
-        self.subs.sort();
-        self.sups.sort();
+        self.subs.sort_unstable();
+        self.sups.sort_unstable();
     }
 }
 
@@ -272,49 +131,10 @@ impl Element {
 /// If you only want to deal with the subelements of a polytope, use
 /// [`SubelementList`] instead.
 #[derive(Debug, Clone)]
-pub struct ElementList(pub Vec<Element>);
+pub struct ElementList(Vec<Element>);
+impl_veclike!(ElementList, Element);
 
 impl ElementList {
-    /// Initializes an empty element list.
-    pub fn new() -> Self {
-        ElementList(Vec::new())
-    }
-
-    /// Initializes an empty element list with a given capacity.
-    pub fn with_capacity(capacity: usize) -> Self {
-        ElementList(Vec::with_capacity(capacity))
-    }
-
-    /// Moves all the elements of `other` into `Self`, leaving `other` empty.
-    pub fn append(&mut self, other: &mut ElementList) {
-        self.0.append(&mut other.0)
-    }
-
-    /// Returns the number of elements in the element list.
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Returns an iterator over the element list.
-    pub fn iter(&self) -> std::slice::Iter<Element> {
-        self.0.iter()
-    }
-
-    /// Returns an iterator that allows modifying each value.
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<Element> {
-        self.0.iter_mut()
-    }
-
-    /// Returns a reference to the element at a given index.
-    pub fn get(&self, idx: usize) -> Option<&Element> {
-        self.0.get(idx)
-    }
-
-    /// Returns a mutable reference to the element at a given index.
-    pub fn get_mut(&mut self, idx: usize) -> Option<&mut Element> {
-        self.0.get_mut(idx)
-    }
-
     /// Returns the element list for the nullitope in a polytope with a given
     /// vertex count.
     pub fn min(vertex_count: usize) -> Self {
@@ -326,77 +146,17 @@ impl ElementList {
     pub fn max(facet_count: usize) -> Self {
         Self(vec![Element::max(facet_count)])
     }
-
-    /// Pushes a value into the element list.
-    pub fn push(&mut self, value: Element) {
-        self.0.push(value)
-    }
-}
-
-impl IntoIterator for ElementList {
-    type Item = Element;
-
-    type IntoIter = std::vec::IntoIter<Element>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl Index<usize> for ElementList {
-    type Output = Element;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
-    }
-}
-
-impl IndexMut<usize> for ElementList {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.0[index]
-    }
 }
 
 /// A list of subelements in a polytope.
 #[derive(Debug)]
 pub struct SubelementList(Vec<Subelements>);
+impl_veclike!(SubelementList, Subelements);
 
 impl SubelementList {
-    /// Initializes an empty subelement list.
-    pub fn new() -> Self {
-        Self(Vec::new())
-    }
-
-    /// Initializes an empty subelement list with a given capacity.
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self(Vec::with_capacity(capacity))
-    }
-
-    /// Pushes a value into the subelement list.
-    pub fn push(&mut self, value: Subelements) {
-        self.0.push(value);
-    }
-
-    /// Returns the number of elements in the subelement list.
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
     /// Returns the subelement list for the minimal element in a polytope.
     pub fn min() -> Self {
         Self(vec![Subelements::new()])
-    }
-
-    pub fn append(&mut self, other: &mut Self) {
-        self.0.append(&mut other.0)
-    }
-
-    pub fn iter(&self) -> std::slice::Iter<Subelements> {
-        self.0.iter()
-    }
-
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<Subelements> {
-        self.0.iter_mut()
     }
 
     /// Returns the subelement list for a set number of vertices in a polytope.
@@ -414,30 +174,6 @@ impl SubelementList {
     /// given facet count.
     pub fn max(facet_count: usize) -> Self {
         Self(vec![Subelements::count(facet_count)])
-    }
-}
-
-impl IntoIterator for SubelementList {
-    type Item = Subelements;
-
-    type IntoIter = std::vec::IntoIter<Subelements>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl Index<usize> for SubelementList {
-    type Output = Subelements;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
-    }
-}
-
-impl IndexMut<usize> for SubelementList {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.0[index]
     }
 }
 

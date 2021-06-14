@@ -9,7 +9,7 @@ pub mod group;
 use std::iter;
 
 use self::r#abstract::{
-    elements::{Element, ElementRef, Section},
+    elements::{Element, ElementList, ElementRef, Section},
     flag::{Flag, FlagIter, OrientedFlag, OrientedFlagIter},
     rank::{Rank, RankVec},
     Abstract,
@@ -21,6 +21,7 @@ use crate::{
         name::{Name, NameData, NameType, Regular},
         Language,
     },
+    vec_like::VecLike,
 };
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
@@ -87,7 +88,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         self.abs()
             .ranks
             .get(rank)
-            .map(|elements| elements.len())
+            .map(ElementList::len)
             .unwrap_or(0)
     }
 

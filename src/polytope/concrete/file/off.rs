@@ -6,11 +6,12 @@ use crate::{
     polytope::{
         concrete::{Concrete, ElementList, Point, Polytope, RankVec, Subelements},
         r#abstract::{
-            elements::{AbstractBuilder, SubelementList, Subsupelements},
+            elements::{AbstractBuilder, SubelementList},
             rank::Rank,
         },
         COMPONENTS, ELEMENT_NAMES,
     },
+    vec_like::VecLike,
 };
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
@@ -501,6 +502,7 @@ impl Default for OffOptions {
     }
 }
 
+/// An auxiliary struct to write a polytope to an OFF file.
 pub struct OffWriter<'a> {
     off: String,
     polytope: &'a Concrete,
@@ -578,14 +580,16 @@ impl<'a> OffWriter<'a> {
     fn write_faces(&mut self, rank: usize, edges: &ElementList, faces: &ElementList) {
         // # Faces
         if self.options.comments {
+            let name;
             let el_name = if rank > 2 {
-                element_name(Rank::new(2))
+                name = element_name(Rank::new(2));
+                &name
             } else {
-                COMPONENTS.to_string()
+                COMPONENTS
             };
 
             self.off.push_str("\n# ");
-            self.off.push_str(&el_name);
+            self.off.push_str(el_name);
             self.off.push('\n');
         }
 
@@ -599,7 +603,7 @@ impl<'a> OffWriter<'a> {
             let mut graph = Graph::new_undirected();
 
             // Maps the vertex indices to consecutive integers from 0.
-            for &edge_idx in &face.subs.0 {
+            for &edge_idx in &face.subs {
                 let edge = &edges[edge_idx];
                 let mut hash_edge = Vec::with_capacity(2);
 

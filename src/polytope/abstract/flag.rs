@@ -12,12 +12,8 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use super::{
-    elements::{ElementRef, Subsupelements},
-    rank::Rank,
-    Abstract,
-};
-use crate::{polytope::Polytope, Float};
+use super::{elements::ElementRef, rank::Rank, Abstract};
+use crate::{impl_veclike, polytope::Polytope, vec_like::VecLike, Float};
 
 /// A [flag](https://polytope.miraheze.org/wiki/Flag) in a polytope. Stores the
 /// indices of the elements of each rank, excluding the minimal and maximal
@@ -393,33 +389,14 @@ impl OrientedFlag {
 }
 
 /// Represents a set of flag changes.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct FlagChanges(Vec<usize>);
+impl_veclike!(FlagChanges, usize);
 
 impl FlagChanges {
-    /// Returns a new, empty set of flag changes.
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    /// Returns the number of flag changes.
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
     /// Returns the set of all flag changes for a polytope of a given rank.
     pub fn all(rank: Rank) -> Self {
         Self((0..rank.usize()).collect())
-    }
-
-    /// Returns whether the set of flag changes is empty.
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    /// Removes a flag change at a given index **without changing their order.**
-    pub fn remove(&mut self, index: usize) -> usize {
-        self.0.remove(index)
     }
 
     /// Returns an iterator over all subsets of flag changes created by taking
@@ -432,14 +409,6 @@ impl FlagChanges {
             subset.remove(i);
             subset
         })
-    }
-}
-
-impl std::ops::Index<usize> for FlagChanges {
-    type Output = usize;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
     }
 }
 
