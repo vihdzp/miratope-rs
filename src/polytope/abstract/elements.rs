@@ -189,6 +189,10 @@ impl AbstractBuilder {
         Self(Abstract::with_rank_capacity(rank))
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub fn reserve(&mut self, additional: usize) {
         self.0.reserve(additional)
     }
@@ -200,8 +204,7 @@ impl AbstractBuilder {
     /// Pushes an element list with a single empty element into the polytope.
     pub fn push_min(&mut self) {
         // If you're using this method, the polytope should be empty.
-        debug_assert!(self.0.ranks.is_empty());
-
+        debug_assert!(self.is_empty());
         self.push(SubelementList::min());
     }
 
@@ -211,7 +214,6 @@ impl AbstractBuilder {
         // If you're using this method, the polytope should consist of a single
         // minimal element.
         debug_assert_eq!(self.0.rank(), Rank::new(-1));
-
         self.push(SubelementList::vertices(vertex_count))
     }
 

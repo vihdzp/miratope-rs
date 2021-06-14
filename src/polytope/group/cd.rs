@@ -82,25 +82,27 @@ impl std::error::Error for CdError {}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CoxMatrix(MatrixOrd);
 
+impl AsRef<Matrix> for CoxMatrix {
+    fn as_ref(&self) -> &Matrix {
+        self.0.as_ref()
+    }
+}
+
+impl AsMut<Matrix> for CoxMatrix {
+    fn as_mut(&mut self) -> &mut Matrix {
+        self.0.as_mut()
+    }
+}
+
 impl CoxMatrix {
     /// Initializes a new CD matrix from a vector of nodes and a matrix.
     pub fn new(matrix: Matrix) -> Self {
         Self(MatrixOrd::new(matrix))
     }
 
-    /// Returns a reference to the inner matrix.
-    pub fn as_matrix(&self) -> &Matrix {
-        self.0.as_matrix()
-    }
-
-    /// Returns a mutable reference to the inner matrix.
-    pub fn as_matrix_mut(&mut self) -> &mut Matrix {
-        self.0.as_matrix_mut()
-    }
-
     /// Returns the dimensions of the matrix.
     pub fn dim(&self) -> usize {
-        self.as_matrix().nrows()
+        self.as_ref().nrows()
     }
 
     /// Parses a [`Cd`] and turns it into a Coxeter matrix.
@@ -815,7 +817,7 @@ impl Cd {
     /// calling [`Self::generator`] and taking the norm.
     pub fn circumradius(&self) -> Option<Float> {
         let mut schlafli = self.cox();
-        let schlafli_ref = schlafli.as_matrix_mut();
+        let schlafli_ref = schlafli.as_mut();
         let node_vec = self.node_vector();
 
         // Converts the Coxeter matrix into the Schläfli matrix.
@@ -827,7 +829,7 @@ impl Cd {
             return None;
         }
 
-        let sq_radius = (node_vec.transpose() * schlafli.as_matrix() * node_vec)[(0, 0)] / -4.0;
+        let sq_radius = (node_vec.transpose() * schlafli.as_ref() * node_vec)[(0, 0)] / -4.0;
         if sq_radius < -Float::EPS {
             None
         } else if sq_radius > Float::EPS {

@@ -205,7 +205,7 @@ impl<'a> Iterator for FlagIter<'a> {
                 break;
             }
 
-            element = &self.polytope[r][flag[r]];
+            element = &self.polytope[r.into()][flag[r]];
             r -= 1;
         }
 

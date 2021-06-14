@@ -6,12 +6,14 @@ use crate::{geometry::Point, Concrete};
 use nalgebra::dvector;
 use xml::{
     attribute::OwnedAttribute,
-    reader::{EventReader, Events, XmlEvent},
+    reader::{EventReader, XmlEvent},
 };
 use zip::read::ZipArchive;
 
+pub type Events<'a> = xml::reader::Events<&'a [u8]>;
+
 /// A wrapper around an iterator over events in an XML file.
-pub struct XmlReader<'a>(Events<&'a [u8]>);
+pub struct XmlReader<'a>(Events<'a>);
 
 impl<'a> Iterator for XmlReader<'a> {
     type Item = xml::reader::Result<XmlEvent>;
@@ -21,20 +23,27 @@ impl<'a> Iterator for XmlReader<'a> {
     }
 }
 
+impl<'a> AsRef<Events<'a>> for XmlReader<'a> {
+    fn as_ref(&self) -> &Events<'a> {
+        &self.0
+    }
+}
+
+impl<'a> AsMut<Events<'a>> for XmlReader<'a> {
+    fn as_mut(&mut self) -> &mut Events<'a> {
+        &mut self.0
+    }
+}
+
 impl<'a> XmlReader<'a> {
     pub fn new(xml: &'a str) -> Self {
         Self(EventReader::from_str(xml).into_iter())
     }
 
-    /// Returns a mutable reference to the internal iterator.
-    pub fn as_iter_mut(&mut self) -> &mut Events<&'a [u8]> {
-        &mut self.0
-    }
-
     /// Reads an XML file until an XML element with a given name is found.
     /// Returns its attributes.
     fn read_until(&mut self, search: &str) -> IoResult<Vec<OwnedAttribute>> {
-        for xml_result in self.as_iter_mut() {
+        for xml_result in self.as_mut() {
             match xml_result {
                 // The next XML event to process:
                 Ok(xml_event) => {
@@ -185,7 +194,7 @@ fn parse_xml(xml: &str) -> IoResult<Concrete> {
     let mut xml = XmlReader::new(xml);
 
     loop {
-        match xml.as_iter_mut().next() {
+        match xml.as_mut().next() {
             // If the document isn't yet over:
             Some(xml_result) => match xml_result {
                 // The next XML event to process:

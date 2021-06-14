@@ -193,6 +193,10 @@ impl Abstract {
         RankVec::with_rank_capacity(rank).into()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.ranks.is_empty()
+    }
+
     pub fn reserve(&mut self, additional: usize) {
         self.ranks.reserve(additional)
     }
@@ -848,8 +852,8 @@ impl Abstract {
         // If !min, we have to set a minimal element manually.
         if !min {
             let vertex_count = p.vertex_count() * q.vertex_count();
-            element_lists[-1] = SubelementList::min();
-            element_lists[0] = SubelementList::vertices(vertex_count);
+            element_lists[Rank::new(-1)] = SubelementList::min();
+            element_lists[Rank::new(0)] = SubelementList::vertices(vertex_count);
         }
 
         // If !max, we have to set a maximal element manually.
@@ -1042,7 +1046,7 @@ impl Polytope<Abs> for Abstract {
         self.pop();
 
         // Clears the current edges' superelements.
-        for edge in self[1].iter_mut() {
+        for edge in self[Rank::new(1)].iter_mut() {
             edge.sups = Superelements::new();
         }
 
@@ -1182,7 +1186,7 @@ impl Polytope<Abs> for Abstract {
     /// given polytope in place.
     fn hosotope_mut(&mut self) {
         let min = self.min().clone();
-        self[-1].push(min);
+        self[Rank::new(-1)].push(min);
         self.ranks.insert(Rank::new(-1), ElementList::max(2));
     }
 
@@ -1202,18 +1206,18 @@ impl Polytope<Abs> for Abstract {
 }
 
 /// Permits indexing an abstract polytope by rank.
-impl<T: Into<Rank>> std::ops::Index<T> for Abstract {
+impl std::ops::Index<Rank> for Abstract {
     type Output = ElementList;
 
-    fn index(&self, index: T) -> &Self::Output {
-        &self.ranks[index.into()]
+    fn index(&self, index: Rank) -> &Self::Output {
+        &self.ranks[index]
     }
 }
 
 /// Permits mutably indexing an abstract polytope by rank.
-impl<T: Into<Rank>> std::ops::IndexMut<T> for Abstract {
-    fn index_mut(&mut self, index: T) -> &mut Self::Output {
-        &mut self.ranks[index.into()]
+impl std::ops::IndexMut<Rank> for Abstract {
+    fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
+        &mut self.ranks[index]
     }
 }
 

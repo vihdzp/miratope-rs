@@ -354,6 +354,24 @@ pub struct MatrixOrdMxN<R: Dim, C: Dim>(pub MatrixMxN<R, C>)
 where
     VecStorage<Float, R, C>: Storage<Float, R, C>;
 
+impl<R: Dim, C: Dim> AsRef<MatrixMxN<R, C>> for MatrixOrdMxN<R, C>
+where
+    VecStorage<Float, R, C>: Storage<Float, R, C>,
+{
+    fn as_ref(&self) -> &MatrixMxN<R, C> {
+        &self.0
+    }
+}
+
+impl<R: Dim, C: Dim> AsMut<MatrixMxN<R, C>> for MatrixOrdMxN<R, C>
+where
+    VecStorage<Float, R, C>: Storage<Float, R, C>,
+{
+    fn as_mut(&mut self) -> &mut MatrixMxN<R, C> {
+        &mut self.0
+    }
+}
+
 impl<R: Dim, C: Dim> PartialEq for MatrixOrdMxN<R, C>
 where
     VecStorage<Float, R, C>: Storage<Float, R, C>,
@@ -423,16 +441,6 @@ where
     /// Initializes a new `MatrixOrd` from a `Matrix`.
     pub fn new(mat: MatrixMxN<R, C>) -> Self {
         Self(mat)
-    }
-
-    /// Returns a reference to the inner matrix.
-    pub fn as_matrix(&self) -> &MatrixMxN<R, C> {
-        &self.0
-    }
-
-    /// Returns a mutable reference to the inner matrix.
-    pub fn as_matrix_mut(&mut self) -> &mut MatrixMxN<R, C> {
-        &mut self.0
     }
 
     /// Iterates over the entries of the `MatrixOrd`.

@@ -19,28 +19,28 @@ pub struct Rank(usize);
 
 impl Rank {
     /// Initializes a `Rank` from an `isize`.
-    pub fn new<T: Into<Rank>>(num: T) -> Self {
-        num.into()
+    pub const fn new(num: isize) -> Self {
+        Self((num + 1) as usize)
     }
 
     /// Casts the `Rank` into an `usize`, or panics if `self` is `-1`. This
     /// value is **not** the same as the internal value. Use `.0` for that.
-    pub fn into_usize(self) -> usize {
-        self.into()
+    pub const fn into_usize(self) -> usize {
+        self.0 as usize - 1
     }
 
     /// Casts the `Rank` into an `isize`.
-    pub fn into_isize(self) -> isize {
-        self.into()
+    pub const fn into_isize(self) -> isize {
+        self.0 as isize - 1
     }
 
     /// Casts the `Rank` into an `u32`, or panics if `self` is `-1`.
-    pub fn into_u32(self) -> u32 {
-        self.into()
+    pub const fn into_u32(self) -> u32 {
+        self.0 as u32 - 1
     }
 
     /// Casts the `Rank` into an `f64`.
-    pub fn into_f64(self) -> f64 {
+    pub const fn into_f64(self) -> f64 {
         self.into_isize() as f64
     }
 
@@ -65,11 +65,11 @@ impl Rank {
     }
 
     /// Subtracts one from the rank.
-    pub const fn minus_one(&self) -> Self {
+    pub const fn minus_one(self) -> Self {
         Self(self.0 - 1)
     }
 
-    pub const fn try_minus_one(&self) -> Option<Self> {
+    pub const fn try_minus_one(self) -> Option<Self> {
         if self.0 == 0 {
             None
         } else {
@@ -227,26 +227,6 @@ impl<T> RankVec<T> {
         IterMut(self.iter_mut())
     }
 }
-
-macro_rules! impl_index {
-    ($U:ty) => {
-        impl<T> std::ops::Index<$U> for RankVec<T> {
-            type Output = T;
-
-            fn index(&self, index: $U) -> &Self::Output {
-                &self[Rank::from(index)]
-            }
-        }
-
-        impl<T> std::ops::IndexMut<$U> for RankVec<T> {
-            fn index_mut(&mut self, index: $U) -> &mut Self::Output {
-                &mut self[Rank::from(index)]
-            }
-        }
-    };
-}
-
-impl_index!(i32);
 
 impl VecIndex for Rank {
     fn index(self) -> usize {

@@ -1,6 +1,4 @@
-/// A trait for any type that acts as a wrapper around a `Vec<T>`. Will
-/// automatically implement all corresponding methods.
-
+/// A trait for anything that should work as an index in a vector.
 pub trait VecIndex {
     fn index(self) -> usize;
 }
@@ -11,6 +9,8 @@ impl VecIndex for usize {
     }
 }
 
+/// A trait for any type that acts as a wrapper around a `Vec<T>`. Will
+/// automatically implement all corresponding methods.
 pub trait VecLike<'a>:
     Default
     + From<Vec<Self::VecItem>>
@@ -130,25 +130,29 @@ pub trait VecLike<'a>:
 }
 
 #[macro_export]
-/// Implements the [`VecLike`] trait for the type of the first argument, and
-/// sets the [`VecLike::VecItem`] parameter to the second argument. Will also
-/// implement all required traits automatically.
+/// Implements the [`VecLike`] trait for the type of the first argument, setting
+/// the [`VecLike::VecItem`] parameter to the second argument and the
+/// [`VecLike::VecIndex`] parameter to the third argument. Will also implement
+/// all required subtraits automatically.
 ///
-/// This macro assumes that the first argument's declaration looks like this:
+/// This macro can either be called like this:
+///
 /// ```
 /// struct Wrapper(Vec<Item>);
+/// impl_veclike!(Wrapper, Item, usize);
+/// ```
+///
+/// Or like this:
+///
+/// ```
+/// struct Wrapper<T>(Vec<T>);
+/// impl_veclike!(@for [T] Wrapper<T>, T, usize);
 /// ```
 macro_rules! impl_veclike {
     ($(@for [$($generics: tt)*])? $Type: ty, $VecItem: ty, $VecIndex: ty $(,)?) => {
         impl<'a, $($($generics)*)?> crate::vec_like::VecLike<'a> for $Type {
             type VecItem = $VecItem;
             type VecIndex = $VecIndex;
-        }
-
-        impl$(<$($generics)*>)? Default for $Type {
-            fn default() -> Self {
-                Vec::new().into()
-            }
         }
 
         impl$(<$($generics)*>)? From<Vec<$VecItem>> for $Type {
@@ -166,6 +170,12 @@ macro_rules! impl_veclike {
         impl$(<$($generics)*>)? AsMut<Vec<$VecItem>> for $Type {
             fn as_mut(&mut self) -> &mut Vec<$VecItem> {
                 &mut self.0
+            }
+        }
+
+        impl$(<$($generics)*>)? Default for $Type {
+            fn default() -> Self {
+                Vec::new().into()
             }
         }
 

@@ -709,7 +709,7 @@ impl<'a> OffWriter<'a> {
 
         // Adds faces.
         if rank >= Rank::new(2) {
-            self.write_faces(rank.into(), &abs[1], &abs[2]);
+            self.write_faces(rank.into(), &abs[Rank::new(1)], &abs[Rank::new(2)]);
         }
 
         // Adds the rest of the elements.

@@ -297,7 +297,7 @@ impl Concrete {
     /// Maybe make this work in the general case?
     pub fn midradius(&self) -> Float {
         let vertices = &self.vertices;
-        let edges = &self[1];
+        let edges = &self[Rank::new(1)];
         let edge = &edges[0];
 
         let sub0 = edge.subs[0];
@@ -730,7 +730,7 @@ impl Concrete {
         let mut hash_element = HashMap::new();
 
         // Determines the vertices of the cross-section.
-        for (idx, edge) in self[1].iter().enumerate() {
+        for (idx, edge) in self[Rank::new(1)].iter().enumerate() {
             let segment = Segment(
                 self.vertices[edge.subs[0]].clone(),
                 self.vertices[edge.subs[1]].clone(),
@@ -1098,18 +1098,18 @@ impl Polytope<Con> for Concrete {
     }
 }
 
-impl<T: Into<Rank>> std::ops::Index<T> for Concrete {
+impl std::ops::Index<Rank> for Concrete {
     type Output = ElementList;
 
     /// Gets the list of elements with a given rank.
-    fn index(&self, rank: T) -> &Self::Output {
+    fn index(&self, rank: Rank) -> &Self::Output {
         &self.abs[rank]
     }
 }
 
-impl<T: Into<Rank>> std::ops::IndexMut<T> for Concrete {
+impl std::ops::IndexMut<Rank> for Concrete {
     /// Gets the list of elements with a given rank.
-    fn index_mut(&mut self, rank: T) -> &mut Self::Output {
+    fn index_mut(&mut self, rank: Rank) -> &mut Self::Output {
         &mut self.abs[rank]
     }
 }
