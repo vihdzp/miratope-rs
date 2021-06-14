@@ -170,6 +170,10 @@ impl Abstract {
         Self::from_vec(RankVec::with_capacity(rank))
     }
 
+    pub fn reserve(&mut self, additional: usize)  {
+        self.ranks.reserve(additional)
+    }
+
     /// Initializes a polytope from a vector of element lists.
     pub fn from_vec(ranks: RankVec<ElementList>) -> Self {
         let name = if ranks.0.len() >= 2 {

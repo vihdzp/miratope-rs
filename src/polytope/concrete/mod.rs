@@ -251,7 +251,7 @@ impl Concrete {
 
         // If there are no edges, we just return the empty vector.
         if let Some(edges) = self.abs.ranks.get(Rank::new(1)) {
-            edge_lengths.reserve_exact(edges.len());
+            edge_lengths.reserve(edges.len());
 
             for edge in edges.iter() {
                 let sub0 = edge.subs[0];

@@ -1,10 +1,4 @@
-use std::{
-    collections::HashMap,
-    fs,
-    path::Path,
-    str::FromStr,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, fs, path::Path, str::FromStr};
 
 use super::IoResult;
 use crate::{
@@ -98,228 +92,378 @@ fn element_name(rank: Rank) -> String {
     }
 }
 
-/// An iterator over the tokens in an OFF file that also keeps track of position.
-pub struct TokenIter<'a, T: Iterator<Item = &'a str>> {
-    /// The inner iterator over the tokens.
-    iter: T,
+/// The result of trying to read the next token from an OFF file.
+enum OffNext<'a> {
+    /// We've read a token from the OFF file. We don't directly store a
+    /// [`Token`], since at this point in the code we don't know the starting
+    /// position.
+    Token(&'a str),
+
+    /// We either read a single character from a comment, or a single whitespace
+    /// character. Either way, we don't want it.
+    Garbage,
+}
+
+/// Represents a token, i.e. any value of importance, in an OFF file.
+struct Token<'a> {
+    /// The string slice containing our value of importance.
+    slice: &'a str,
+
+    /// The starting position of the token.
+    pos: Position,
+}
+
+/// An iterator over the tokens in an OFF file. It excludes whitespace and
+/// comments. It also keeps track of position.
+struct TokenIter<'a> {
+    /// A reference to the source OFF file.
+    src: &'a str,
+
+    /// The inner iterator over the characters.
+    iter: std::str::CharIndices<'a>,
+
+    /// Whether we're currently reading a comment.
+    comment: bool,
 
     /// The row and column in the file.
-    position: Arc<Mutex<Position>>,
+    position: Position,
 }
 
 /// Any dummy iterator would've done here.
-impl<'a> TokenIter<'a, std::vec::IntoIter<&'a str>> {
+impl<'a> TokenIter<'a> {
     /// Returns an iterator over the OFF file, with all whitespace and comments
     /// removed.
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new(src: &'a str) -> TokenIter<'a, impl Iterator<Item = &'a str>> {
-        let mut comment = false;
-        let position = Arc::new(Mutex::new(Position::default()));
-        let position_clone = Arc::clone(&position);
+    fn new(src: &'a str) -> Self {
+        Self {
+            src,
+            iter: src.char_indices(),
+            comment: false,
+            position: Default::default(),
+        }
+    }
 
-        TokenIter {
-            iter: str::split(src, move |c: char| {
-                let mut position = position_clone.lock().unwrap();
+    /// Attempts to get the next token from the file. Returns `None` if the
+    /// inner iterator has been exhausted.
+    fn try_next(&mut self) -> Option<OffNext<'a>> {
+        let (mut idx, mut c) = self.iter.next()?;
+        let init_idx = idx;
+        let mut end_idx = init_idx;
 
-                if c == '#' {
-                    comment = true;
-                    position.next();
-                } else if c == '\n' {
-                    comment = false;
-                    position.next_line();
-                } else {
-                    position.next();
+        loop {
+            match c {
+                // The start of a comment.
+                '#' => {
+                    self.comment = true;
+                    self.position.next();
                 }
 
-                comment || c.is_whitespace()
-            }),
-            position,
-        }
-    }
-}
+                // End lines also end comments.
+                '\n' => {
+                    self.comment = false;
+                    self.position.next_line();
+                }
 
-impl<'a, T: Iterator<Item = &'a str>> TokenIter<'a, T> {
-    /// Returns the current position of the iterator.
-    pub fn position(&self) -> Position {
-        *self.position.lock().unwrap()
-    }
+                // We just advance the position otherwise.
+                _ => self.position.next(),
+            }
 
-    /// Returns the next token from the file, and the position at which it
-    /// starts. Manual implementation of a filter over non-empty strings.
-    pub fn next(&mut self) -> Option<(&str, Position)> {
-        loop {
-            let pos = self.position();
-            let str = self.iter.next()?;
+            // If we're in the middle of a comment, or we found a whitespace,
+            // then whatever token we were reading has ended.
+            if self.comment || c.is_whitespace() {
+                break;
+            }
 
-            if !str.is_empty() {
-                return Some((str, pos));
+            // Advances the iterator.
+            end_idx = idx;
+            if let Some((new_idx, new_c)) = self.iter.next() {
+                idx = new_idx;
+                c = new_c;
+            } else {
+                // We do this so that it seems ilke we read something at the end.
+                idx += 1;
+                break;
             }
         }
+
+        // If we immediately broke out of the loop, this means we just read a
+        // single character in a comment or a whitespace. That is, garbage.
+        Some(if init_idx == idx {
+            OffNext::Garbage
+        } else {
+            OffNext::Token(dbg!(&self.src[init_idx..=end_idx]))
+        })
     }
 
-    /// Reads the next integer or float from the OFF file.
+    /// Reads and parses the next token from the OFF file.
     pub fn parse_next<U: FromStr>(&mut self) -> OffResult<U>
     where
         <U as FromStr>::Err: std::fmt::Debug,
     {
+        let Token { slice, pos } = self
+            .next()
+            .ok_or(OffError::UnexpectedEnding(self.position))?;
+
+        slice.parse().map_err(|_| OffError::Parsing(pos))
+    }
+}
+
+impl<'a> Iterator for TokenIter<'a> {
+    type Item = Token<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let pos = self.position();
-            let str = self.iter.next().ok_or(OffError::UnexpectedEnding(pos))?;
-
-            if !str.is_empty() {
-                return str.parse().map_err(|_| OffError::Parsing(pos));
+            let pos = self.position;
+            if let OffNext::Token(slice) = self.try_next()? {
+                return Some(Token { slice, pos });
             }
         }
     }
 }
 
-/// Gets the number of elements from the OFF file.
-/// This includes components iff dim ≤ 2, as this makes things easier down the
-/// line.
-fn el_nums<'a, T: Iterator<Item = &'a str>>(
-    rank: Rank,
-    toks: &mut TokenIter<'a, T>,
-) -> OffResult<Vec<usize>> {
-    let rank = rank.usize();
-    let mut el_nums = Vec::with_capacity(rank);
+/// An auxiliary struct that reads through an OFF file and builds a concrete
+/// polytope out of it.
+pub struct OffReader<'a> {
+    /// An iterator over the tokens of the OFF file.
+    iter: TokenIter<'a>,
 
-    // Reads entries one by one.
-    for _ in 0..rank {
-        el_nums.push(toks.parse_next()?);
-    }
-
-    // A point has a single component (itself)
-    if rank == 0 {
-        el_nums.push(1);
-    }
-    // A dyad has twice as many vertices as components.
-    else if rank == 1 {
-        let comps = el_nums[0] / 2;
-        el_nums.push(comps);
-    } else {
-        // A polygon always has as many vertices as edges.
-        if rank == 2 {
-            el_nums.push(el_nums[0]);
-        }
-
-        // 2-elements go before 1-elements, we're undoing that.
-        el_nums.swap(1, 2);
-    }
-
-    Ok(el_nums)
+    /// The underlying abstract polytope.
+    abs: AbstractBuilder,
 }
 
-/// Parses all vertex coordinates from the OFF file.
-fn parse_vertices<'a, T: Iterator<Item = &'a str>>(
-    num: usize,
-    dim: usize,
-    toks: &mut TokenIter<'a, T>,
-) -> OffResult<Vec<Point>> {
-    // Reads all vertices.
-    let mut vertices = Vec::with_capacity(num);
-
-    // Add each vertex to the vector.
-    for _ in 0..num {
-        let mut vert = Vec::with_capacity(dim);
-
-        for _ in 0..dim {
-            vert.push(toks.parse_next()?);
+impl<'a> OffReader<'a> {
+    /// Initializes a new reader from a source OFF file.
+    pub fn new(src: &'a str) -> Self {
+        Self {
+            iter: TokenIter::new(src),
+            abs: AbstractBuilder::new(),
         }
-
-        vertices.push(vert.into());
     }
 
-    Ok(vertices)
-}
+    /// Returns a reference to the underlying OFF file.
+    pub fn src(&self) -> &'a str {
+        self.iter.src
+    }
 
-/// Reads the faces from the OFF file and gets the edges and faces from them.
-/// Since the OFF file doesn't store edges explicitly, this is harder than
-/// reading general elements.
-fn parse_edges_and_faces<'a, T: Iterator<Item = &'a str>>(
-    rank: Rank,
-    num_edges: usize,
-    num_faces: usize,
-    toks: &mut TokenIter<'a, T>,
-) -> OffResult<(SubelementList, SubelementList)> {
-    let mut edges = SubelementList::with_capacity(num_edges);
-    let mut faces = SubelementList::with_capacity(num_faces);
+    /// Advances the underlying iterator.
+    fn next(&mut self) -> Option<Token<'a>> {
+        self.iter.next()
+    }
 
-    let mut hash_edges = HashMap::new();
+    /// Reads the rank from the OFF file.
+    fn rank(&mut self) -> OffResult<Rank> {
+        let Token { slice: first, pos } = self.next().ok_or(OffError::Empty)?;
+        let rank = first.strip_suffix("OFF").ok_or(OffError::MagicWord(pos))?;
 
-    // Add each face to the element list.
-    for _ in 0..num_faces {
-        let face_sub_num = toks.parse_next()?;
+        Ok(if rank.is_empty() {
+            Rank::new(3)
+        } else {
+            Rank::new(rank.parse().map_err(|_| OffError::Rank(pos))?)
+        })
+    }
 
-        let mut face = Subelements::new();
-        let mut face_verts = Vec::with_capacity(face_sub_num);
+    /// Gets the number of elements from the OFF file. This includes components
+    /// iff dim ≤ 2, as this makes things easier down the line.
+    fn el_nums(&mut self, rank: Rank) -> OffResult<Vec<usize>> {
+        let rank = rank.usize();
+        let mut el_nums = Vec::with_capacity(rank);
 
-        // Reads all vertices of the face.
-        for _ in 0..face_sub_num {
-            face_verts.push(toks.parse_next()?);
+        // Reads entries one by one.
+        for _ in 0..rank {
+            el_nums.push(self.iter.parse_next()?);
         }
 
-        // Gets all edges of the face.
-        for i in 0..face_sub_num {
-            let mut edge = Subelements(vec![face_verts[i], face_verts[(i + 1) % face_sub_num]]);
-            edge.sort();
+        match rank {
+            // A point has a single component (itself)
+            0 => el_nums.push(1),
 
-            if let Some(idx) = hash_edges.get(&edge) {
-                face.push(*idx);
-            } else {
-                hash_edges.insert(edge.clone(), edges.len());
-                face.push(edges.len());
-                edges.push(edge);
+            // A dyad has twice as many vertices as components.
+            1 => {
+                let comps = el_nums[0] / 2;
+                el_nums.push(comps);
+            }
+
+            _ => {
+                // A polygon always has as many vertices as edges.
+                if rank == 2 {
+                    el_nums.push(el_nums[0]);
+                }
+
+                // 2-elements go before 1-elements, we're undoing that.
+                el_nums.swap(1, 2);
             }
         }
 
-        // If these are truly faces and not just components, we add them.
+        Ok(el_nums)
+    }
+
+    /// Parses all vertex coordinates from the OFF file.
+    fn parse_vertices(&mut self, num: usize, dim: usize) -> OffResult<Vec<Point>> {
+        // Reads all vertices.
+        let mut vertices = Vec::with_capacity(num);
+
+        // Add each vertex to the vector.
+        for _ in 0..num {
+            let mut vert = Vec::with_capacity(dim);
+
+            for _ in 0..dim {
+                vert.push(self.iter.parse_next()?);
+            }
+
+            vertices.push(vert.into());
+        }
+
+        Ok(vertices)
+    }
+
+    /// Reads the faces from the OFF file and gets the edges and faces from
+    /// them. Since the OFF file doesn't store edges explicitly, this is harder
+    /// than reading general elements.
+    fn parse_edges_and_faces(
+        &mut self,
+        rank: Rank,
+        num_edges: usize,
+        num_faces: usize,
+    ) -> OffResult<(SubelementList, SubelementList)> {
+        let mut edges = SubelementList::with_capacity(num_edges);
+        let mut faces = SubelementList::with_capacity(num_faces);
+
+        let mut hash_edges = HashMap::new();
+
+        // Add each face to the element list.
+        for _ in 0..num_faces {
+            let face_sub_num = self.iter.parse_next()?;
+
+            let mut face = Subelements::new();
+            let mut face_verts = Vec::with_capacity(face_sub_num);
+
+            // Reads all vertices of the face.
+            for _ in 0..face_sub_num {
+                face_verts.push(self.iter.parse_next()?);
+            }
+
+            // Gets all edges of the face.
+            for i in 0..face_sub_num {
+                let mut edge = Subelements(vec![face_verts[i], face_verts[(i + 1) % face_sub_num]]);
+                edge.sort();
+
+                if let Some(idx) = hash_edges.get(&edge) {
+                    face.push(*idx);
+                } else {
+                    hash_edges.insert(edge.clone(), edges.len());
+                    face.push(edges.len());
+                    edges.push(edge);
+                }
+            }
+
+            // If these are truly faces and not just components, we add them.
+            if rank != Rank::new(2) {
+                faces.push(face);
+            }
+        }
+
+        // If this is a polygon, we add a single maximal element as a face.
+        if rank == Rank::new(2) {
+            faces = SubelementList::max(edges.len());
+        }
+
+        // The number of edges in the file should match the number of read edges, though this isn't obligatory.
+        if edges.len() != num_edges {
+            println!("WARNING: Edge count doesn't match expected edge count!");
+        }
+
+        Ok((edges, faces))
+    }
+
+    /// Parses the next set of d-elements from the OFF file.
+    fn parse_els(&mut self, num_el: usize) -> OffResult<SubelementList> {
+        let mut els_subs = SubelementList::with_capacity(num_el);
+
+        // Adds every d-element to the element list.
+        for _ in 0..num_el {
+            let el_sub_num = self.iter.parse_next()?;
+            let mut subs = Subelements::with_capacity(el_sub_num);
+
+            // Reads all sub-elements of the d-element.
+            for _ in 0..el_sub_num {
+                subs.push(self.iter.parse_next()?);
+            }
+
+            els_subs.push(subs);
+        }
+
+        Ok(els_subs)
+    }
+
+    /// Returns the [`Name`] stored in the OFF file, if any.
+    fn name(&self) -> Option<Name<Con>> {
+        self.src()
+            .lines()
+            .next()
+            .map(Concrete::name_from_src)
+            .flatten()
+    }
+
+    /// Builds a concrete polytope from the OFF reader.
+    pub fn build(mut self) -> OffResult<Concrete> {
+        // Reads the rank of the polytope.
+        let rank = self.rank()?;
+
+        // Deals with dumb degenerate cases.
+        if rank == Rank::new(-1) {
+            return Ok(Concrete::nullitope());
+        } else if rank == Rank::new(0) {
+            return Ok(Concrete::point());
+        } else if rank == Rank::new(1) {
+            return Ok(Concrete::dyad());
+        }
+
+        // Reads the element numbers and vertices.
+        let num_elems = self.el_nums(rank)?;
+        let vertices = self.parse_vertices(num_elems[0], rank.usize())?;
+
+        // Adds nullitope and vertices.
+        self.abs.reserve(rank.plus_one_usize());
+        self.abs.push_min();
+        self.abs.push_vertices(vertices.len());
+
+        // Reads edges and faces.
+        if rank >= Rank::new(2) {
+            let (edges, faces) = self.parse_edges_and_faces(rank, num_elems[1], num_elems[2])?;
+            self.abs.push(edges);
+            self.abs.push(faces);
+        }
+
+        // Adds all higher elements.
+        for &num_el in num_elems.iter().take(rank.usize()).skip(3) {
+            let subelements = self.parse_els(num_el)?;
+            self.abs.push(subelements);
+        }
+
+        // Caps the abstract polytope.
         if rank != Rank::new(2) {
-            faces.push(face);
-        }
-    }
-
-    // If this is a polygon, we add a single maximal element as a face.
-    if rank == Rank::new(2) {
-        faces = SubelementList::max(edges.len());
-    }
-
-    // The number of edges in the file should match the number of read edges, though this isn't obligatory.
-    if edges.len() != num_edges {
-        println!("WARNING: Edge count doesn't match expected edge count!");
-    }
-
-    Ok((edges, faces))
-}
-
-fn parse_els<'a, T: Iterator<Item = &'a str>>(
-    num_el: usize,
-    toks: &mut TokenIter<'a, T>,
-) -> OffResult<SubelementList> {
-    let mut els_subs = SubelementList::with_capacity(num_el);
-
-    // Adds every d-element to the element list.
-    for _ in 0..num_el {
-        let el_sub_num = toks.parse_next()?;
-        let mut subs = Subelements::with_capacity(el_sub_num);
-
-        // Reads all sub-elements of the d-element.
-        for _ in 0..el_sub_num {
-            subs.push(toks.parse_next()?);
+            self.abs.push_max();
         }
 
-        els_subs.push(subs);
-    }
+        // Builds the concrete polytope.
+        let name = self.name();
+        let mut poly = Concrete::new(vertices, self.abs.build());
 
-    Ok(els_subs)
+        if let Some(name) = name {
+            poly.name = name;
+        }
+
+        Ok(poly)
+    }
 }
 
 impl Concrete {
     /// Gets the name from the first line of an OFF file.
     fn name_from_src(first_line: &str) -> Option<Name<Con>> {
-        let mut first_line = first_line.chars();
+        let mut fl_iter = first_line.char_indices();
 
-        if first_line.next() == Some('#') {
-            if let Ok(new_name) = ron::from_str(&first_line.collect::<String>()) {
+        if let Some((_, '#')) = fl_iter.next() {
+            let (idx, _) = fl_iter.next()?;
+            if let Ok(new_name) = ron::from_str(&first_line[idx..]) {
                 return Some(new_name);
             }
         }
@@ -340,67 +484,7 @@ impl Concrete {
 
     /// Builds a polytope from the string representation of an OFF file.
     pub fn from_off(src: &str) -> OffResult<Self> {
-        // Reads name.
-        let name = src
-            .lines()
-            .next()
-            .map(|first_line| Self::name_from_src(first_line))
-            .flatten();
-
-        let mut toks = TokenIter::new(&src);
-        let rank = {
-            let (first, pos) = toks.next().ok_or(OffError::Empty)?;
-            let rank = first.strip_suffix("OFF").ok_or(OffError::MagicWord(pos))?;
-
-            if rank.is_empty() {
-                Rank::new(3)
-            } else {
-                Rank::new(rank.parse().map_err(|_| OffError::Rank(pos))?)
-            }
-        };
-
-        // Deals with dumb degenerate cases.
-        if rank == Rank::new(-1) {
-            return Ok(Concrete::nullitope());
-        } else if rank == Rank::new(0) {
-            return Ok(Concrete::point());
-        } else if rank == Rank::new(1) {
-            return Ok(Concrete::dyad());
-        }
-
-        let num_elems = el_nums(rank, &mut toks)?;
-        let vertices = parse_vertices(num_elems[0], rank.usize(), &mut toks)?;
-        let mut abs = AbstractBuilder::with_capacity(rank);
-
-        // Adds nullitope and vertices.
-        abs.push_min();
-        abs.push_vertices(vertices.len());
-
-        // Reads edges and faces.
-        if rank >= Rank::new(2) {
-            let (edges, faces) =
-                parse_edges_and_faces(rank, num_elems[1], num_elems[2], &mut toks)?;
-            abs.push(edges);
-            abs.push(faces);
-        }
-
-        // Adds all higher elements.
-        for &num_el in num_elems.iter().take(rank.usize()).skip(3) {
-            abs.push(parse_els(num_el, &mut toks)?);
-        }
-
-        // Caps the abstract polytope, returns the concrete one.
-        if rank != Rank::new(2) {
-            abs.push_max();
-        }
-
-        let poly = Self::new(vertices, abs.build());
-
-        Ok(if let Some(name) = name {
-            poly.with_name(name)
-        } else {
-            poly
-        })
+        OffReader::new(src).build()
     }
 }
 
@@ -417,179 +501,186 @@ impl Default for OffOptions {
     }
 }
 
-/// Writes the polytope's element counts into an OFF file.
-fn write_el_counts(off: &mut String, opt: &OffOptions, mut el_counts: RankVec<usize>) {
-    let rank = el_counts.rank();
-
-    // # Vertices, Faces, Edges, ...
-    if opt.comments {
-        off.push_str("\n# Vertices");
-
-        let mut element_names = Vec::with_capacity(rank.usize() - 1);
-
-        for r in Rank::range_iter(Rank::new(1), rank) {
-            element_names.push(element_name(r));
-        }
-
-        if element_names.len() >= 2 {
-            element_names.swap(0, 1);
-        }
-
-        for element_name in element_names {
-            off.push_str(", ");
-            off.push_str(&element_name);
-        }
-
-        off.push('\n');
-    }
-
-    // Swaps edges and faces, because OFF format bad.
-    if rank >= Rank::new(3) {
-        el_counts.swap(Rank::new(1), Rank::new(2));
-    }
-
-    for r in Rank::range_iter(Rank::new(0), rank) {
-        off.push_str(&el_counts[r].to_string());
-        off.push(' ');
-    }
-
-    off.push('\n');
+pub struct OffWriter<'a> {
+    off: String,
+    polytope: &'a Concrete,
+    options: OffOptions,
 }
 
-/// Writes the vertices of a polytope into an OFF file.
-fn write_vertices(off: &mut String, opt: &OffOptions, vertices: &[Point]) {
-    // # Vertices
-    if opt.comments {
-        off.push_str("\n# ");
-        off.push_str(&element_name(Rank::new(0)));
-        off.push('\n');
-    }
-
-    // Adds the coordinates.
-    for v in vertices {
-        for c in v.into_iter() {
-            off.push_str(&c.to_string());
-            off.push(' ');
+impl<'a> OffWriter<'a> {
+    pub fn new(polytope: &'a Concrete, options: OffOptions) -> Self {
+        Self {
+            off: String::new(),
+            polytope,
+            options,
         }
-        off.push('\n');
-    }
-}
-
-/// Gets and writes the faces of a polytope into an OFF file.
-fn write_faces(
-    off: &mut String,
-    opt: &OffOptions,
-    rank: usize,
-    edges: &ElementList,
-    faces: &ElementList,
-) {
-    // # Faces
-    if opt.comments {
-        let el_name = if rank > 2 {
-            element_name(Rank::new(2))
-        } else {
-            COMPONENTS.to_string()
-        };
-
-        off.push_str("\n# ");
-        off.push_str(&el_name);
-        off.push('\n');
     }
 
-    // TODO: write components instead of faces in 2D case.
-    // ALSO TODO: reuse code from mesh builder.
-    for face in faces.iter() {
-        off.push_str(&face.subs.len().to_string());
+    /// Writes the polytope's element counts into an OFF file.
+    fn write_el_counts(&mut self, mut el_counts: RankVec<usize>) {
+        let rank = el_counts.rank();
 
-        // Maps an OFF index into a graph index.
-        let mut hash_edges = HashMap::new();
-        let mut graph = Graph::new_undirected();
+        // # Vertices, Faces, Edges, ...
+        if self.options.comments {
+            self.off.push_str("\n# Vertices");
 
-        // Maps the vertex indices to consecutive integers from 0.
-        for &edge_idx in &face.subs.0 {
-            let edge = &edges[edge_idx];
-            let mut hash_edge = Vec::with_capacity(2);
+            let mut element_names = Vec::with_capacity(rank.usize() - 1);
 
-            for &vertex_idx in &edge.subs.0 {
-                match hash_edges.get(&vertex_idx) {
-                    Some(&idx) => hash_edge.push(idx),
-                    None => {
-                        let idx = hash_edges.len();
-                        hash_edges.insert(vertex_idx, idx);
-                        hash_edge.push(idx);
+            for r in Rank::range_iter(Rank::new(1), rank) {
+                element_names.push(element_name(r));
+            }
 
-                        graph.add_node(vertex_idx);
+            if element_names.len() >= 2 {
+                element_names.swap(0, 1);
+            }
+
+            for element_name in element_names {
+                self.off.push_str(", ");
+                self.off.push_str(&element_name);
+            }
+
+            self.off.push('\n');
+        }
+
+        // Swaps edges and faces, because OFF format bad.
+        if rank >= Rank::new(3) {
+            el_counts.swap(Rank::new(1), Rank::new(2));
+        }
+
+        for r in Rank::range_iter(Rank::new(0), rank) {
+            self.off.push_str(&el_counts[r].to_string());
+            self.off.push(' ');
+        }
+
+        self.off.push('\n');
+    }
+
+    /// Writes the vertices of a polytope into an OFF file.
+    fn write_vertices(&mut self, vertices: &[Point]) {
+        // # Vertices
+        if self.options.comments {
+            self.off.push_str("\n# ");
+            self.off.push_str(&element_name(Rank::new(0)));
+            self.off.push('\n');
+        }
+
+        // Adds the coordinates.
+        for v in vertices {
+            for c in v.into_iter() {
+                self.off.push_str(&c.to_string());
+                self.off.push(' ');
+            }
+            self.off.push('\n');
+        }
+    }
+
+    /// Gets and writes the faces of a polytope into an OFF file.
+    fn write_faces(&mut self, rank: usize, edges: &ElementList, faces: &ElementList) {
+        // # Faces
+        if self.options.comments {
+            let el_name = if rank > 2 {
+                element_name(Rank::new(2))
+            } else {
+                COMPONENTS.to_string()
+            };
+
+            self.off.push_str("\n# ");
+            self.off.push_str(&el_name);
+            self.off.push('\n');
+        }
+
+        // TODO: write components instead of faces in 2D case.
+        // ALSO TODO: reuse code from mesh builder.
+        for face in faces.iter() {
+            self.off.push_str(&face.subs.len().to_string());
+
+            // Maps an OFF index into a graph index.
+            let mut hash_edges = HashMap::new();
+            let mut graph = Graph::new_undirected();
+
+            // Maps the vertex indices to consecutive integers from 0.
+            for &edge_idx in &face.subs.0 {
+                let edge = &edges[edge_idx];
+                let mut hash_edge = Vec::with_capacity(2);
+
+                for &vertex_idx in &edge.subs.0 {
+                    match hash_edges.get(&vertex_idx) {
+                        Some(&idx) => hash_edge.push(idx),
+                        None => {
+                            let idx = hash_edges.len();
+                            hash_edges.insert(vertex_idx, idx);
+                            hash_edge.push(idx);
+
+                            graph.add_node(vertex_idx);
+                        }
                     }
                 }
             }
-        }
 
-        // There should be as many graph indices as edges on the face.
-        // Otherwise, something went wrong.
-        debug_assert_eq!(
-            hash_edges.len(),
-            face.subs.len(),
-            "Faces don't have the same number of edges as there are in the polytope!"
-        );
-
-        // Adds the edges to the graph.
-        for &edge_idx in &face.subs.0 {
-            let edge = &edges[edge_idx];
-            graph.add_edge(
-                NodeIndex::new(*hash_edges.get(&edge.subs[0]).unwrap()),
-                NodeIndex::new(*hash_edges.get(&edge.subs[1]).unwrap()),
-                (),
+            // There should be as many graph indices as edges on the face.
+            // Otherwise, something went wrong.
+            debug_assert_eq!(
+                hash_edges.len(),
+                face.subs.len(),
+                "Faces don't have the same number of edges as there are in the polytope!"
             );
+
+            // Adds the edges to the graph.
+            for &edge_idx in &face.subs.0 {
+                let edge = &edges[edge_idx];
+                graph.add_edge(
+                    NodeIndex::new(*hash_edges.get(&edge.subs[0]).unwrap()),
+                    NodeIndex::new(*hash_edges.get(&edge.subs[1]).unwrap()),
+                    (),
+                );
+            }
+
+            // Retrieves the cycle of vertices.
+            let mut dfs = Dfs::new(&graph, NodeIndex::new(0));
+            while let Some(nx) = dfs.next(&graph) {
+                self.off.push(' ');
+                self.off.push_str(&graph[nx].to_string());
+            }
+            self.off.push('\n');
+        }
+    }
+
+    /// Writes the n-elements of a polytope into an OFF file.
+    fn write_els(&mut self, rank: Rank, els: &ElementList) {
+        // # n-elements
+        if self.options.comments {
+            self.off.push_str("\n# ");
+            self.off.push_str(&element_name(rank));
+            self.off.push('\n');
         }
 
-        // Retrieves the cycle of vertices.
-        let mut dfs = Dfs::new(&graph, NodeIndex::new(0));
-        while let Some(nx) = dfs.next(&graph) {
-            off.push(' ');
-            off.push_str(&graph[nx].to_string());
+        // Adds the elements' indices.
+        for el in els.iter() {
+            self.off.push_str(&el.subs.len().to_string());
+
+            for &sub in &el.subs.0 {
+                self.off.push(' ');
+                self.off.push_str(&sub.to_string());
+            }
+
+            self.off.push('\n');
         }
-        off.push('\n');
-    }
-}
-
-/// Writes the n-elements of a polytope into an OFF file.
-fn write_els(off: &mut String, opt: &OffOptions, rank: Rank, els: &ElementList) {
-    // # n-elements
-    if opt.comments {
-        off.push_str("\n# ");
-        off.push_str(&element_name(rank));
-        off.push('\n');
     }
 
-    // Adds the elements' indices.
-    for el in els.iter() {
-        off.push_str(&el.subs.len().to_string());
-
-        for &sub in &el.subs.0 {
-            off.push(' ');
-            off.push_str(&sub.to_string());
-        }
-
-        off.push('\n');
-    }
-}
-
-impl Concrete {
-    /// Converts a polytope into an OFF file.
-    pub fn to_off(&self, opt: OffOptions) -> String {
-        let rank = self.rank();
-        let vertices = &self.vertices;
-        let abs = &self.abs;
-        let mut off = String::new();
+    pub fn build(mut self) -> String {
+        let rank = self.polytope.rank();
+        let vertices = &self.polytope.vertices;
+        let abs = &self.polytope.abs;
 
         // Serialized name.
-        off.push_str("# ");
-        off.push_str(&ron::to_string(self.name()).unwrap());
-        off.push('\n');
+        self.off.push_str("# ");
+        self.off
+            .push_str(&ron::to_string(self.polytope.name()).unwrap());
+        self.off.push('\n');
 
         // Blatant advertising.
-        if opt.comments {
-            off += &format!(
+        if self.options.comments {
+            self.off += &format!(
                 "# Generated using Miratope v{} (https://github.com/OfficialURL/miratope-rs)\n\n",
                 env!("CARGO_PKG_VERSION")
             );
@@ -597,38 +688,39 @@ impl Concrete {
 
         // Writes header.
         if rank != Rank::new(3) {
-            off += &rank.to_string();
+            self.off += &rank.to_string();
         }
-        off += "OFF\n";
+        self.off += "OFF\n";
 
         // If we have a nullitope or point on our hands, that is all.
         if rank < Rank::new(1) {
-            return off;
+            return self.off;
         }
 
         // Adds the element counts.
-        write_el_counts(&mut off, &opt, self.el_counts());
+        self.write_el_counts(self.polytope.el_counts());
 
         // Adds vertex coordinates.
-        write_vertices(&mut off, &opt, vertices);
+        self.write_vertices(vertices);
 
         // Adds faces.
         if rank >= Rank::new(2) {
-            write_faces(
-                &mut off,
-                &opt,
-                rank.usize(),
-                &abs[Rank::new(1)],
-                &abs[Rank::new(2)],
-            );
+            self.write_faces(rank.usize(), &abs[Rank::new(1)], &abs[Rank::new(2)]);
         }
 
         // Adds the rest of the elements.
         for r in Rank::range_iter(Rank::new(3), rank) {
-            write_els(&mut off, &opt, r, &abs[r]);
+            self.write_els(r, &abs[r]);
         }
 
-        off
+        self.off
+    }
+}
+
+impl Concrete {
+    /// Converts a polytope into an OFF file.
+    pub fn to_off(&self, options: OffOptions) -> String {
+        OffWriter::new(self, options).build()
     }
 
     /// Writes a polytope's OFF file in a specified file path.
@@ -660,7 +752,6 @@ mod tests {
     /// Checks that a point has the correct amount of elements.
     fn point_nums() {
         let point = Concrete::from_off("0OFF").unwrap();
-
         test_shape(point, vec![1, 1])
     }
 
@@ -701,28 +792,20 @@ mod tests {
             "OFF 4 4 6 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2",
         )
         .unwrap();
-
         test_shape(tet, vec![1, 4, 6, 4, 1])
     }
 
     #[test]
     /// Checks that a 2-tetrahedron compund has the correct amount of elements.
     fn so_nums() {
-        let so = Concrete::from_off(
-            "OFF 8 8 12 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 -1 -1 -1 -1 1 1 1 -1 1 1 1 -1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2 3 4 5 6 3 7 4 6 3 4 5 7 3 7 5 6 ",
-        ).unwrap();
-
+        let so = Concrete::from_off(include_str!("so.off")).unwrap();
         test_shape(so, vec![1, 8, 12, 8, 1])
     }
 
     #[test]
     /// Checks that a pentachoron has the correct amount of elements.
     fn pen_nums() {
-        let pen =   Concrete::   from_off(
-            "4OFF 5 10 10 5 0.158113883008419 0.204124145231932 0.288675134594813 0.5 0.158113883008419 0.204124145231932 0.288675134594813 -0.5 0.158113883008419 0.204124145231932 -0.577350269189626 0 0.158113883008419 -0.612372435695794 0 0 -0.632455532033676 0 0 0 3 0 3 4 3 0 2 4 3 2 3 4 3 0 2 3 3 0 1 4 3 1 3 4 3 0 1 3 3 1 2 4 3 0 1 2 3 1 2 3 4 0 1 2 3 4 0 4 5 6 4 1 4 7 8 4 2 5 7 9 4 3 6 8 9"
-                ,
-        ).unwrap();
-
+        let pen = Concrete::from_off(include_str!("pen.off")).unwrap();
         test_shape(pen, vec![1, 5, 10, 10, 5, 1])
     }
 
@@ -744,7 +827,6 @@ mod tests {
             3 3 1 2#works!#",
         )
         .unwrap();
-
         test_shape(tet, vec![1, 4, 6, 4, 1])
     }
 

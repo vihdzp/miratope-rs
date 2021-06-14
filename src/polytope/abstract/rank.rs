@@ -181,6 +181,10 @@ impl<T> RankVec<T> {
         RankVec(Vec::with_capacity(rank.plus_one_usize() + 1))
     }
 
+    pub fn reserve(&mut self, additional: usize)  {
+        self.0.reserve(additional)
+    }
+
     /// Returns the greatest rank stored in the array.
     ///
     /// # Panics

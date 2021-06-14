@@ -453,6 +453,10 @@ impl AbstractBuilder {
         Self(Abstract::with_capacity(rank))
     }
 
+    pub fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional)
+    }
+
     pub fn push(&mut self, subelements: SubelementList) {
         self.0.push_subs(subelements)
     }

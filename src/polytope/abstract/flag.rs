@@ -494,7 +494,7 @@ pub struct OrientedFlagIter<'a> {
 }
 
 /// The result of trying to get the next flag.
-pub enum IterResult {
+pub enum FlagNext {
     /// We found a new flag event (either a flag or the non-orientable event).
     New(FlagEvent),
 
@@ -583,7 +583,7 @@ impl<'a> OrientedFlagIter<'a> {
     }
 
     /// Attempts to get the next flag.
-    pub fn try_next(&mut self) -> IterResult {
+    pub fn try_next(&mut self) -> FlagNext {
         // We get the current flag from the queue.
         if let Some(current) = self.queue.front() {
             let rank = self.polytope.rank().usize();
@@ -611,7 +611,7 @@ impl<'a> OrientedFlagIter<'a> {
                     // orientability, then we know the polytope isn't orientable.
                     if self.orientable && new_orientation != occupied_entry.key().orientation {
                         self.orientable = false;
-                        return IterResult::New(FlagEvent::NonOrientable);
+                        return FlagNext::New(FlagEvent::NonOrientable);
                     }
 
                     // In any case, if we got here, we know this is a repeated
@@ -624,7 +624,7 @@ impl<'a> OrientedFlagIter<'a> {
                         occupied_entry.remove();
                     }
 
-                    IterResult::Repeat
+                    FlagNext::Repeat
                 }
 
                 // If this flag is new, we just add it and return it.
@@ -635,13 +635,13 @@ impl<'a> OrientedFlagIter<'a> {
                     // We've found the flag one (1) time.
                     vacant_entry.insert(1);
 
-                    IterResult::New(FlagEvent::Flag(new_flag))
+                    FlagNext::New(FlagEvent::Flag(new_flag))
                 }
             }
         }
         // The queue is empty.
         else {
-            IterResult::None
+            FlagNext::None
         }
     }
 }
@@ -692,15 +692,15 @@ impl<'a> Iterator for OrientedFlagIter<'a> {
         loop {
             match self.try_next() {
                 // We found a new flag event.
-                IterResult::New(flag_event) => {
+                FlagNext::New(flag_event) => {
                     return Some(flag_event);
                 }
 
                 // We already exhausted the flag supply.
-                IterResult::None => return None,
+                FlagNext::None => return None,
 
                 // Repeat flag, try again.
-                IterResult::Repeat => {}
+                FlagNext::Repeat => {}
             }
         }
     }
