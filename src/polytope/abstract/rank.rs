@@ -2,6 +2,11 @@ use std::{fmt::Display, hash::Hash, iter, slice, vec};
 
 use serde::{Deserialize, Serialize};
 
+use crate::{
+    impl_veclike,
+    vec_like::{VecIndex, VecLike},
+};
+
 /// Represents the [rank](https://polytope.miraheze.org/w/index.php?title=Rank)
 /// of a polytope.
 ///
@@ -193,155 +198,59 @@ impl bevy_egui::egui::emath::Numeric for Rank {
 
 /// A `Vec` indexed by [rank](https://polytope.miraheze.org/wiki/Rank). Wraps
 /// around operations that offset by a constant for our own convenience.
-#[derive(PartialEq, Eq, Hash, Debug, Default, Clone)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct RankVec<T>(Vec<T>);
-
-impl<T> From<Vec<T>> for RankVec<T> {
-    fn from(vec: Vec<T>) -> Self {
-        Self(vec)
-    }
-}
-
-impl<T> AsRef<Vec<T>> for RankVec<T> {
-    fn as_ref(&self) -> &Vec<T> {
-        &self.0
-    }
-}
-
-impl<T> AsMut<Vec<T>> for RankVec<T> {
-    fn as_mut(&mut self) -> &mut Vec<T> {
-        &mut self.0
-    }
-}
+impl_veclike!(@for [T] RankVec<T>, T, Rank);
 
 impl<T> RankVec<T> {
-    /// Constructs a new, empty `RankVec<T>`.
-    pub fn new() -> Self {
-        RankVec(Vec::new())
-    }
-
-    /// Determines if the `RankVec<T>` is empty.
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    /// Determines if the `RankVec<T>` is empty.
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Constructs a new, empty `RankVec<T>` with the capacity.
-    pub fn with_capacity(rank: Rank) -> Self {
-        RankVec(Vec::with_capacity(rank.plus_one_usize() + 1))
-    }
-
-    pub fn reserve(&mut self, additional: usize) {
-        self.0.reserve(additional)
-    }
-
     /// Returns the greatest rank stored in the array.
     ///
     /// # Panics
     /// Panics if the `RankVec<T>` is empty.
     pub fn rank(&self) -> Rank {
-        Rank(self.0.len() - 1)
+        (self.0.len() as isize - 2).into()
     }
 
-    /// Pushes a value onto the `RankVec<T>`.
-    pub fn push(&mut self, value: T) {
-        self.0.push(value)
+    pub fn with_rank_capacity(rank: Rank) -> Self {
+        Self::with_capacity(rank.plus_one_usize() + 1)
     }
 
-    /// Pops a value from the `RankVec<T>`.
-    pub fn pop(&mut self) -> Option<T> {
-        self.0.pop()
+    pub fn rank_into_iter(self) -> IntoIter<T> {
+        IntoIter(self.into_iter())
     }
 
-    /// Returns a reference to the element at a given position or `None` if out
-    /// of bounds.
-    pub fn get(&self, index: Rank) -> Option<&T> {
-        self.0.get(index.0)
+    pub fn rank_iter(&self) -> Iter<T> {
+        Iter(self.iter())
     }
 
-    /// Returns a mutable reference to an element or `None` if the index is out
-    /// of bounds.
-    pub fn get_mut(&mut self, index: Rank) -> Option<&mut T> {
-        self.0.get_mut(index.0)
-    }
-
-    pub fn last(&self) -> Option<&T> {
-        self.0.last()
-    }
-
-    /// Returns an iterator over the `RankVec<T>`.
-    pub fn iter(&self) -> Iter<T> {
-        Iter(self.0.iter())
-    }
-
-    /// Returns an iterator that allows modifying each value.
-    pub fn iter_mut(&mut self) -> IterMut<T> {
-        IterMut(self.0.iter_mut())
-    }
-
-    /// Reverses the order of elements in the `RankVec<T>`, in place.
-    pub fn reverse(&mut self) {
-        self.0.reverse()
-    }
-
-    /// Divides one mutable slice into two at an index.
-    pub fn split_at_mut(&mut self, mid: Rank) -> (&mut [T], &mut [T]) {
-        self.0.split_at_mut(mid.0)
-    }
-
-    /// Swaps two elements in the `RankVec<T>`.
-    pub fn swap(&mut self, a: Rank, b: Rank) {
-        self.0.swap(a.0, b.0);
-    }
-
-    /// Inserts an element at position `index` within the vector, shifting all
-    /// elements after it to the right.
-    pub fn insert(&mut self, index: Rank, element: T) {
-        self.0.insert(index.0, element)
+    pub fn rank_iter_mut(&mut self) -> IterMut<T> {
+        IterMut(self.iter_mut())
     }
 }
 
-/// Allows indexing a `RankVec<T>` by a `Rank`.
-impl<T, U: Into<Rank>> std::ops::Index<U> for RankVec<T> {
-    type Output = T;
+macro_rules! impl_index {
+    ($U:ty) => {
+        impl<T> std::ops::Index<$U> for RankVec<T> {
+            type Output = T;
 
-    fn index(&self, index: U) -> &Self::Output {
-        let rank = self.rank();
-        let index = index.into();
-        self.0.get(index.0).unwrap_or_else(|| {
-            panic!(
-                "index out of bounds: the rank is {} but the index is {}",
-                rank, index
-            )
-        })
-    }
+            fn index(&self, index: $U) -> &Self::Output {
+                &self[Rank::from(index)]
+            }
+        }
+
+        impl<T> std::ops::IndexMut<$U> for RankVec<T> {
+            fn index_mut(&mut self, index: $U) -> &mut Self::Output {
+                &mut self[Rank::from(index)]
+            }
+        }
+    };
 }
 
-/// Allows mutably indexing a `RankVec<T>` by a `Rank`.
-impl<T, U: Into<Rank>> std::ops::IndexMut<U> for RankVec<T> {
-    fn index_mut(&mut self, index: U) -> &mut Self::Output {
-        let rank = self.rank();
-        let index = index.into();
-        self.0.get_mut(index.0).unwrap_or_else(|| {
-            panic!(
-                "index out of bounds: the rank is {} but the index is {}",
-                rank, index
-            )
-        })
-    }
-}
+impl_index!(i32);
 
-impl<T> IntoIterator for RankVec<T> {
-    type Item = T;
-
-    type IntoIter = IntoIter<T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        IntoIter(self.0.into_iter())
+impl VecIndex for Rank {
+    fn index(self) -> usize {
+        self.plus_one_usize()
     }
 }
 

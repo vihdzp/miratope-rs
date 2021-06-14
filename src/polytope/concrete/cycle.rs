@@ -165,4 +165,4 @@ impl CycleBuilder {
 /// Represents a cyclic list of vertex indices, which may then be turned into a
 /// path and tessellated.
 pub struct Cycle(Vec<usize>);
-impl_veclike!(Cycle, usize);
+impl_veclike!(Cycle, usize, usize);

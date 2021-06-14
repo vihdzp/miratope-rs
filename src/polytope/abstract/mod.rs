@@ -189,8 +189,8 @@ impl Abstract {
 
     /// Initializes a new polytope with the capacity needed to store elements up
     /// to a given rank.
-    pub fn with_capacity(rank: Rank) -> Self {
-        RankVec::with_capacity(rank).into()
+    pub fn with_rank_capacity(rank: Rank) -> Self {
+        RankVec::with_rank_capacity(rank).into()
     }
 
     pub fn reserve(&mut self, additional: usize) {
@@ -360,7 +360,7 @@ impl Abstract {
 
         // We actually build the elements backwards, which is as awkward as it
         // seems. Maybe we should fix that in the future?
-        let mut backwards_abs = RankVec::with_capacity(rank.plus_one());
+        let mut backwards_abs = RankVec::with_rank_capacity(rank.plus_one());
         backwards_abs.push(SubelementList::max(section_hash.len));
 
         // Indices of base.
@@ -385,7 +385,7 @@ impl Abstract {
             // sections of the current height by either changing the upper
             // element into one of its superelements, or changing the lower
             // element into one of its subelements.
-            for (rank_lo, map) in section_hash.rank_vec.iter().rank_enumerate() {
+            for (rank_lo, map) in section_hash.rank_vec.rank_iter().rank_enumerate() {
                 // The lower and higher ranks of our OLD sections.
                 let rank_hi = rank_lo + height;
 
@@ -569,7 +569,7 @@ impl Abstract {
     /// seriously wrong.
     pub fn check_incidences(&self) -> AbstractResult<()> {
         // Iterates over elements of every rank.
-        for (r, elements) in self.ranks.iter().rank_enumerate() {
+        for (r, elements) in self.ranks.rank_iter().rank_enumerate() {
             // Iterates over all such elements.
             for (idx, el) in elements.iter().enumerate() {
                 // Only the minimal element can have no subelements.
@@ -745,7 +745,7 @@ impl Abstract {
         // Initializes the element lists. These will only contain the
         // subelements as they're generated. When they're complete, we'll call
         // push_subs for each of them into a new Abstract.
-        let mut element_lists = RankVec::with_capacity(rank);
+        let mut element_lists = RankVec::with_rank_capacity(rank);
         for _ in Rank::range_inclusive_iter(-1, rank) {
             element_lists.push(SubelementList::new());
         }
@@ -1087,7 +1087,7 @@ impl Polytope<Abs> for Abstract {
 
         for (r, elements) in p
             .ranks
-            .into_iter()
+            .rank_into_iter()
             .rank_enumerate()
             .skip(1)
             .take(rank.into())
@@ -1206,14 +1206,14 @@ impl<T: Into<Rank>> std::ops::Index<T> for Abstract {
     type Output = ElementList;
 
     fn index(&self, index: T) -> &Self::Output {
-        &self.ranks[index]
+        &self.ranks[index.into()]
     }
 }
 
 /// Permits mutably indexing an abstract polytope by rank.
 impl<T: Into<Rank>> std::ops::IndexMut<T> for Abstract {
     fn index_mut(&mut self, index: T) -> &mut Self::Output {
-        &mut self.ranks[index]
+        &mut self.ranks[index.into()]
     }
 }
 
@@ -1223,7 +1223,7 @@ impl IntoIterator for Abstract {
     type IntoIter = crate::polytope::r#abstract::rank::IntoIter<ElementList>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.ranks.into_iter()
+        self.ranks.rank_into_iter()
     }
 }
 
@@ -1456,6 +1456,8 @@ mod tests {
     #[test]
     /// Checks that duals are generated correctly.
     fn dual_check() {
+        use crate::vec_like::VecLike;
+
         for poly in test_polytopes().iter_mut() {
             let el_counts = poly.el_counts();
             poly.dual_mut();

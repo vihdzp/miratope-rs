@@ -20,7 +20,7 @@ use crate::{impl_veclike, polytope::Polytope, vec_like::VecLike, Float};
 /// elements.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Flag(Vec<usize>);
-impl_veclike!(Flag, usize);
+impl_veclike!(Flag, usize, usize);
 
 impl Flag {
     /// Gets the index of the element with a given rank, or returns `0` if it
@@ -318,7 +318,7 @@ impl OrientedFlag {
 /// Represents a set of flag changes.
 #[derive(Clone)]
 pub struct FlagChanges(Vec<usize>);
-impl_veclike!(FlagChanges, usize);
+impl_veclike!(FlagChanges, usize, usize);
 
 impl FlagChanges {
     /// Returns the set of all flag changes for a polytope of a given rank.

@@ -1,16 +1,27 @@
 /// A trait for any type that acts as a wrapper around a `Vec<T>`. Will
 /// automatically implement all corresponding methods.
 
-pub trait VecLike:
+pub trait VecIndex {
+    fn index(self) -> usize;
+}
+
+impl VecIndex for usize {
+    fn index(self) -> usize {
+        self
+    }
+}
+
+pub trait VecLike<'a>:
     Default
     + From<Vec<Self::VecItem>>
     + AsRef<Vec<Self::VecItem>>
     + AsMut<Vec<Self::VecItem>>
-    + std::ops::Index<usize>
-    + std::ops::IndexMut<usize>
+    + std::ops::Index<Self::VecIndex>
+    + std::ops::IndexMut<Self::VecIndex>
     + IntoIterator
 {
     type VecItem;
+    type VecIndex: VecIndex;
 
     fn new() -> Self {
         Vec::new().into()
@@ -20,9 +31,13 @@ pub trait VecLike:
         Vec::with_capacity(capacity).into()
     }
 
+    fn reserve(&mut self, additional: usize) {
+        self.as_mut().reserve(additional)
+    }
+
     fn contains(&self, x: &Self::VecItem) -> bool
     where
-        <Self as VecLike>::VecItem: PartialEq,
+        <Self as VecLike<'a>>::VecItem: PartialEq,
     {
         self.as_ref().contains(x)
     }
@@ -39,16 +54,28 @@ pub trait VecLike:
         self.as_mut().remove(index)
     }
 
-    fn get(&self, index: usize) -> Option<&Self::VecItem> {
-        self.as_ref().get(index)
+    fn get(&self, index: Self::VecIndex) -> Option<&Self::VecItem> {
+        self.as_ref().get(index.index())
     }
 
-    fn get_mut(&mut self, index: usize) -> Option<&mut Self::VecItem> {
-        self.as_mut().get_mut(index)
+    fn get_mut(&mut self, index: Self::VecIndex) -> Option<&mut Self::VecItem> {
+        self.as_mut().get_mut(index.index())
     }
 
     fn append(&mut self, other: &mut Self) {
         self.as_mut().append(other.as_mut())
+    }
+
+    fn insert(&mut self, index: Self::VecIndex, element: Self::VecItem) {
+        self.as_mut().insert(index.index(), element)
+    }
+
+    fn iter(&'a self) -> std::slice::Iter<'a, <Self as VecLike<'a>>::VecItem> {
+        self.as_ref().iter()
+    }
+
+    fn iter_mut(&'a mut self) -> std::slice::IterMut<'a, <Self as VecLike<'a>>::VecItem> {
+        self.as_mut().iter_mut()
     }
 
     fn is_empty(&self) -> bool {
@@ -59,35 +86,46 @@ pub trait VecLike:
         self.as_ref().len()
     }
 
-    fn iter(&self) -> std::slice::Iter<Self::VecItem> {
-        self.as_ref().iter()
+    fn last(&self) -> Option<&Self::VecItem> {
+        self.as_ref().last()
     }
 
-    fn iter_mut(&mut self) -> std::slice::IterMut<Self::VecItem> {
-        self.as_mut().iter_mut()
+    fn reverse(&mut self) {
+        self.as_mut().reverse()
     }
 
     fn sort(&mut self)
     where
-        <Self as VecLike>::VecItem: Ord,
+        <Self as VecLike<'a>>::VecItem: Ord,
     {
         self.as_mut().sort()
     }
 
     fn sort_unstable(&mut self)
     where
-        <Self as VecLike>::VecItem: Ord,
+        <Self as VecLike<'a>>::VecItem: Ord,
     {
         self.as_mut().sort_unstable()
     }
 
     fn sort_unstable_by_key<K, F>(&mut self, f: F)
     where
-        <Self as VecLike>::VecItem: Ord,
+        <Self as VecLike<'a>>::VecItem: Ord,
         F: FnMut(&Self::VecItem) -> K,
         K: Ord,
     {
         self.as_mut().sort_unstable_by_key(f)
+    }
+
+    fn swap(&mut self, a: Self::VecIndex, b: Self::VecIndex) {
+        self.as_mut().swap(a.index(), b.index())
+    }
+
+    fn split_at_mut(
+        &mut self,
+        mid: Self::VecIndex,
+    ) -> (&mut [Self::VecItem], &mut [Self::VecItem]) {
+        self.as_mut().split_at_mut(mid.index())
     }
 }
 
@@ -101,50 +139,53 @@ pub trait VecLike:
 /// struct Wrapper(Vec<Item>);
 /// ```
 macro_rules! impl_veclike {
-    ($T: ty, $VecItem: ty) => {
-        impl crate::vec_like::VecLike for $T {
+    ($(@for [$($generics: tt)*])? $Type: ty, $VecItem: ty, $VecIndex: ty $(,)?) => {
+        impl<'a, $($($generics)*)?> crate::vec_like::VecLike<'a> for $Type {
             type VecItem = $VecItem;
+            type VecIndex = $VecIndex;
         }
 
-        impl Default for $T {
+        impl$(<$($generics)*>)? Default for $Type {
             fn default() -> Self {
                 Vec::new().into()
             }
         }
 
-        impl From<Vec<$VecItem>> for $T {
+        impl$(<$($generics)*>)? From<Vec<$VecItem>> for $Type {
             fn from(list: Vec<$VecItem>) -> Self {
                 Self(list)
             }
         }
 
-        impl AsRef<Vec<$VecItem>> for $T {
+        impl$(<$($generics)*>)? AsRef<Vec<$VecItem>> for $Type {
             fn as_ref(&self) -> &Vec<$VecItem> {
                 &self.0
             }
         }
 
-        impl AsMut<Vec<$VecItem>> for $T {
+        impl$(<$($generics)*>)? AsMut<Vec<$VecItem>> for $Type {
             fn as_mut(&mut self) -> &mut Vec<$VecItem> {
                 &mut self.0
             }
         }
 
-        impl std::ops::Index<usize> for $T {
+        impl$(<$($generics)*>)? std::ops::Index<$VecIndex> for $Type {
             type Output = $VecItem;
 
-            fn index(&self, index: usize) -> &Self::Output {
-                &self.as_ref()[index]
+            fn index(&self, index: $VecIndex) -> &Self::Output {
+                use crate::vec_like::VecIndex;
+                &self.as_ref()[index.index()]
             }
         }
 
-        impl std::ops::IndexMut<usize> for $T {
-            fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-                &mut self.as_mut()[index]
+        impl$(<$($generics)*>)? std::ops::IndexMut<$VecIndex> for $Type {
+            fn index_mut(&mut self, index: $VecIndex) -> &mut Self::Output {
+                use crate::vec_like::VecIndex;
+                &mut self.as_mut()[index.index()]
             }
         }
 
-        impl IntoIterator for $T {
+        impl$(<$($generics)*>)? IntoIterator for $Type {
             type Item = $VecItem;
 
             type IntoIter = std::vec::IntoIter<$VecItem>;
@@ -154,7 +195,7 @@ macro_rules! impl_veclike {
             }
         }
 
-        impl<'a> IntoIterator for &'a $T {
+        impl<'a, $($($generics)*)?> IntoIterator for &'a $Type {
             type Item = &'a $VecItem;
 
             type IntoIter = std::slice::Iter<'a, $VecItem>;
@@ -164,7 +205,17 @@ macro_rules! impl_veclike {
             }
         }
 
-        impl<'a> rayon::iter::IntoParallelIterator for &'a mut $T {
+        impl<'a, $($($generics)*)?> IntoIterator for &'a mut $Type {
+            type Item = &'a mut $VecItem;
+
+            type IntoIter = std::slice::IterMut<'a, $VecItem>;
+
+            fn into_iter(self) -> Self::IntoIter {
+                self.iter_mut()
+            }
+        }
+
+        impl<'a, $($($generics: Send)*)?> rayon::iter::IntoParallelIterator for &'a mut $Type {
             type Iter = rayon::slice::IterMut<'a, $VecItem>;
 
             type Item = &'a mut $VecItem;

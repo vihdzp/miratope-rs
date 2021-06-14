@@ -95,7 +95,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// Returns the element counts of the polytope.
     fn el_counts(&self) -> RankVec<usize> {
         let abs = self.abs();
-        let mut counts = RankVec::with_capacity(abs.rank());
+        let mut counts = RankVec::with_rank_capacity(abs.rank());
 
         for r in Rank::range_inclusive_iter(Rank::new(-1), abs.rank()) {
             counts.push(abs[r].len())

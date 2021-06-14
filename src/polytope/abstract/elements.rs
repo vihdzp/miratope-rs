@@ -35,7 +35,7 @@ impl ElementRef {
 }
 
 /// Common boilerplate code for [`Subelements`] and [`Superelements`].
-pub trait Subsupelements: Sized + VecLike<VecItem = usize> {
+pub trait Subsupelements<'a>: Sized + VecLike<'a, VecItem = usize> {
     /// Returns whether the indices are sorted.
     fn is_sorted(&self) -> bool {
         let vec = self.as_ref();
@@ -63,13 +63,13 @@ pub trait Subsupelements: Sized + VecLike<VecItem = usize> {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Subelements(pub Vec<usize>);
-impl_veclike!(Subelements, usize);
-impl Subsupelements for Subelements {}
+impl_veclike!(Subelements, usize, usize);
+impl<'a> Subsupelements<'a> for Subelements {}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Superelements(pub Vec<usize>);
-impl_veclike!(Superelements, usize);
-impl Subsupelements for Superelements {}
+impl_veclike!(Superelements, usize, usize);
+impl<'a> Subsupelements<'a> for Superelements {}
 
 /// An element in a polytope, which stores the indices of both its subelements
 /// and superlements. These make up the entries of an [`ElementList`].
@@ -132,7 +132,7 @@ impl Element {
 /// [`SubelementList`] instead.
 #[derive(Debug, Clone)]
 pub struct ElementList(Vec<Element>);
-impl_veclike!(ElementList, Element);
+impl_veclike!(ElementList, Element, usize);
 
 impl ElementList {
     /// Returns the element list for the nullitope in a polytope with a given
@@ -151,7 +151,7 @@ impl ElementList {
 /// A list of subelements in a polytope.
 #[derive(Debug)]
 pub struct SubelementList(Vec<Subelements>);
-impl_veclike!(SubelementList, Subelements);
+impl_veclike!(SubelementList, Subelements, usize);
 
 impl SubelementList {
     /// Returns the subelement list for the minimal element in a polytope.
@@ -186,7 +186,7 @@ impl AbstractBuilder {
     }
 
     pub fn with_capacity(rank: Rank) -> Self {
-        Self(Abstract::with_capacity(rank))
+        Self(Abstract::with_rank_capacity(rank))
     }
 
     pub fn reserve(&mut self, additional: usize) {
@@ -238,7 +238,7 @@ impl ElementHash {
 
         // A vector of HashMaps. The k-th entry is a map from k-elements of the
         // original polytope into k-elements in a new polytope.
-        let mut hashes = RankVec::with_capacity(el.rank);
+        let mut hashes = RankVec::with_rank_capacity(el.rank);
         for _ in Rank::range_inclusive_iter(-1, el.rank) {
             hashes.push(HashMap::new());
         }
@@ -291,7 +291,7 @@ impl ElementHash {
     /// Gets the indices of the vertices of a given element in a polytope.
     pub fn to_polytope(&self, poly: &Abstract) -> Abstract {
         let rank = self.0.rank();
-        let mut abs = Abstract::with_capacity(rank);
+        let mut abs = Abstract::with_rank_capacity(rank);
 
         // For every rank stored in the element map.
         for r in Rank::range_inclusive_iter(-1, rank) {
@@ -402,7 +402,7 @@ impl SectionHash {
         let mut section_hash = Self::new(rank, Rank::new(-1));
         let mut len = 0;
 
-        for (rank, elements) in poly.ranks.iter().rank_enumerate() {
+        for (rank, elements) in poly.ranks.rank_iter().rank_enumerate() {
             for i in 0..elements.len() {
                 section_hash.rank_vec[rank].insert(Indices(i, i), len);
                 len += 1;

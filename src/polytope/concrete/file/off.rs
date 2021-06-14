@@ -191,7 +191,7 @@ impl<'a> TokenIter<'a> {
         Some(if init_idx == idx {
             OffNext::Garbage
         } else {
-            OffNext::Token(dbg!(&self.src[init_idx..=end_idx]))
+            OffNext::Token(&self.src[init_idx..=end_idx])
         })
     }
 
@@ -739,15 +739,17 @@ mod tests {
 
     /// Used to test a particular polytope.
     fn test_shape(p: Concrete, el_nums: Vec<usize>) {
+        let el_nums = el_nums.into();
+
         // Checks that element counts match up.
-        assert_eq!(p.el_counts().as_ref(), &el_nums);
+        assert_eq!(p.el_counts(), el_nums);
 
         // Checks that the polytope can be reloaded correctly.
         assert_eq!(
             Concrete::from_off(&p.to_off(Default::default()))
                 .unwrap()
                 .el_counts(),
-            el_nums.into()
+            el_nums
         );
     }
 

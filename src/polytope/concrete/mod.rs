@@ -722,7 +722,7 @@ impl Concrete {
             "Sections can only be taken from hyperplanes!"
         );
         let mut vertices = Vec::new();
-        let mut ranks = RankVec::with_capacity(self.rank().minus_one());
+        let mut ranks = RankVec::with_rank_capacity(self.rank().minus_one());
 
         // We map all indices of k-elements in the original polytope to the
         // indices of the new (k-1)-elements resulting from taking their
