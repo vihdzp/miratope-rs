@@ -363,8 +363,8 @@ impl<T: NameType> Name<T> {
                 rank: _,
             } => *n,
             Name::Simplex { regular: _, rank } => rank.plus_one_usize(),
-            Name::Hyperblock { regular: _, rank } => 2u32.pow(rank.u32()) as usize,
-            Name::Orthoplex { regular: _, rank } => rank.usize() * 2,
+            Name::Hyperblock { regular: _, rank } => 2u32.pow(rank.into_u32()) as usize,
+            Name::Orthoplex { regular: _, rank } => rank.into_usize() * 2,
 
             // Modifiers:
             Name::Pyramid(base) => base.vertex_count() + 1,
@@ -433,8 +433,8 @@ impl<T: NameType> Name<T> {
                 rank: _,
             } => *n,
             Name::Simplex { regular: _, rank } => rank.plus_one_usize(),
-            Name::Hyperblock { regular: _, rank } => rank.usize() * 2,
-            Name::Orthoplex { regular: _, rank } => 2u32.pow(rank.u32()) as usize,
+            Name::Hyperblock { regular: _, rank } => rank.into_usize() * 2,
+            Name::Orthoplex { regular: _, rank } => 2u32.pow(rank.into_u32()) as usize,
 
             // Modifiers:
             Name::Pyramid(base) => base.facet_count() + 1,
@@ -543,7 +543,7 @@ impl<T: NameType> Name<T> {
     }
 
     pub fn generic(n: usize, rank: Rank) -> Self {
-        match rank.isize() {
+        match rank.into_isize() {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
@@ -855,7 +855,7 @@ impl<T: NameType> Name<T> {
 
     /// The name for an *n*-simplex, regular or not.
     pub fn simplex(regular: T::DataRegular, rank: Rank) -> Self {
-        match rank.isize() {
+        match rank.into_isize() {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
@@ -866,7 +866,7 @@ impl<T: NameType> Name<T> {
 
     /// The name for an *n*-block, regular or not.
     pub fn hyperblock(regular: T::DataRegular, rank: Rank) -> Self {
-        match rank.isize() {
+        match rank.into_isize() {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
@@ -883,7 +883,7 @@ impl<T: NameType> Name<T> {
 
     /// The name for an *n*-orthoplex.
     pub fn orthoplex(regular: T::DataRegular, rank: Rank) -> Self {
-        match rank.isize() {
+        match rank.into_isize() {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,

@@ -87,7 +87,7 @@ pub type OffResult<T> = Result<T, OffError>;
 
 /// Gets the name for an element with a given rank.
 fn element_name(rank: Rank) -> String {
-    match ELEMENT_NAMES.get(rank.usize()) {
+    match ELEMENT_NAMES.get(rank.into_usize()) {
         Some(&name) => String::from(name),
         None => rank.to_string() + "-elements",
     }
@@ -258,14 +258,14 @@ impl<'a> OffReader<'a> {
         Ok(if rank.is_empty() {
             Rank::new(3)
         } else {
-            Rank::new(rank.parse().map_err(|_| OffError::Rank(pos))?)
+            rank.parse().map_err(|_| OffError::Rank(pos))?
         })
     }
 
     /// Gets the number of elements from the OFF file. This includes components
     /// iff dim ≤ 2, as this makes things easier down the line.
     fn el_nums(&mut self, rank: Rank) -> OffResult<Vec<usize>> {
-        let rank = rank.usize();
+        let rank = rank.into_usize();
         let mut el_nums = Vec::with_capacity(rank);
 
         // Reads entries one by one.
@@ -420,7 +420,7 @@ impl<'a> OffReader<'a> {
 
         // Reads the element numbers and vertices.
         let num_elems = self.el_nums(rank)?;
-        let vertices = self.parse_vertices(num_elems[0], rank.usize())?;
+        let vertices = self.parse_vertices(num_elems[0], rank.into_usize())?;
 
         // Adds nullitope and vertices.
         self.abs.reserve(rank.plus_one_usize());
@@ -435,7 +435,7 @@ impl<'a> OffReader<'a> {
         }
 
         // Adds all higher elements.
-        for &num_el in num_elems.iter().take(rank.usize()).skip(3) {
+        for &num_el in num_elems.iter().take(rank.into_usize()).skip(3) {
             let subelements = self.parse_els(num_el)?;
             self.abs.push(subelements);
         }
@@ -526,9 +526,9 @@ impl<'a> OffWriter<'a> {
         if self.options.comments {
             self.off.push_str("\n# Vertices");
 
-            let mut element_names = Vec::with_capacity(rank.usize() - 1);
+            let mut element_names = Vec::with_capacity(rank.into_usize() - 1);
 
-            for r in Rank::range_iter(Rank::new(1), rank) {
+            for r in Rank::range_iter(1, rank) {
                 element_names.push(element_name(r));
             }
 
@@ -549,7 +549,7 @@ impl<'a> OffWriter<'a> {
             el_counts.swap(Rank::new(1), Rank::new(2));
         }
 
-        for r in Rank::range_iter(Rank::new(0), rank) {
+        for r in Rank::range_iter(0, rank) {
             self.off.push_str(&el_counts[r].to_string());
             self.off.push(' ');
         }
@@ -595,7 +595,7 @@ impl<'a> OffWriter<'a> {
 
         // TODO: write components instead of faces in 2D case.
         // ALSO TODO: reuse code from mesh builder.
-        for face in faces.iter() {
+        for face in faces {
             self.off.push_str(&face.subs.len().to_string());
 
             // Maps an OFF index into a graph index.
@@ -659,7 +659,7 @@ impl<'a> OffWriter<'a> {
         }
 
         // Adds the elements' indices.
-        for el in els.iter() {
+        for el in els {
             self.off.push_str(&el.subs.len().to_string());
 
             for &sub in &el.subs.0 {
@@ -709,11 +709,11 @@ impl<'a> OffWriter<'a> {
 
         // Adds faces.
         if rank >= Rank::new(2) {
-            self.write_faces(rank.usize(), &abs[Rank::new(1)], &abs[Rank::new(2)]);
+            self.write_faces(rank.into(), &abs[1], &abs[2]);
         }
 
         // Adds the rest of the elements.
-        for r in Rank::range_iter(Rank::new(3), rank) {
+        for r in Rank::range_iter(3, rank) {
             self.write_els(r, &abs[r]);
         }
 
@@ -740,15 +740,14 @@ mod tests {
     /// Used to test a particular polytope.
     fn test_shape(p: Concrete, el_nums: Vec<usize>) {
         // Checks that element counts match up.
-        assert_eq!(p.el_counts().0, el_nums);
+        assert_eq!(p.el_counts().as_ref(), &el_nums);
 
         // Checks that the polytope can be reloaded correctly.
         assert_eq!(
             Concrete::from_off(&p.to_off(Default::default()))
                 .unwrap()
-                .el_counts()
-                .0,
-            el_nums
+                .el_counts(),
+            el_nums.into()
         );
     }
 

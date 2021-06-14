@@ -14,18 +14,33 @@ pub struct Rank(usize);
 
 impl Rank {
     /// Initializes a `Rank` from an `isize`.
-    pub const fn new(rank: isize) -> Self {
-        Self((rank + 1) as usize)
+    pub fn new<T: Into<Rank>>(num: T) -> Self {
+        num.into()
     }
 
     /// Casts the `Rank` into an `usize`, or panics if `self` is `-1`. This
     /// value is **not** the same as the internal value. Use `.0` for that.
-    pub const fn usize(&self) -> usize {
-        self.0 - 1
+    pub fn into_usize(self) -> usize {
+        self.into()
+    }
+
+    /// Casts the `Rank` into an `isize`.
+    pub fn into_isize(self) -> isize {
+        self.into()
+    }
+
+    /// Casts the `Rank` into an `u32`, or panics if `self` is `-1`.
+    pub fn into_u32(self) -> u32 {
+        self.into()
+    }
+
+    /// Casts the `Rank` into an `f64`.
+    pub fn into_f64(self) -> f64 {
+        self.into_isize() as f64
     }
 
     /// Casts the `Rank` into an `usize`, or returns `None` if `self` is `-1`.
-    pub const fn try_usize(&self) -> Option<usize> {
+    pub const fn try_usize(self) -> Option<usize> {
         if self.0 == 0 {
             None
         } else {
@@ -33,29 +48,14 @@ impl Rank {
         }
     }
 
-    /// Casts the `Rank` into an `isize`.
-    pub const fn isize(&self) -> isize {
-        self.0 as isize - 1
-    }
-
-    /// Casts the `Rank` into an `u32`, or panics if `self` is `-1`.
-    pub const fn u32(&self) -> u32 {
-        self.usize() as u32
-    }
-
-    /// Casts the `Rank` into an `f64`.
-    pub const fn f64(&self) -> f64 {
-        self.isize() as f64
-    }
-
     /// Adds one to the rank.
-    pub const fn plus_one(&self) -> Self {
+    pub const fn plus_one(self) -> Self {
         Self(self.0 + 1)
     }
 
     /// Adds one to the rank, returns it as a `usize`. This is equivalent to
     /// simply getting the internal value.
-    pub const fn plus_one_usize(&self) -> usize {
+    pub const fn plus_one_usize(self) -> usize {
         self.0
     }
 
@@ -74,26 +74,26 @@ impl Rank {
 
     /// Returns an iterator over `lo..hi`. A workaround until `Step` is
     /// stabilized.
-    pub fn range_iter(
-        lo: Rank,
-        hi: Rank,
+    pub fn range_iter<T: Into<Rank>, U: Into<Rank>>(
+        lo: T,
+        hi: U,
     ) -> std::iter::Map<std::ops::Range<usize>, impl FnMut(usize) -> Rank> {
-        (lo.0..hi.0).into_iter().map(Rank)
+        (lo.into().0..hi.into().0).into_iter().map(Rank)
     }
 
     /// Returns an iterator over `lo..=hi`. A workaround until `Step` is
     /// stabilized.
-    pub fn range_inclusive_iter(
-        lo: Rank,
-        hi: Rank,
+    pub fn range_inclusive_iter<T: Into<Rank>, U: Into<Rank>>(
+        lo: T,
+        hi: U,
     ) -> std::iter::Map<std::ops::RangeInclusive<usize>, impl FnMut(usize) -> Rank> {
-        (lo.0..=hi.0).into_iter().map(Rank)
+        (lo.into().0..=hi.into().0).into_iter().map(Rank)
     }
 
     /// Subtraction with bounds checking.
-    pub const fn try_sub(&self, rhs: Self) -> Option<Self> {
+    pub fn try_sub<T: Into<Rank>>(&self, rhs: T) -> Option<Self> {
         let lhs = self.0 + 1;
-        let rhs = rhs.0;
+        let rhs = rhs.into().0;
 
         if lhs < rhs {
             None
@@ -102,6 +102,44 @@ impl Rank {
         }
     }
 }
+
+impl std::str::FromStr for Rank {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(i32::from_str(s)?.into())
+    }
+}
+
+macro_rules! impl_rank {
+    ($T:ty) => {
+        impl From<$T> for Rank {
+            fn from(n: $T) -> Self {
+                Self((n + 1) as usize)
+            }
+        }
+
+        impl From<Rank> for $T {
+            fn from(rank: Rank) -> Self {
+                rank.0 as $T - 1
+            }
+        }
+    };
+}
+
+impl_rank!(u8);
+impl_rank!(u16);
+impl_rank!(u32);
+impl_rank!(u64);
+impl_rank!(u128);
+impl_rank!(usize);
+
+impl_rank!(i8);
+impl_rank!(i16);
+impl_rank!(i32);
+impl_rank!(i64);
+impl_rank!(i128);
+impl_rank!(isize);
 
 /// Adds two ranks.
 impl std::ops::Add for Rank {
@@ -129,17 +167,10 @@ impl std::ops::Sub for Rank {
     }
 }
 
-/// Converts a `usize` into a `Rank`.
-impl From<usize> for Rank {
-    fn from(rank: usize) -> Self {
-        Self(rank + 1)
-    }
-}
-
 /// Displays a rank as its `isize` value.
 impl Display for Rank {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.isize().fmt(f)
+        self.into_isize().fmt(f)
     }
 }
 
@@ -152,7 +183,7 @@ impl bevy_egui::egui::emath::Numeric for Rank {
     const MAX: Self = Self(usize::MAX);
 
     fn to_f64(self) -> f64 {
-        self.f64()
+        self.into_f64()
     }
 
     fn from_f64(num: f64) -> Self {
@@ -162,8 +193,26 @@ impl bevy_egui::egui::emath::Numeric for Rank {
 
 /// A `Vec` indexed by [rank](https://polytope.miraheze.org/wiki/Rank). Wraps
 /// around operations that offset by a constant for our own convenience.
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
-pub struct RankVec<T>(pub Vec<T>);
+#[derive(PartialEq, Eq, Hash, Debug, Default, Clone)]
+pub struct RankVec<T>(Vec<T>);
+
+impl<T> From<Vec<T>> for RankVec<T> {
+    fn from(vec: Vec<T>) -> Self {
+        Self(vec)
+    }
+}
+
+impl<T> AsRef<Vec<T>> for RankVec<T> {
+    fn as_ref(&self) -> &Vec<T> {
+        &self.0
+    }
+}
+
+impl<T> AsMut<Vec<T>> for RankVec<T> {
+    fn as_mut(&mut self) -> &mut Vec<T> {
+        &mut self.0
+    }
+}
 
 impl<T> RankVec<T> {
     /// Constructs a new, empty `RankVec<T>`.
@@ -174,6 +223,11 @@ impl<T> RankVec<T> {
     /// Determines if the `RankVec<T>` is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    /// Determines if the `RankVec<T>` is empty.
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 
     /// Constructs a new, empty `RankVec<T>` with the capacity.
@@ -215,6 +269,10 @@ impl<T> RankVec<T> {
         self.0.get_mut(index.0)
     }
 
+    pub fn last(&self) -> Option<&T> {
+        self.0.last()
+    }
+
     /// Returns an iterator over the `RankVec<T>`.
     pub fn iter(&self) -> Iter<T> {
         Iter(self.0.iter())
@@ -248,11 +306,12 @@ impl<T> RankVec<T> {
 }
 
 /// Allows indexing a `RankVec<T>` by a `Rank`.
-impl<T> std::ops::Index<Rank> for RankVec<T> {
+impl<T, U: Into<Rank>> std::ops::Index<U> for RankVec<T> {
     type Output = T;
 
-    fn index(&self, index: Rank) -> &Self::Output {
+    fn index(&self, index: U) -> &Self::Output {
         let rank = self.rank();
+        let index = index.into();
         self.0.get(index.0).unwrap_or_else(|| {
             panic!(
                 "index out of bounds: the rank is {} but the index is {}",
@@ -263,9 +322,10 @@ impl<T> std::ops::Index<Rank> for RankVec<T> {
 }
 
 /// Allows mutably indexing a `RankVec<T>` by a `Rank`.
-impl<T> std::ops::IndexMut<Rank> for RankVec<T> {
-    fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
+impl<T, U: Into<Rank>> std::ops::IndexMut<U> for RankVec<T> {
+    fn index_mut(&mut self, index: U) -> &mut Self::Output {
         let rank = self.rank();
+        let index = index.into();
         self.0.get_mut(index.0).unwrap_or_else(|| {
             panic!(
                 "index out of bounds: the rank is {} but the index is {}",

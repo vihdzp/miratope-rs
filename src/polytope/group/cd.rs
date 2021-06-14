@@ -7,7 +7,7 @@ use crate::{
 
 use nalgebra::{dmatrix, Dynamic, VecStorage};
 use petgraph::{
-    graph::{Graph, Node as GraphNode, NodeIndex},
+    graph::{Edge as GraphEdge, Graph, Node as GraphNode, NodeIndex},
     Undirected,
 };
 
@@ -725,6 +725,11 @@ impl Cd {
         }
     }
 
+    /// The dimension of the polytope the Coxeter diagram describes.
+    pub fn dim(&self) -> usize {
+        self.node_count()
+    }
+
     /// Returns the number of nodes in the Coxeter diagram.
     pub fn node_count(&self) -> usize {
         self.0.node_count()
@@ -735,9 +740,12 @@ impl Cd {
         self.0.edge_count()
     }
 
-    /// The dimension of the polytope the Coxeter diagram describes.
-    pub fn dim(&self) -> usize {
-        self.node_count()
+    pub fn raw_nodes(&self) -> &[GraphNode<Node>] {
+        self.0.raw_nodes()
+    }
+
+    pub fn raw_edges(&self) -> &[GraphEdge<Edge>] {
+        self.0.raw_edges()
     }
 
     /// Adds a node into the Coxeter diagram.
@@ -857,12 +865,12 @@ impl Display for Cd {
         writeln!(f, "{} Edges", self.edge_count())?;
 
         // Prints out nodes.
-        for (i, n) in self.0.raw_nodes().iter().enumerate() {
+        for (i, n) in self.raw_nodes().iter().enumerate() {
             write!(f, "Node {}: {}", i, n.weight)?;
         }
 
         // Prints out edges.
-        for (i, e) in self.0.raw_edges().iter().enumerate() {
+        for (i, e) in self.raw_edges().iter().enumerate() {
             write!(f, "Edge {}: {}", i, e.weight)?;
         }
 

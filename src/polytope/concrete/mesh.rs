@@ -118,7 +118,7 @@ impl Triangulation {
         let concrete_vertex_len = polytope.vertices.len() as u16;
 
         // We render each face separately.
-        for face in faces.iter() {
+        for face in faces {
             let mut vertex_loop = CycleBuilder::with_capacity(face.subs.len());
 
             // We first figure out the vertices in order.
@@ -323,7 +323,7 @@ impl Concrete {
 
         // Adds the edges to the wireframe.
         if let Some(edges) = edges {
-            for edge in edges.iter() {
+            for edge in edges {
                 debug_assert_eq!(
                     edge.subs.len(),
                     2,

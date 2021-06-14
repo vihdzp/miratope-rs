@@ -101,7 +101,7 @@ pub trait VecLike:
 /// struct Wrapper(Vec<Item>);
 /// ```
 macro_rules! impl_veclike {
-    ($T: tt, $VecItem: tt) => {
+    ($T: ty, $VecItem: ty) => {
         impl crate::vec_like::VecLike for $T {
             type VecItem = $VecItem;
         }

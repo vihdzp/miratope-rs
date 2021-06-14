@@ -72,6 +72,10 @@ impl CycleBuilder {
         self.0.get(&idx)
     }
 
+    fn iter(&self) -> std::collections::hash_map::Iter<usize, Pair<usize>> {
+        self.0.iter()
+    }
+
     /// Removes the entry associated to a given vertex and returns it, or `None`
     /// if no such entry exists.
     fn remove(&mut self, idx: usize) -> Option<Pair<usize>> {
@@ -119,7 +123,7 @@ impl CycleBuilder {
         let mut cycles = Vec::new();
 
         // While there's some vertex from which we haven't generated a cycle:
-        while let Some((&init, _)) = self.0.iter().next() {
+        while let Some((&init, _)) = self.iter().next() {
             let mut cycle = Cycle::with_capacity(self.len());
             let mut prev = init;
             let mut cur = self.get_remove(prev).0;

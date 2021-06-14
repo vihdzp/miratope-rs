@@ -38,7 +38,7 @@ impl Language for Ja {
     }
 
     fn generic(n: usize, rank: Rank, _options: Options) -> String {
-        match rank.usize() {
+        match rank.into() {
             2 => format!("{}形", Self::prefix(n)),
             3 => format!("{}面体", Self::prefix(n)),
             4 => format!("{}胞体", Self::prefix(n)),

@@ -19,36 +19,18 @@ use crate::{impl_veclike, polytope::Polytope, vec_like::VecLike, Float};
 /// indices of the elements of each rank, excluding the minimal and maximal
 /// elements.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Flag(pub Vec<usize>);
+pub struct Flag(Vec<usize>);
+impl_veclike!(Flag, usize);
 
 impl Flag {
-    /// Initializes a new `Flag` with a given capacity.
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self(Vec::with_capacity(capacity))
-    }
-
-    /// Gets the index of the element with a given rank, or returns `None` if it
-    /// doesn't exist.
-    pub fn get(&self, rank: Rank) -> Option<&usize> {
-        self.0.get(rank.try_usize()?)
-    }
-
     /// Gets the index of the element with a given rank, or returns `0` if it
     /// doesn't exist. This allows us to pretend that the flag stores a minimal
     /// and maximal element.
     pub fn get_or_zero(&self, rank: Rank) -> usize {
-        self.get(rank).cloned().unwrap_or(0)
-    }
-
-    /// Gets the index of the element with a given rank, or returns `None` if it
-    /// doesn't exist.
-    pub fn get_mut(&mut self, index: Rank) -> Option<&mut usize> {
-        self.0.get_mut(index.try_usize()?)
-    }
-
-    /// Pushes an index into the flag.
-    pub fn push(&mut self, value: usize) {
-        self.0.push(value);
+        match rank.try_usize() {
+            Some(rank) => self.get(rank).cloned().unwrap_or(0),
+            None => 0,
+        }
     }
 
     /// Applies a specified flag change to the flag in place.
@@ -65,9 +47,9 @@ impl Flag {
             return;
         }
 
-        let r = Rank::from(r);
-        let r_minus_one = r.minus_one();
-        let r_plus_one = r.plus_one();
+        let r_rank = Rank::from(r);
+        let r_minus_one = r_rank.minus_one();
+        let r_plus_one = r_rank.plus_one();
 
         // Determines the common elements between the subelements of the element
         // above and the superelements of the element below.
@@ -88,9 +70,9 @@ impl Flag {
             2,
             "Diamond property fails between rank {}, index {}, and rank {}, index {}.",
             r_minus_one,
-            self[r_minus_one],
+            self.get_or_zero(r_minus_one),
             r_plus_one,
-            self[r_plus_one]
+            self.get_or_zero(r_plus_one),
         );
 
         // Changes the element at idx to the other element in the section
@@ -107,47 +89,6 @@ impl Flag {
         let mut clone = self.clone();
         clone.change_mut(polytope, idx);
         clone
-    }
-}
-
-/// Allows indexing a flag by rank.
-impl Index<Rank> for Flag {
-    type Output = usize;
-
-    fn index(&self, index: Rank) -> &Self::Output {
-        &self.get(index).unwrap()
-    }
-}
-
-/// Allows mutably indexing a flag by rank.
-impl IndexMut<Rank> for Flag {
-    fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
-        self.get_mut(index).unwrap()
-    }
-}
-
-impl Index<usize> for Flag {
-    type Output = usize;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self[Rank::from(index)]
-    }
-}
-
-impl IndexMut<usize> for Flag {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self[Rank::from(index)]
-    }
-}
-
-/// Iterates over the contents of the flag.
-impl std::iter::IntoIterator for Flag {
-    type Item = usize;
-
-    type IntoIter = std::vec::IntoIter<usize>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
     }
 }
 
@@ -229,7 +170,7 @@ impl<'a> Iterator for FlagIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let flag = self.flag.as_mut()?;
         let prev_flag = flag.clone();
-        let rank = self.polytope.rank().usize();
+        let rank = self.polytope.rank().into_usize();
 
         // The largest rank of the elements we'll update.
         let mut r = 0;
@@ -254,7 +195,7 @@ impl<'a> Iterator for FlagIter<'a> {
 
         // Updates all elements in the flag with ranks r down to 0.
         let r_plus_one = Rank::from(r + 1);
-        let idx = flag.get(r_plus_one).copied().unwrap_or(0);
+        let idx = flag.get(r + 1).copied().unwrap_or(0);
         let mut element = &self.polytope[r_plus_one][idx];
         loop {
             let idx = self.indices[r];
@@ -264,7 +205,7 @@ impl<'a> Iterator for FlagIter<'a> {
                 break;
             }
 
-            element = &self.polytope[Rank::from(r)][flag[r]];
+            element = &self.polytope[r][flag[r]];
             r -= 1;
         }
 
@@ -340,20 +281,6 @@ impl IndexMut<usize> for OrientedFlag {
     }
 }
 
-impl Index<Rank> for OrientedFlag {
-    type Output = usize;
-
-    fn index(&self, index: Rank) -> &Self::Output {
-        &self.flag[index]
-    }
-}
-
-impl IndexMut<Rank> for OrientedFlag {
-    fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
-        &mut self.flag[index]
-    }
-}
-
 /// Gets the common elements of two **sorted** lists.
 fn common(vec0: &[usize], vec1: &[usize]) -> Vec<usize> {
     let mut common = Vec::new();
@@ -396,7 +323,7 @@ impl_veclike!(FlagChanges, usize);
 impl FlagChanges {
     /// Returns the set of all flag changes for a polytope of a given rank.
     pub fn all(rank: Rank) -> Self {
-        Self((0..rank.usize()).collect())
+        Self((0..rank.into()).collect())
     }
 
     /// Returns an iterator over all subsets of flag changes created by taking
@@ -555,7 +482,7 @@ impl<'a> OrientedFlagIter<'a> {
     pub fn try_next(&mut self) -> FlagNext {
         // We get the current flag from the queue.
         if let Some(current) = self.queue.front() {
-            let rank = self.polytope.rank().usize();
+            let rank = self.polytope.rank().into_usize();
 
             // Applies the current flag change to the current flag.
             let flag_change = self.flag_changes[self.flag_idx];

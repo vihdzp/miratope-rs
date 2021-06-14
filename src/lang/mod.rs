@@ -481,7 +481,7 @@ pub trait Language: Prefix {
 
         format!(
             "{}{}",
-            SUFFIXES[rank.usize()],
+            SUFFIXES[rank.into_usize()],
             if rank == Rank::new(2) {
                 options.three("", "s", "al")
             } else if rank == Rank::new(3) {
@@ -641,7 +641,7 @@ pub trait Language: Prefix {
 
     /// The name for a hyperblock with a given rank.
     fn hyperblock(rank: Rank, options: Options) -> String {
-        match rank.usize() {
+        match rank.into_usize() {
             3 => format!("cuboid{}", options.three("", "s", "al")),
             n => {
                 format!("{}block{}", Self::prefix(n), options.two("", "s"))
@@ -651,7 +651,7 @@ pub trait Language: Prefix {
 
     /// The name for a hypercube with a given rank.
     fn hypercube(rank: Rank, options: Options) -> String {
-        match rank.usize() {
+        match rank.into_usize() {
             3 => format!("cub{}", options.three("e", "s", "ic")),
             4 => format!("tesseract{}", options.three("", "s", "ic")),
             n => {
@@ -673,7 +673,7 @@ pub trait Language: Prefix {
 
     /// The name for an orthoplex with a given rank.
     fn orthoplex(rank: Rank, options: Options) -> String {
-        Self::generic(2u32.pow(rank.u32()) as usize, rank, options)
+        Self::generic(2u32.pow(rank.into_u32()) as usize, rank, options)
     }
 
     fn great(_options: Options) -> String {

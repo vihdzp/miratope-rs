@@ -254,7 +254,7 @@ impl Concrete {
         if let Some(edges) = self.abs.ranks.get(Rank::new(1)) {
             edge_lengths.reserve(edges.len());
 
-            for edge in edges.iter() {
+            for edge in edges {
                 let sub0 = edge.subs[0];
                 let sub1 = edge.subs[1];
 
@@ -297,7 +297,7 @@ impl Concrete {
     /// Maybe make this work in the general case?
     pub fn midradius(&self) -> Float {
         let vertices = &self.vertices;
-        let edges = &self[Rank::new(1)];
+        let edges = &self[1];
         let edge = &edges[0];
 
         let sub0 = edge.subs[0];
@@ -595,7 +595,7 @@ impl Concrete {
         let flat_vertices = self.flat_vertices();
         let flat_vertices = flat_vertices.as_ref().unwrap_or(&self.vertices);
 
-        match flat_vertices.get(0)?.len().cmp(&rank.usize()) {
+        match flat_vertices.get(0)?.len().cmp(&rank.into()) {
             // Degenerate polytopes have volume 0.
             std::cmp::Ordering::Less => {
                 return Some(0.0);
@@ -622,15 +622,15 @@ impl Concrete {
         for r in Rank::range_inclusive_iter(Rank::new(1), self.rank()) {
             let mut element_list = Vec::new();
 
-            for el in self[r].iter() {
-                element_list.push(vertex_map[r.usize() - 1][el.subs[0]]);
+            for el in &self[r] {
+                element_list.push(vertex_map[r.into_usize() - 1][el.subs[0]]);
             }
 
             vertex_map.push(element_list);
         }
 
         let mut volume = 0.0;
-        let rank_usize = rank.usize();
+        let rank_usize = rank.into_usize();
 
         // All of the flags we've found so far.
         let mut all_flags = HashSet::new();
@@ -688,7 +688,7 @@ impl Concrete {
             None
         } else {
             let mut flat_vertices = Vec::new();
-            for v in self.vertices.iter() {
+            for v in &self.vertices {
                 flat_vertices.push(subspace.flatten(v));
             }
             Some(flat_vertices)
@@ -730,7 +730,7 @@ impl Concrete {
         let mut hash_element = HashMap::new();
 
         // Determines the vertices of the cross-section.
-        for (idx, edge) in self[Rank::new(1)].iter().enumerate() {
+        for (idx, edge) in self[1].iter().enumerate() {
             let segment = Segment(
                 self.vertices[edge.subs[0]].clone(),
                 self.vertices[edge.subs[1]].clone(),
@@ -754,7 +754,7 @@ impl Concrete {
         ranks.push(SubelementList::vertices(vertex_count));
 
         // Takes care of building everything else.
-        for r in Rank::range_iter(Rank::new(2), self.rank()) {
+        for r in Rank::range_iter(2, self.rank()) {
             let mut new_hash_element = HashMap::new();
             let mut new_els = SubelementList::new();
 
@@ -778,7 +778,7 @@ impl Concrete {
         }
 
         // Adds a maximal element manually.
-        ranks.push(SubelementList::max(ranks.0.last().unwrap().len()));
+        ranks.push(SubelementList::max(ranks.last().unwrap().len()));
 
         // Splits compounds of dyads.
         let (first, last) = ranks.split_at_mut(Rank::new(2));
@@ -966,12 +966,12 @@ impl Polytope<Con> for Concrete {
         for r in Rank::range_inclusive_iter(Rank::new(1), self.rank()) {
             let mut rank_vertices = Vec::new();
 
-            for el in self[r].iter() {
+            for el in &self[r] {
                 let mut p = Point::zeros(dim);
                 let subs = &el.subs;
 
                 for &sub in subs {
-                    p += &element_vertices[r.usize() - 1][sub];
+                    p += &element_vertices[r.into_usize() - 1][sub];
                 }
 
                 rank_vertices.push(p / subs.len() as Float);
@@ -983,8 +983,7 @@ impl Polytope<Con> for Concrete {
         let vertices: Vec<_> = flags
             .into_iter()
             .map(|flag| {
-                flag.0
-                    .into_iter()
+                flag.into_iter()
                     .enumerate()
                     .map(|(r, idx)| &element_vertices[r][idx])
                     .sum()
@@ -1076,7 +1075,7 @@ impl Polytope<Con> for Concrete {
         if rank == Rank::new(-1) {
             Self::nullitope()
         } else {
-            let dim = rank.usize();
+            let dim = rank.into_usize();
             let mut vertices = Vec::with_capacity(dim + 1);
 
             // Adds all points with a single entry equal to √2/2, and all others
@@ -1099,18 +1098,18 @@ impl Polytope<Con> for Concrete {
     }
 }
 
-impl std::ops::Index<Rank> for Concrete {
+impl<T: Into<Rank>> std::ops::Index<T> for Concrete {
     type Output = ElementList;
 
     /// Gets the list of elements with a given rank.
-    fn index(&self, rank: Rank) -> &Self::Output {
+    fn index(&self, rank: T) -> &Self::Output {
         &self.abs[rank]
     }
 }
 
-impl std::ops::IndexMut<Rank> for Concrete {
+impl<T: Into<Rank>> std::ops::IndexMut<T> for Concrete {
     /// Gets the list of elements with a given rank.
-    fn index_mut(&mut self, rank: Rank) -> &mut Self::Output {
+    fn index_mut(&mut self, rank: T) -> &mut Self::Output {
         &mut self.abs[rank]
     }
 }
@@ -1267,7 +1266,7 @@ mod tests {
 
     #[test]
     fn simplex() {
-        for n in 0..=5 {
+        for n in 0u32..=5 {
             test(
                 &mut Concrete::simplex(Rank::from(n)),
                 Some(
@@ -1287,7 +1286,7 @@ mod tests {
 
     #[test]
     fn orthoplex() {
-        for n in 0..=5 {
+        for n in 0u32..=5 {
             test(
                 &mut Concrete::orthoplex(Rank::from(n)),
                 Some(1.0 / n.factorial() as Float),

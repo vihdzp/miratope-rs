@@ -239,13 +239,13 @@ impl ElementHash {
         // A vector of HashMaps. The k-th entry is a map from k-elements of the
         // original polytope into k-elements in a new polytope.
         let mut hashes = RankVec::with_capacity(el.rank);
-        for _ in Rank::range_inclusive_iter(Rank::new(-1), el.rank) {
+        for _ in Rank::range_inclusive_iter(-1, el.rank) {
             hashes.push(HashMap::new());
         }
         hashes[el.rank].insert(el.idx, 0);
 
         // Gets subindices of subindices, until reaching the vertices.
-        for r in Rank::range_inclusive_iter(Rank::new(0), el.rank).rev() {
+        for r in Rank::range_inclusive_iter(0, el.rank).rev() {
             let (left_slice, right_slice) = hashes.split_at_mut(r);
             let prev_hash = left_slice.last_mut().unwrap();
             let hash = right_slice.first().unwrap();
@@ -294,7 +294,7 @@ impl ElementHash {
         let mut abs = Abstract::with_capacity(rank);
 
         // For every rank stored in the element map.
-        for r in Rank::range_inclusive_iter(Rank::new(-1), rank) {
+        for r in Rank::range_inclusive_iter(-1, rank) {
             let mut elements = ElementList::new();
             let hash = &self.0[r];
 
@@ -389,7 +389,7 @@ impl SectionHash {
     /// in a polytope with a given rank.
     pub fn new(rank: Rank, height: Rank) -> Self {
         let mut rank_vec = RankVec::new();
-        for _ in Rank::range_iter(Rank::new(-1), rank - height) {
+        for _ in Rank::range_iter(-1, rank - height) {
             rank_vec.push(HashMap::new());
         }
 

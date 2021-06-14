@@ -250,7 +250,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         let mut idx = 0;
         flag.push(0);
 
-        for r in Rank::range_iter(Rank::new(1), rank) {
+        for r in Rank::range_iter(1, rank) {
             idx = self
                 .abs()
                 .get_element(ElementRef::new(r.minus_one(), idx))
@@ -410,7 +410,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
             Self::multipyramid(iter::repeat(&Self::point()).take(rank.plus_one_usize())).with_name(
                 Name::simplex(
                     T::DataRegular::new(Regular::Yes {
-                        center: Point::zeros(rank.usize()),
+                        center: Point::zeros(rank.into()),
                     }),
                     rank,
                 ),
@@ -424,7 +424,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         if rank == Rank::new(-1) {
             Self::nullitope()
         } else {
-            let rank_u = rank.usize();
+            let rank_u = rank.into();
 
             Self::multiprism(iter::repeat(&Self::dyad()).take(rank_u)).with_name(Name::hyperblock(
                 T::DataRegular::new(Regular::Yes {
@@ -441,7 +441,7 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         if rank == Rank::new(-1) {
             Self::nullitope()
         } else {
-            let rank_u = rank.usize();
+            let rank_u = rank.into();
 
             Self::multitegum(iter::repeat(&Self::dyad()).take(rank_u)).with_name(Name::orthoplex(
                 T::DataRegular::new(Regular::Yes {

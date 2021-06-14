@@ -79,7 +79,7 @@ impl Language for Es {
 
         format!(
             "{}{}",
-            SUFFIXES[d.usize()],
+            SUFFIXES[d.into_usize()],
             options.four("o", "os", "al", "ales")
         )
     }
@@ -249,7 +249,7 @@ impl Language for Es {
     }
 
     fn hyperblock(rank: Rank, options: Options) -> String {
-        match rank.usize() {
+        match rank.into_usize() {
             3 => format!("cuboid{}", options.four("e", "es", "al", "ales")),
             n => {
                 format!(
@@ -264,7 +264,7 @@ impl Language for Es {
 
     /// The name for a hypercube with a given rank.
     fn hypercube(rank: Rank, options: Options) -> String {
-        match rank.usize() {
+        match rank.into_usize() {
             3 => format!(
                 "c{}",
                 options.six("ubo", "ubos", "úbico", "úbicos", "úbica", "úbicas")
@@ -293,7 +293,7 @@ impl Language for Es {
 
     /// The name for an orthoplex with a given rank.
     fn orthoplex(rank: Rank, options: Options) -> String {
-        Self::generic(2u32.pow(rank.u32()) as usize, rank, options)
+        Self::generic(2u32.pow(rank.into_u32()) as usize, rank, options)
     }
 
     fn compound<T: NameType>(components: &[(usize, Name<T>)], options: Options) -> String {
