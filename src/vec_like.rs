@@ -1,3 +1,6 @@
+//! Implements all of the boilerplate code for structs throughout the code that
+//! wrap around `Vec<T>`s.
+
 /// A trait for anything that should work as an index in a vector.
 pub trait VecIndex {
     fn index(self) -> usize;
@@ -20,21 +23,29 @@ pub trait VecLike<'a>:
     + std::ops::IndexMut<Self::VecIndex>
     + IntoIterator
 {
+    /// The item contained in the wrapped vector.
     type VecItem;
+
+    /// The type used to index over the vector.
     type VecIndex: VecIndex;
 
+    /// Initializes a new empty `Self` with no elements.
     fn new() -> Self {
         Vec::new().into()
     }
 
+    /// Initializes a new empty `Self` with a given capacity.
     fn with_capacity(capacity: usize) -> Self {
         Vec::with_capacity(capacity).into()
     }
 
+    /// Reserves capacity for at least `additional` more elements to be inserted
+    /// in `Self`.
     fn reserve(&mut self, additional: usize) {
         self.as_mut().reserve(additional)
     }
 
+    // Returns true if `self` contains an element with the given value.
     fn contains(&self, x: &Self::VecItem) -> bool
     where
         <Self as VecLike<'a>>::VecItem: PartialEq,
@@ -42,10 +53,12 @@ pub trait VecLike<'a>:
         self.as_ref().contains(x)
     }
 
+    /// Pushes a value onto `self`.
     fn push(&mut self, value: Self::VecItem) {
         self.as_mut().push(value)
     }
 
+    /// Pops a value from `self`.
     fn pop(&mut self) -> Option<Self::VecItem> {
         self.as_mut().pop()
     }
@@ -86,6 +99,7 @@ pub trait VecLike<'a>:
         self.as_ref().len()
     }
 
+    /// Returns the last element of `Self`, or `None` if it's empty.
     fn last(&self) -> Option<&Self::VecItem> {
         self.as_ref().last()
     }
@@ -94,6 +108,7 @@ pub trait VecLike<'a>:
         self.as_mut().reverse()
     }
 
+    /// Sorts `Self`.
     fn sort(&mut self)
     where
         <Self as VecLike<'a>>::VecItem: Ord,
@@ -117,15 +132,17 @@ pub trait VecLike<'a>:
         self.as_mut().sort_unstable_by_key(f)
     }
 
-    fn swap(&mut self, a: Self::VecIndex, b: Self::VecIndex) {
-        self.as_mut().swap(a.index(), b.index())
-    }
-
+    // Divides a mutable slice into two at an index.
     fn split_at_mut(
         &mut self,
         mid: Self::VecIndex,
     ) -> (&mut [Self::VecItem], &mut [Self::VecItem]) {
         self.as_mut().split_at_mut(mid.index())
+    }
+
+    /// Swaps two elements in `Self`.
+    fn swap(&mut self, a: Self::VecIndex, b: Self::VecIndex) {
+        self.as_mut().swap(a.index(), b.index())
     }
 }
 

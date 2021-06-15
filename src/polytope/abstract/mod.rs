@@ -9,7 +9,7 @@ use std::{
 
 use self::{
     elements::{
-        AbstractBuilder, Element, ElementHash, ElementList, ElementRef, Section, SectionHash,
+        AbstractBuilder, Element, ElementHash, ElementList, ElementRef, SectionHash, SectionRef,
         SubelementList, Subelements, Superelements,
     },
     flag::{Flag, FlagEvent, FlagSet},
@@ -65,11 +65,11 @@ pub enum AbstractError {
 
     /// The polytope is not dyadic, i.e. some section of height 1 does not have
     /// exactly 4 elements.
-    Dyadic { section: Section, more: bool },
+    Dyadic { section: SectionRef, more: bool },
 
     /// The polytope is not strictly connected, i.e. some section's flags don't
     /// form a connected graph under flag changes.
-    Connected(Section),
+    Connected(SectionRef),
 }
 
 impl std::fmt::Display for AbstractError {
@@ -365,7 +365,7 @@ impl Abstract {
         // We actually build the elements backwards, which is as awkward as it
         // seems. Maybe we should fix that in the future?
         let mut backwards_abs = RankVec::with_rank_capacity(rank.plus_one());
-        backwards_abs.push(SubelementList::max(section_hash.len));
+        backwards_abs.push(SubelementList::max(section_hash.len()));
 
         // Indices of base.
         let vertex_count = self.vertex_count();
@@ -378,10 +378,10 @@ impl Abstract {
         // Adds all elements corresponding to sections of a given height.
         for height in 0..=rank.into_isize() + 1 {
             let height = Rank::new(height);
-            let mut new_section_hash = SectionHash::new(rank, height);
-            let mut elements = SubelementList::with_capacity(section_hash.len);
+            let mut new_section_hash = SectionHash::new();
+            let mut elements = SubelementList::with_capacity(section_hash.len());
 
-            for _ in 0..section_hash.len {
+            for _ in 0..section_hash.len() {
                 elements.push(Subelements::new());
             }
 
@@ -389,46 +389,35 @@ impl Abstract {
             // sections of the current height by either changing the upper
             // element into one of its superelements, or changing the lower
             // element into one of its subelements.
-            for (rank_lo, map) in section_hash.rank_vec.rank_iter().rank_enumerate() {
-                // The lower and higher ranks of our OLD sections.
-                let rank_hi = rank_lo + height;
+            for (section, idx) in section_hash.into_iter() {
+                // Finds all of the subelements of our old section's
+                // lowest element.
+                for &idx_lo in &self.get_element(section.lo).unwrap().subs {
+                    // Adds the new sections of the current height, gets
+                    // their index, uses that to build the ElementList.
+                    let sub = new_section_hash.get(SectionRef::new(
+                        ElementRef::new(section.lo.rank.minus_one(), idx_lo),
+                        section.hi,
+                    ));
 
-                // The indices for the bottom and top elements and the index in
-                // the antiprism of the old section.
-                for (indices, &idx) in map {
-                    // Finds all of the subelements of our old section's
-                    // lowest element.
-                    for &idx_lo in &self
-                        .get_element(ElementRef::new(rank_lo, indices.0))
-                        .unwrap()
-                        .subs
-                    {
-                        // Adds the new sections of the current height, gets
-                        // their index, uses that to build the ElementList.
-                        let sub = new_section_hash.get(Section::new(
-                            ElementRef::new(rank_lo.minus_one(), idx_lo),
-                            ElementRef::new(rank_hi, indices.1),
-                        ));
+                    elements[idx].push(sub);
+                }
 
-                        elements[idx].push(sub);
-                    }
+                // Finds all of the superelements of our old section's
+                // highest element.
+                for &idx_hi in &self
+                    .get_element(section.hi)
+                    .unwrap()
+                    .sups
+                {
+                    // Adds the new sections of the current height, gets
+                    // their index, uses that to build the ElementList.
+                    let sub = new_section_hash.get(SectionRef::new(
+                        section.lo,
+                        ElementRef::new(section.hi.rank.plus_one(), idx_hi),
+                    ));
 
-                    // Finds all of the superelements of our old section's
-                    // highest element.
-                    for &idx_hi in &self
-                        .get_element(ElementRef::new(rank_hi, indices.1))
-                        .unwrap()
-                        .sups
-                    {
-                        // Adds the new sections of the current height, gets
-                        // their index, uses that to build the ElementList.
-                        let sub = new_section_hash.get(Section::new(
-                            ElementRef::new(rank_lo, indices.0),
-                            ElementRef::new(rank_hi.plus_one(), idx_hi),
-                        ));
-
-                        elements[idx].push(sub);
-                    }
+                    elements[idx].push(sub);
                 }
             }
 
@@ -437,7 +426,7 @@ impl Abstract {
             if height == rank.minus_one() {
                 // We create a map from the base's vertices to the new vertices.
                 for v in 0..vertex_count {
-                    vertices.push(new_section_hash.get(Section::new(
+                    vertices.push(new_section_hash.get(SectionRef::new(
                         ElementRef::new(Rank::new(0), v),
                         ElementRef::new(rank, 0),
                     )));
@@ -445,7 +434,7 @@ impl Abstract {
 
                 // We create a map from the dual base's vertices to the new vertices.
                 for f in 0..facet_count {
-                    dual_vertices.push(new_section_hash.get(Section::new(
+                    dual_vertices.push(new_section_hash.get(SectionRef::new(
                         ElementRef::new(Rank::new(-1), 0),
                         ElementRef::new(rank.minus_one(), f),
                     )));
@@ -678,7 +667,7 @@ impl Abstract {
                             // Found for the third time?! Abort!
                             Some(Count::Twice) => {
                                 return Err(AbstractError::Dyadic {
-                                    section: Section::new(
+                                    section: SectionRef::new(
                                         ElementRef::new(r - Rank::new(2), sub_sub),
                                         ElementRef::new(r, idx),
                                     ),
@@ -694,7 +683,7 @@ impl Abstract {
                 for (sub_sub, count) in hash_sub_subs.into_iter() {
                     if count == Count::Once {
                         return Err(AbstractError::Dyadic {
-                            section: Section::new(
+                            section: SectionRef::new(
                                 ElementRef::new(r - Rank::new(2), sub_sub),
                                 ElementRef::new(r, idx),
                             ),
@@ -710,7 +699,7 @@ impl Abstract {
 
     /// Determines whether the polytope is connected. A valid non-compound
     /// polytope should always return `true`.
-    pub fn is_connected(&self, _section: Section) -> bool {
+    pub fn is_connected(&self, _section: SectionRef) -> bool {
         todo!()
         /*
         let section = self.get_section(section).unwrap();
