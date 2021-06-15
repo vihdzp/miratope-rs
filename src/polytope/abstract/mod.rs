@@ -405,11 +405,7 @@ impl Abstract {
 
                 // Finds all of the superelements of our old section's
                 // highest element.
-                for &idx_hi in &self
-                    .get_element(section.hi)
-                    .unwrap()
-                    .sups
-                {
+                for &idx_hi in &self.get_element(section.hi).unwrap().sups {
                     // Adds the new sections of the current height, gets
                     // their index, uses that to build the ElementList.
                     let sub = new_section_hash.get(SectionRef::new(

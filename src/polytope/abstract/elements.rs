@@ -363,32 +363,31 @@ impl SectionRef {
     }
 }
 
-/// Maps the sections of a polytope with the same height to indices in a new
-/// polytope. Organizes the sections first by their lowest rank, then by their
-/// hash.
+/// Represents a map from sections in a polytope to their indices in a new
+/// polytope (its [antiprism](Abstract::antiprism)). Exists only to make the
+/// antiprism code a bit easier to understand.
+///
+/// In practice, all of the sections we store have a common height, which means
+/// that we could save some memory by using a representation of [`SectionRef`]
+/// with three arguments instead of four. This probably isn't worth the hassle,
+/// though.
 #[derive(Default, Debug)]
 pub struct SectionHash(HashMap<SectionRef, usize>);
 
 impl SectionHash {
+    /// Initializes a new section hash.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Returns the number of stored elements.
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    /// Returns an iterator over the stored section index pairs.
     pub fn into_iter(self) -> std::collections::hash_map::IntoIter<SectionRef, usize> {
         self.0.into_iter()
-    }
-
-    pub fn iter(&self) -> std::collections::hash_map::Iter<SectionRef, usize> {
-        self.0.iter()
-    }
-
-    pub fn insert(&mut self, section: SectionRef) -> Option<usize> {
-        let len = self.len();
-        self.0.insert(section, len)
     }
 
     /// Returns all singleton sections of a polytope.
@@ -398,7 +397,9 @@ impl SectionHash {
         for (rank, elements) in poly.ranks.rank_iter().rank_enumerate() {
             for idx in 0..elements.len() {
                 let el = ElementRef::new(rank, idx);
-                section_hash.insert(SectionRef::new(el, el));
+                section_hash
+                    .0
+                    .insert(SectionRef::new(el, el), section_hash.len());
             }
         }
 
