@@ -391,8 +391,8 @@ where
     }
 }
 
-/// Equality on `OrdMatrices` should be an equality relation, as long as the
-/// distance between the `OrdMatrices` you're comparing is "small".
+/// Equality on `MatrixOrds` should be an equality relation, as long as the
+/// distance between the `MatrixOrds` you're comparing is "small".
 impl<R: Dim, C: Dim> Eq for MatrixOrdMxN<R, C> where VecStorage<Float, R, C>: Storage<Float, R, C> {}
 
 impl<R: Dim, C: Dim> PartialOrd for MatrixOrdMxN<R, C>
@@ -400,11 +400,7 @@ where
     VecStorage<Float, R, C>: Storage<Float, R, C>,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let mut other = other.iter();
-
-        for x in self.iter() {
-            let y = other.next().unwrap();
-
+        for (x, y) in self.iter().zip(other.iter()) {
             if abs_diff_ne!(x, y, epsilon = Float::EPS) {
                 return x.partial_cmp(y);
             }

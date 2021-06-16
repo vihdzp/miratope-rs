@@ -193,6 +193,7 @@ fn setup(
                 transform: cam,
                 perspective_projection: PerspectiveProjection {
                     near: 0.0001,
+                    far: 10000.0,
                     ..Default::default()
                 },
                 ..Default::default()
