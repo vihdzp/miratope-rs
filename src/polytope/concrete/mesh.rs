@@ -7,7 +7,7 @@ use super::{
     Concrete,
 };
 use crate::{
-    geometry::{Point, Subspace, Vector},
+    geometry::{Point, Subspace},
     polytope::{
         r#abstract::{elements::ElementList, rank::Rank},
         Polytope,
@@ -22,6 +22,9 @@ use bevy::{
     render::{mesh::Indices, pipeline::PrimitiveTopology},
 };
 use lyon::{math::point, path::Path, tessellation::*};
+
+const ATTRIBUTE_POSITION_EXTRA: &str = "Vertex_Position_7D";
+const ATTRIBUTE_NORMAL_EXTRA: &str = "Vertex_Normal_7D";
 
 impl Cycle {
     /// Attempts to turn the cycle into a 2D path, which can then be given to
@@ -203,23 +206,29 @@ impl Triangulation {
 
 /// Generates normals from a set of vertices by just projecting radially from
 /// the origin.
-fn normals(vertices: &[[f32; 3]]) -> Vec<[f32; 3]> {
+fn normals(vertices: &[[f32; 7]]) -> (Vec<[f32; 3]>, Vec<[f32; 4]>) {
     vertices
         .iter()
         .map(|n| {
-            let sq_norm = n[0] * n[0] + n[1] * n[1] + n[2] * n[2];
+            let mut sq_norm = 0.0;
+            for &c in n {
+                sq_norm += c * c;
+            }
+
             if sq_norm < f32::EPS {
-                [0.0, 0.0, 0.0]
+                (Default::default(), Default::default())
             } else {
                 let norm = sq_norm.sqrt();
                 let mut n = *n;
-                n[0] /= norm;
-                n[1] /= norm;
-                n[2] /= norm;
-                n
+
+                for c in n.iter_mut() {
+                    *c /= norm;
+                }
+
+                split7(n)
             }
         })
-        .collect()
+        .unzip()
 }
 
 /// Returns an empty mesh.
@@ -233,49 +242,31 @@ fn empty_mesh() -> Mesh {
     mesh
 }
 
+/// Splits a [T; 7] into a [T; 3] and a [T; 4].
+fn split7<T: Copy>(x: [T; 7]) -> ([T; 3], [T; 4]) {
+    ([x[0], x[1], x[2]], [x[3], x[4], x[5], x[6]])
+}
+
+// TODO: take common code in mesh and wireframe, combine it.
+
 impl Concrete {
     /// Gets the coordinates of the vertices, after projecting down into 3D.
     fn vertex_coords<'a, T: Iterator<Item = &'a Point>>(
         &self,
         vertices: T,
-        projection_type: ProjectionType,
-    ) -> Vec<[f32; 3]> {
-        let dim = self.dim_or();
+        _projection_type: ProjectionType,
+    ) -> Vec<[f32; 7]> {
+        vertices
+            .map(|point| {
+                let mut coords: [f32; 7] = Default::default();
 
-        // If the polytope is at most 3D, we just embed it into 3D space.
-        if projection_type.is_orthogonal() || dim <= 3 {
-            vertices
-                .map(|point| {
-                    let mut iter = point.iter().take(3).map(|&c| c as f32);
-                    let x = iter.next().unwrap_or(0.0);
-                    let y = iter.next().unwrap_or(0.0);
-                    let z = iter.next().unwrap_or(0.0);
-                    [x, y, z]
-                })
-                .collect()
-        }
-        // Else, we project it down.
-        else {
-            // Distance from the projection planes.
-            let mut direction = Vector::zeros(dim);
-            direction[3] = 1.0;
+                for (idx, &c) in point.iter().enumerate().take(7) {
+                    coords[idx] = c as f32;
+                }
 
-            let (min, max) = self.minmax(&direction).unwrap();
-            let dist = (min as f32 - 1.0).abs().max(max as f32 + 1.0).abs();
-
-            vertices
-                .map(|point| {
-                    let factor: f32 = point.iter().skip(3).map(|&x| x as f32 + dist).product();
-
-                    // We scale the first three coordinates accordingly.
-                    let mut iter = point.iter().copied().take(3).map(|c| c as f32 / factor);
-                    let x = iter.next().unwrap();
-                    let y = iter.next().unwrap();
-                    let z = iter.next().unwrap();
-                    [x, y, z]
-                })
-                .collect()
-        }
+                coords
+            })
+            .collect()
     }
 
     /// Builds the mesh of a polytope.
@@ -296,10 +287,16 @@ impl Concrete {
         );
 
         // Builds the actual mesh.
+        let len = vertices.len();
+        let (normals1, normals2) = normals(&vertices);
+        let (vertices1, vertices2): (Vec<_>, Vec<_>) = vertices.into_iter().map(split7).unzip();
+
         let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-        mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 1.0]; vertices.len()]);
-        mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals(&vertices));
-        mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
+        mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 1.0]; len]);
+        mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals1);
+        mesh.set_attribute(ATTRIBUTE_NORMAL_EXTRA, normals2);
+        mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices1);
+        mesh.set_attribute(ATTRIBUTE_POSITION_EXTRA, vertices2);
         mesh.set_indices(Some(Indices::U16(triangulation.triangles)));
 
         mesh
@@ -337,9 +334,14 @@ impl Concrete {
         }
 
         // Sets the mesh attributes.
+        let (normals1, normals2) = normals(&vertices);
+        let (vertices1, vertices2): (Vec<_>, Vec<_>) = vertices.into_iter().map(split7).unzip();
+
         let mut mesh = Mesh::new(PrimitiveTopology::LineList);
-        mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals(&vertices));
-        mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
+        mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals1);
+        mesh.set_attribute(ATTRIBUTE_NORMAL_EXTRA, normals2);
+        mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices1);
+        mesh.set_attribute(ATTRIBUTE_POSITION_EXTRA, vertices2);
         mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0; 2]; vertex_count]);
         mesh.set_indices(Some(Indices::U16(indices)));
 
