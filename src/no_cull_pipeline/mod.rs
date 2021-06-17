@@ -149,7 +149,7 @@ impl Default for GlobalTransform7 {
 
 impl From<Transform7> for GlobalTransform7 {
     fn from(Transform7(tf): Transform7) -> Self {
-        GlobalTransform7(tf)
+        Self(tf)
     }
 }
 
@@ -181,6 +181,7 @@ impl Plugin for Pbr7DPlugin {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn update_globals_from_local_tfs(
     mut root_query: Query<
         (
