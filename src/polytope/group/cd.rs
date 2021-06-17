@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, f64::consts::PI, fmt::Display, iter, mem, str::FromStr};
+use std::{collections::VecDeque, fmt::Display, iter, mem, str::FromStr};
 
 use crate::{
     geometry::{Matrix, MatrixOrd, Point, Vector},
@@ -166,14 +166,13 @@ impl CoxMatrix {
         let mut mat = Matrix::zeros(dim, dim);
 
         // Builds each column from the top down, so that each of the succesive
-        // dot products we check matcht he values in the Coxeter matrix.
+        // dot products we check match the values in the Coxeter matrix.
         for i in 0..dim {
             let (prev_gens, mut n_i) = mat.columns_range_pair_mut(0..i, i);
 
             for (j, n_j) in prev_gens.column_iter().enumerate() {
                 // All other entries in the dot product are zero.
                 let dot = n_i.rows_range(0..=j).dot(&n_j.rows_range(0..=j));
-
                 n_i[j] = ((Float::PI / self[(i, j)]).cos() - dot) / n_j[j];
             }
 
@@ -237,6 +236,11 @@ impl Node {
     /// Shorthand for `NodeVal::Snub(FloatOrd::from(x))`.
     pub fn snub(x: Float) -> Self {
         Self::Snub(FloatOrd::from(x))
+    }
+
+    /// Returns whether this node is ringed.
+    pub fn is_ringed(&self) -> bool {
+        matches!(self, Self::Ringed(_))
     }
 
     pub fn from_char(c: char) -> Option<Self> {
@@ -370,6 +374,7 @@ pub struct EdgeRef {
 }
 
 impl EdgeRef {
+    /// Initializes a new edge reference from its fields.
     pub fn new(first: NodeRef, last: NodeRef, edge: Edge) -> Self {
         Self { first, last, edge }
     }
@@ -569,14 +574,12 @@ impl<'a> CdBuilder<'a> {
 
                 // If we have a negative virtual node, we advance the iterator
                 // and set the neg flag.
-                let neg = if c == '-' {
+                let neg = c == '-';
+                if neg {
                     let (new_idx, new_c) = self.next_or()?;
                     idx = new_idx;
                     c = new_c;
-                    true
-                } else {
-                    false
-                };
+                }
 
                 match c {
                     // A virtual node, from *a to *z.
@@ -742,10 +745,12 @@ impl Cd {
         self.0.edge_count()
     }
 
+    /// Returns a reference to the raw node array.
     pub fn raw_nodes(&self) -> &[GraphNode<Node>] {
         self.0.raw_nodes()
     }
 
+    /// Returns a reference to the raw edge array.
     pub fn raw_edges(&self) -> &[GraphEdge<Edge>] {
         self.0.raw_edges()
     }
@@ -775,21 +780,36 @@ impl Cd {
     /// in which they were found.
     pub fn node_iter<'a>(
         &'a self,
-    ) -> std::iter::Map<std::slice::Iter<GraphNode<Node>>, impl Fn(&'a GraphNode<Node>) -> Node>
+    ) -> std::iter::Map<std::slice::Iter<GraphNode<Node>>, impl FnMut(&'a GraphNode<Node>) -> Node>
     {
-        let closure = |node: &GraphNode<Node>| node.weight;
-        self.0.raw_nodes().iter().map(closure)
+        self.0.raw_nodes().iter().map(|node| node.weight)
     }
 
     /// Returns the nodes in the Coxeter diagram, in the order in which they
     /// were found.
     pub fn nodes(&self) -> Vec<Node> {
-        self.0.raw_nodes().iter().map(|node| node.weight).collect()
+        self.node_iter().collect()
     }
 
     /// Returns the vector whose values represent the node values.
     pub fn node_vector(&self) -> Vector {
         Vector::from_iterator(self.dim(), self.node_iter().map(|node| node.value()))
+    }
+
+    /// Returns whether a CD is minimal, i.e. whether every connected component
+    /// has at least one ringed node.
+    pub fn minimal(&self) -> bool {
+        'COMPONENT: for component in petgraph::algo::tarjan_scc(&self.0) {
+            for node in component {
+                if self.0[node].is_ringed() {
+                    continue 'COMPONENT;
+                }
+            }
+
+            return false;
+        }
+
+        true
     }
 
     /// Creates a [`CoxMatrix`] from a Coxeter diagram.
@@ -798,13 +818,17 @@ impl Cd {
         let graph = &self.0;
 
         let matrix = Matrix::from_fn(dim, dim, |i, j| {
+            // Every entry in the diagonal of a Coxeter matrix is 1.
             if i == j {
                 return 1.0;
             }
 
+            // If an edge connects two nodes, it adds its value to the matrix.
             if let Some(idx) = graph.find_edge(NodeIndex::new(i), NodeIndex::new(j)) {
                 graph[idx].value()
-            } else {
+            }
+            // Else, we write a 2.
+            else {
                 2.0
             }
         });
@@ -816,27 +840,7 @@ impl Cd {
     /// `None` if this doesn't apply. This may or may not be faster than just
     /// calling [`Self::generator`] and taking the norm.
     pub fn circumradius(&self) -> Option<Float> {
-        let mut schlafli = self.cox();
-        let schlafli_ref = schlafli.as_mut();
-        let node_vec = self.node_vector();
-
-        // Converts the Coxeter matrix into the Schläfli matrix.
-        for v in schlafli_ref.iter_mut() {
-            *v = (PI / *v).cos();
-        }
-
-        if !schlafli_ref.try_inverse_mut() {
-            return None;
-        }
-
-        let sq_radius = (node_vec.transpose() * schlafli.as_ref() * node_vec)[(0, 0)] / -4.0;
-        if sq_radius < -Float::EPS {
-            None
-        } else if sq_radius > Float::EPS {
-            Some(sq_radius.sqrt())
-        } else {
-            Some(0.0)
-        }
+        self.generator().as_ref().map(Point::norm)
     }
 
     /// Returns a point in the position specified by the Coxeter diagram,
@@ -845,11 +849,9 @@ impl Cd {
         let normals = self.cox().normals()?;
         let mut vector = self.node_vector();
 
-        if normals.solve_upper_triangular_mut(&mut vector) {
-            Some(vector)
-        } else {
-            None
-        }
+        normals
+            .solve_upper_triangular_mut(&mut vector)
+            .then(|| vector)
     }
 }
 
@@ -957,7 +959,7 @@ mod tests {
     }
 
     #[test]
-    /// Tests a very funny looking diagram.
+    /// Tests a nice looking diagram.
     fn star() {
         test(
             "x3o3o3o3o3*a *a3*c3*e3*b3*d3*a",
@@ -993,10 +995,10 @@ mod tests {
         test(
             "v4x3F4f",
             vec![
-                Node::ringed((5f64.sqrt() - 1f64) / 2f64),
+                Node::from_char('v').unwrap(),
                 x(),
-                Node::ringed((5f64.sqrt() + 3f64) / 2f64),
-                Node::ringed((5f64.sqrt() + 1f64) / 2f64),
+                Node::from_char('F').unwrap(),
+                Node::from_char('f').unwrap(),
             ],
             dmatrix![
                 1.0, 4.0, 2.0, 2.0;
@@ -1041,7 +1043,7 @@ mod tests {
     fn node_lengths() {
         test(
             "(1.0)4(2.2)3(-3.0)",
-            vec![Node::ringed(1.0), Node::ringed(2.2), Node::ringed(-3.0)],
+            vec![x(), Node::ringed(2.2), Node::ringed(-3.0)],
             dmatrix![
                 1.0, 4.0, 2.0;
                 4.0, 1.0, 3.0;
@@ -1065,7 +1067,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "InvalidSymbol { pos: 2 }")]
     fn invalid_symbol() {
-        Cd::parse("x3∞5o").unwrap();
+        Cd::parse("x3⊕5o").unwrap();
     }
 
     #[test]

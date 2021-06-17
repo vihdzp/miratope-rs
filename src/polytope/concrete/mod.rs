@@ -1258,7 +1258,7 @@ mod tests {
 
         for m in 0..polygons.len() {
             for n in 0..polygons.len() {
-                let volume = if m == 0 || n == 0 { Some(0.0) } else { None };
+                let volume = (m == 0 || n == 0).then(|| 0.0);
                 test(&mut Concrete::duocomb(&polygons[m], &polygons[n]), volume)
             }
         }

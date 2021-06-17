@@ -133,13 +133,11 @@ impl CameraInputEvent {
         cam_gtf: &GlobalTransform,
     ) {
         match *self {
-            CameraInputEvent::RotateAnchor(vec) => CameraInputEvent::rotate(vec, anchor_tf),
-            CameraInputEvent::Translate(vec) => {
-                CameraInputEvent::translate(vec, anchor_tf, cam_gtf)
-            }
-            CameraInputEvent::Roll(roll) => CameraInputEvent::roll(roll, anchor_tf),
-            CameraInputEvent::Zoom(zoom) => CameraInputEvent::zoom(zoom, cam_tf),
-            CameraInputEvent::Reset => CameraInputEvent::reset(anchor_tf, cam_tf),
+            Self::RotateAnchor(vec) => Self::rotate(vec, anchor_tf),
+            Self::Translate(vec) => Self::translate(vec, anchor_tf, cam_gtf),
+            Self::Roll(roll) => Self::roll(roll, anchor_tf),
+            Self::Zoom(zoom) => Self::zoom(zoom, cam_tf),
+            Self::Reset => Self::reset(anchor_tf, cam_tf),
         }
     }
 }
@@ -151,7 +149,10 @@ fn cam_events_from_kb(
     cam_inputs: &mut EventWriter<CameraInputEvent>,
     ctx: &CtxRef,
 ) -> (f32, f32) {
+    // TODO: make the spin rate modifiable in preferences.
     const SPIN_RATE: f32 = std::f32::consts::TAU / 5.0;
+    const ROLL: CameraInputEvent = CameraInputEvent::Roll(SPIN_RATE);
+
     let real_scale = time.delta_seconds();
     let scale = if keyboard.pressed(KeyCode::LControl) | keyboard.pressed(KeyCode::RControl) {
         real_scale * 3.0
@@ -162,7 +163,6 @@ fn cam_events_from_kb(
     let fb = CameraInputEvent::Translate(Vec3::Z);
     let lr = CameraInputEvent::Translate(Vec3::X);
     let ud = CameraInputEvent::Translate(Vec3::Y);
-    const ROLL: CameraInputEvent = CameraInputEvent::Roll(SPIN_RATE);
 
     if !ctx.wants_keyboard_input() {
         for keycode in keyboard.get_pressed() {
@@ -194,7 +194,7 @@ fn cam_events_from_mouse(
     cam_inputs: &mut EventWriter<CameraInputEvent>,
 ) {
     if mouse_button.pressed(MouseButton::Right) {
-        for &MouseMotion { mut delta } in mouse_move.iter() {
+        for MouseMotion { mut delta } in mouse_move.iter() {
             delta.x /= width;
             delta.y /= height;
             cam_inputs.send(CameraInputEvent::RotateAnchor(-100.0 * real_scale * delta))
@@ -265,10 +265,13 @@ fn update_cameras_and_anchors(
         Option<&Camera>,
     )>,
 ) {
+    // SAFETY: see the remark below.
     for (mut cam_tf, cam_gtf, parent, cam) in unsafe { q.iter_unsafe() } {
         if cam.is_none() {
             continue;
         } else if let Some(parent) = parent {
+            // SAFETY: we assume that a camera isn't its own parent (this
+            // shouldn't ever happen on purpose)
             if let Ok(mut anchor_tf) =
                 unsafe { q.get_component_unchecked_mut::<Transform>(parent.0) }
             {

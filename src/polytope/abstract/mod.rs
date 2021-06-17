@@ -159,6 +159,8 @@ pub type AbstractResult<T> = Result<T, AbstractError>;
 pub struct Abstract {
     pub ranks: RankVec<ElementList>,
     name: Name<Abs>,
+
+    sorted: bool,
 }
 
 impl Default for Abstract {
@@ -177,7 +179,11 @@ impl From<RankVec<ElementList>> for Abstract {
             Name::Nullitope
         };
 
-        Self { ranks, name }
+        Self {
+            ranks,
+            name,
+            sorted: false,
+        }
     }
 }
 
@@ -279,11 +285,17 @@ impl Abstract {
     /// Sorts the subelements and superelements of the entire polytope. This is
     /// usually called before iterating over the flags of the polytope.
     pub fn sort(&mut self) {
+        if self.sorted {
+            return;
+        }
+
         for elements in self.ranks.iter_mut() {
             for el in elements.iter_mut() {
                 el.sort();
             }
         }
+
+        self.sorted = true;
     }
 
     /// Returns a reference to an element of the polytope. To actually get the
@@ -905,6 +917,7 @@ impl Polytope<Abs> for Abstract {
         Self {
             ranks: vec![ElementList::min(0)].into(),
             name: Name::Nullitope,
+            sorted: true,
         }
     }
 
@@ -915,6 +928,7 @@ impl Polytope<Abs> for Abstract {
         Self {
             ranks: vec![ElementList::min(1), ElementList::max(1)].into(),
             name: Name::Point,
+            sorted: true,
         }
     }
 
@@ -928,7 +942,9 @@ impl Polytope<Abs> for Abstract {
         abs.push_vertices(2);
         abs.push_max();
 
-        abs.build().with_name(Name::Dyad)
+        let mut abs = abs.build().with_name(Name::Dyad);
+        abs.sorted = true;
+        abs
     }
 
     /// Returns an instance of a [polygon](https://polytope.miraheze.org/wiki/Polygon)
@@ -938,9 +954,11 @@ impl Polytope<Abs> for Abstract {
 
         let mut edges = SubelementList::with_capacity(n);
 
-        for i in 0..n {
-            edges.push(Subelements(vec![i % n, (i + 1) % n]));
+        // We add the edges with their indices sorted.
+        for i in 0..(n - 1) {
+            edges.push(Subelements(vec![i, (i + 1)]));
         }
+        edges.push(Subelements(vec![0, n - 1]));
 
         let mut poly = AbstractBuilder::with_capacity(Rank::new(2));
 
@@ -949,7 +967,9 @@ impl Polytope<Abs> for Abstract {
         poly.push(edges);
         poly.push_max();
 
-        poly.build().with_name(Name::polygon(Default::default(), n))
+        let mut poly = poly.build().with_name(Name::polygon(Default::default(), n));
+        poly.sorted = true;
+        poly
     }
 
     /// Converts a polytope into its dual. Use [`Self::dual`] instead, as this method
