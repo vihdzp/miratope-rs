@@ -787,7 +787,7 @@ impl SelectedLanguage {
         }
     }
 
-    pub fn to_string(&self) -> &str {
+    pub fn to_string(self) -> &'static str {
         match self {
             Self::En => "English",
             Self::Es => "Spanish",
