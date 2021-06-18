@@ -7,12 +7,12 @@ use std::{
 };
 
 use super::config::LibPath;
-use crate::{
+use miratope_core::{
     lang::{
         name::{Con, Name},
         SelectedLanguage,
     },
-    polytope::{concrete::Concrete, r#abstract::rank::Rank, Polytope},
+    concrete::Concrete, r#abstract::rank::Rank, Polytope,
 };
 
 use bevy::prelude::*;

@@ -1,0 +1,30 @@
+[package]
+name = "miratope-core"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+approx = "0.5"
+dyn-clone = "1.0"
+factorial = "0.2"
+gcd = "2.0"
+itertools = "0.10"
+nalgebra = { git = "https://github.com/dimforge/nalgebra", branch = "dev", version = "0.27", features = [
+    "serde-serialize"
+] }
+ordered-float = "2.4"
+petgraph = "0.5"
+rand = "0.8"
+rayon = "1.5"
+ron = "0.6"
+serde = { version = "1.0", features = ["derive"] }
+strum = "0.21"
+strum_macros = "0.21"
+xml-rs = "0.8"
+zip = "0.5"
+
+# Bevy egui integration with this latest version.
+[dependencies.bevy_egui]
+git = "https://github.com/jakobhellermann/bevy_egui"
+branch = "bevy-main"
+optional = true

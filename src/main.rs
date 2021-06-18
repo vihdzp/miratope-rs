@@ -60,57 +60,18 @@ use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::EguiPlugin;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
-use polytope::concrete::Concrete;
+use miratope_core::concrete::Concrete;
 use ui::{
     camera::{CameraInputEvent, ProjectionType},
     MiratopePlugins,
 };
 
-mod geometry;
-mod lang;
+pub mod mesh;
 mod no_cull_pipeline;
-mod polytope;
 mod ui;
-pub mod vec_like;
-
-/// The link to the [Polytope Wiki](https://polytope.miraheze.org/wiki/).
-const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
 
 /// The link to the GitHub issues.
 const NEW_ISSUE: &str = "https://github.com/OfficialURL/miratope-rs/issues/new";
-
-/// A trait containing the constants associated to each floating point type.
-trait Consts {
-    type T;
-    const EPS: Self::T;
-    const PI: Self::T;
-    const TAU: Self::T;
-    const SQRT_2: Self::T;
-}
-
-/// Constants for `f32`.
-impl Consts for f32 {
-    type T = f32;
-    const EPS: f32 = 1e-5;
-    const PI: f32 = std::f32::consts::PI;
-    const TAU: f32 = std::f32::consts::TAU;
-    const SQRT_2: f32 = std::f32::consts::SQRT_2;
-}
-
-/// Constants for `f64`.
-impl Consts for f64 {
-    type T = f64;
-    const EPS: f64 = 1e-9;
-    const PI: f64 = std::f64::consts::PI;
-    const TAU: f64 = std::f64::consts::TAU;
-    const SQRT_2: f64 = std::f64::consts::SQRT_2;
-}
-
-/// The floating point type used for all calculations.
-type Float = f64;
-
-/// A wrapper around [`Float`] to allow for ordering and equality.
-type FloatOrd = ordered_float::OrderedFloat<Float>;
 
 /// Loads all of the necessary systems for the application to run.
 fn main() {
@@ -168,14 +129,14 @@ fn setup(
         .spawn()
         // Mesh
         .insert_bundle(PbrNoBackfaceBundle {
-            mesh: meshes.add(poly.mesh(ProjectionType::Perspective)),
+            mesh: meshes.add(mesh::mesh(&poly, ProjectionType::Perspective)),
             material: mesh_material,
             ..Default::default()
         })
         // Wireframe
         .with_children(|cb| {
             cb.spawn().insert_bundle(PbrNoBackfaceBundle {
-                mesh: meshes.add(poly.wireframe(ProjectionType::Perspective)),
+                mesh: meshes.add(mesh::wireframe(&poly, ProjectionType::Perspective)),
                 material: wf_material,
                 ..Default::default()
             });

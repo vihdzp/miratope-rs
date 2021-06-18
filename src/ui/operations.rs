@@ -6,9 +6,9 @@
 use std::marker::PhantomData;
 
 use super::{memory::Memory, PointWidget};
-use crate::{
+use miratope_core::{
     geometry::{Hypersphere, Point},
-    polytope::{concrete::Concrete, Polytope},
+    concrete::Concrete, Polytope,
     Float,
 };
 
@@ -315,7 +315,7 @@ pub trait DuoWindow: Window {
     fn build(&mut self, _: &mut Ui, _: &Concrete, _: &Res<Memory>) {}
 
     fn build_dropdowns(&mut self, ui: &mut Ui, polytope: &Concrete, memory: &Res<Memory>) {
-        use crate::lang::{En, Language};
+        use miratope_core::lang::{En, Language};
 
         const SELECT: &str = "Select";
 

@@ -455,13 +455,9 @@ impl Iterator for GenIter {
 }
 
 /// Determines whether two matrices are "approximately equal" elementwise.
+#[cfg(test)]
 fn matrix_approx(mat1: &Matrix, mat2: &Matrix) -> bool {
-    let mat1 = mat1.iter();
-    let mut mat2 = mat2.iter();
-
-    for x in mat1 {
-        let y = mat2.next().expect("Matrices don't have the same size!");
-
+    for (x, y) in mat1.iter().zip(mat2.iter()) {
         if abs_diff_ne!(x, y, epsilon = Float::EPS) {
             return false;
         }

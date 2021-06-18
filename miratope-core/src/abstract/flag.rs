@@ -13,7 +13,7 @@ use std::{
 };
 
 use super::{elements::ElementRef, rank::Rank, Abstract};
-use crate::{impl_veclike, polytope::Polytope, vec_like::VecLike, Float};
+use crate::{impl_veclike, Polytope, vec_like::VecLike, Float};
 
 /// A [flag](https://polytope.miraheze.org/wiki/Flag) in a polytope. Stores the
 /// indices of the elements of each rank, excluding the minimal and maximal
@@ -680,7 +680,7 @@ impl FlagSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::polytope::Polytope;
+    use crate::Polytope;
 
     /// Tests that a polytope has an expected number of flags, oriented or not.
     fn test(polytope: &mut Abstract, expected: usize) {

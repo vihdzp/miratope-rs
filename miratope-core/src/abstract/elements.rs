@@ -8,7 +8,7 @@ use super::{
     rank::{Rank, RankVec},
     Abstract,
 };
-use crate::polytope::Polytope;
+use crate::Polytope;
 
 /// A bundled rank and index, which can be used to refer to an element in an
 /// abstract polytope.

@@ -1229,7 +1229,7 @@ impl std::ops::IndexMut<Rank> for Abstract {
 impl IntoIterator for Abstract {
     type Item = ElementList;
 
-    type IntoIter = crate::polytope::r#abstract::rank::IntoIter<ElementList>;
+    type IntoIter = crate::r#abstract::rank::IntoIter<ElementList>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.ranks.rank_into_iter()

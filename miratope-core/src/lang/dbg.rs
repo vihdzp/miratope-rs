@@ -4,7 +4,7 @@ use super::{
     name::{Name, NameType},
     Language, Options, Prefix,
 };
-use crate::polytope::r#abstract::rank::Rank;
+use crate::r#abstract::rank::Rank;
 
 pub struct Dbg;
 

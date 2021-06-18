@@ -66,12 +66,6 @@ impl CycleBuilder {
         self.0.len()
     }
 
-    /// Returns a reference to the edge associated to a vertex, or `None` if it
-    /// doesn't exist.
-    fn get(&self, idx: usize) -> Option<&Pair<usize>> {
-        self.0.get(&idx)
-    }
-
     fn iter(&self) -> std::collections::hash_map::Iter<usize, Pair<usize>> {
         self.0.iter()
     }

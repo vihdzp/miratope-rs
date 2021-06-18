@@ -4,7 +4,10 @@
 
 pub mod r#abstract;
 pub mod concrete;
+pub mod geometry;
 pub mod group;
+pub mod lang;
+pub mod vec_like;
 
 use std::iter;
 
@@ -17,7 +20,6 @@ use self::r#abstract::{
 use crate::{
     geometry::Point,
     lang::{
-        self,
         name::{Name, NameData, NameType, Regular},
         Language,
     },
@@ -31,6 +33,42 @@ const ELEMENT_NAMES: [&str; 11] = [
 
 /// The word "Components".
 const COMPONENTS: &str = "Components";
+
+/// The link to the [Polytope Wiki](https://polytope.miraheze.org/wiki/).
+pub const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
+
+/// A trait containing the constants associated to each floating point type.
+pub trait Consts {
+    type T;
+    const EPS: Self::T;
+    const PI: Self::T;
+    const TAU: Self::T;
+    const SQRT_2: Self::T;
+}
+
+/// Constants for `f32`.
+impl Consts for f32 {
+    type T = f32;
+    const EPS: f32 = 1e-5;
+    const PI: f32 = std::f32::consts::PI;
+    const TAU: f32 = std::f32::consts::TAU;
+    const SQRT_2: f32 = std::f32::consts::SQRT_2;
+}
+
+/// Constants for `f64`.
+impl Consts for f64 {
+    type T = f64;
+    const EPS: f64 = 1e-9;
+    const PI: f64 = std::f64::consts::PI;
+    const TAU: f64 = std::f64::consts::TAU;
+    const SQRT_2: f64 = std::f64::consts::SQRT_2;
+}
+
+/// The floating point type used for all calculations.
+pub type Float = f64;
+
+/// A wrapper around [`Float`] to allow for ordering and equality.
+pub type FloatOrd = ordered_float::OrderedFloat<Float>;
 
 /// The result of taking a dual: can either be a success value of `T`, or the
 /// index of a facet through the inversion center.

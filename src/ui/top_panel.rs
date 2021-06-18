@@ -2,19 +2,18 @@
 
 use std::{marker::PhantomData, path::PathBuf};
 
-use super::{camera::ProjectionType, memory::Memory};
-use crate::{
-    geometry::{Hyperplane, Point, Vector},
-    lang::SelectedLanguage,
-    polytope::{concrete::Concrete, Polytope},
-    ui::{operations::*, UnitPointWidget},
-    Float,
-};
+use super::{camera::ProjectionType, memory::Memory, operations::*, UnitPointWidget};
 
 use bevy::prelude::*;
 use bevy_egui::{
     egui::{self, menu, Ui},
     EguiContext,
+};
+use miratope_core::{
+    concrete::Concrete,
+    geometry::{Hyperplane, Point, Vector},
+    lang::SelectedLanguage,
+    Float, Polytope,
 };
 use rfd::FileDialog;
 use strum::IntoEnumIterator;
@@ -554,7 +553,7 @@ pub fn show_top_panel(
             menu::menu(ui, "Wiki", |ui| {
                 // Goes to the wiki main page.
                 if ui.button("Main Page").clicked() {
-                    if let Err(err) = webbrowser::open(crate::WIKI_LINK) {
+                    if let Err(err) = webbrowser::open(miratope_core::WIKI_LINK) {
                         eprintln!("Website opening failed: {}", err);
                     }
                 }

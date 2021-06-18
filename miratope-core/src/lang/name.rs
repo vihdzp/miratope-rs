@@ -2,7 +2,7 @@
 
 use std::{fmt::Debug, marker::PhantomData};
 
-use crate::{geometry::Point, polytope::r#abstract::rank::Rank, Consts, Float};
+use crate::{geometry::Point, r#abstract::rank::Rank, Consts, Float};
 
 use serde::{Deserialize, Serialize};
 

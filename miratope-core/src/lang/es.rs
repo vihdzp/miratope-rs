@@ -3,7 +3,7 @@ use crate::{
         name::{Name, NameType},
         Gender,
     },
-    polytope::r#abstract::rank::Rank,
+    r#abstract::rank::Rank,
 };
 
 use super::{GreekPrefix, Language, Options, Position, Prefix};

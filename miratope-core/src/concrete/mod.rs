@@ -1,7 +1,6 @@
 pub mod cycle;
 pub mod element_types;
 pub mod file;
-pub mod mesh;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -1119,7 +1118,7 @@ mod tests {
     use super::Concrete;
     use crate::{
         lang::{En, Language},
-        polytope::{r#abstract::rank::Rank, Polytope},
+        r#abstract::rank::Rank, Polytope,
         Consts, Float,
     };
 

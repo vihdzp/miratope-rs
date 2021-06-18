@@ -81,7 +81,7 @@ pub use pii::Pii;
 
 use crate::{
     lang::name::{Name, NameData, NameType},
-    polytope::r#abstract::rank::Rank,
+    r#abstract::rank::Rank,
 };
 
 use serde::{Deserialize, Serialize};

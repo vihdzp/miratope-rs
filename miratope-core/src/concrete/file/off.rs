@@ -3,14 +3,14 @@ use std::{collections::HashMap, fs, path::Path, str::FromStr};
 use super::IoResult;
 use crate::{
     lang::name::{Con, Name},
-    polytope::{
+  
         concrete::{Concrete, ElementList, Point, Polytope, RankVec, Subelements},
         r#abstract::{
             elements::{AbstractBuilder, SubelementList},
             rank::Rank,
         },
         COMPONENTS, ELEMENT_NAMES,
-    },
+    
     vec_like::VecLike,
 };
 
