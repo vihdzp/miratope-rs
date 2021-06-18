@@ -8,11 +8,13 @@ use std::{
 
 use super::config::LibPath;
 use miratope_core::{
+    concrete::Concrete,
     lang::{
         name::{Con, Name},
         SelectedLanguage,
     },
-    concrete::Concrete, r#abstract::rank::Rank, Polytope,
+    r#abstract::rank::Rank,
+    Polytope,
 };
 
 use bevy::prelude::*;

@@ -3,9 +3,8 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::{
-    concrete::Concrete, r#abstract::rank::Rank, Polytope,
-    vec_like::VecLike,
-    Consts, Float, FloatOrd,
+    concrete::Concrete, r#abstract::rank::Rank, vec_like::VecLike, Consts, Float, FloatOrd,
+    Polytope,
 };
 
 use approx::abs_diff_eq;

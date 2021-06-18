@@ -293,7 +293,7 @@ impl Language for Es {
 
     /// The name for an orthoplex with a given rank.
     fn orthoplex(rank: Rank, options: Options) -> String {
-        Self::generic(2u32.pow(rank.into_u32()) as usize, rank, options)
+        Self::generic(1 << rank.into_usize(), rank, options)
     }
 
     fn compound<T: NameType>(components: &[(usize, Name<T>)], options: Options) -> String {

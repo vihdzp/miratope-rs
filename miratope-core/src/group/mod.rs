@@ -14,7 +14,7 @@ use crate::{
 };
 use cd::{Cd, CdResult, CoxMatrix};
 
-use approx::{abs_diff_ne, relative_eq};
+use approx::relative_eq;
 use nalgebra::{Dynamic, Quaternion, VecStorage};
 
 /// Converts a 3D rotation matrix into a quaternion. Uses the code from
@@ -280,8 +280,9 @@ impl Group {
         }
     }
 
-    /// Generates a Coxeter group from its [`CdMatrix`], or returns `None` if
-    /// the group doesn't fit as a matrix group in spherical space.
+    /// Generates a Coxeter group from its [`CdMatrix`](cd::CoxMatrix), or
+    /// returns `None` if the group doesn't fit as a matrix group in spherical
+    /// space.
     pub fn cox_group(cox: CoxMatrix) -> Option<Self> {
         Some(Self::new(cox.dim(), GenIter::from_cox(cox)?))
     }
@@ -452,18 +453,6 @@ impl Iterator for GenIter {
             };
         }
     }
-}
-
-/// Determines whether two matrices are "approximately equal" elementwise.
-#[cfg(test)]
-fn matrix_approx(mat1: &Matrix, mat2: &Matrix) -> bool {
-    for (x, y) in mat1.iter().zip(mat2.iter()) {
-        if abs_diff_ne!(x, y, epsilon = Float::EPS) {
-            return false;
-        }
-    }
-
-    true
 }
 
 /// Builds a reflection matrix from a given vector.

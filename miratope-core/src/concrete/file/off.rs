@@ -2,16 +2,14 @@ use std::{collections::HashMap, fs, path::Path, str::FromStr};
 
 use super::IoResult;
 use crate::{
+    concrete::{Concrete, ElementList, Point, Polytope, RankVec, Subelements},
     lang::name::{Con, Name},
-  
-        concrete::{Concrete, ElementList, Point, Polytope, RankVec, Subelements},
-        r#abstract::{
-            elements::{AbstractBuilder, SubelementList},
-            rank::Rank,
-        },
-        COMPONENTS, ELEMENT_NAMES,
-    
+    r#abstract::{
+        elements::{AbstractBuilder, SubelementList},
+        rank::Rank,
+    },
     vec_like::VecLike,
+    COMPONENTS, ELEMENT_NAMES,
 };
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};

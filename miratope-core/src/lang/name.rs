@@ -363,7 +363,7 @@ impl<T: NameType> Name<T> {
                 rank: _,
             } => *n,
             Name::Simplex { regular: _, rank } => rank.plus_one_usize(),
-            Name::Hyperblock { regular: _, rank } => 2u32.pow(rank.into_u32()) as usize,
+            Name::Hyperblock { regular: _, rank } => 1 << rank.into_usize(),
             Name::Orthoplex { regular: _, rank } => rank.into_usize() * 2,
 
             // Modifiers:
@@ -434,7 +434,7 @@ impl<T: NameType> Name<T> {
             } => *n,
             Name::Simplex { regular: _, rank } => rank.plus_one_usize(),
             Name::Hyperblock { regular: _, rank } => rank.into_usize() * 2,
-            Name::Orthoplex { regular: _, rank } => 2u32.pow(rank.into_u32()) as usize,
+            Name::Orthoplex { regular: _, rank } => 1 << rank.into_usize(),
 
             // Modifiers:
             Name::Pyramid(base) => base.facet_count() + 1,

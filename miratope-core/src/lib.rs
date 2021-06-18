@@ -87,6 +87,14 @@ impl std::fmt::Display for DualError {
 
 impl std::error::Error for DualError {}
 
+fn factorial(n: usize) -> u32 {
+    const FACTORIALS: [u32; 13] = [
+        1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600,
+    ];
+
+    FACTORIALS[n]
+}
+
 /// The trait for methods common to all polytopes.
 pub trait Polytope<T: NameType>: Sized + Clone {
     /// Returns a reference to the underlying abstract polytope.

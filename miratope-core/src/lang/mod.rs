@@ -35,6 +35,7 @@
 //! and uses the corresponding methods to parse and combine each of its parts:
 //!
 //! ```
+//! # use name::Name; use lang::En;
 //! assert_eq!(En::parse(pecube, Options {
 //!     adjective: false,
 //!     count: 1,
@@ -79,10 +80,8 @@ pub use fr::Fr;
 pub use ja::Ja;
 pub use pii::Pii;
 
-use crate::{
-    lang::name::{Name, NameData, NameType},
-    r#abstract::rank::Rank,
-};
+use crate::r#abstract::rank::Rank;
+use name::{Name, NameData, NameType};
 
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
@@ -673,7 +672,7 @@ pub trait Language: Prefix {
 
     /// The name for an orthoplex with a given rank.
     fn orthoplex(rank: Rank, options: Options) -> String {
-        Self::generic(2u32.pow(rank.into_u32()) as usize, rank, options)
+        Self::generic(1 << rank.into_usize(), rank, options)
     }
 
     fn great(_options: Options) -> String {

@@ -13,7 +13,7 @@ use std::{
 };
 
 use super::{elements::ElementRef, rank::Rank, Abstract};
-use crate::{impl_veclike, Polytope, vec_like::VecLike, Float};
+use crate::{impl_veclike, vec_like::VecLike, Float, Polytope};
 
 /// A [flag](https://polytope.miraheze.org/wiki/Flag) in a polytope. Stores the
 /// indices of the elements of each rank, excluding the minimal and maximal
@@ -724,33 +724,30 @@ mod tests {
 
     #[test]
     fn simplex() {
-        use factorial::Factorial;
-
         for n in 0..=7 {
-            test(&mut Abstract::simplex(Rank::from(n)), (n + 1).factorial());
+            test(
+                &mut Abstract::simplex(Rank::from(n)),
+                crate::factorial(n + 1) as usize,
+            );
         }
     }
 
     #[test]
     fn hypercube() {
-        use factorial::Factorial;
-
         for n in 0..=7 {
             test(
                 &mut Abstract::hypercube(Rank::new(n as isize)),
-                (2u32.pow(n as u32) as usize) * n.factorial(),
+                (1 << n) * crate::factorial(n) as usize,
             );
         }
     }
 
     #[test]
     fn orthoplex() {
-        use factorial::Factorial;
-
         for n in 0..=7 {
             test(
                 &mut Abstract::orthoplex(Rank::new(n as isize)),
-                (2u32.pow(n as u32) as usize) * n.factorial(),
+                (1 << n) * crate::factorial(n) as usize,
             );
         }
     }

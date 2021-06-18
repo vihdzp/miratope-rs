@@ -415,7 +415,7 @@ impl EdgeRef {
 ///
 /// * A single integer, like `3` or `15`.
 /// * Two integers separated by a backslash, like `5/2` or `7/3`.
-struct CdBuilder<'a> {
+pub struct CdBuilder<'a> {
     /// The Coxeter diagram in inline ASCII notation.
     diagram: &'a str,
 
@@ -425,7 +425,7 @@ struct CdBuilder<'a> {
 
     /// Represents the Coxeter diagram itself. However, we don't add any edges
     /// to it until the very last step. These are provisionally stored in
-    /// [`edge_queue`] instead.
+    /// [`Self::edge_queue`] instead.
     cd: Cd,
 
     /// A provisional queue in which the [`EdgeRef`]s are stored up and until
@@ -693,7 +693,7 @@ impl<'a> CdBuilder<'a> {
 /// for certain polytopes called [Wythoffians](https://polytope.miraheze.org/wiki/Wythoffian),
 /// and as a representation for certain symmetry groups called
 /// [Coxeter groups](https://polytope.miraheze.org/wiki/Coxeter_group). In code,
-/// these correspond to [`Concrete::truncate`] and [`Group::cox_group`],
+/// these correspond to `Concrete::truncate` (WIP) and [`Group::cox_group`](super::Group::cox_group),
 /// respectively.
 ///
 /// Each [`Node`] a Coxeter diagram represents a mirror (or hyperplane) in

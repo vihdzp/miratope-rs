@@ -1426,8 +1426,7 @@ mod tests {
 
             element_counts.push(1);
             for k in Rank::range_inclusive_iter(Rank::new(0), n) {
-                element_counts
-                    .push(choose(n.into(), k.into()) * 2u32.pow((n - k).into_u32()) as usize);
+                element_counts.push(choose(n.into(), k.into()) * (1 << (n - k).into_usize()));
             }
 
             test(&hypercube, element_counts);
@@ -1442,7 +1441,7 @@ mod tests {
             let mut element_counts = Vec::with_capacity(n.plus_one_usize());
 
             for k in Rank::range_inclusive_iter(0, n) {
-                element_counts.push(choose(n.into(), (n - k).into()) * 2u32.pow(k.into()) as usize);
+                element_counts.push(choose(n.into(), (n - k).into()) * (1 << k.into_usize()));
             }
             element_counts.push(1);
 

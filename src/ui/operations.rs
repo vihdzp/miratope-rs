@@ -7,9 +7,9 @@ use std::marker::PhantomData;
 
 use super::{memory::Memory, PointWidget};
 use miratope_core::{
+    concrete::Concrete,
     geometry::{Hypersphere, Point},
-    concrete::Concrete, Polytope,
-    Float,
+    Float, Polytope,
 };
 
 use bevy::prelude::*;

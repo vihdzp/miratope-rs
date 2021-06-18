@@ -581,8 +581,6 @@ impl Concrete {
     /// Computes the volume of a polytope by adding up the contributions of all
     /// flags. Returns `None` if the volume is undefined.
     pub fn volume(&mut self) -> Option<Float> {
-        use factorial::Factorial;
-
         let rank = self.rank();
 
         // We leave the nullitope's volume undefined.
@@ -677,7 +675,7 @@ impl Concrete {
             }
         }
 
-        Some(volume / rank_usize.factorial() as Float)
+        Some(volume / crate::factorial(rank_usize) as Float)
     }
 
     pub fn flat_vertices(&self) -> Option<Vec<Point>> {
@@ -1118,12 +1116,11 @@ mod tests {
     use super::Concrete;
     use crate::{
         lang::{En, Language},
-        r#abstract::rank::Rank, Polytope,
-        Consts, Float,
+        r#abstract::rank::Rank,
+        Consts, Float, Polytope,
     };
 
     use approx::abs_diff_eq;
-    use factorial::Factorial;
 
     /// Tests that a polytope has an expected volume.
     fn test(poly: &mut Concrete, volume: Option<Float>) {
@@ -1265,12 +1262,12 @@ mod tests {
 
     #[test]
     fn simplex() {
-        for n in 0u32..=5 {
+        for n in 0..=5 {
             test(
                 &mut Concrete::simplex(Rank::from(n)),
                 Some(
-                    ((n + 1) as Float / 2u32.pow(n as u32) as Float).sqrt()
-                        / n.factorial() as Float,
+                    ((n + 1) as Float / (1 << n) as Float).sqrt()
+                        / crate::factorial(n as usize) as Float,
                 ),
             );
         }
@@ -1285,10 +1282,10 @@ mod tests {
 
     #[test]
     fn orthoplex() {
-        for n in 0u32..=5 {
+        for n in 0..=5 {
             test(
                 &mut Concrete::orthoplex(Rank::from(n)),
-                Some(1.0 / n.factorial() as Float),
+                Some(1.0 / crate::factorial(n) as Float),
             );
         }
     }

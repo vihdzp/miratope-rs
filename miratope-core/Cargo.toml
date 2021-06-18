@@ -6,7 +6,6 @@ edition = "2018"
 [dependencies]
 approx = "0.5"
 dyn-clone = "1.0"
-factorial = "0.2"
 gcd = "2.0"
 itertools = "0.10"
 nalgebra = { git = "https://github.com/dimforge/nalgebra", branch = "dev", version = "0.27", features = [
