@@ -56,7 +56,7 @@
 
 use polytope::concrete::Concrete;
 use ui::{
-    camera::{CameraInputEvent, PerspectiveCameraBundle7, ProjectionType, RotDirections},
+    camera::{CameraInputEvent, PerspectiveCameraBundle7, RotDirections},
     MiratopePlugins,
 };
 
@@ -169,14 +169,14 @@ fn setup(
         .spawn()
         // Mesh
         .insert_bundle(PbrNoBackfaceBundle {
-            mesh: meshes.add(poly.mesh(ProjectionType::Perspective)),
+            mesh: meshes.add(poly.mesh()),
             material: mesh_material,
             ..Default::default()
         })
         // Wireframe
         .with_children(|cb| {
             cb.spawn().insert_bundle(PbrNoBackfaceBundle {
-                mesh: meshes.add(poly.wireframe(ProjectionType::Perspective)),
+                mesh: meshes.add(poly.wireframe()),
                 material: wf_material,
                 ..Default::default()
             });

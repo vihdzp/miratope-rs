@@ -12,7 +12,6 @@ use crate::{
         r#abstract::{elements::ElementList, rank::Rank},
         Polytope,
     },
-    ui::camera::ProjectionType,
     vec_like::VecLike,
     Consts, Float,
 };
@@ -251,11 +250,7 @@ fn split7<T: Copy>(x: [T; 7]) -> ([T; 3], [T; 4]) {
 
 impl Concrete {
     /// Gets the coordinates of the vertices, after projecting down into 3D.
-    fn vertex_coords<'a, T: Iterator<Item = &'a Point>>(
-        &self,
-        vertices: T,
-        _projection_type: ProjectionType,
-    ) -> Vec<[f32; 7]> {
+    fn vertex_coords<'a, T: Iterator<Item = &'a Point>>(&self, vertices: T) -> Vec<[f32; 7]> {
         vertices
             .map(|point| {
                 let mut coords: [f32; 7] = Default::default();
@@ -270,7 +265,7 @@ impl Concrete {
     }
 
     /// Builds the mesh of a polytope.
-    pub fn mesh(&self, projection_type: ProjectionType) -> Mesh {
+    pub fn mesh(&self) -> Mesh {
         // If there's no vertices, returns an empty mesh.
         if self.vertex_count() == 0 {
             return empty_mesh();
@@ -283,7 +278,6 @@ impl Concrete {
             self.vertices
                 .iter()
                 .chain(triangulation.extra_vertices.iter()),
-            projection_type,
         );
 
         // Builds the actual mesh.
@@ -303,7 +297,7 @@ impl Concrete {
     }
 
     /// Builds the wireframe of a polytope.
-    pub fn wireframe(&self, projection_type: ProjectionType) -> Mesh {
+    pub fn wireframe(&self) -> Mesh {
         let vertex_count = self.vertex_count();
 
         // If there's no vertices, returns an empty mesh.
@@ -315,7 +309,7 @@ impl Concrete {
         let edge_count = self.el_count(Rank::new(1));
 
         // We add a single vertex so that Miratope doesn't crash.
-        let vertices = self.vertex_coords(self.vertices.iter(), projection_type);
+        let vertices = self.vertex_coords(self.vertices.iter());
         let mut indices = Vec::with_capacity(edge_count * 2);
 
         // Adds the edges to the wireframe.

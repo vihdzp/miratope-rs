@@ -17,7 +17,6 @@ pub struct InputPlugin;
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_event::<CameraInputEvent>()
-            .insert_resource(ProjectionType::Perspective)
             // We register inputs after the library has been shown, so that we
             // know whether mouse input should register.
             .add_system(add_cam_input_events.system().after("show_library"))
@@ -25,36 +24,10 @@ impl Plugin for InputPlugin {
     }
 }
 
-#[derive(Clone, Copy)]
-pub enum ProjectionType {
-    /// We're projecting orthogonally.
-    Orthogonal,
-
-    /// We're projecting from a point.
-    Perspective,
-}
-
-impl ProjectionType {
-    /// Flips the projection type.
-    pub fn flip(&mut self) {
-        match self {
-            Self::Orthogonal => *self = Self::Perspective,
-            Self::Perspective => *self = Self::Orthogonal,
-        }
-    }
-
-    /// Returns whether the projection type is `Orthogonal`.
-    pub fn is_orthogonal(&self) -> bool {
-        match self {
-            Self::Orthogonal => true,
-            Self::Perspective => false,
-        }
-    }
-}
-
-/// Component bundle for camera entities with perspective projection
+/// Component bundle for camera entities with perspective projection. (We'll add
+/// some way to change the projection type in the future).
 ///
-/// Use this for 3D rendering.
+/// Use this for 7D rendering.
 #[derive(Bundle)]
 pub struct PerspectiveCameraBundle7 {
     pub camera: Camera,
@@ -64,11 +37,13 @@ pub struct PerspectiveCameraBundle7 {
     pub global_transform: GlobalTransform7,
 }
 
+const CAMERA_7D: &str = "Camera7d";
+
 impl Default for PerspectiveCameraBundle7 {
     fn default() -> Self {
         Self {
             camera: Camera {
-                name: Some("Camera7d".to_string()),
+                name: Some(CAMERA_7D.to_string()),
                 ..Default::default()
             },
             perspective_projection: Default::default(),
@@ -79,7 +54,8 @@ impl Default for PerspectiveCameraBundle7 {
     }
 }
 
-/// An input event for the camera.
+/// Represents the effect of any of the possible user inputs that change the
+/// camera and/or anchor.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CameraInputEvent {
     /// Rotate the camera about the anchor.

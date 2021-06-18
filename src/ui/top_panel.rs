@@ -2,7 +2,7 @@
 
 use std::{marker::PhantomData, path::PathBuf};
 
-use super::{camera::ProjectionType, memory::Memory};
+use super::memory::Memory;
 use crate::{
     geometry::{Hyperplane, Point, Vector},
     lang::SelectedLanguage,
@@ -231,7 +231,6 @@ pub fn show_top_panel(
     mut section_state: ResMut<SectionState>,
     mut section_direction: ResMut<SectionDirection>,
     mut file_dialog_state: ResMut<FileDialogState>,
-    mut projection_type: ResMut<ProjectionType>,
     mut memory: ResMut<Memory>,
     mut background_color: ResMut<ClearColor>,
     mut selected_language: ResMut<SelectedLanguage>,
@@ -277,7 +276,7 @@ pub fn show_top_panel(
             });
 
             // Configures the view.
-            menu::menu(ui, "View", |ui| {
+            /* menu::menu(ui, "View", |ui| {
                 let mut checked = projection_type.is_orthogonal();
 
                 if ui.checkbox(&mut checked, "Orthogonal projection").clicked() {
@@ -288,7 +287,7 @@ pub fn show_top_panel(
                         p.set_changed();
                     }
                 }
-            });
+            }); */
 
             // Anything related to the polytope on screen.
             menu::menu(ui, "Polytope", |ui| {

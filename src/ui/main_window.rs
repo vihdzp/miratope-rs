@@ -5,7 +5,7 @@ use crate::{
     polytope::{concrete::Concrete, Polytope},
 };
 
-use super::{camera::ProjectionType, top_panel::SectionState};
+use super::top_panel::SectionState;
 
 use bevy::prelude::*;
 use bevy_egui::EguiSettings;
@@ -59,7 +59,6 @@ pub fn update_changed_polytopes(
     mut windows: ResMut<Windows>,
     mut section_state: ResMut<SectionState>,
     selected_language: Res<SelectedLanguage>,
-    orthogonal: Res<ProjectionType>,
 ) {
     for (poly, mesh_handle, children) in polies.iter() {
         if cfg!(debug_assertions) {
@@ -67,7 +66,7 @@ pub fn update_changed_polytopes(
             poly.abs.is_valid().unwrap();
         }
 
-        *meshes.get_mut(mesh_handle).unwrap() = poly.mesh(*orthogonal);
+        *meshes.get_mut(mesh_handle).unwrap() = poly.mesh();
 
         // Sets the window's name to the polytope's name.
         windows
@@ -78,7 +77,7 @@ pub fn update_changed_polytopes(
         // Updates all wireframes.
         for child in children.iter() {
             if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {
-                *meshes.get_mut(wf_handle).unwrap() = poly.wireframe(*orthogonal);
+                *meshes.get_mut(wf_handle).unwrap() = poly.wireframe();
             }
         }
 
