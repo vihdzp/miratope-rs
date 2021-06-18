@@ -54,24 +54,24 @@
 //! ## Why is the rendering buggy?
 //! Proper rendering, even in 3D, is a work in progress.
 
+use polytope::concrete::Concrete;
+use ui::{
+    camera::{CameraInputEvent, PerspectiveCameraBundle7, ProjectionType, RotDirections},
+    MiratopePlugins,
+};
+
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::EguiPlugin;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
-use polytope::concrete::Concrete;
-use ui::{
-    camera::{CameraInputEvent, ProjectionType},
-    MiratopePlugins,
-};
-
 mod geometry;
 mod lang;
 mod no_cull_pipeline;
 mod polytope;
 mod ui;
-pub mod vec_like;
+mod vec_like;
 
 /// The link to the [Polytope Wiki](https://polytope.miraheze.org/wiki/).
 const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
@@ -117,6 +117,7 @@ fn main() {
     App::build()
         // Adds resources.
         .insert_resource(Msaa { samples: 4 })
+        .insert_resource(RotDirections::default())
         // Adds plugins.
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
@@ -189,7 +190,7 @@ fn setup(
         .insert_bundle((GlobalTransform::default(), cam_anchor))
         .with_children(|cb| {
             // Camera
-            cb.spawn_bundle(PerspectiveCameraBundle {
+            cb.spawn_bundle(PerspectiveCameraBundle7 {
                 transform: cam,
                 perspective_projection: PerspectiveProjection {
                     near: 0.0001,

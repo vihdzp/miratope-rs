@@ -16,6 +16,9 @@ use bevy::{
         texture::TextureFormat,
     },
 };
+use nalgebra::Const;
+
+use crate::ui::camera::RotDirections;
 
 pub const NO_CULL_PIPELINE_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(PipelineDescriptor::TYPE_UUID, 0x7CAE7047DEE79C84);
@@ -101,55 +104,136 @@ impl Default for PbrNoBackfaceBundle {
     }
 }
 
+type Matrix8 = nalgebra::SMatrix<f32, 8, 8>;
+
+/// An 8×8 matrix with homogeneous coordinates.
 type TF7 = nalgebra::Transform<f32, nalgebra::TProjective, 7>;
 
+macro_rules! impl_trans {
+    ($T: tt) => {
+        impl AsRef<TF7> for $T {
+            fn as_ref(&self) -> &TF7 {
+                &self.0
+            }
+        }
+
+        impl AsMut<TF7> for $T {
+            fn as_mut(&mut self) -> &mut TF7 {
+                &mut self.0
+            }
+        }
+
+        impl From<TF7> for $T {
+            fn from(tf: TF7) -> Self {
+                Self(tf)
+            }
+        }
+
+        impl Default for $T {
+            fn default() -> Self {
+                TF7::identity().into()
+            }
+        }
+
+        impl Trans7 for $T {
+            /// Returns a reference to the underlying 8x8 matrix.
+            fn matrix(&self) -> &Matrix8 {
+                self.as_ref().matrix()
+            }
+
+            /// Returns a reference to the underlying 8x8 matrix.
+            fn matrix_mut(&mut self) -> &mut Matrix8 {
+                self.as_mut().matrix_mut_unchecked()
+            }
+        }
+    };
+}
+
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy)]
+/// The analog of [`Transform`] in 7D homogeneous coordinates.
 pub struct Transform7(pub TF7);
-
-impl Default for Transform7 {
-    fn default() -> Self {
-        Transform7(TF7::identity())
-    }
-}
-
-impl AsRef<TF7> for Transform7 {
-    fn as_ref(&self) -> &TF7 {
-        &self.0
-    }
-}
-
-impl AsMut<TF7> for Transform7 {
-    fn as_mut(&mut self) -> &mut TF7 {
-        &mut self.0
-    }
-}
+impl_trans!(Transform7);
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy)]
+/// The analog of [`GlobalTransform`] in 7D homogeneous coordinates.
 pub struct GlobalTransform7(pub TF7);
+impl_trans!(GlobalTransform7);
 
-impl AsRef<TF7> for GlobalTransform7 {
-    fn as_ref(&self) -> &TF7 {
-        &self.0
+pub trait Trans7: From<TF7> + AsRef<TF7> + AsMut<TF7> {
+    /// Returns a reference to the underlying 8x8 matrix.
+    fn matrix(&self) -> &Matrix8;
+
+    /// Returns a reference to the underlying 8x8 matrix.
+    fn matrix_mut(&mut self) -> &mut Matrix8;
+
+    /// Returns a reference to the underlying 7D translation vector.
+    fn translation(
+        &self,
+    ) -> nalgebra::Matrix<
+        f32,
+        Const<1>,
+        Const<7>,
+        nalgebra::SliceStorage<f32, Const<1>, Const<7>, Const<1>, Const<8>>,
+    > {
+        self.matrix().fixed_slice(7, 0)
     }
-}
 
-impl AsMut<TF7> for GlobalTransform7 {
-    fn as_mut(&mut self) -> &mut TF7 {
-        &mut self.0
+    /// Returns a mutable reference to the underlying 7D translation vector.
+    fn translation_mut(
+        &mut self,
+    ) -> nalgebra::Matrix<
+        f32,
+        Const<1>,
+        Const<7>,
+        nalgebra::SliceStorageMut<f32, Const<1>, Const<7>, Const<1>, Const<8>>,
+    > {
+        self.matrix_mut().fixed_slice_mut(7, 0)
     }
-}
 
-impl Default for GlobalTransform7 {
-    fn default() -> Self {
-        GlobalTransform7(TF7::identity())
+    /// Returns a reference to the underlying 7×7 rotation matrix.
+    fn rotation(
+        &self,
+    ) -> nalgebra::Matrix<
+        f32,
+        Const<7>,
+        Const<7>,
+        nalgebra::SliceStorage<f32, Const<7>, Const<7>, Const<1>, Const<8>>,
+    > {
+        self.matrix().fixed_slice(0, 0)
+    }
+
+    fn rotate(&mut self, rhs: Self) {
+        *self.as_mut() *= rhs.as_ref();
+    }
+
+    /// Creates an Euler rotation from a certain pitch and yaw applied to a
+    /// certain set of axes.
+    fn from_euler(directions: RotDirections, x: f32, y: f32) -> Self {
+        let mut mat = TF7::identity();
+        let mat_mut = mat.matrix_mut_unchecked();
+        let rot = nalgebra::Rotation3::from_euler_angles(0.0, x, y);
+
+        for (rot_idx_x, &mat_idx_x) in directions.iter().enumerate() {
+            for (rot_idx_y, &mat_idx_y) in directions.iter().enumerate() {
+                mat_mut[(mat_idx_x, mat_idx_y)] = rot[(rot_idx_x, rot_idx_y)];
+            }
+        }
+
+        mat.into()
     }
 }
 
 impl From<Transform7> for GlobalTransform7 {
     fn from(Transform7(tf): Transform7) -> Self {
         Self(tf)
+    }
+}
+
+impl GlobalTransform7 {
+    pub fn matrix(&self) -> &Matrix8 {
+        self.0.matrix()
     }
 }
 
