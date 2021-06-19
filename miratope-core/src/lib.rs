@@ -1,3 +1,7 @@
+#![warn(clippy::missing_docs_in_private_items)]
+#![warn(clippy::missing_panics_doc)]
+#![warn(missing_docs)]
+
 //! This is the main dependency of
 //! [Miratope](https://github.com/OfficialURL/miratope-rs). It contains all code
 //! to build and name [`Abstract`] and [`Concrete`](conc::Concrete) polytopes
@@ -40,16 +44,24 @@ pub const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
 
 /// A trait containing the constants associated to each floating point type.
 pub trait Consts {
-    type T;
-    const EPS: Self::T;
-    const PI: Self::T;
-    const TAU: Self::T;
-    const SQRT_2: Self::T;
+    /// A default epsilon value. Used in general floating point operations that
+    /// would return zero given infinite precision.
+    const EPS: Self;
+
+    /// Archimedes' constant (π)
+    const PI: Self;
+
+    /// The full circle constant (τ)
+    ///
+    /// Equal to 2π.
+    const TAU: Self;
+
+    /// sqrt(2)
+    const SQRT_2: Self;
 }
 
 /// Constants for `f32`.
 impl Consts for f32 {
-    type T = f32;
     const EPS: f32 = 1e-5;
     const PI: f32 = std::f32::consts::PI;
     const TAU: f32 = std::f32::consts::TAU;
@@ -58,7 +70,6 @@ impl Consts for f32 {
 
 /// Constants for `f64`.
 impl Consts for f64 {
-    type T = f64;
     const EPS: f64 = 1e-9;
     const PI: f64 = std::f64::consts::PI;
     const TAU: f64 = std::f64::consts::TAU;
@@ -108,10 +119,12 @@ pub trait Polytope<T: NameType>:
 
     /// Gets the wiki link to the polytope, based on its English name.
     fn wiki_link(&self) -> String {
+        let name: &Name<_> = self.as_ref();
+
         format!(
             "{}{}",
             crate::WIKI_LINK,
-            lang::En::parse(self.as_ref(), Default::default()).replace(" ", "_")
+            lang::En::parse(name, Default::default()).replace(" ", "_")
         )
     }
 
@@ -198,11 +211,11 @@ pub trait Polytope<T: NameType>:
     /// # Todo
     /// We should make this method take only the `ranks`, so that we can use the
     /// names from the previous polytopes.
-    fn _append(&mut self, p: Self);
+    fn _comp_append(&mut self, p: Self);
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks.
-    fn append(&mut self, p: Self);
+    fn comp_append(&mut self, p: Self);
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
     fn element(&self, el: ElementRef) -> Option<Self>;
@@ -249,7 +262,7 @@ pub trait Polytope<T: NameType>:
     fn compound_iter<U: Iterator<Item = Self>>(mut components: U) -> Self {
         if let Some(mut p) = components.next() {
             for q in components {
-                p._append(q);
+                p._comp_append(q);
             }
 
             // Updates the minimal and maximal elements of the compound.

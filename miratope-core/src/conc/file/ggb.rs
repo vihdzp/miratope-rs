@@ -1,6 +1,8 @@
-use std::io::{self, Error, ErrorKind, Read};
+use std::{
+    fs::File,
+    io::{Read, Result as IoResult},
+};
 
-use super::IoResult;
 use crate::{conc::Concrete, geometry::Point};
 
 use nalgebra::dvector;
@@ -8,7 +10,7 @@ use xml::{
     attribute::OwnedAttribute,
     reader::{EventReader, XmlEvent},
 };
-use zip::read::ZipArchive;
+use zip::result::ZipError;
 
 type Events<'a> = xml::reader::Events<&'a [u8]>;
 
@@ -42,7 +44,7 @@ impl<'a> XmlReader<'a> {
 
     /// Reads an XML file until an XML element with a given name is found.
     /// Returns its attributes.
-    fn read_until(&mut self, search: &str) -> IoResult<Vec<OwnedAttribute>> {
+    fn read_until(&mut self, search: &str) -> GgbResult<Vec<OwnedAttribute>> {
         for xml_result in self.as_mut() {
             match xml_result {
                 // The next XML event to process:
@@ -61,12 +63,12 @@ impl<'a> XmlReader<'a> {
                     }
                 }
                 // Something went wrong while fetching the next XML event.
-                Err(_) => return GgbErrors::InvalidXml.to_err(),
+                Err(_) => return Err(GgbError::InvalidXml),
             }
         }
 
         // We didn't find the element we were looking for.
-        GgbErrors::MissingElement.to_err()
+        Err(GgbError::MissingElement)
     }
 
     /// Reads a point from the GGB file, assuming that we're currently in an XML
@@ -74,7 +76,7 @@ impl<'a> XmlReader<'a> {
     /// ```xml
     /// <element type="point3d" label="A">
     /// ```
-    fn read_point(&mut self, attributes: &[OwnedAttribute]) -> IoResult<Vertex> {
+    fn read_point(&mut self, attributes: &[OwnedAttribute]) -> GgbResult<Vertex> {
         let label = attribute(&attributes, "label").unwrap_or_default();
         let coord_attributes = self.read_until("coords")?;
 
@@ -88,10 +90,10 @@ impl<'a> XmlReader<'a> {
                     if let Ok(c) = c.parse() {
                         $x = c;
                     } else {
-                        return GgbErrors::ParseError.to_err();
+                        return Err(GgbError::ParseError);
                     };
                 } else {
-                    return GgbErrors::MissingAttribute.to_err();
+                    return Err(GgbError::MissingAttribute);
                 }
             };
         }
@@ -113,12 +115,16 @@ impl<'a> XmlReader<'a> {
 }
 
 /// Possible errors while reading a GGB file.
-enum GgbErrors {
+#[derive(Debug)]
+pub enum GgbError {
     /// An attribute of an XML tag wasn't found.
     MissingAttribute,
 
     /// We couldn't find the next <element> tag.
     MissingElement,
+
+    /// An error occured while reading the ZIP file.
+    ZipError(ZipError),
 
     /// The XML file is not valid.
     InvalidXml,
@@ -130,20 +136,28 @@ enum GgbErrors {
     ParseError,
 }
 
-impl GgbErrors {
-    /// Creates a new [`IoResult`] out of this error.
-    pub fn to_err<T>(&self) -> IoResult<T> {
-        use GgbErrors::*;
-
-        Err(match self {
-            MissingAttribute => Error::new(ErrorKind::InvalidData, "Attribute not found."),
-            MissingElement => Error::new(ErrorKind::InvalidData, "Element not found."),
-            InvalidXml => Error::new(ErrorKind::InvalidData, "Invalid XML data."),
-            InvalidGgb => Error::new(ErrorKind::InvalidData, "File is not valid GGB file."),
-            ParseError => Error::new(ErrorKind::InvalidData, "Data could not be parsed."),
-        })
+impl std::fmt::Display for GgbError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingAttribute => write!(f, "missing XML attribute"),
+            Self::MissingElement => write!(f, "missing XML element"),
+            Self::InvalidXml => write!(f, "invalid XML"),
+            Self::InvalidGgb => write!(f, "invalid GGB"),
+            Self::ZipError(err) => write!(f, "ZIP error: {}", err),
+            Self::ParseError => write!(f, "parse error"),
+        }
     }
 }
+
+impl From<ZipError> for GgbError {
+    fn from(zip: ZipError) -> Self {
+        Self::ZipError(zip)
+    }
+}
+
+pub type GgbResult<T> = Result<T, GgbError>;
+
+impl std::error::Error for GgbError {}
 
 enum Element {
     Point3D { label: String },
@@ -188,7 +202,7 @@ fn read_face() -> Face {
 }
 
 /// Parses the `geogebra.xml` file to produce a polytope.
-fn parse_xml(xml: &str) -> IoResult<Concrete> {
+fn parse_xml(xml: &str) -> GgbResult<Concrete> {
     let mut vertices = Vec::new();
     let mut edges = Vec::new();
     let mut xml = XmlReader::new(xml);
@@ -224,9 +238,11 @@ fn parse_xml(xml: &str) -> IoResult<Concrete> {
                         "command" => read_face(&mut xml), */
                     }
                 }
+
                 // Something went wrong while fetching the next XML event.
-                Err(_) => return GgbErrors::InvalidXml.to_err(),
+                Err(_) => return Err(GgbError::InvalidXml),
             },
+
             // The file has finished being read. Time for processing!
             None => todo!(),
         }
@@ -236,16 +252,17 @@ fn parse_xml(xml: &str) -> IoResult<Concrete> {
 impl Concrete {
     /// Attempts to read a GGB file. If succesful, outputs a polytope in at most
     /// 3D.
-    pub fn from_ggb<R: io::Read + io::Seek>(mut zip: ZipArchive<R>) -> IoResult<Self> {
+    pub fn from_ggb(mut file: File) -> GgbResult<Self> {
         if let Ok(xml) = String::from_utf8(
-            zip.by_name("geogebra.xml")?
+            zip::read::ZipArchive::new(&mut file)?
+                .by_name("geogebra.xml")?
                 .bytes()
                 .map(|b| b.unwrap_or(0))
                 .collect(),
         ) {
             parse_xml(&xml)
         } else {
-            GgbErrors::InvalidGgb.to_err()
+            Err(GgbError::InvalidGgb)
         }
     }
 }

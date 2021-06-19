@@ -255,11 +255,11 @@ impl Subspace {
         Point::from_iterator(self.rank(), self.basis.iter().map(|b| p.dot(b)))
     }
 
-    /// Computes a set of independent vectors that span the orthogonal
-    /// complement of the subspace.
-    pub fn orthogonal_comp(&self) -> Vec<Vector> {
+    // Computes a set of independent vectors that span the orthogonal
+    // complement of the subspace.
+    /* pub fn orthogonal_comp(&self) -> Vec<Vector> {
         todo!()
-    }
+    } */
 }
 
 /// Represents an (oriented) hyperplane together with a normal vector.

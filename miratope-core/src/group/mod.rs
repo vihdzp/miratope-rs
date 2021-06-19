@@ -188,6 +188,9 @@ impl Group {
     }
 
     /// Returns the swirl symmetry group of two 3D groups.
+    ///
+    /// # Panics
+    /// Panics if either of its arguments is not a group of 3D matrices.
     pub fn swirl(g: Self, h: Self) -> Self {
         if g.dim != 3 {
             panic!("g must be a group of 3D matrices.");
@@ -216,6 +219,11 @@ impl Group {
 
     /// Returns the exact same group, but now asserts that each generated
     /// element has the appropriate dimension. Used for debugging purposes.
+    ///
+    /// # Panics
+    /// The group returned by this method will cause a panic if any of the
+    /// matrices it generates does not have the same dimension as the group.
+    #[cfg(test)]
     pub fn debug(self) -> Self {
         const MSG: &str = "Size of matrix does not match expected dimension.";
         let dim = self.dim;

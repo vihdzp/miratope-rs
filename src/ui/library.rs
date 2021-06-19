@@ -513,13 +513,9 @@ fn show_library(
                         // Loads a selected file.
                         ShowResult::Load(file) => {
                             if let Some(mut p) = query.iter_mut().next() {
-                                if let Ok(res) = Concrete::from_path(&file) {
-                                    match res {
-                                        Ok(q) => *p = q,
-                                        Err(err) => eprintln!("File read failed: {}", err),
-                                    }
-                                } else {
-                                    eprintln!("File open failed!");
+                                match Concrete::from_path(&file) {
+                                    Ok(q) => *p = q,
+                                    Err(err) => eprintln!("File open failed: {}", err),
                                 }
                             }
                         }

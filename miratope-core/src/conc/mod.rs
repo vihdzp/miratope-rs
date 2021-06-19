@@ -928,16 +928,16 @@ impl Polytope<Con> for Concrete {
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks.
-    fn _append(&mut self, mut p: Self) {
-        self.abs.append(p.abs);
+    fn _comp_append(&mut self, mut p: Self) {
+        self.abs.comp_append(p.abs);
         self.vertices.append(&mut p.vertices);
     }
 
-    fn append(&mut self, p: Self) {
+    fn comp_append(&mut self, p: Self) {
         let name = mem::replace(&mut self.name, Name::Nullitope);
         self.name = Name::compound(vec![(1, name), (1, p.name.clone())]);
 
-        self._append(p);
+        self._comp_append(p);
     }
 
     /// Gets the element with a given rank and index as a polytope, or returns

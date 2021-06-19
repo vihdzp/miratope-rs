@@ -1,6 +1,5 @@
-use std::{collections::HashMap, fs, path::Path, str::FromStr};
+use std::{collections::HashMap, fs, io::Result as IoResult, path::Path, str::FromStr};
 
-use super::IoResult;
 use crate::{
     abs::{
         elements::{AbstractBuilder, SubelementList},
@@ -8,12 +7,11 @@ use crate::{
     },
     conc::{Concrete, ElementList, Point, Polytope, RankVec, Subelements},
     lang::name::{Con, Name},
-    
     COMPONENTS, ELEMENT_NAMES,
 };
 
-use vec_like::VecLike;
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
+use vec_like::VecLike;
 
 /// A position in a file.
 #[derive(Clone, Copy, Default, Debug)]
@@ -61,9 +59,6 @@ pub enum OffError {
 
     /// Didn't find the OFF magic word.
     MagicWord(Position),
-
-    /// The file couldn't be parsed as UTF-8.
-    InvalidFile,
 }
 
 impl std::fmt::Display for OffError {
@@ -74,7 +69,6 @@ impl std::fmt::Display for OffError {
             Self::Parsing(pos) => write!(f, "could not parse number at {}", pos),
             Self::Rank(pos) => write!(f, "could not read rank at {}", pos),
             Self::MagicWord(pos) => write!(f, "no \"OFF\" detected at {}", pos),
-            Self::InvalidFile => write!(f, "could not parse file as UTF-8"),
         }
     }
 }

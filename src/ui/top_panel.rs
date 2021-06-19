@@ -180,13 +180,10 @@ pub fn file_dialog(
                 if let Some(path) = file_dialog.pick_file() {
                     if let Some(mut p) = query.iter_mut().next() {
                         match Concrete::from_path(&path) {
-                            Ok(res) => match res {
-                                Ok(q) => {
-                                    *p = q;
-                                    p.recenter();
-                                }
-                                Err(err) => eprintln!("File parsing failed: {}", err),
-                            },
+                            Ok(q) => {
+                                *p = q;
+                                p.recenter();
+                            }
                             Err(err) => eprintln!("File open failed: {}", err),
                         }
                     }

@@ -1,11 +1,10 @@
+//! Declares the [`Abstract`] polytope type and all associated data structures.
+
 pub mod elements;
 pub mod flag;
 pub mod rank;
 
-use std::{
-    collections::{BTreeSet, HashMap, HashSet},
-    mem,
-};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use self::{
     elements::{
@@ -16,12 +15,11 @@ use self::{
     rank::{Rank, RankVec},
 };
 use super::{DualResult, Polytope};
-use crate::{
-    lang::name::{Abs, Name},
-};
+use crate::lang::name::{Abs, Name};
 
 use rayon::prelude::*;
-use strum_macros::Display;use vec_like::VecLike;
+use strum_macros::Display;
+use vec_like::VecLike;
 
 #[derive(Debug, Display)]
 pub enum IncidenceType {
@@ -140,6 +138,9 @@ pub type AbstractResult<T> = Result<T, AbstractError>;
 /// It stores the indices of both the subelements and superelements of each
 /// element.
 ///
+/// # What is an abstract polytope?
+/// todo
+///
 /// # How to use?
 /// The fact that we store both subelements and superelements is quite useful
 /// for many algorithms. However, it becomes inconvenient when actually building
@@ -157,6 +158,9 @@ pub type AbstractResult<T> = Result<T, AbstractError>;
 #[derive(Debug, Clone)]
 pub struct Abstract {
     pub ranks: RankVec<ElementList>,
+
+    /// The name of the polytope, using the transformation rules for an abstract
+    /// polytope.
     name: Name<Abs>,
 
     sorted: bool,
@@ -165,6 +169,18 @@ pub struct Abstract {
 impl Default for Abstract {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl AsRef<Vec<ElementList>> for Abstract {
+    fn as_ref(&self) -> &Vec<ElementList> {
+        self.ranks.as_ref()
+    }
+}
+
+impl AsMut<Vec<ElementList>> for Abstract {
+    fn as_mut(&mut self) -> &mut Vec<ElementList> {
+        self.ranks.as_mut()
     }
 }
 
@@ -184,6 +200,17 @@ impl From<RankVec<ElementList>> for Abstract {
             sorted: false,
         }
     }
+}
+
+impl From<Vec<ElementList>> for Abstract {
+    fn from(vec: Vec<ElementList>) -> Self {
+        RankVec::from(vec).into()
+    }
+}
+
+impl VecLike<'_> for Abstract {
+    type VecItem = ElementList;
+    type VecIndex = Rank;
 }
 
 impl Abstract {
@@ -207,22 +234,34 @@ impl Abstract {
     }
 
     /// Returns a reference to the minimal element of the polytope.
+    ///
+    /// # Panics
+    /// Panics if the polytope has not been initialized.
     pub fn min(&self) -> &Element {
         self.get_element(ElementRef::new(Rank::new(-1), 0)).unwrap()
     }
 
     /// Returns a mutable reference to the minimal element of the polytope.
+    ///
+    /// # Panics
+    /// Panics if the polytope has not been initialized.
     pub fn min_mut(&mut self) -> &mut Element {
         self.get_element_mut(ElementRef::new(Rank::new(-1), 0))
             .unwrap()
     }
 
     /// Returns a reference to the maximal element of the polytope.
+    ///
+    /// # Panics
+    /// Panics if the polytope has not been initialized.
     pub fn max(&self) -> &Element {
         self.get_element(ElementRef::new(self.rank(), 0)).unwrap()
     }
 
     /// Returns a mutable reference to the maximal element of the polytope.
+    ///
+    /// # Panics
+    /// Panics if the polytope has not been initialized.
     pub fn max_mut(&mut self) -> &mut Element {
         self.get_element_mut(ElementRef::new(self.rank(), 0))
             .unwrap()
@@ -462,7 +501,7 @@ impl Abstract {
         // Sets name.
         let mut abs = abs.build();
         let facet_count = abs.facet_count();
-        abs = abs.with_name(Name::antiprism(self.name.clone(), facet_count));
+        abs = abs.with_name(Box::new(self.name.clone()).antiprism(facet_count));
 
         (abs, vertices, dual_vertices)
     }
@@ -983,7 +1022,7 @@ impl Polytope<Abs> for Abstract {
         }
 
         self.ranks.reverse();
-        self.name = self.name.clone().dual(Default::default());
+        self.name = Box::new(self.name.clone()).dual(Default::default());
         Ok(())
     }
 
@@ -1055,8 +1094,7 @@ impl Polytope<Abs> for Abstract {
         self.push_max();
 
         // Builds name.
-        let name = mem::replace(&mut self.name, Name::Nullitope);
-        self.name = name.petrial(self.facet_count());
+        self.name = self.name.clone().petrial(self.facet_count());
 
         // Checks for dyadicity, since that sometimes fails.
         self.is_dyadic().is_ok()
@@ -1081,7 +1119,7 @@ impl Polytope<Abs> for Abstract {
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks. *Updates neither the name nor the
     /// min/max elements.*
-    fn _append(&mut self, p: Self) {
+    fn _comp_append(&mut self, p: Self) {
         let rank = self.rank();
 
         // The polytopes must have the same ranks.
@@ -1117,11 +1155,10 @@ impl Polytope<Abs> for Abstract {
         }
     }
 
-    fn append(&mut self, p: Self) {
-        let name = mem::replace(&mut self.name, Name::Nullitope);
-        let new_name = Name::compound(vec![(1, name), (1, p.name.clone())]);
+    fn comp_append(&mut self, p: Self) {
+        let new_name = Name::compound(vec![(1, self.name.clone()), (1, p.name.clone())]);
 
-        self._append(p);
+        self._comp_append(p);
 
         *self.min_mut() = Element::min(self.vertex_count());
         *self.max_mut() = Element::max(self.facet_count());

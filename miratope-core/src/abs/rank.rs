@@ -65,6 +65,7 @@ impl Rank {
         Self(self.0 - 1)
     }
 
+    /// Subtracts one from the rank, or returns `None` if out of bounds.
     pub const fn try_minus_one(self) -> Option<Self> {
         if self.0 == 0 {
             None
@@ -112,6 +113,7 @@ impl std::str::FromStr for Rank {
     }
 }
 
+/// Implements `From<T> for Rank` and `From<Rank> for T` for any given type `T`.
 macro_rules! impl_rank {
     ($T:ty) => {
         impl From<$T> for Rank {
@@ -128,6 +130,7 @@ macro_rules! impl_rank {
     };
 }
 
+// Unsigned into rank.
 impl_rank!(u8);
 impl_rank!(u16);
 impl_rank!(u32);
@@ -135,6 +138,7 @@ impl_rank!(u64);
 impl_rank!(u128);
 impl_rank!(usize);
 
+// Signed into rank.
 impl_rank!(i8);
 impl_rank!(i16);
 impl_rank!(i32);
