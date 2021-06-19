@@ -60,7 +60,7 @@ use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::EguiPlugin;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
-use miratope_core::concrete::Concrete;
+use miratope_core::conc::Concrete;
 use ui::{
     camera::{CameraInputEvent, ProjectionType},
     MiratopePlugins,

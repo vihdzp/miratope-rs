@@ -16,10 +16,17 @@
 //! this:
 //!
 //! ```
-//! let pecube = Name::Multiprism(Box::new([
-//!     Name::Polygon(5),  // 5-gon
-//!     Name::Hypercube(3) // 3-hypercube
-//! ]));
+//! let pecube = Name::multiprism(vec![
+//!     Name::polygon(5, 1),  // 5-gon
+//!     Name::hypercube(3) // 3-hypercube
+//! ]);
+//! # use miratope_core::lang::{En, Options, Language, name::Name};
+//! # assert_eq!(En::parse(&pecube, Options {
+//! #     adjective: false,
+//! #     count: 1,
+//! #     gender: Gender::Male,
+//! #     parentheses: false
+//! # }), "pentagonal-cubic duoprism");
 //! ```
 //!
 //! For more information, see the [`Name`] module's documentation.
@@ -35,11 +42,16 @@
 //! and uses the corresponding methods to parse and combine each of its parts:
 //!
 //! ```
-//! # use name::Name; use lang::En;
-//! assert_eq!(En::parse(pecube, Options {
+//! # use miratope_core::lang::{En, Options, Language, name::Name};
+//! # let pecube = Name::multiprism(vec![
+//! #     Name::polygon(5, 1),  // 5-gon
+//! #     Name::hypercube(3) // 3-hypercube
+//! # ]);
+//! assert_eq!(En::parse(&pecube, Options {
 //!     adjective: false,
 //!     count: 1,
 //!     gender: Gender::Male,
+//!     parentheses: false
 //! }), "pentagonal-cubic duoprism");
 //! ```
 //!
@@ -80,7 +92,7 @@ pub use fr::Fr;
 pub use ja::Ja;
 pub use pii::Pii;
 
-use crate::r#abstract::rank::Rank;
+use crate::abs::rank::Rank;
 use name::{Name, NameData, NameType};
 
 use serde::{Deserialize, Serialize};

@@ -1,7 +1,7 @@
 //! Credits to Nayuta Ito
 
 use super::{Language, Options, Prefix};
-use crate::r#abstract::rank::Rank;
+use crate::abs::rank::Rank;
 
 pub struct Ja;
 

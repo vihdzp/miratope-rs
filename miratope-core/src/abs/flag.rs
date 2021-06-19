@@ -649,6 +649,10 @@ impl FlagSet {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.flags.is_empty()
+    }
+
     /// Returns the number of flags contained in the flag set.
     pub fn len(&self) -> usize {
         self.flags.len()

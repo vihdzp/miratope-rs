@@ -5,7 +5,7 @@ use super::{camera::ProjectionType, top_panel::SectionState};
 use bevy::prelude::*;
 use bevy_egui::EguiSettings;
 use miratope_core::{
-    concrete::Concrete,
+    conc::Concrete,
     lang::{Options, SelectedLanguage},
     Polytope,
 };

@@ -8,7 +8,7 @@ use std::{
 };
 
 use super::{
-    r#abstract::{
+    abs::{
         elements::{
             AbstractBuilder, ElementList, ElementRef, SubelementList, Subelements, Superelements,
         },
@@ -1115,8 +1115,8 @@ impl std::ops::IndexMut<Rank> for Concrete {
 mod tests {
     use super::Concrete;
     use crate::{
+        abs::rank::Rank,
         lang::{En, Language},
-        r#abstract::rank::Rank,
         Consts, Float, Polytope,
     };
 

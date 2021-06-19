@@ -8,12 +8,12 @@ use std::{
 
 use super::config::LibPath;
 use miratope_core::{
-    concrete::Concrete,
+    abs::rank::Rank,
+    conc::Concrete,
     lang::{
         name::{Con, Name},
         SelectedLanguage,
     },
-    r#abstract::rank::Rank,
     Polytope,
 };
 

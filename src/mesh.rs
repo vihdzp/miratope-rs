@@ -10,12 +10,12 @@ use bevy::{
 };
 use lyon::{math::point, path::Path, tessellation::*};
 use miratope_core::{
-    concrete::{
+    abs::{elements::ElementList, rank::Rank},
+    conc::{
         cycle::{Cycle, CycleBuilder},
         Concrete,
     },
     geometry::{Point, Subspace, Vector},
-    r#abstract::{elements::ElementList, rank::Rank},
     vec_like::VecLike,
     Consts, Float, Polytope,
 };

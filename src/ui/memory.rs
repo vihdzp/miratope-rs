@@ -1,6 +1,6 @@
 use bevy::prelude::Query;
 use bevy_egui::egui;
-use miratope_core::{concrete::Concrete, lang::En};
+use miratope_core::{conc::Concrete, lang::En};
 
 pub const MEMORY_SLOTS: usize = 8;
 

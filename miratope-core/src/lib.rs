@@ -2,8 +2,8 @@
 //! [polytopes](https://polytope.miraheze.org/wiki/Polytope), as well as some
 //! basic methods to operate on them.
 
-pub mod r#abstract;
-pub mod concrete;
+pub mod abs;
+pub mod conc;
 pub mod geometry;
 pub mod group;
 pub mod lang;
@@ -11,7 +11,7 @@ pub mod vec_like;
 
 use std::iter;
 
-use self::r#abstract::{
+use self::abs::{
     elements::{Element, ElementList, ElementRef, SectionRef},
     flag::{Flag, FlagIter, OrientedFlag, OrientedFlagIter},
     rank::{Rank, RankVec},

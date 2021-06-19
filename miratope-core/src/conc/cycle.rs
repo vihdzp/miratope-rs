@@ -22,6 +22,10 @@ impl<T> Default for Pair<T> {
 }
 
 impl<T> Pair<T> {
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::None)
+    }
+
     /// Returns the number of elements stored in the pair.
     pub fn len(&self) -> usize {
         match self {
@@ -53,16 +57,21 @@ impl<T> Pair<T> {
 /// Internally, each vertex is mapped to a [`Pair`], which stores the (at most)
 /// two other vertices it's connected to. By traversing this map, we're able to
 /// recover the vertex cycles.
+#[derive(Default)]
 pub struct CycleBuilder(HashMap<usize, Pair<usize>>);
 
 impl CycleBuilder {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
     /// Initializes a cycle builder with a given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
         Self(HashMap::with_capacity(capacity))
     }
 
     /// Returns the number of vertices in the vertex loop.
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         self.0.len()
     }
 

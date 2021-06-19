@@ -2,12 +2,12 @@ use std::{collections::HashMap, fs, path::Path, str::FromStr};
 
 use super::IoResult;
 use crate::{
-    concrete::{Concrete, ElementList, Point, Polytope, RankVec, Subelements},
-    lang::name::{Con, Name},
-    r#abstract::{
+    abs::{
         elements::{AbstractBuilder, SubelementList},
         rank::Rank,
     },
+    conc::{Concrete, ElementList, Point, Polytope, RankVec, Subelements},
+    lang::name::{Con, Name},
     vec_like::VecLike,
     COMPONENTS, ELEMENT_NAMES,
 };

@@ -166,11 +166,12 @@ impl SubelementList {
 }
 
 /// A structure used to build a polytope from the bottom up.
+#[derive(Default)]
 pub struct AbstractBuilder(Abstract);
 
 impl AbstractBuilder {
     pub fn new() -> Self {
-        Self(Abstract::new())
+        Default::default()
     }
 
     pub fn with_capacity(rank: Rank) -> Self {
@@ -374,20 +375,30 @@ impl SectionRef {
 #[derive(Default, Debug)]
 pub struct SectionHash(HashMap<SectionRef, usize>);
 
+impl IntoIterator for SectionHash {
+    type Item = (SectionRef, usize);
+
+    type IntoIter = std::collections::hash_map::IntoIter<SectionRef, usize>;
+
+    /// Returns an iterator over the stored section index pairs.
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 impl SectionHash {
     /// Initializes a new section hash.
     pub fn new() -> Self {
         Default::default()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     /// Returns the number of stored elements.
     pub fn len(&self) -> usize {
         self.0.len()
-    }
-
-    /// Returns an iterator over the stored section index pairs.
-    pub fn into_iter(self) -> std::collections::hash_map::IntoIter<SectionRef, usize> {
-        self.0.into_iter()
     }
 
     /// Returns all singleton sections of a polytope.

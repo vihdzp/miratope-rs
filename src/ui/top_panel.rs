@@ -10,7 +10,7 @@ use bevy_egui::{
     EguiContext,
 };
 use miratope_core::{
-    concrete::Concrete,
+    conc::Concrete,
     geometry::{Hyperplane, Point, Vector},
     lang::SelectedLanguage,
     Float, Polytope,

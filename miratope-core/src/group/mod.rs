@@ -7,7 +7,7 @@ use std::{
     iter,
 };
 
-use super::concrete::Concrete;
+use super::conc::Concrete;
 use crate::{
     geometry::{Matrix, MatrixOrd, Point, PointOrd, VectorSlice},
     Consts, Float,

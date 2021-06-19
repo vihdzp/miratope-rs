@@ -183,9 +183,7 @@ impl Display for Rank {
 #[cfg(feature = "bevy_egui")]
 impl bevy_egui::egui::emath::Numeric for Rank {
     const INTEGRAL: bool = true;
-
     const MIN: Self = Self(0);
-
     const MAX: Self = Self(usize::MAX);
 
     fn to_f64(self) -> f64 {

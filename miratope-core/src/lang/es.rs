@@ -1,9 +1,9 @@
 use crate::{
+    abs::rank::Rank,
     lang::{
         name::{Name, NameType},
         Gender,
     },
-    r#abstract::rank::Rank,
 };
 
 use super::{GreekPrefix, Language, Options, Position, Prefix};

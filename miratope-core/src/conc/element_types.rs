@@ -2,10 +2,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::{
-    concrete::Concrete, r#abstract::rank::Rank, vec_like::VecLike, Consts, Float, FloatOrd,
-    Polytope,
-};
+use crate::{abs::rank::Rank, conc::Concrete, vec_like::VecLike, Consts, Float, FloatOrd, Polytope};
 
 use approx::abs_diff_eq;
 
@@ -18,11 +15,12 @@ pub struct ElementCount {
     count: usize,
 }
 
-pub struct ElementCountBuilder(BTreeMap<usize, usize>);
+#[derive(Default)]
+struct ElementCountBuilder(BTreeMap<usize, usize>);
 
 impl ElementCountBuilder {
     pub fn new() -> Self {
-        Self(BTreeMap::new())
+        Default::default()
     }
 
     pub fn insert(&mut self, type_index: usize) {
