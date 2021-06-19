@@ -18,11 +18,10 @@ use self::{
 use super::{DualResult, Polytope};
 use crate::{
     lang::name::{Abs, Name},
-    vec_like::VecLike,
 };
 
 use rayon::prelude::*;
-use strum_macros::Display;
+use strum_macros::Display;use vec_like::VecLike;
 
 #[derive(Debug, Display)]
 pub enum IncidenceType {
@@ -1460,7 +1459,7 @@ mod tests {
     #[test]
     /// Checks that duals are generated correctly.
     fn dual_check() {
-        use crate::vec_like::VecLike;
+        use vec_like::VecLike;
 
         for poly in test_polytopes().iter_mut() {
             let el_counts = poly.el_counts();

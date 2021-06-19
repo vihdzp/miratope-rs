@@ -1,11 +1,7 @@
 use std::{fmt::Display, hash::Hash, iter, slice, vec};
 
 use serde::{Deserialize, Serialize};
-
-use crate::{
-    impl_veclike,
-    vec_like::{VecIndex, VecLike},
-};
+use vec_like::*;
 
 /// Represents the [rank](https://polytope.miraheze.org/w/index.php?title=Rank)
 /// of a polytope.
@@ -199,7 +195,7 @@ impl bevy_egui::egui::emath::Numeric for Rank {
 /// around operations that offset by a constant for our own convenience.
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct RankVec<T>(Vec<T>);
-impl_veclike!(@for [T] RankVec<T>, T, Rank);
+impl_veclike!(@for [T] RankVec<T>, Item = T, Index = Rank);
 
 impl<T> RankVec<T> {
     /// Returns the greatest rank stored in the array.

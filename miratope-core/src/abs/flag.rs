@@ -13,14 +13,16 @@ use std::{
 };
 
 use super::{elements::ElementRef, rank::Rank, Abstract};
-use crate::{impl_veclike, vec_like::VecLike, Float, Polytope};
+use crate::{Float, Polytope};
+
+use vec_like::*;
 
 /// A [flag](https://polytope.miraheze.org/wiki/Flag) in a polytope. Stores the
 /// indices of the elements of each rank, excluding the minimal and maximal
 /// elements.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Flag(Vec<usize>);
-impl_veclike!(Flag, usize, usize);
+impl_veclike!(Flag, Item = usize, Index = usize);
 
 impl Flag {
     /// Gets the index of the element with a given rank, or returns `0` if it
@@ -318,7 +320,7 @@ impl OrientedFlag {
 /// Represents a set of flag changes.
 #[derive(Clone)]
 pub struct FlagChanges(Vec<usize>);
-impl_veclike!(FlagChanges, usize, usize);
+impl_veclike!(FlagChanges, Item = usize, Index = usize);
 
 impl FlagChanges {
     /// Returns the set of all flag changes for a polytope of a given rank.

@@ -16,9 +16,10 @@ use miratope_core::{
         Concrete,
     },
     geometry::{Point, Subspace, Vector},
-    vec_like::VecLike,
     Consts, Float, Polytope,
 };
+
+use vec_like::*;
 
 /// Attempts to turn the cycle into a 2D path, which can then be given to
 /// the tessellator. Uses the specified vertex list to grab the coordinates

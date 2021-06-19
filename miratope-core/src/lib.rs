@@ -1,6 +1,7 @@
-//! This is the main dependency of [Miratope](https://github.com/OfficialURL/miratope-rs).
-//! It contains all code to build
-//! and name [`Abstract`] and [`Concrete`](conc::Concrete) polytopes alike.
+//! This is the main dependency of
+//! [Miratope](https://github.com/OfficialURL/miratope-rs). It contains all code
+//! to build and name [`Abstract`] and [`Concrete`](conc::Concrete) polytopes
+//! alike.
 //!
 //! If you're interested in actually rendering polytopes, you might want to take
 //! a look at the [`miratope`](https://crates.io/crates/miratope) crate instead.
@@ -10,7 +11,6 @@ pub mod conc;
 pub mod geometry;
 pub mod group;
 pub mod lang;
-pub mod vec_like;
 
 use std::iter;
 

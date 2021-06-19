@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{impl_veclike, vec_like::VecLike};
+use vec_like::*;
 
 /// Represents a set with at most two values.
 #[derive(Clone, Copy)]
@@ -168,4 +168,4 @@ impl CycleBuilder {
 /// Represents a cyclic list of vertex indices, which may then be turned into a
 /// path and tessellated.
 pub struct Cycle(Vec<usize>);
-impl_veclike!(Cycle, usize, usize);
+impl_veclike!(Cycle, Item = usize, Index = usize);

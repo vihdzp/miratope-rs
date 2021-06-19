@@ -2111,6 +2111,7 @@ dependencies = [
  "serde",
  "strum 0.21.0",
  "strum_macros 0.21.1",
+ "vec-like",
  "webbrowser",
 ]
 
@@ -2132,6 +2133,7 @@ dependencies = [
  "serde",
  "strum 0.21.0",
  "strum_macros 0.21.1",
+ "vec-like",
  "xml-rs",
  "zip",
 ]
@@ -3214,6 +3216,10 @@ dependencies = [
  "getrandom",
  "serde",
 ]
+
+[[package]]
+name = "vec-like"
+version = "0.1.0"
 
 [[package]]
 name = "version-compare"

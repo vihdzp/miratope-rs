@@ -8,10 +8,11 @@ use crate::{
     },
     conc::{Concrete, ElementList, Point, Polytope, RankVec, Subelements},
     lang::name::{Con, Name},
-    vec_like::VecLike,
+    
     COMPONENTS, ELEMENT_NAMES,
 };
 
+use vec_like::VecLike;
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
 
 /// A position in a file.

@@ -1,4 +1,5 @@
 [workspace]
+members = ["miratope-core", "vec-like"]
 
 [package]
 name = "miratope"
@@ -16,6 +17,7 @@ edition = "2018"
 
 [dependencies]
 miratope-core = { path = "miratope-core", features = ["bevy_egui"] }
+vec-like = { path = "vec-like" }
 approx = "0.5"
 directories = "3.0"
 lyon = "0.17"

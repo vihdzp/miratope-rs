@@ -21,12 +21,12 @@ use super::{
 use crate::{
     geometry::{Hyperplane, Hypersphere, Matrix, Point, PointOrd, Segment, Subspace, Vector},
     lang::name::{Con, ConData, Name, NameData, Regular},
-    vec_like::VecLike,
     Consts, Float,
 };
 
 use approx::{abs_diff_eq, abs_diff_ne};
 use rayon::prelude::*;
+use vec_like::*;
 
 /// Represents a [concrete polytope](https://polytope.miraheze.org/wiki/Polytope),
 /// which is an [`Abstract`] together with its corresponding vertices.

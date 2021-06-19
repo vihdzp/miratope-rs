@@ -1,5 +1,5 @@
-//! Implements all of the boilerplate code for structs throughout the code that
-//! wrap around `Vec<T>`s.
+//! Declares a general trait for all structs that wrap around `Vec<T>`s, and a
+//! macro that implements this trait.
 
 /// A trait for anything that should work as an index in a vector.
 pub trait VecIndex {
@@ -159,18 +159,18 @@ pub trait VecLike<'a>:
 ///
 /// ```
 /// struct Wrapper(Vec<Item>);
-/// impl_veclike!(Wrapper, Item, usize);
+/// impl_veclike!(Wrapper, item = Item, index = usize);
 /// ```
 ///
 /// Or like this:
 ///
 /// ```
 /// struct Wrapper<T>(Vec<T>);
-/// impl_veclike!(@for [T] Wrapper<T>, T, usize);
+/// impl_veclike!(@for [T] Wrapper<T>, item = T, index = usize);
 /// ```
 macro_rules! impl_veclike {
-    ($(@for [$($generics: tt)*])? $Type: ty, $VecItem: ty, $VecIndex: ty $(,)?) => {
-        impl<'a, $($($generics)*)?> crate::vec_like::VecLike<'a> for $Type {
+    ($(@for [$($generics: tt)*])? $Type: ty, Item = $VecItem: ty, Index = $VecIndex: ty $(,)?) => {
+        impl<'a, $($($generics)*)?> vec_like::VecLike<'a> for $Type {
             type VecItem = $VecItem;
             type VecIndex = $VecIndex;
         }
@@ -203,14 +203,14 @@ macro_rules! impl_veclike {
             type Output = $VecItem;
 
             fn index(&self, index: $VecIndex) -> &Self::Output {
-                use crate::vec_like::VecIndex;
+                use vec_like::VecIndex;
                 &self.as_ref()[index.index()]
             }
         }
 
         impl$(<$($generics)*>)? std::ops::IndexMut<$VecIndex> for $Type {
             fn index_mut(&mut self, index: $VecIndex) -> &mut Self::Output {
-                use crate::vec_like::VecIndex;
+                use vec_like::VecIndex;
                 &mut self.as_mut()[index.index()]
             }
         }

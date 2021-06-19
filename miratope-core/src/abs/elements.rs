@@ -1,7 +1,6 @@
 //! A bunch of wrappers and helper structs that make dealing with abstract
 //! polytopes much less confusing.
 
-use crate::{impl_veclike, vec_like::VecLike};
 use std::{collections::HashMap, iter::IntoIterator};
 
 use super::{
@@ -9,6 +8,8 @@ use super::{
     Abstract,
 };
 use crate::Polytope;
+
+use vec_like::*;
 
 /// A bundled rank and index, which can be used to refer to an element in an
 /// abstract polytope.
@@ -51,12 +52,12 @@ pub trait Subsupelements<'a>: Sized + VecLike<'a, VecItem = usize> {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Subelements(pub Vec<usize>);
-impl_veclike!(Subelements, usize, usize);
+impl_veclike!(Subelements, Item = usize, Index = usize);
 impl<'a> Subsupelements<'a> for Subelements {}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Superelements(pub Vec<usize>);
-impl_veclike!(Superelements, usize, usize);
+impl_veclike!(Superelements, Item = usize, Index = usize);
 impl<'a> Subsupelements<'a> for Superelements {}
 
 /// An element in a polytope, which stores the indices of both its subelements
@@ -120,7 +121,7 @@ impl Element {
 /// [`SubelementList`] instead.
 #[derive(Debug, Clone)]
 pub struct ElementList(Vec<Element>);
-impl_veclike!(ElementList, Element, usize);
+impl_veclike!(ElementList, Item = Element, Index = usize);
 
 impl ElementList {
     /// Returns the element list for the nullitope in a polytope with a given
@@ -139,7 +140,7 @@ impl ElementList {
 /// A list of subelements in a polytope.
 #[derive(Debug)]
 pub struct SubelementList(Vec<Subelements>);
-impl_veclike!(SubelementList, Subelements, usize);
+impl_veclike!(SubelementList, Item = Subelements, Index = usize);
 
 impl SubelementList {
     /// Returns the subelement list for the minimal element in a polytope.
