@@ -280,7 +280,7 @@ impl Group {
         }
     }
 
-    /// Generates a Coxeter group from its [`CdMatrix`](cd::CoxMatrix), or
+    /// Generates a Coxeter group from its [`CoxMatrix`](cd::CoxMatrix), or
     /// returns `None` if the group doesn't fit as a matrix group in spherical
     /// space.
     pub fn cox_group(cox: CoxMatrix) -> Option<Self> {
@@ -293,29 +293,34 @@ impl Group {
         g: Self,
         h: Self,
         dim: usize,
-        product: (impl Fn((Matrix, Matrix)) -> Matrix + Clone + 'static),
+        product: (impl Fn(Matrix, Matrix) -> Matrix + Clone + 'static),
     ) -> Self {
-        Self::new(dim, itertools::iproduct!(g, h).map(product))
+        Self::new(
+            dim,
+            itertools::iproduct!(g, h).map(move |(mat1, mat2)| product(mat1, mat2)),
+        )
     }
 
     /// Returns the group determined by all products between elements of the
     /// first and the second group. **Is meant only for groups that commute with
     /// one another.**
     pub fn matrix_product(g: Self, h: Self) -> Option<Self> {
+        use std::ops::Mul;
+
         // The two matrices must have the same size.
         if g.dim != h.dim {
             return None;
         }
 
         let dim = g.dim;
-        Some(Self::fn_product(g, h, dim, |(mat1, mat2)| mat1 * mat2))
+        Some(Self::fn_product(g, h, dim, Matrix::mul))
     }
 
     /// Calculates the direct product of two groups. Pairs of matrices are then
     /// mapped to their direct sum.
     pub fn direct_product(g: Self, h: Self) -> Self {
         let dim = g.dim + h.dim;
-        Self::fn_product(g, h, dim, |(mat1, mat2)| direct_sum(mat1, mat2))
+        Self::fn_product(g, h, dim, direct_sum)
     }
 
     /// Generates the [wreath product](https://en.wikipedia.org/wiki/Wreath_product)
@@ -353,7 +358,7 @@ impl Group {
         let g_prod = vec![&g; h.len() - 1]
             .into_iter()
             .cloned()
-            .fold(g.clone(), |acc, g| Group::direct_product(g, acc));
+            .fold(g.clone(), Group::direct_product);
 
         Self::new(
             dim,

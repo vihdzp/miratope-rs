@@ -881,35 +881,31 @@ impl Abstract {
     }
 }
 
-impl Polytope<Abs> for Abstract {
-    /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
-    fn rank(&self) -> Rank {
-        self.ranks.rank()
+impl AsRef<Abstract> for Abstract {
+    fn as_ref(&self) -> &Abstract {
+        self
     }
+}
 
-    /// Returns a reference to the [`Name`] of the polytope. This exists only
-    /// for trait purposes.
-    fn name(&self) -> &Name<Abs> {
+impl AsMut<Abstract> for Abstract {
+    fn as_mut(&mut self) -> &mut Abstract {
+        self
+    }
+}
+
+impl AsRef<Name<Abs>> for Abstract {
+    fn as_ref(&self) -> &Name<Abs> {
         &self.name
     }
+}
 
-    /// Returns a mutable reference to the [`Name`] of the polytope. This exists
-    /// only for trait purposes.
-    fn name_mut(&mut self) -> &mut Name<Abs> {
+impl AsMut<Name<Abs>> for Abstract {
+    fn as_mut(&mut self) -> &mut Name<Abs> {
         &mut self.name
     }
+}
 
-    /// Returns a reference to `self`. This exists only for trait purposes.
-    fn abs(&self) -> &Abstract {
-        self
-    }
-
-    /// Returns a mutable reference to `self`. This exists only for trait
-    /// purposes.
-    fn abs_mut(&mut self) -> &mut Abstract {
-        self
-    }
-
+impl Polytope<Abs> for Abstract {
     /// Returns an instance of the
     /// [nullitope](https://polytope.miraheze.org/wiki/Nullitope), the unique
     /// polytope of rank &minus;1.
@@ -1274,13 +1270,13 @@ mod tests {
             poly.el_counts(),
             element_counts.into(),
             "{} element counts don't match expected value.",
-            En::parse_uppercase(poly.name(), Default::default())
+            En::parse_uppercase(&poly.name, Default::default())
         );
 
         assert!(
             poly.is_valid().is_ok(),
             "{} is not a valid polytope.",
-            En::parse_uppercase(poly.name(), Default::default())
+            En::parse_uppercase(&poly.name, Default::default())
         );
     }
 
@@ -1456,7 +1452,7 @@ mod tests {
             assert!(
                 poly.is_valid().is_ok(),
                 "{} is not valid.",
-                En::parse(poly.name(), Default::default())
+                En::parse(&poly.name, Default::default())
             );
         }
     }
@@ -1478,14 +1474,14 @@ mod tests {
                 el_counts,
                 du_el_counts_rev,
                 "Dual element counts of {} don't match expected value.",
-                En::parse(poly.name(), Default::default())
+                En::parse(&poly.name, Default::default())
             );
 
             // The duals should also be valid polytopes.
             assert!(
                 poly.is_valid().is_ok(),
                 "Dual of polytope {} is invalid.",
-                En::parse(poly.name(), Default::default())
+                En::parse(&poly.name, Default::default())
             );
         }
     }

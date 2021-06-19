@@ -7,7 +7,6 @@ use bevy_egui::EguiSettings;
 use miratope_core::{
     conc::Concrete,
     lang::{Options, SelectedLanguage},
-    Polytope,
 };
 
 /// The plugin in charge of the Miratope main window, and of drawing the
@@ -73,7 +72,7 @@ pub fn update_changed_polytopes(
         windows
             .get_primary_mut()
             .unwrap()
-            .set_title(selected_language.parse(poly.name(), Options::default()));
+            .set_title(selected_language.parse(&poly.name, Options::default()));
 
         // Updates all wireframes.
         for child in children.iter() {

@@ -677,7 +677,7 @@ impl<'a> OffWriter<'a> {
         // Serialized name.
         self.off.push_str("# ");
         self.off
-            .push_str(&ron::to_string(self.polytope.name()).unwrap());
+            .push_str(&ron::to_string(&self.polytope.name).unwrap());
         self.off.push('\n');
 
         // Blatant advertising.

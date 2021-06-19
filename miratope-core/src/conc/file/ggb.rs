@@ -10,7 +10,7 @@ use xml::{
 };
 use zip::read::ZipArchive;
 
-pub type Events<'a> = xml::reader::Events<&'a [u8]>;
+type Events<'a> = xml::reader::Events<&'a [u8]>;
 
 /// A wrapper around an iterator over events in an XML file.
 pub struct XmlReader<'a>(Events<'a>);

@@ -263,7 +263,7 @@ pub fn show_top_panel(
                 if ui.button("Save").clicked() {
                     if let Some(p) = query.iter_mut().next() {
                         file_dialog_state
-                            .save(selected_language.parse(p.name(), Default::default()));
+                            .save(selected_language.parse(&p.name, Default::default()));
                     }
                 }
 
@@ -579,9 +579,10 @@ pub fn show_top_panel(
 
                     if selected_language.is_changed() {
                         if let Some(poly) = query.iter_mut().next() {
-                            windows.get_primary_mut().unwrap().set_title(
-                                selected_language.parse(poly.name(), Default::default()),
-                            );
+                            windows
+                                .get_primary_mut()
+                                .unwrap()
+                                .set_title(selected_language.parse(&poly.name, Default::default()));
                         }
                     }
                 });

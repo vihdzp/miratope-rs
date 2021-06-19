@@ -372,10 +372,7 @@ impl Concrete {
 
         // Takes the abstract dual.
         self.abs.dual_mut();
-        *self.name_mut() = self
-            .name()
-            .clone()
-            .dual(ConData::new(sphere.center.clone()));
+        self.name = self.name.clone().dual(ConData::new(sphere.center.clone()));
 
         Ok(())
     }
@@ -839,28 +836,31 @@ impl Concrete {
     }
 }
 
-impl Polytope<Con> for Concrete {
-    /// Returns the rank of the polytope.
-    fn rank(&self) -> Rank {
-        self.abs.rank()
-    }
-
-    fn name(&self) -> &Name<Con> {
-        &self.name
-    }
-
-    fn name_mut(&mut self) -> &mut Name<Con> {
-        &mut self.name
-    }
-
-    fn abs(&self) -> &Abstract {
+impl AsRef<Abstract> for Concrete {
+    fn as_ref(&self) -> &Abstract {
         &self.abs
     }
+}
 
-    fn abs_mut(&mut self) -> &mut Abstract {
+impl AsMut<Abstract> for Concrete {
+    fn as_mut(&mut self) -> &mut Abstract {
         &mut self.abs
     }
+}
 
+impl AsRef<Name<Con>> for Concrete {
+    fn as_ref(&self) -> &Name<Con> {
+        &self.name
+    }
+}
+
+impl AsMut<Name<Con>> for Concrete {
+    fn as_mut(&mut self) -> &mut Name<Con> {
+        &mut self.name
+    }
+}
+
+impl Polytope<Con> for Concrete {
     /// Builds the unique polytope of rank −1.
     fn nullitope() -> Self {
         Self::new(Vec::new(), Abstract::nullitope()).with_name(Name::Nullitope)
@@ -1127,7 +1127,7 @@ mod tests {
         if let Some(poly_volume) = poly.volume() {
             let volume = volume.expect(&format!(
                 "Expected no volume for {}, found volume {}!",
-                En::parse(poly.name(), Default::default()),
+                En::parse(&poly.name, Default::default()),
                 poly_volume
             ));
 
@@ -1135,14 +1135,14 @@ mod tests {
                 abs_diff_eq!(poly_volume, volume, epsilon = Float::EPS),
                 "Expected volume {} for {}, found volume {}.",
                 volume,
-                En::parse(poly.name(), Default::default()),
+                En::parse(&poly.name, Default::default()),
                 poly_volume
             );
         } else if let Some(volume) = volume {
             panic!(
                 "Expected volume {} for {}, found no volume!",
                 volume,
-                En::parse(poly.name(), Default::default()),
+                En::parse(&poly.name, Default::default()),
             );
         }
     }

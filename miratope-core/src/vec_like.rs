@@ -45,7 +45,7 @@ pub trait VecLike<'a>:
         self.as_mut().reserve(additional)
     }
 
-    // Returns true if `self` contains an element with the given value.
+    /// Returns true if `self` contains an element with the given value.
     fn contains(&self, x: &Self::VecItem) -> bool
     where
         <Self as VecLike<'a>>::VecItem: PartialEq,
@@ -63,6 +63,8 @@ pub trait VecLike<'a>:
         self.as_mut().pop()
     }
 
+    /// Removes and returns the element at position index within the `self`,
+    /// shifting all elements after it to the left.
     fn remove(&mut self, index: usize) -> Self::VecItem {
         self.as_mut().remove(index)
     }
@@ -91,6 +93,7 @@ pub trait VecLike<'a>:
         self.as_mut().iter_mut()
     }
 
+    /// Returns `true` if `self` contains no elements.
     fn is_empty(&self) -> bool {
         self.as_ref().is_empty()
     }

@@ -1,6 +1,9 @@
-//! Contains the definitions of the different traits and structs for
-//! [polytopes](https://polytope.miraheze.org/wiki/Polytope), as well as some
-//! basic methods to operate on them.
+//! This is the main dependency of [Miratope](https://github.com/OfficialURL/miratope-rs).
+//! It contains all code to build
+//! and name [`Abstract`] and [`Concrete`](conc::Concrete) polytopes alike.
+//!
+//! If you're interested in actually rendering polytopes, you might want to take
+//! a look at the [`miratope`](https://crates.io/crates/miratope) crate instead.
 
 pub mod abs;
 pub mod conc;
@@ -11,20 +14,18 @@ pub mod vec_like;
 
 use std::iter;
 
-use self::abs::{
+use abs::{
     elements::{Element, ElementList, ElementRef, SectionRef},
     flag::{Flag, FlagIter, OrientedFlag, OrientedFlagIter},
     rank::{Rank, RankVec},
     Abstract,
 };
-use crate::{
-    geometry::Point,
-    lang::{
-        name::{Name, NameData, NameType, Regular},
-        Language,
-    },
-    vec_like::VecLike,
+use geometry::Point;
+use lang::{
+    name::{Name, NameData, NameType, Regular},
+    Language,
 };
+use vec_like::VecLike;
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
 const ELEMENT_NAMES: [&str; 11] = [
@@ -96,51 +97,39 @@ fn factorial(n: usize) -> u32 {
 }
 
 /// The trait for methods common to all polytopes.
-pub trait Polytope<T: NameType>: Sized + Clone {
-    /// Returns a reference to the underlying abstract polytope.
-    fn abs(&self) -> &Abstract;
-
-    /// Returns a mutable reference to the underlying abstract polytope.
-    fn abs_mut(&mut self) -> &mut Abstract;
-
+pub trait Polytope<T: NameType>:
+    Sized + Clone + AsRef<Abstract> + AsMut<Abstract> + AsRef<Name<T>> + AsMut<Name<T>>
+{
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
     fn rank(&self) -> Rank {
-        self.abs().ranks.rank()
+        let abs: &Abstract = self.as_ref();
+        abs.ranks.rank()
     }
-
-    /// The name of the polytope in its language-independent representation.
-    fn name(&self) -> &Name<T>;
-
-    /// A mutable reference to the name of the polytope.
-    fn name_mut(&mut self) -> &mut Name<T>;
 
     /// Gets the wiki link to the polytope, based on its English name.
     fn wiki_link(&self) -> String {
         format!(
             "{}{}",
             crate::WIKI_LINK,
-            lang::En::parse(self.name(), Default::default()).replace(" ", "_")
+            lang::En::parse(self.as_ref(), Default::default()).replace(" ", "_")
         )
     }
 
     /// Used as a chaining operator to set the name of a polytope.
     fn with_name(mut self, name: Name<T>) -> Self {
-        *self.name_mut() = name;
+        *self.as_mut() = name;
         self
     }
 
     /// Returns the number of elements of a given rank.
     fn el_count(&self, rank: Rank) -> usize {
-        self.abs()
-            .ranks
-            .get(rank)
-            .map(ElementList::len)
-            .unwrap_or(0)
+        let abs: &Abstract = self.as_ref();
+        abs.ranks.get(rank).map(ElementList::len).unwrap_or(0)
     }
 
     /// Returns the element counts of the polytope.
     fn el_counts(&self) -> RankVec<usize> {
-        let abs = self.abs();
+        let abs: &Abstract = self.as_ref();
         let mut counts = RankVec::with_rank_capacity(abs.rank());
 
         for r in Rank::range_inclusive_iter(Rank::new(-1), abs.rank()) {
@@ -264,8 +253,11 @@ pub trait Polytope<T: NameType>: Sized + Clone {
             }
 
             // Updates the minimal and maximal elements of the compound.
-            *p.abs_mut().min_mut() = Element::min(p.vertex_count());
-            *p.abs_mut().max_mut() = Element::max(p.facet_count());
+            let vc = p.vertex_count();
+            let fc = p.facet_count();
+            let abs: &mut Abstract = p.as_mut();
+            *abs.min_mut() = Element::min(vc);
+            *abs.max_mut() = Element::max(fc);
 
             // TODO: UPDATE NAME.
             p
@@ -296,9 +288,9 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         let mut idx = 0;
         flag.push(0);
 
+        let abs: &Abstract = self.as_ref();
         for r in Rank::range_iter(1, rank) {
-            idx = self
-                .abs()
+            idx = abs
                 .get_element(ElementRef::new(r.minus_one(), idx))
                 .unwrap()
                 .sups[0];
@@ -317,12 +309,12 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Returns an iterator over all [`Flag`]s of a polytope.
     fn flags(&self) -> FlagIter {
-        FlagIter::new(self.abs())
+        FlagIter::new(self.as_ref())
     }
 
     /// Returns an iterator over all [`OrientedFlag`]s of a polytope.
     fn flag_events(&self) -> OrientedFlagIter {
-        OrientedFlagIter::new(self.abs())
+        OrientedFlagIter::new(self.as_ref())
     }
 
     fn omnitruncate(&mut self) -> Self;
@@ -377,19 +369,22 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
     /// given base.
     fn pyramid(&self) -> Self {
-        Self::duopyramid(self, &Self::point()).with_name(self.name().clone().pyramid())
+        let name: &Name<_> = self.as_ref();
+        Self::duopyramid(self, &Self::point()).with_name(name.clone().pyramid())
     }
 
     /// Builds a [prism](https://polytope.miraheze.org/wiki/Prism) from a
     /// given base.
     fn prism(&self) -> Self {
-        Self::duoprism(self, &Self::dyad()).with_name(self.name().clone().prism())
+        let name: &Name<_> = self.as_ref();
+        Self::duoprism(self, &Self::dyad()).with_name(name.clone().prism())
     }
 
     /// Builds a [tegum](https://polytope.miraheze.org/wiki/Bipyramid) from a
     /// given base.
     fn tegum(&self) -> Self {
-        Self::duotegum(self, &Self::dyad()).with_name(self.name().clone().tegum())
+        let name: &Name<_> = self.as_ref();
+        Self::duotegum(self, &Self::dyad()).with_name(name.clone().tegum())
     }
 
     /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)
