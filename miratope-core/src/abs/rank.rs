@@ -1,3 +1,5 @@
+//! Declares the [`Rank`] type, along with a few other related types.
+
 use std::{fmt::Display, hash::Hash, iter, slice, vec};
 
 use serde::{Deserialize, Serialize};
@@ -7,7 +9,7 @@ use vec_like::*;
 /// of a polytope.
 ///
 /// Externally, it behaves as a number from -1 onwards. Internally, it contains
-/// a signed integer, representing the rank plus 1.
+/// an unsigned integer, representing the rank plus 1.
 #[derive(
     PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Debug, Hash, Serialize, Deserialize,
 )]
@@ -195,8 +197,12 @@ impl bevy_egui::egui::emath::Numeric for Rank {
     }
 }
 
-/// A `Vec` indexed by [rank](https://polytope.miraheze.org/wiki/Rank). Wraps
-/// around operations that offset by a constant for our own convenience.
+/// A convenient wrapper around a `Vec` that is indexed by a [`Rank`]. The first
+/// element in a `RankVec` is the one with index `-1`.
+///
+/// The element that a [`Rank`] indexes in a `RankVec` is the same as what the
+/// internal value of the [`Rank`] indexes in a `Vec`. Therefore, this wrapper
+/// should theoretically be zero-cost.
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct RankVec<T>(Vec<T>);
 impl_veclike!(@for [T] RankVec<T>, Item = T, Index = Rank);
@@ -210,23 +216,34 @@ impl<T> RankVec<T> {
         (self.0.len() as isize - 2).into()
     }
 
+    /// Initializes a new empty `Self` with the capacity to store elements up to
+    /// and including a given [`Rank`].
     pub fn with_rank_capacity(rank: Rank) -> Self {
         Self::with_capacity(rank.plus_one_usize() + 1)
     }
 
+    /// Returns a iterator that takes ownership of `self` and allows for
+    /// enumeration over `(Rank, T)` pairs. For more info, see the [`IntoIter`]
+    /// struct defined in the same module.
     pub fn rank_into_iter(self) -> IntoIter<T> {
         IntoIter(self.into_iter())
     }
 
+    /// Returns a iterator that allows for enumeration over `(Rank, &T)` pairs.
+    /// For more info, see the [`Iter`] struct defined in the same module.
     pub fn rank_iter(&self) -> Iter<T> {
         Iter(self.iter())
     }
 
+    /// Returns a iterator that allows for enumeration over `(Rank, &mut T)`
+    /// pairs. For more info, see the [`IterMut`] struct defined in the same
+    /// module.
     pub fn rank_iter_mut(&mut self) -> IterMut<T> {
         IterMut(self.iter_mut())
     }
 }
 
+/// Allows for [`Rank`] to be used as an index in a [`RankVec`].
 impl VecIndex for Rank {
     fn index(self) -> usize {
         self.plus_one_usize()

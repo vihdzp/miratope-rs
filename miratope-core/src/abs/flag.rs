@@ -1,5 +1,5 @@
 //! Helpful methods and structs for operating on the
-//! [flags](https://polytope.miraheze.org/wiki/Flag) of a polytope.
+//! [`Flags`](Flag) of a polytope.
 //!
 //! Recall that a flag is a maximal set of pairwise incident elements in a
 //! polytope. For convenience, we omit the minimal and maximal elements from our
@@ -17,9 +17,9 @@ use crate::{Float, Polytope};
 
 use vec_like::*;
 
-/// A [flag](https://polytope.miraheze.org/wiki/Flag) in a polytope. Stores the
-/// indices of the elements of each rank, excluding the minimal and maximal
-/// elements.
+/// Represents a [flag](https://polytope.miraheze.org/wiki/Flag) in a polytope.
+/// Stores the indices of the elements of each rank, excluding the minimal and
+/// maximal elements.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Flag(Vec<usize>);
 impl_veclike!(Flag, Item = usize, Index = usize);
@@ -651,6 +651,7 @@ impl FlagSet {
         }
     }
 
+    /// Returns `true` if the flag set is empty.
     pub fn is_empty(&self) -> bool {
         self.flags.is_empty()
     }
@@ -660,6 +661,8 @@ impl FlagSet {
         self.flags.len()
     }
 
+    /// Returns the set of all flag sets obtained from this one after removing
+    /// exactly one element.
     pub fn subsets(&self, polytope: &Abstract) -> Vec<Self> {
         let mut subsets = Vec::new();
 

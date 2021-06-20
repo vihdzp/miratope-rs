@@ -22,6 +22,7 @@ impl<T> Default for Pair<T> {
 }
 
 impl<T> Pair<T> {
+    /// Returns `true` if the pair is `None`.
     pub fn is_empty(&self) -> bool {
         matches!(self, Self::None)
     }
@@ -61,33 +62,36 @@ impl<T> Pair<T> {
 pub struct CycleBuilder(HashMap<usize, Pair<usize>>);
 
 impl CycleBuilder {
+    /// Initializes a new empty cycle builder.
     pub fn new() -> Self {
         Default::default()
     }
 
-    /// Initializes a cycle builder with a given capacity.
+    /// Initializes an empty cycle builder with a given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
         Self(HashMap::with_capacity(capacity))
     }
 
-    /// Returns the number of vertices in the vertex loop.
-    fn len(&self) -> usize {
+    /// Returns the number of vertices that have been added.
+    pub fn len(&self) -> usize {
         self.0.len()
     }
 
-    fn iter(&self) -> std::collections::hash_map::Iter<usize, Pair<usize>> {
-        self.0.iter()
+    /// Returns the first index and pair in the hash, under some arbitrary
+    /// order.
+    pub fn first(&self) -> Option<(&usize, &Pair<usize>)> {
+        self.0.iter().next()
     }
 
     /// Removes the entry associated to a given vertex and returns it, or `None`
     /// if no such entry exists.
-    fn remove(&mut self, idx: usize) -> Option<Pair<usize>> {
+    pub fn remove(&mut self, idx: usize) -> Option<Pair<usize>> {
         self.0.remove(&idx)
     }
 
     /// Returns a mutable reference to the edge associated to a vertex, adding
     /// it if it doesn't exist.
-    fn get_mut(&mut self, idx: usize) -> &mut Pair<usize> {
+    pub fn get_mut(&mut self, idx: usize) -> &mut Pair<usize> {
         use std::collections::hash_map::Entry;
 
         match self.0.entry(idx) {
@@ -126,7 +130,7 @@ impl CycleBuilder {
         let mut cycles = Vec::new();
 
         // While there's some vertex from which we haven't generated a cycle:
-        while let Some((&init, _)) = self.iter().next() {
+        while let Some((&init, _)) = self.first() {
             let mut cycle = Cycle::with_capacity(self.len());
             let mut prev = init;
             let mut cur = self.get_remove(prev).0;

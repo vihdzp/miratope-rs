@@ -41,7 +41,7 @@ pub trait VecLike<'a>:
     }
 
     /// Reserves capacity for at least `additional` more elements to be inserted
-    /// in `Self`.
+    /// in `self`.
     fn reserve(&mut self, additional: usize) {
         self.as_mut().reserve(additional)
     }
@@ -80,6 +80,7 @@ pub trait VecLike<'a>:
         self.as_mut().get_mut(index.index())
     }
 
+    /// Moves all the elements of `other` into `self`, leaving `other` empty.
     fn append(&mut self, other: &mut Self) {
         self.as_mut().append(other.as_mut())
     }

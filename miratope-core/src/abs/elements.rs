@@ -11,8 +11,8 @@ use crate::Polytope;
 
 use vec_like::*;
 
-/// A bundled rank and index, which can be used to refer to an element in an
-/// abstract polytope.
+/// A bundled rank and index, which can be used as coordinates to refer to an
+/// element in an abstract polytope.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ElementRef {
     /// The rank of the element.
@@ -50,18 +50,33 @@ pub trait Subsupelements<'a>: Sized + VecLike<'a, VecItem = usize> {
     }
 }
 
+/// Represents a list of subelements in a polytope. Each element is represented
+/// as its index in the [`ElementList`] of the previous rank. Is used as one of
+/// the fields in an [`Element`].
+///
+/// Internally, this is just a wrapper around a `Vec<usize>`.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Subelements(pub Vec<usize>);
 impl_veclike!(Subelements, Item = usize, Index = usize);
 impl<'a> Subsupelements<'a> for Subelements {}
 
+/// Represents a list of superelements in a polytope. Each element is
+/// represented as its index in the [`ElementList`] of the next rank. Is used as
+/// one of the fields in an [`Element`].
+///
+/// Internally, this is just a wrapper around a `Vec<usize>`.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Superelements(pub Vec<usize>);
 impl_veclike!(Superelements, Item = usize, Index = usize);
 impl<'a> Subsupelements<'a> for Superelements {}
 
-/// An element in a polytope, which stores the indices of both its subelements
-/// and superlements. These make up the entries of an [`ElementList`].
+/// Represents an element in a polytope (also known as a face), which stores the
+/// indices of both its [`Subelements`] and its [`Superelements`]. These make up
+/// the entries of an [`ElementList`].
+///
+/// Even though one of these fields would suffice to precisely define an
+/// element in an abstract polytope, we often are in need to use both of them.
+/// To avoid recalculating them every single time, we just store them both.
 #[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Element {
     /// The indices of the subelements of the previous rank.
@@ -115,10 +130,13 @@ impl Element {
 }
 
 /// A list of [`Elements`](Element) of the same
-/// [rank](https://polytope.miraheze.org/wiki/Rank).
+/// [rank](https://polytope.miraheze.org/wiki/Rank). An [`Abstract`] is built
+/// out of a [`RankVec`] of these.
 ///
-/// If you only want to deal with the subelements of a polytope, use
-/// [`SubelementList`] instead.
+/// If you only want to deal with the subelements of a polytope, consider using
+/// a [`SubelementList`] instead.
+///
+/// Internally, this is just a wrapper around `Vec<Element>`.
 #[derive(Debug, Clone)]
 pub struct ElementList(Vec<Element>);
 impl_veclike!(ElementList, Item = Element, Index = usize);
@@ -137,7 +155,9 @@ impl ElementList {
     }
 }
 
-/// A list of subelements in a polytope.
+/// A list of [`Subelements`] in a polytope. Can be used by an
+/// [`AbstractBuilder`] to build the [`Elements`](Element) of a polytope one
+/// rank at a time.
 #[derive(Debug)]
 pub struct SubelementList(Vec<Subelements>);
 impl_veclike!(SubelementList, Item = Subelements, Index = usize);
@@ -167,39 +187,57 @@ impl SubelementList {
 }
 
 /// A structure used to build a polytope from the bottom up.
+///
+/// To operate on polytopes, we often need both the [`Subelements`] and
+/// [`Superelements`] of each [`Element`]. However, if we only had one of these
+/// for every `Element`, the other would be uniquely specified. This struct
+/// allows us to build a polytope rank by rank by specifying the
+/// [`SubelementLists`](SubelementList) of each succesive rank. It also has a
+/// few convenienece methods to build these lists in specific cases.
 #[derive(Default)]
 pub struct AbstractBuilder(Abstract);
 
 impl AbstractBuilder {
+    /// Initializes a new empty abstract builder.
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Initializes a new empty abstract builder with a capacity to store
+    /// elements up and until a given [`Rank`].
     pub fn with_capacity(rank: Rank) -> Self {
         Self(Abstract::with_rank_capacity(rank))
     }
 
+    /// Returns `true` if we haven't added any elements to the polytope.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
+    /// Reserves capacity for at least `additional` more element lists to be
+    /// inserted in the polytope.
     pub fn reserve(&mut self, additional: usize) {
         self.0.reserve(additional)
     }
 
+    /// Pushes a new [`SubelementList`] onto the polytope.
     pub fn push(&mut self, subelements: SubelementList) {
         self.0.push_subs(subelements)
     }
 
     /// Pushes an element list with a single empty element into the polytope.
+    ///
+    /// This method should only be used when the polytope is empty.
     pub fn push_min(&mut self) {
         // If you're using this method, the polytope should be empty.
         debug_assert!(self.is_empty());
         self.push(SubelementList::min());
     }
 
-    ///  To be
-    /// used in circumstances where the elements are built up in layers.
+    /// Pushes an element list with a set number of vertices into the polytope.
+    ///
+    /// This method should only be used when a single, minimal element list has
+    /// been inserted into the polytope.
     pub fn push_vertices(&mut self, vertex_count: usize) {
         // If you're using this method, the polytope should consist of a single
         // minimal element.
@@ -207,10 +245,14 @@ impl AbstractBuilder {
         self.push(SubelementList::vertices(vertex_count))
     }
 
+    /// Pushes a maximal element list into the polytope.
+    ///
+    /// This should be the last push operation that you apply to a polytope.
     pub fn push_max(&mut self) {
         self.0.push_max();
     }
 
+    /// Returns the built polytope, consuming the builder in the process.
     pub fn build(self) -> Abstract {
         self.0
     }
@@ -218,7 +260,7 @@ impl AbstractBuilder {
 
 /// Maps each recursive subelement of an abstract polytope's element to a
 /// `usize`, representing its index in a new polytope. This is used to build the
-/// elements of polytopes (as polytopes), or to find their vertices.
+/// elements figures of polytopes, or to find their vertices.
 pub struct ElementHash(RankVec<HashMap<usize, usize>>);
 
 impl ElementHash {
@@ -332,10 +374,6 @@ impl ElementHash {
     }
 }
 
-/// A pair of indices in a polytope.
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct Indices(pub usize, pub usize);
-
 /// Represents the lowest and highest element of a section of an abstract
 /// polytope. Not to be confused with a cross-section.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -358,11 +396,6 @@ impl SectionRef {
     pub fn new(lo: ElementRef, hi: ElementRef) -> Self {
         Self { lo, hi }
     }
-
-    /// Returns the indices stored in the section.
-    pub fn indices(&self) -> Indices {
-        Indices(self.lo.idx, self.hi.idx)
-    }
 }
 
 /// Represents a map from sections in a polytope to their indices in a new
@@ -374,7 +407,7 @@ impl SectionRef {
 /// with three arguments instead of four. This probably isn't worth the hassle,
 /// though.
 #[derive(Default, Debug)]
-pub struct SectionHash(HashMap<SectionRef, usize>);
+pub(crate) struct SectionHash(HashMap<SectionRef, usize>);
 
 impl IntoIterator for SectionHash {
     type Item = (SectionRef, usize);
@@ -391,10 +424,6 @@ impl SectionHash {
     /// Initializes a new section hash.
     pub fn new() -> Self {
         Default::default()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 
     /// Returns the number of stored elements.

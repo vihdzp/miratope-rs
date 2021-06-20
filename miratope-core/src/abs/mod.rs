@@ -21,11 +21,16 @@ use rayon::prelude::*;
 use strum_macros::Display;
 use vec_like::VecLike;
 
+/// Represents the way in which two elements with one rank of difference are
+/// incident to one another. Used as a field in some [`AbstractError`] variants.
+
 #[derive(Debug, Display)]
 pub enum IncidenceType {
+    /// This element is a subelement of another.
     #[strum(serialize = "subelement")]
     Subelement,
 
+    /// This element is a superelement of another.
     #[strum(serialize = "superelement")]
     Superelement,
 }
@@ -35,34 +40,59 @@ pub enum IncidenceType {
 pub enum AbstractError {
     /// The polytope is not bounded, i.e. it doesn't have a single minimal and
     /// maximal element.
-    Bounded { min_count: usize, max_count: usize },
+    Bounded {
+        /// The number of minimal elements.
+        min_count: usize,
+
+        /// The number of maximal elements.
+        max_count: usize,
+    },
 
     /// The polytope has some invalid index, i.e. some element points to another
     /// non-existent element.
     Index {
+        /// The coordinates of the element at fault.
         el: ElementRef,
+
+        /// Whether the invalid index is a subelement or a superelement.
         incidence_type: IncidenceType,
+
+        /// The invalid index.
         index: usize,
     },
 
     /// The polytope has a consistency error, i.e. some element is incident to
     /// another but not viceversa.
     Consistency {
+        /// The coordinates of the element at fault.
         el: ElementRef,
+
+        /// Whether the invalid incidence is a subelement or a superelement.
         incidence_type: IncidenceType,
+
+        /// The invalid index.
         index: usize,
     },
 
     /// The polytope is not ranked, i.e. some element that's not minimal or not
     /// maximal lacks a subelement or superelement, respectively.
     Ranked {
+        /// The coordinates of the element at fault.
         el: ElementRef,
+
+        /// Whether the missing incidences are at subelements or superelements.
         incidence_type: IncidenceType,
     },
 
     /// The polytope is not dyadic, i.e. some section of height 1 does not have
     /// exactly 4 elements.
-    Dyadic { section: SectionRef, more: bool },
+    Dyadic {
+        /// The coordinates of the section at fault.
+        section: SectionRef,
+
+        /// Whether there were more than 4 elements in the section (or less).
+        more: bool,
+    },
 
     /// The polytope is not strictly connected, i.e. some section's flags don't
     /// form a connected graph under flag changes.
@@ -133,13 +163,49 @@ impl std::error::Error for AbstractError {}
 /// The return value for [`Abstract::is_valid`].
 pub type AbstractResult<T> = Result<T, AbstractError>;
 
-/// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
-/// to an [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
-/// It stores the indices of both the subelements and superelements of each
-/// element.
+/// Encodes the ranked poset corresponding to the abstract polytope. Internally,
+/// it wraps around a [`RankVec`] of [`ElementLists`](ElementList).
 ///
 /// # What is an abstract polytope?
-/// todo
+/// Mathematically, an abstract polytope is a certain kind of **partially
+/// ordered set** (also known as a poset). A partially ordered set is a set P
+/// together with a relation ≤ on the set, satisfying three properties.
+/// 1. Reflexivity: *a* ≤ *a*.
+/// 2. Antisymmetry: *a* ≤ *b* and *b* ≤ *a* implies *a* = *b*.
+/// 3. Transitivity: *a* ≤ *b* and *b* ≤ *c* implies *a* ≤ *c*.
+///
+/// If either *a* ≤ *b* or *b* ≤ *a*, we say that *a* and *b* are incident. If
+/// *a* ≤ *c* and there's no *b* other than *a* or *c* such that *a* ≤ *b* ≤
+/// *c*, we say that *c* covers *a*.
+///
+/// An **abstract polytope** must also satisfy these three extra conditions:
+/// 1. Bounded: It has a minimal and maximal element.
+/// 2. Ranked: Every element *x* can be assigned a rank *r*(*x*) so that
+///    *r*(*x*) ≤ *r*(*y*) when *x* ≤ *y*, and *r*(*x*) + 1 = *r*(*y*) when *y*
+///    covers *x*.
+/// 3. Diamond property: If *a* ≤ *c* and *r*(*a*) + 2 = *r*(*c*), then there
+///    must be exactly two elements *b* such that *a* ≤ *b* ≤ *c*.
+///
+/// Each element in the poset represents an element in the polytope (that is, a
+/// vertex, edge, etc.) By convention, we choose the rank function so that the
+/// minimal element has rank &minus;1, which makes the rank of an element match
+/// its expected dimension (vertices are rank 0, edges are rank 1, etc.) The
+/// minimal and maximal element in the poset represent an "empty" element and
+/// the entire polytope, and are there mostly for convenience.
+///
+/// For more info, see [Wikipedia](https://en.wikipedia.org/wiki/Abstract_polytope)
+/// or the [Polytope Wiki](https://polytope.miraheze.org/wiki/Abstract_polytope)
+///
+/// # How are these represented?
+/// The core attribute of the `Abstract` type is the `ranks` attribute, which
+/// contains a `RankVec<ElementList>`.
+///
+/// A [`RankVec`] is a wrapper around a `Vec` that allows us to index by a
+/// [`Rank`]. That is, indexing starts at `-1`.
+///
+/// An [`ElementList`] is nothing but a list of [`Elements`](Element). Every
+/// element stores the indices of the incident [`Subelements`] of the previous
+/// rank, as well as the [`Superelements`] of the next rank.
 ///
 /// # How to use?
 /// The fact that we store both subelements and superelements is quite useful
@@ -157,12 +223,14 @@ pub type AbstractResult<T> = Result<T, AbstractError>;
 /// assumption that they're empty.
 #[derive(Debug, Clone)]
 pub struct Abstract {
+    /// The list of element lists in the polytope, ordered by [`Rank`].
     pub ranks: RankVec<ElementList>,
 
     /// The name of the polytope, using the transformation rules for an abstract
     /// polytope.
     name: Name<Abs>,
 
+    /// Whether every single element's subelements and superelements are sorted.
     sorted: bool,
 }
 
@@ -225,10 +293,14 @@ impl Abstract {
         RankVec::with_rank_capacity(rank).into()
     }
 
+    /// Returns `true` if we haven't added any elements to the polytope. Note
+    /// that such a polytope is considered invalid.
     pub fn is_empty(&self) -> bool {
         self.ranks.is_empty()
     }
 
+    /// Reserves capacity for at least `additional` more element lists to be
+    /// inserted in `self`.
     pub fn reserve(&mut self, additional: usize) {
         self.ranks.reserve(additional)
     }
@@ -297,8 +369,8 @@ impl Abstract {
     }
 
     /// Pushes a new element list without superelements, assuming that the
-    /// superelements of the maximal rank **haven't** already been set. If they
-    /// have already been set, use [`push`](Self::push) instead.
+    /// superelements of the current maximal rank **haven't** already been set.
+    /// If they have already been set, use [`push`](Self::push) instead.
     pub fn push_subs(&mut self, subelements: SubelementList) {
         self.push(ElementList::with_capacity(subelements.len()));
 
@@ -506,6 +578,8 @@ impl Abstract {
         (abs, vertices, dual_vertices)
     }
 
+    /// Returns the omnitruncate of a polytope, along with the flags that make
+    /// up its vertices.
     pub fn omnitruncate_and_flags(&mut self) -> (Self, Vec<Flag>) {
         self.sort();
 

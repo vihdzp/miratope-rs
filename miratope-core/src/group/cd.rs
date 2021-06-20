@@ -348,6 +348,9 @@ pub enum NodeRef {
 }
 
 impl NodeRef {
+    /// Initializes a new node reference from an index. The `neg` parameter
+    /// determines if indexing should be [`Negative`](Self::Negative) or
+    /// [`Absolute`](Self::Absolute).
     pub fn new(neg: bool, idx: usize) -> Self {
         if neg {
             Self::Negative(idx)
