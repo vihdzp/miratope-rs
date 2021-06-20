@@ -99,7 +99,9 @@ impl std::fmt::Display for DualError {
 
 impl std::error::Error for DualError {}
 
+/// Gets the precalculated value for n!.
 fn factorial(n: usize) -> u32 {
+    /// Precalculated factorials from 0! to 13!.
     const FACTORIALS: [u32; 13] = [
         1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600,
     ];
@@ -279,16 +281,25 @@ pub trait Polytope<T: NameType>:
         }
     }
 
+    /// Builds a Petrial in place. Returns `true` if successful. Does not modify
+    /// the original polytope otherwise.
     fn petrial_mut(&mut self) -> bool;
 
-    fn petrial(mut self) -> Option<Self> {
-        self.petrial_mut().then(|| self)
+    /// Builds the Petrial of a polytope. Returns `None` if the polytope is not
+    /// 3D, or if its Petrial is not a valid polytope.
+    fn petrial(&self) -> Option<Self> {
+        let mut clone = self.clone();
+        clone.petrial_mut().then(|| clone)
     }
 
+    /// Builds a Petrie polygon from the first flag of the polytope. Returns
+    /// `None` if this Petrie polygon is invalid.
     fn petrie_polygon(&mut self) -> Option<Self> {
         self.petrie_polygon_with(self.first_flag()?)
     }
 
+    /// Builds a Petrie polygon from a given flag of the polytope. Returns
+    /// `None` if this Petrie polygon is invalid.
     fn petrie_polygon_with(&mut self, flag: Flag) -> Option<Self>;
 
     /// Returns the first [`Flag`] of a polytope. This is the flag built when we
@@ -330,6 +341,7 @@ pub trait Polytope<T: NameType>:
         OrientedFlagIter::new(self.as_ref())
     }
 
+    /// Returns the omnitruncate of a polytope.
     fn omnitruncate(&mut self) -> Self;
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)

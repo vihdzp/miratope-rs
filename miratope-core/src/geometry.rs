@@ -12,6 +12,8 @@ pub type VectorSlice<'a> = nalgebra::DVectorSlice<'a, Float>;
 /// An *n* by *n* matrix.
 pub type Matrix = nalgebra::DMatrix<Float>;
 
+use std::borrow::Cow;
+
 use crate::{Consts, Float};
 
 use approx::{abs_diff_eq, abs_diff_ne};
@@ -177,18 +179,17 @@ impl Subspace {
     ///
     /// Consider using [`Self::from_points_with`] if you expect your subspace to
     /// have an exact rank.
-    pub fn from_points<'a, T: Iterator<Item = &'a Point>>(mut points: T) -> Self {
+    pub fn from_points<'a, T: Iterator<Item = &'a Point>>(mut iter: T) -> Self {
         let mut subspace = Self::new(
-            points
-                .next()
+            iter.next()
                 .expect("A hyperplane can't be created from an empty point array!")
                 .clone(),
         );
 
-        for p in points {
+        for p in iter {
             // If the subspace is of full rank, we don't need to check any
             // more points.
-            if subspace.add(p) && subspace.is_full_rank() {
+            if subspace.add(&p) && subspace.is_full_rank() {
                 return subspace;
             }
         }
@@ -237,6 +238,30 @@ impl Subspace {
         q
     }
 
+    /// Projects a point onto the subspace, but returns lower-dimensional
+    /// coordinates in the subspace's basis.
+    pub fn flatten(&self, p: &Point) -> Point {
+        let p = p - &self.offset;
+        Point::from_iterator(self.rank(), self.basis.iter().map(|b| p.dot(b)))
+    }
+
+    /// Projects a set of points onto the subspace, but returns
+    /// lower-dimensional coordinates in the subspace's basis.
+    ///
+    /// This optimizes [`Self::flatten`] by just returning the original set in
+    /// case that the subspace is of full rank.
+    pub fn flatten_vec<'a>(&self, vec: &'a [Point]) -> Cow<'a, [Point]> {
+        if self.is_full_rank() {
+            Cow::Borrowed(vec)
+        } else {
+            let mut flat_vec = Vec::new();
+            for v in vec {
+                flat_vec.push(self.flatten(v));
+            }
+            Cow::Owned(flat_vec)
+        }
+    }
+
     /// Calculates the distance from a point to the subspace.
     pub fn distance(&self, p: &Point) -> Float {
         (p - self.project(p)).norm()
@@ -246,13 +271,6 @@ impl Subspace {
     /// left out of it. Returns `None` if the point given lies on the subspace.
     pub fn normal(&self, p: &Point) -> Option<Vector> {
         (p - self.project(p)).try_normalize(Float::EPS)
-    }
-
-    /// Applies a map from the subspace to a lower dimensional space to the
-    /// point.
-    pub fn flatten(&self, p: &Point) -> Point {
-        let p = p - &self.offset;
-        Point::from_iterator(self.rank(), self.basis.iter().map(|b| p.dot(b)))
     }
 
     // Computes a set of independent vectors that span the orthogonal
@@ -286,10 +304,6 @@ impl Hyperplane {
         }
 
         Self { subspace, normal }
-    }
-
-    pub fn is_hyperplane(&self) -> bool {
-        self.subspace.is_hyperplane()
     }
 
     /// Projects a point onto the hyperplane.

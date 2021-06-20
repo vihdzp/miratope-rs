@@ -1,3 +1,5 @@
+//! Declares the [`Concrete`] polytope type and all associated data structures.
+
 pub mod cycle;
 pub mod element_types;
 pub mod file;
@@ -151,6 +153,7 @@ impl Concrete {
         }
     }
 
+    /// Recenters a polytope so that a certain point is at the origin.
     pub fn recenter_with(&mut self, p: &Point) {
         for v in &mut self.vertices {
             *v -= p;
@@ -240,6 +243,7 @@ impl Concrete {
         }
     }
 
+    /// Returns the length of a given edge.
     pub fn edge_len(&self, idx: usize) -> Option<Float> {
         let edge = self.abs.get_element(ElementRef::new(Rank::new(1), idx))?;
         Some((&self.vertices[edge.subs[0]] - &self.vertices[edge.subs[1]]).norm())
@@ -435,6 +439,12 @@ impl Concrete {
         Ok(self.antiprism_with_vertices(vertices, dual_vertices))
     }
 
+    /// Builds an antiprism, using a specified hypersphere to take a dual, and
+    /// with a given height.
+    ///
+    /// # Panics
+    /// Panics if any facets pass through the inversion center. If you want to
+    /// handle this possibility, use [`Self::try_antiprism_with`] instead.
     pub fn antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Self {
         self.try_antiprism_with(sphere, height).unwrap()
     }
@@ -585,9 +595,9 @@ impl Concrete {
             return None;
         }
 
-        // The vertices, flattened if necessary.
-        let flat_vertices = self.flat_vertices();
-        let flat_vertices = flat_vertices.as_ref().unwrap_or(&self.vertices);
+        // The flattened vertices (may possibly be the original vertices).
+        let subspace = Subspace::from_points(self.vertices.iter());
+        let flat_vertices = subspace.flatten_vec(&self.vertices);
 
         match flat_vertices.get(0)?.len().cmp(&rank.into()) {
             // Degenerate polytopes have volume 0.
@@ -675,20 +685,6 @@ impl Concrete {
         Some(volume / crate::factorial(rank_usize) as Float)
     }
 
-    pub fn flat_vertices(&self) -> Option<Vec<Point>> {
-        let subspace = Subspace::from_points(self.vertices.iter());
-
-        if subspace.is_full_rank() {
-            None
-        } else {
-            let mut flat_vertices = Vec::new();
-            for v in &self.vertices {
-                flat_vertices.push(subspace.flatten(v));
-            }
-            Some(flat_vertices)
-        }
-    }
-
     /// Projects the vertices of the polytope into the lowest dimension possible.
     /// If the polytope's subspace is already of full rank, this is a no-op.
     pub fn flatten(&mut self) {
@@ -711,10 +707,6 @@ impl Concrete {
     /// # Todo
     /// We should make this function take a general [`Subspace`] instead.
     pub fn cross_section(&self, slice: &Hyperplane) -> Self {
-        debug_assert!(
-            slice.is_hyperplane(),
-            "Sections can only be taken from hyperplanes!"
-        );
         let mut vertices = Vec::new();
         let mut ranks = RankVec::with_rank_capacity(self.rank().minus_one());
 

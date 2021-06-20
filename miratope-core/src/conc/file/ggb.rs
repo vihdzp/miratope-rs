@@ -1,3 +1,8 @@
+//! Contains the code that opens a GGB file and parses it into a polytope.
+
+// This code is unfinished.
+#![allow(dead_code)]
+
 use std::{
     fs::File,
     io::{Read, Result as IoResult},
@@ -38,6 +43,7 @@ impl<'a> AsMut<Events<'a>> for XmlReader<'a> {
 }
 
 impl<'a> XmlReader<'a> {
+    /// Initializes a new XML reader from a source XML string.
     pub fn new(xml: &'a str) -> Self {
         Self(EventReader::from_str(xml).into_iter())
     }
@@ -155,6 +161,7 @@ impl From<ZipError> for GgbError {
     }
 }
 
+/// The result of trying to read a GGB file.
 pub type GgbResult<T> = Result<T, GgbError>;
 
 impl std::error::Error for GgbError {}

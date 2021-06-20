@@ -7,7 +7,6 @@ use std::{
     iter,
 };
 
-use super::conc::Concrete;
 use crate::{
     geometry::{Matrix, MatrixOrd, Point, PointOrd, VectorSlice},
     Consts, Float,
@@ -145,6 +144,8 @@ impl Iterator for Group {
 }
 
 impl Group {
+    /// Initializes a new group with a given dimension and a given
+    /// [`GroupIter`].
     pub fn new<T: 'static + GroupIter>(dim: usize, iter: T) -> Self {
         Self {
             dim,
@@ -162,6 +163,7 @@ impl Group {
         self.count()
     }
 
+    /// Initializes a group from a given set of generators.
     pub fn from_gens(dim: usize, gens: Vec<Matrix>) -> Self {
         Self::new(dim, Box::new(GenIter::new(dim, gens)))
     }
@@ -244,6 +246,10 @@ impl Group {
     }
 
     /// Shorthand for `Self::parse(input).unwrap().unwrap()`.
+    ///
+    /// # Panics
+    /// Panics if either the Coxeter diagram is invalid, or if doesn't describe
+    /// a valid group.
     pub fn parse_unwrap(input: &str) -> Self {
         Self::parse(input).unwrap().unwrap()
     }
@@ -263,16 +269,25 @@ impl Group {
     }
 
     /// Returns the I2(x) symmetry group.
+    ///
+    /// # Panics
+    /// This should never panic. If it does, please file a bug report.
     pub fn i2(x: Float) -> Self {
         Self::cox_group(CoxMatrix::i2(x)).unwrap()
     }
 
     /// Returns the An symmetry group.
+    ///
+    /// # Panics
+    /// This should never panic. If it does, please file a bug report.
     pub fn a(n: usize) -> Self {
         Self::cox_group(CoxMatrix::a(n)).unwrap()
     }
 
     /// Returns the Bn symmetry group.
+    ///
+    /// # Panics
+    /// This should never panic. If it does, please file a bug report.
     pub fn b(n: usize) -> Self {
         Self::cox_group(CoxMatrix::b(n)).unwrap()
     }
@@ -407,12 +422,12 @@ impl Group {
         points.into_iter().map(|x| x.0).collect()
     }
 
-    /// Generates a polytope as the convex hull of the orbit of a point under a
-    /// given symmetry group.
-    pub fn into_polytope(self, _: Point) -> Concrete {
+    // Generates a polytope as the convex hull of the orbit of a point under a
+    // given symmetry group.
+    /* pub fn into_polytope(self, _: Point) -> Concrete {
         todo!()
         // convex::convex_hull(self.orbit(p))
-    }
+    } */
 }
 
 /// The result of trying to get the next element in a group.

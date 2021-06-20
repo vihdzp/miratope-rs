@@ -24,8 +24,11 @@ pub enum FileError<'a> {
     /// Some generic I/O error occured.
     IoError(IoError),
 
+    /// The file couldn't be parsed as UTF-8.
     InvalidFile(FromUtf8Error),
 
+    /// An error while opening the GGB file (which is really a ZIP file in
+    /// disguise).
     ZipError(ZipError),
 
     /// A non-supported file extension.

@@ -1,3 +1,6 @@
+//! Contains the code to convert from a polygon as a set of edges into a polygon
+//! as a cycle of vertices.
+
 use std::collections::HashMap;
 
 use vec_like::*;

@@ -1,3 +1,5 @@
+//! Contains the code that opens an OFF file and parses it into a polytope.
+
 use std::{collections::HashMap, fs, io::Result as IoResult, path::Path, str::FromStr};
 
 use crate::{
@@ -497,12 +499,20 @@ impl Default for OffOptions {
 
 /// An auxiliary struct to write a polytope to an OFF file.
 pub struct OffWriter<'a> {
+    /// The output OFF file, as a string. (Maybe we should use a file writer
+    /// or something similar instead?)
     off: String,
+
+    /// The polytope that we're converting into an OFF file.
     polytope: &'a Concrete,
+
+    /// Options for the text output.
     options: OffOptions,
 }
 
 impl<'a> OffWriter<'a> {
+    /// Initializes a new OFF writer from a polytope, with a given set of 
+    /// options.
     pub fn new(polytope: &'a Concrete, options: OffOptions) -> Self {
         Self {
             off: String::new(),
@@ -664,6 +674,7 @@ impl<'a> OffWriter<'a> {
         }
     }
 
+    /// Consumes the OFF writer, returns the actual OFF file as a `String`.
     pub fn build(mut self) -> String {
         let rank = self.polytope.rank();
         let vertices = &self.polytope.vertices;
@@ -757,7 +768,6 @@ mod tests {
     /// Checks that a dyad has the correct amount of elements.
     fn dyad_nums() {
         let dyad = Concrete::from_off("1OFF 2 -1 1 0 1").unwrap();
-
         test_shape(dyad, vec![1, 2, 1])
     }
 

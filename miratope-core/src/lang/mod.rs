@@ -1,3 +1,9 @@
+// This part of the code is still REALLY unstable. No point in documenting stuff
+// thoroughly just yet.
+#![allow(clippy::missing_docs_in_private_items)]
+#![allow(clippy::missing_panics_doc)]
+#![allow(missing_docs)]
+
 //! A module dedicated to parsing the names of polytopes into different
 //! languages.
 //!

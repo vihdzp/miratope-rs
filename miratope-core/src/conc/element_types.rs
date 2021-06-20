@@ -8,6 +8,8 @@ use approx::abs_diff_eq;
 use vec_like::*;
 
 #[derive(PartialOrd, Ord, PartialEq, Eq, Hash)]
+/// Contains both the "type" of a set of elements, and the number of elements of
+/// such type.
 pub struct ElementCount {
     /// The index of the type of these elements.
     type_index: usize,
@@ -58,6 +60,7 @@ pub enum ElementData {
 }
 
 impl ElementData {
+    /// The number of facets in a polytope with a given metadata.
     pub fn facet_count(&self) -> usize {
         match self {
             ElementData::Point => 1,
@@ -79,10 +82,16 @@ pub struct ElementType {
 }
 
 impl ElementType {
+    /// Returns the number of elements with this type.
     pub fn count(&self) -> usize {
         self.indices.len()
     }
 
+    /// Returns the edge length of the element data, if applicable.
+    ///
+    /// # Panics
+    /// Panics if the data of this element type isn't an
+    /// [`Edge`](ElementData::Edge).
     pub fn len(&self) -> Float {
         if let ElementData::Edge(len) = self.data {
             len.0
@@ -214,6 +223,7 @@ impl Concrete {
         output
     }
 
+    /// Prints all element types of a polytope into the console.
     pub fn print_element_types(&self) {
         // An iterator over the element types of each rank.
         let mut type_iter = self.element_types().into_iter().enumerate();
