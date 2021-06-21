@@ -580,6 +580,9 @@ impl Abstract {
 
     /// Returns the omnitruncate of a polytope, along with the flags that make
     /// up its vertices.
+    ///
+    /// # Panics
+    /// This method shouldn't panic. If it does, please file a bug.
     pub fn omnitruncate_and_flags(&mut self) -> (Self, Vec<Flag>) {
         self.sort();
 
@@ -759,9 +762,13 @@ impl Abstract {
     /// Determines whether the polytope satisfies the diamond property. A valid
     /// non-fissary polytope should always return `true`.
     pub fn is_dyadic(&self) -> AbstractResult<()> {
+        /// The number of times we've found an element.
         #[derive(PartialEq)]
         enum Count {
+            /// We've found an element once.
             Once,
+
+            /// We've found an element twice.
             Twice,
         }
 

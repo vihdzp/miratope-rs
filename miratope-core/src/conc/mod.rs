@@ -59,7 +59,7 @@ impl Concrete {
         if cfg!(debug_assertions) {
             if let Some(vertex0) = vertices.get(0) {
                 for vertex1 in &vertices {
-                    assert_eq!(vertex0.len(), vertex1.len());
+                    debug_assert_eq!(vertex0.len(), vertex1.len());
                 }
             }
         }
@@ -123,6 +123,10 @@ impl Concrete {
 
     /// Builds the star polygon `{n / d}`. with unit circumradius. If `n` and `d`
     /// have a common factor, the result is a compound.
+    ///
+    /// # Panics
+    /// Will panic if either `n < 2` or if `d < 1`, in which case there's
+    /// nothing sensible to do.
     pub fn star_polygon(n: usize, d: usize) -> Self {
         assert!(n >= 2);
         assert!(d >= 1);
@@ -320,6 +324,9 @@ impl Concrete {
     /// place, or does nothing in case any facets go through the reciprocation
     /// center. In case of failure, returns the index of the facet through the
     /// projection center.
+    ///
+    /// # Panics
+    /// This method shouldn't panic. If it does, please file a bug.
     pub fn try_dual_mut_with(&mut self, sphere: &Hypersphere) -> DualResult<()> {
         // If we're dealing with a nullitope, the dual is itself.
         let rank = self.rank();
@@ -703,6 +710,9 @@ impl Concrete {
     }
 
     /// Takes the cross-section of a polytope through a given hyperplane.
+    ///
+    /// # Panics
+    /// This method shouldn't panic. If it does, please file a bug.
     ///
     /// # Todo
     /// We should make this function take a general [`Subspace`] instead.

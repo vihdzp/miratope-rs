@@ -36,6 +36,10 @@ impl Flag {
     }
 
     /// Applies a specified flag change to the flag in place.
+    ///
+    /// # Panics
+    /// This method should only panic if an invalid polytope is given as an
+    /// argument.
     pub fn change_mut(&mut self, polytope: &Abstract, r: usize) {
         let rank = polytope.rank();
         debug_assert_ne!(
@@ -444,9 +448,7 @@ impl<'a> OrientedFlagIter<'a> {
         flag_changes: FlagChanges,
         first_flag: OrientedFlag,
     ) -> Self {
-        if cfg!(debug_assertions) {
-            polytope.bounded().unwrap();
-        }
+        debug_assert_eq!(polytope.bounded().unwrap(), ());
 
         let first = polytope.rank() == Rank::new(-1);
 

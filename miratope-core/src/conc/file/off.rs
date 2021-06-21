@@ -511,7 +511,7 @@ pub struct OffWriter<'a> {
 }
 
 impl<'a> OffWriter<'a> {
-    /// Initializes a new OFF writer from a polytope, with a given set of 
+    /// Initializes a new OFF writer from a polytope, with a given set of
     /// options.
     pub fn new(polytope: &'a Concrete, options: OffOptions) -> Self {
         Self {
@@ -683,7 +683,7 @@ impl<'a> OffWriter<'a> {
         // Serialized name.
         self.off.push_str("# ");
         self.off
-            .push_str(&ron::to_string(&self.polytope.name).unwrap());
+            .push_str(&ron::to_string(&self.polytope.name).unwrap_or_default());
         self.off.push('\n');
 
         // Blatant advertising.

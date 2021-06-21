@@ -75,6 +75,12 @@ impl CycleBuilder {
         Self(HashMap::with_capacity(capacity))
     }
 
+    /// Returns `true` if no vertices have been added.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+
     /// Returns the number of vertices that have been added.
     pub fn len(&self) -> usize {
         self.0.len()
