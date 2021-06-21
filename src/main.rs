@@ -35,7 +35,7 @@
 //!
 //! Miratope is written in Rust, so if you don't already have the latest version and its Visual Studio C++ Build tools downloaded then you should do that first. Instructions for downloading can be found here: [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install). **You may have to restart your computer for Rust to fully install**.
 //!
-//! 1. Once you have Rust setup click the green button here on Github that says "Code".
+//! 1. Once you have Rust set up click the green button on [the Github page](https://github.com/OfficialURL/miratope-rs) that says "Code".
 //!    * If you already have Github Desktop, you can just click "Open with Github Desktop".
 //!    * If you don't, click "Download ZIP" and once it's done downloading, extract the `.zip` file.
 //! 2. Next, open a command line. On Windows you can do this by opening Run with `Win+R` and typing `cmd` in the search box.
