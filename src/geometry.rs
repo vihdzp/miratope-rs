@@ -321,6 +321,7 @@ impl Hyperplane {
         let d1 = self.distance(&l.1);
         let t = d1 / (d1 - d0);
 
+        #[allow(clippy::if_same_then_else)]
         if abs_diff_eq!(d1 - d0, 0.0, epsilon = Float::EPS) {
             None
         } else if (d0 < 0.0) ^ (d1 >= 0.0) {
