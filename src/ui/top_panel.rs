@@ -752,7 +752,7 @@ fn show_views(
 
             if let Some(mut p) = query.iter_mut().next() {
                 let r = original_polytope.clone();
-                let hyp_pos = *hyperplane_pos + 0.0000001; // Botch fix for degeneracies.
+                let hyp_pos = *hyperplane_pos + 0.0; // removing the +0.0 triggers a runtime error
 
                 if let Some(dim) = r.dim() {
                     let hyperplane = Hyperplane::new(section_direction.0.clone(), hyp_pos);

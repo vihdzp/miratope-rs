@@ -320,8 +320,10 @@ impl Hyperplane {
         let d0 = self.distance(&l.0);
         let d1 = self.distance(&l.1);
         let t = d1 / (d1 - d0);
-
-        if !(0.0..=1.0).contains(&t) {
+        
+        if abs_diff_eq!(d1 - d0, 0.0, epsilon = Float::EPS) {
+            None
+        } else if (d0 < 0.0) ^ (d1 >= 0.0) {
             None
         } else {
             Some(l.at(t))
