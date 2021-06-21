@@ -658,14 +658,13 @@ fn show_views(
         ui.add(
             egui::Slider::new(
                 &mut new_hyperplane_pos,
-                (minmax.0 + 0.00001)..=(minmax.1 - 0.00001),
+                (minmax.0 + 0.0000001)..=(minmax.1 - 0.0000001),
             )
             .text("Slice depth")
             .prefix("pos: "),
         );
 
         // Updates the slicing depth.
-
         #[allow(clippy::float_cmp)]
         if hyperplane_pos != new_hyperplane_pos {
             if let SectionState::Active { hyperplane_pos, .. } = section_state.as_mut() {
@@ -676,7 +675,6 @@ fn show_views(
         }
 
         let mut new_direction = section_direction.0.clone();
-
         ui.add(UnitPointWidget::new(
             &mut new_direction,
             "Cross-section depth",
@@ -749,7 +747,7 @@ fn show_views(
 
             if let Some(mut p) = query.iter_mut().next() {
                 let r = original_polytope.clone();
-                let hyp_pos = *hyperplane_pos + 0.0; // removing the +0.0 triggers a runtime error
+                let hyp_pos = *hyperplane_pos;
 
                 if let Some(dim) = r.dim() {
                     let hyperplane = Hyperplane::new(section_direction.0.clone(), hyp_pos);

@@ -1,6 +1,7 @@
-#![warn(clippy::missing_docs_in_private_items)]
-#![warn(clippy::missing_panics_doc)]
-#![warn(missing_docs)]
+// These are helpful to enable while we're building the docs.
+// #![warn(clippy::missing_docs_in_private_items)]
+// #![warn(clippy::missing_panics_doc)]
+// #![warn(missing_docs)]
 
 //! This is the main dependency of
 //! [Miratope](https://github.com/OfficialURL/miratope-rs). It contains all code

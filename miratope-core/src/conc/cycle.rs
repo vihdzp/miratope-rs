@@ -80,7 +80,6 @@ impl CycleBuilder {
         self.0.is_empty()
     }
 
-
     /// Returns the number of vertices that have been added.
     pub fn len(&self) -> usize {
         self.0.len()

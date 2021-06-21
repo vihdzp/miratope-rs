@@ -330,30 +330,28 @@ impl Hyperplane {
 
     /// Returns the intersection of itself and a line segment, or `None` if it
     /// doesn't exist.
-    pub fn intersect(&self, l: Segment) -> Option<Point> {
-        let d0 = self.distance(&l.0);
-        let d1 = self.distance(&l.1);
-        let t = d1 / (d1 - d0);
+    pub fn intersect(&self, line: Segment) -> Option<Point> {
+        let d0 = self.distance(&line.0);
+        let d1 = self.distance(&line.1);
 
-        #[allow(clippy::if_same_then_else)]
-        if abs_diff_eq!(d1 - d0, 0.0, epsilon = Float::EPS) {
-            None
-        } else if (d0 < 0.0) ^ (d1 >= 0.0) {
+        // This right here is some really sensitive code. If we screw up
+        // handling the edge cases, cross-sections through elements will crash.
+        if abs_diff_eq!(d0, d1, epsilon = Float::EPS) || (d0 < -Float::EPS) == (d1 < -Float::EPS) {
             None
         } else {
-            Some(l.at(t))
+            Some(line.at(d1 / (d1 - d0)))
         }
     }
 }
 
 /// Represents a line segment between two points.
-pub struct Segment(pub Point, pub Point);
+pub struct Segment<'a>(pub &'a Point, pub &'a Point);
 
-impl Segment {
+impl<'a> Segment<'a> {
     /// Returns the point at a certain position along the line. If `t` is
     /// between 0 and 1, the point will be contained on the line segment.
     pub fn at(&self, t: Float) -> Point {
-        &self.0 * t + &self.1 * (1.0 - t)
+        self.0 * t + self.1 * (1.0 - t)
     }
 }
 

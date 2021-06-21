@@ -448,8 +448,6 @@ impl<'a> OrientedFlagIter<'a> {
         flag_changes: FlagChanges,
         first_flag: OrientedFlag,
     ) -> Self {
-        debug_assert_eq!(polytope.bounded().unwrap(), ());
-
         let first = polytope.rank() == Rank::new(-1);
 
         // Initializes found flags.

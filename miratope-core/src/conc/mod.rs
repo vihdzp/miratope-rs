@@ -727,10 +727,7 @@ impl Concrete {
 
         // Determines the vertices of the cross-section.
         for (idx, edge) in self[Rank::new(1)].iter().enumerate() {
-            let segment = Segment(
-                self.vertices[edge.subs[0]].clone(),
-                self.vertices[edge.subs[1]].clone(),
-            );
+            let segment = Segment(&self.vertices[edge.subs[0]], &self.vertices[edge.subs[1]]);
 
             // If we got ourselves a new vertex:
             if let Some(p) = slice.intersect(segment) {
