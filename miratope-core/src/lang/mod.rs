@@ -1,3 +1,9 @@
+// This part of the code is still REALLY unstable. No point in documenting stuff
+// thoroughly just yet.
+#![allow(clippy::missing_docs_in_private_items)]
+#![allow(clippy::missing_panics_doc)]
+#![allow(missing_docs)]
+
 //! A module dedicated to parsing the names of polytopes into different
 //! languages.
 //!
@@ -16,10 +22,17 @@
 //! this:
 //!
 //! ```
-//! let pecube = Name::Multiprism(Box::new([
-//!     Name::Polygon(5),  // 5-gon
-//!     Name::Hypercube(3) // 3-hypercube
-//! ]));
+//! let pecube = Name::multiprism(vec![
+//!     Name::polygon(5, 1),  // 5-gon
+//!     Name::hypercube(3) // 3-hypercube
+//! ]);
+//! # use miratope_core::lang::{En, Options, Language, name::Name};
+//! # assert_eq!(En::parse(&pecube, Options {
+//! #     adjective: false,
+//! #     count: 1,
+//! #     gender: Gender::Male,
+//! #     parentheses: false
+//! # }), "pentagonal-cubic duoprism");
 //! ```
 //!
 //! For more information, see the [`Name`] module's documentation.
@@ -35,10 +48,16 @@
 //! and uses the corresponding methods to parse and combine each of its parts:
 //!
 //! ```
-//! assert_eq!(En::parse(pecube, Options {
+//! # use miratope_core::lang::{En, Options, Language, name::Name};
+//! # let pecube = Name::multiprism(vec![
+//! #     Name::polygon(5, 1),  // 5-gon
+//! #     Name::hypercube(3) // 3-hypercube
+//! # ]);
+//! assert_eq!(En::parse(&pecube, Options {
 //!     adjective: false,
 //!     count: 1,
 //!     gender: Gender::Male,
+//!     parentheses: false
 //! }), "pentagonal-cubic duoprism");
 //! ```
 //!
@@ -79,10 +98,8 @@ pub use fr::Fr;
 pub use ja::Ja;
 pub use pii::Pii;
 
-use crate::{
-    lang::name::{Name, NameData, NameType},
-    polytope::r#abstract::rank::Rank,
-};
+use crate::abs::rank::Rank;
+use name::{Name, NameData, NameType};
 
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
@@ -673,7 +690,7 @@ pub trait Language: Prefix {
 
     /// The name for an orthoplex with a given rank.
     fn orthoplex(rank: Rank, options: Options) -> String {
-        Self::generic(2u32.pow(rank.into_u32()) as usize, rank, options)
+        Self::generic(1 << rank.into_usize(), rank, options)
     }
 
     fn great(_options: Options) -> String {

@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::lang::SelectedLanguage;
+use miratope_core::lang::SelectedLanguage;
 
 use bevy::{app::AppExit, prelude::*};
 use bevy_egui::{egui, EguiContext};

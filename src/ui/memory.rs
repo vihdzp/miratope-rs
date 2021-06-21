@@ -1,7 +1,6 @@
-use crate::{lang::En, polytope::concrete::Concrete};
-
 use bevy::prelude::Query;
 use bevy_egui::egui;
+use miratope_core::{conc::Concrete, lang::En};
 
 pub const MEMORY_SLOTS: usize = 8;
 
@@ -25,7 +24,7 @@ impl Memory {
 
     /// Shows the memory menu in a specified Ui.
     pub fn show(&mut self, ui: &mut egui::Ui, query: &mut Query<&mut Concrete>) {
-        use crate::lang::Language;
+        use miratope_core::lang::Language;
 
         egui::menu::menu(ui, "Memory", |ui| {
             for (idx, slot) in self.0.iter_mut().enumerate() {

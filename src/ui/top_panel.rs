@@ -2,19 +2,18 @@
 
 use std::{marker::PhantomData, path::PathBuf};
 
-use super::{camera::ProjectionType, memory::Memory};
-use crate::{
-    geometry::{Hyperplane, Point, Vector},
-    lang::SelectedLanguage,
-    polytope::{concrete::Concrete, Polytope},
-    ui::{operations::*, UnitPointWidget},
-    Float,
-};
+use super::{camera::ProjectionType, memory::Memory, operations::*, UnitPointWidget};
 
 use bevy::prelude::*;
 use bevy_egui::{
     egui::{self, menu, Ui},
     EguiContext,
+};
+use miratope_core::{
+    conc::Concrete,
+    geometry::{Hyperplane, Point, Vector},
+    lang::SelectedLanguage,
+    Float, Polytope,
 };
 use rfd::FileDialog;
 use strum::IntoEnumIterator;
@@ -181,13 +180,10 @@ pub fn file_dialog(
                 if let Some(path) = file_dialog.pick_file() {
                     if let Some(mut p) = query.iter_mut().next() {
                         match Concrete::from_path(&path) {
-                            Ok(res) => match res {
-                                Ok(q) => {
-                                    *p = q;
-                                    p.recenter();
-                                }
-                                Err(err) => eprintln!("File parsing failed: {}", err),
-                            },
+                            Ok(q) => {
+                                *p = q;
+                                p.recenter();
+                            }
                             Err(err) => eprintln!("File open failed: {}", err),
                         }
                     }
@@ -264,7 +260,7 @@ pub fn show_top_panel(
                 if ui.button("Save").clicked() {
                     if let Some(p) = query.iter_mut().next() {
                         file_dialog_state
-                            .save(selected_language.parse(p.name(), Default::default()));
+                            .save(selected_language.parse(&p.name, Default::default()));
                     }
                 }
 
@@ -554,7 +550,7 @@ pub fn show_top_panel(
             menu::menu(ui, "Wiki", |ui| {
                 // Goes to the wiki main page.
                 if ui.button("Main Page").clicked() {
-                    if let Err(err) = webbrowser::open(crate::WIKI_LINK) {
+                    if let Err(err) = webbrowser::open(miratope_core::WIKI_LINK) {
                         eprintln!("Website opening failed: {}", err);
                     }
                 }
@@ -580,9 +576,10 @@ pub fn show_top_panel(
 
                     if selected_language.is_changed() {
                         if let Some(poly) = query.iter_mut().next() {
-                            windows.get_primary_mut().unwrap().set_title(
-                                selected_language.parse(poly.name(), Default::default()),
-                            );
+                            windows
+                                .get_primary_mut()
+                                .unwrap()
+                                .set_title(selected_language.parse(&poly.name, Default::default()));
                         }
                     }
                 });

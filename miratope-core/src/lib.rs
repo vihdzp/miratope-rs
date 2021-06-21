@@ -1,28 +1,35 @@
-//! Contains the definitions of the different traits and structs for
-//! [polytopes](https://polytope.miraheze.org/wiki/Polytope), as well as some
-//! basic methods to operate on them.
+#![warn(clippy::missing_docs_in_private_items)]
+#![warn(clippy::missing_panics_doc)]
+#![warn(missing_docs)]
 
-pub mod r#abstract;
-pub mod concrete;
+//! This is the main dependency of
+//! [Miratope](https://github.com/OfficialURL/miratope-rs). It contains all code
+//! to build and name [`Abstract`] and [`Concrete`](conc::Concrete) polytopes
+//! alike.
+//!
+//! If you're interested in actually rendering polytopes, you might want to take
+//! a look at the [`miratope`](https://crates.io/crates/miratope) crate instead.
+
+pub mod abs;
+pub mod conc;
+pub mod geometry;
 pub mod group;
+pub mod lang;
 
 use std::iter;
 
-use self::r#abstract::{
+use abs::{
     elements::{Element, ElementList, ElementRef, SectionRef},
     flag::{Flag, FlagIter, OrientedFlag, OrientedFlagIter},
     rank::{Rank, RankVec},
     Abstract,
 };
-use crate::{
-    geometry::Point,
-    lang::{
-        self,
-        name::{Name, NameData, NameType, Regular},
-        Language,
-    },
-    vec_like::VecLike,
+use geometry::Point;
+use lang::{
+    name::{Name, NameData, NameType, Regular},
+    Language,
 };
+use vec_like::VecLike;
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
 const ELEMENT_NAMES: [&str; 11] = [
@@ -31,6 +38,49 @@ const ELEMENT_NAMES: [&str; 11] = [
 
 /// The word "Components".
 const COMPONENTS: &str = "Components";
+
+/// The link to the [Polytope Wiki](https://polytope.miraheze.org/wiki/).
+pub const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
+
+/// A trait containing the constants associated to each floating point type.
+pub trait Consts {
+    /// A default epsilon value. Used in general floating point operations that
+    /// would return zero given infinite precision.
+    const EPS: Self;
+
+    /// Archimedes' constant (π)
+    const PI: Self;
+
+    /// The full circle constant (τ)
+    ///
+    /// Equal to 2π.
+    const TAU: Self;
+
+    /// sqrt(2)
+    const SQRT_2: Self;
+}
+
+/// Constants for `f32`.
+impl Consts for f32 {
+    const EPS: f32 = 1e-5;
+    const PI: f32 = std::f32::consts::PI;
+    const TAU: f32 = std::f32::consts::TAU;
+    const SQRT_2: f32 = std::f32::consts::SQRT_2;
+}
+
+/// Constants for `f64`.
+impl Consts for f64 {
+    const EPS: f64 = 1e-9;
+    const PI: f64 = std::f64::consts::PI;
+    const TAU: f64 = std::f64::consts::TAU;
+    const SQRT_2: f64 = std::f64::consts::SQRT_2;
+}
+
+/// The floating point type used for all calculations.
+pub type Float = f64;
+
+/// A wrapper around [`Float`] to allow for ordering and equality.
+pub type FloatOrd = ordered_float::OrderedFloat<Float>;
 
 /// The result of taking a dual: can either be a success value of `T`, or the
 /// index of a facet through the inversion center.
@@ -49,52 +99,52 @@ impl std::fmt::Display for DualError {
 
 impl std::error::Error for DualError {}
 
+/// Gets the precalculated value for n!.
+fn factorial(n: usize) -> u32 {
+    /// Precalculated factorials from 0! to 13!.
+    const FACTORIALS: [u32; 13] = [
+        1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600,
+    ];
+
+    FACTORIALS[n]
+}
+
 /// The trait for methods common to all polytopes.
-pub trait Polytope<T: NameType>: Sized + Clone {
-    /// Returns a reference to the underlying abstract polytope.
-    fn abs(&self) -> &Abstract;
-
-    /// Returns a mutable reference to the underlying abstract polytope.
-    fn abs_mut(&mut self) -> &mut Abstract;
-
+pub trait Polytope<T: NameType>:
+    Sized + Clone + AsRef<Abstract> + AsMut<Abstract> + AsRef<Name<T>> + AsMut<Name<T>>
+{
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
     fn rank(&self) -> Rank {
-        self.abs().ranks.rank()
+        let abs: &Abstract = self.as_ref();
+        abs.ranks.rank()
     }
-
-    /// The name of the polytope in its language-independent representation.
-    fn name(&self) -> &Name<T>;
-
-    /// A mutable reference to the name of the polytope.
-    fn name_mut(&mut self) -> &mut Name<T>;
 
     /// Gets the wiki link to the polytope, based on its English name.
     fn wiki_link(&self) -> String {
+        let name: &Name<_> = self.as_ref();
+
         format!(
             "{}{}",
             crate::WIKI_LINK,
-            lang::En::parse(self.name(), Default::default()).replace(" ", "_")
+            lang::En::parse(name, Default::default()).replace(" ", "_")
         )
     }
 
     /// Used as a chaining operator to set the name of a polytope.
     fn with_name(mut self, name: Name<T>) -> Self {
-        *self.name_mut() = name;
+        *self.as_mut() = name;
         self
     }
 
     /// Returns the number of elements of a given rank.
     fn el_count(&self, rank: Rank) -> usize {
-        self.abs()
-            .ranks
-            .get(rank)
-            .map(ElementList::len)
-            .unwrap_or(0)
+        let abs: &Abstract = self.as_ref();
+        abs.ranks.get(rank).map(ElementList::len).unwrap_or(0)
     }
 
     /// Returns the element counts of the polytope.
     fn el_counts(&self) -> RankVec<usize> {
-        let abs = self.abs();
+        let abs: &Abstract = self.as_ref();
         let mut counts = RankVec::with_rank_capacity(abs.rank());
 
         for r in Rank::range_inclusive_iter(Rank::new(-1), abs.rank()) {
@@ -163,11 +213,11 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// # Todo
     /// We should make this method take only the `ranks`, so that we can use the
     /// names from the previous polytopes.
-    fn _append(&mut self, p: Self);
+    fn _comp_append(&mut self, p: Self);
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks.
-    fn append(&mut self, p: Self);
+    fn comp_append(&mut self, p: Self);
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
     fn element(&self, el: ElementRef) -> Option<Self>;
@@ -214,12 +264,15 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     fn compound_iter<U: Iterator<Item = Self>>(mut components: U) -> Self {
         if let Some(mut p) = components.next() {
             for q in components {
-                p._append(q);
+                p._comp_append(q);
             }
 
             // Updates the minimal and maximal elements of the compound.
-            *p.abs_mut().min_mut() = Element::min(p.vertex_count());
-            *p.abs_mut().max_mut() = Element::max(p.facet_count());
+            let vc = p.vertex_count();
+            let fc = p.facet_count();
+            let abs: &mut Abstract = p.as_mut();
+            *abs.min_mut() = Element::min(vc);
+            *abs.max_mut() = Element::max(fc);
 
             // TODO: UPDATE NAME.
             p
@@ -228,16 +281,25 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         }
     }
 
+    /// Builds a Petrial in place. Returns `true` if successful. Does not modify
+    /// the original polytope otherwise.
     fn petrial_mut(&mut self) -> bool;
 
-    fn petrial(mut self) -> Option<Self> {
-        self.petrial_mut().then(|| self)
+    /// Builds the Petrial of a polytope. Returns `None` if the polytope is not
+    /// 3D, or if its Petrial is not a valid polytope.
+    fn petrial(&self) -> Option<Self> {
+        let mut clone = self.clone();
+        clone.petrial_mut().then(|| clone)
     }
 
+    /// Builds a Petrie polygon from the first flag of the polytope. Returns
+    /// `None` if this Petrie polygon is invalid.
     fn petrie_polygon(&mut self) -> Option<Self> {
         self.petrie_polygon_with(self.first_flag()?)
     }
 
+    /// Builds a Petrie polygon from a given flag of the polytope. Returns
+    /// `None` if this Petrie polygon is invalid.
     fn petrie_polygon_with(&mut self, flag: Flag) -> Option<Self>;
 
     /// Returns the first [`Flag`] of a polytope. This is the flag built when we
@@ -250,9 +312,9 @@ pub trait Polytope<T: NameType>: Sized + Clone {
         let mut idx = 0;
         flag.push(0);
 
+        let abs: &Abstract = self.as_ref();
         for r in Rank::range_iter(1, rank) {
-            idx = self
-                .abs()
+            idx = abs
                 .get_element(ElementRef::new(r.minus_one(), idx))
                 .unwrap()
                 .sups[0];
@@ -271,14 +333,15 @@ pub trait Polytope<T: NameType>: Sized + Clone {
 
     /// Returns an iterator over all [`Flag`]s of a polytope.
     fn flags(&self) -> FlagIter {
-        FlagIter::new(self.abs())
+        FlagIter::new(self.as_ref())
     }
 
     /// Returns an iterator over all [`OrientedFlag`]s of a polytope.
     fn flag_events(&self) -> OrientedFlagIter {
-        OrientedFlagIter::new(self.abs())
+        OrientedFlagIter::new(self.as_ref())
     }
 
+    /// Returns the omnitruncate of a polytope.
     fn omnitruncate(&mut self) -> Self;
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
@@ -331,19 +394,22 @@ pub trait Polytope<T: NameType>: Sized + Clone {
     /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
     /// given base.
     fn pyramid(&self) -> Self {
-        Self::duopyramid(self, &Self::point()).with_name(self.name().clone().pyramid())
+        let name: &Name<_> = self.as_ref();
+        Self::duopyramid(self, &Self::point()).with_name(name.clone().pyramid())
     }
 
     /// Builds a [prism](https://polytope.miraheze.org/wiki/Prism) from a
     /// given base.
     fn prism(&self) -> Self {
-        Self::duoprism(self, &Self::dyad()).with_name(self.name().clone().prism())
+        let name: &Name<_> = self.as_ref();
+        Self::duoprism(self, &Self::dyad()).with_name(name.clone().prism())
     }
 
     /// Builds a [tegum](https://polytope.miraheze.org/wiki/Bipyramid) from a
     /// given base.
     fn tegum(&self) -> Self {
-        Self::duotegum(self, &Self::dyad()).with_name(self.name().clone().tegum())
+        let name: &Name<_> = self.as_ref();
+        Self::duotegum(self, &Self::dyad()).with_name(name.clone().tegum())
     }
 
     /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)

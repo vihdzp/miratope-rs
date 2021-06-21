@@ -1,3 +1,5 @@
+//! Contains methods to parse and generate Coxeter diagrams and matrices.
+
 use std::{collections::VecDeque, fmt::Display, iter, mem, str::FromStr};
 
 use crate::{
@@ -18,22 +20,49 @@ pub type CdResult<T> = Result<T, CdError>;
 #[derive(Clone, Copy, Debug)]
 pub enum CdError {
     /// A parenthesis was opened but not closed.
-    MismatchedParenthesis { pos: usize },
+    MismatchedParenthesis {
+        /// The position at which the reader found the error.
+        pos: usize,
+    },
 
     /// The diagram ended unexpectedly.
-    UnexpectedEnding { pos: usize },
+    UnexpectedEnding {
+        /// The position at which the reader found the error.
+        pos: usize,
+    },
 
     /// A number couldn't be parsed.
-    ParseError { pos: usize },
+    ParseError {
+        /// The position at which the reader found the error.
+        pos: usize,
+    },
 
     /// An invalid symbol was found.
-    InvalidSymbol { pos: usize },
+    InvalidSymbol {
+        /// The position at which the reader found the error.
+        pos: usize,
+    },
 
     /// An invalid edge was found.
-    InvalidEdge { num: u32, den: u32, pos: usize },
+    InvalidEdge {
+        /// The numerator of the invalid edge.
+        num: u32,
+
+        /// The denominator of the invalid edge.
+        den: u32,
+
+        /// The position at which the reader found the error.
+        pos: usize,
+    },
 
     /// An edge was specified twice.
-    RepeatEdge { a: usize, b: usize },
+    RepeatEdge {
+        /// The first node in the duplicated edge.
+        a: usize,
+
+        /// The second node in the duplicated edge.
+        b: usize,
+    },
 }
 
 impl Display for CdError {
@@ -243,6 +272,10 @@ impl Node {
         matches!(self, Self::Ringed(_))
     }
 
+    /// Converts the character into a node value, by using Wendy's scheme.
+    ///
+    /// # Todo
+    /// Make this customizable?
     pub fn from_char(c: char) -> Option<Self> {
         Some(Node::ringed(match c {
             'o' => return Some(Node::Unringed),
@@ -268,12 +301,10 @@ impl Node {
         }))
     }
 
+    /// Attempts to convert a character into a [`Node`]. Returns a
+    /// [`CdError::InvalidSymbol`] if it fails.
     pub fn from_char_or(c: char, idx: usize) -> CdResult<Self> {
-        if let Some(node) = Self::from_char(c) {
-            Ok(node)
-        } else {
-            Err(CdError::InvalidSymbol { pos: idx })
-        }
+        Self::from_char(c).ok_or(CdError::InvalidSymbol { pos: idx })
     }
 }
 
@@ -300,6 +331,8 @@ pub struct Edge {
 }
 
 impl Edge {
+    /// Initializes a new edge from a given numerator and denominator. If these
+    /// are invalid, returns a [`CdError::InvalidEdge`].
     pub fn rational(num: u32, den: u32, pos: usize) -> CdResult<Self> {
         if num > 1 && den != 0 && den < num {
             Ok(Self { num, den })
@@ -308,6 +341,8 @@ impl Edge {
         }
     }
 
+    /// Initializes a new edge from a given integral value. If this is invalid,
+    /// returns a [`CdError::InvalidEdge`].
     pub fn int(num: u32, pos: usize) -> CdResult<Self> {
         Self::rational(num, 1, pos)
     }
@@ -317,6 +352,7 @@ impl Edge {
         self.num as Float / self.den as Float
     }
 
+    /// Returns `true` if the edge stores any value equivalent to 2.
     pub fn eq_two(&self) -> bool {
         self.num == self.den * 2
     }
@@ -348,6 +384,9 @@ pub enum NodeRef {
 }
 
 impl NodeRef {
+    /// Initializes a new node reference from an index. The `neg` parameter
+    /// determines if indexing should be [`Negative`](Self::Negative) or
+    /// [`Absolute`](Self::Absolute).
     pub fn new(neg: bool, idx: usize) -> Self {
         if neg {
             Self::Negative(idx)
@@ -368,21 +407,30 @@ impl NodeRef {
 
 /// Stores the [`NodeRef`]s of both ends of an edge, along with its value.
 pub struct EdgeRef {
+    /// The reference to the first node in the edge.
     first: NodeRef,
-    last: NodeRef,
+
+    /// The reference to the other node in the edge.
+    other: NodeRef,
+
+    /// The edge value.
     edge: Edge,
 }
 
 impl EdgeRef {
     /// Initializes a new edge reference from its fields.
     pub fn new(first: NodeRef, last: NodeRef, edge: Edge) -> Self {
-        Self { first, last, edge }
+        Self {
+            first,
+            other: last,
+            edge,
+        }
     }
 
     /// Returns the index in the graph of both node references. Requires knowing
     /// the number of nodes in the graph.
     pub fn indices(&self, len: usize) -> [NodeIndex; 2] {
-        [self.first.index(len), self.last.index(len)]
+        [self.first.index(len), self.other.index(len)]
     }
 }
 
@@ -415,7 +463,7 @@ impl EdgeRef {
 ///
 /// * A single integer, like `3` or `15`.
 /// * Two integers separated by a backslash, like `5/2` or `7/3`.
-struct CdBuilder<'a> {
+pub struct CdBuilder<'a> {
     /// The Coxeter diagram in inline ASCII notation.
     diagram: &'a str,
 
@@ -425,7 +473,7 @@ struct CdBuilder<'a> {
 
     /// Represents the Coxeter diagram itself. However, we don't add any edges
     /// to it until the very last step. These are provisionally stored in
-    /// [`edge_queue`] instead.
+    /// [`Self::edge_queue`] instead.
     cd: Cd,
 
     /// A provisional queue in which the [`EdgeRef`]s are stored up and until
@@ -612,6 +660,13 @@ impl<'a> CdBuilder<'a> {
         Ok(())
     }
 
+    /// Parses the next edge in the Coxeter diagram. May return `None` if
+    /// there's currently no edge to be read.
+    ///
+    /// # Errors
+    /// This method will return a [`CdError::InvalidSymbol`] if it ever
+    /// encounters any unexpected symbol. Likewise, it will return a
+    /// [`CdError::InvalidEdge`] if the edge is something invalid like `1/0`.
     fn parse_edge(&mut self) -> CdResult<Option<Edge>> {
         let mut numerator = None;
         let (mut init_idx, c) = self.peek().expect("Slice can't be empty!");
@@ -693,7 +748,7 @@ impl<'a> CdBuilder<'a> {
 /// for certain polytopes called [Wythoffians](https://polytope.miraheze.org/wiki/Wythoffian),
 /// and as a representation for certain symmetry groups called
 /// [Coxeter groups](https://polytope.miraheze.org/wiki/Coxeter_group). In code,
-/// these correspond to [`Concrete::truncate`] and [`Group::cox_group`],
+/// these correspond to `Concrete::truncate` (WIP) and [`Group::cox_group`](super::Group::cox_group),
 /// respectively.
 ///
 /// Each [`Node`] a Coxeter diagram represents a mirror (or hyperplane) in

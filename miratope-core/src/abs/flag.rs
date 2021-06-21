@@ -1,5 +1,5 @@
 //! Helpful methods and structs for operating on the
-//! [flags](https://polytope.miraheze.org/wiki/Flag) of a polytope.
+//! [`Flags`](Flag) of a polytope.
 //!
 //! Recall that a flag is a maximal set of pairwise incident elements in a
 //! polytope. For convenience, we omit the minimal and maximal elements from our
@@ -13,14 +13,16 @@ use std::{
 };
 
 use super::{elements::ElementRef, rank::Rank, Abstract};
-use crate::{impl_veclike, polytope::Polytope, vec_like::VecLike, Float};
+use crate::{Float, Polytope};
 
-/// A [flag](https://polytope.miraheze.org/wiki/Flag) in a polytope. Stores the
-/// indices of the elements of each rank, excluding the minimal and maximal
-/// elements.
+use vec_like::*;
+
+/// Represents a [flag](https://polytope.miraheze.org/wiki/Flag) in a polytope.
+/// Stores the indices of the elements of each rank, excluding the minimal and
+/// maximal elements.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Flag(Vec<usize>);
-impl_veclike!(Flag, usize, usize);
+impl_veclike!(Flag, Item = usize, Index = usize);
 
 impl Flag {
     /// Gets the index of the element with a given rank, or returns `0` if it
@@ -34,6 +36,10 @@ impl Flag {
     }
 
     /// Applies a specified flag change to the flag in place.
+    ///
+    /// # Panics
+    /// This method should only panic if an invalid polytope is given as an
+    /// argument.
     pub fn change_mut(&mut self, polytope: &Abstract, r: usize) {
         let rank = polytope.rank();
         debug_assert_ne!(
@@ -318,7 +324,7 @@ impl OrientedFlag {
 /// Represents a set of flag changes.
 #[derive(Clone)]
 pub struct FlagChanges(Vec<usize>);
-impl_veclike!(FlagChanges, usize, usize);
+impl_veclike!(FlagChanges, Item = usize, Index = usize);
 
 impl FlagChanges {
     /// Returns the set of all flag changes for a polytope of a given rank.
@@ -442,9 +448,7 @@ impl<'a> OrientedFlagIter<'a> {
         flag_changes: FlagChanges,
         first_flag: OrientedFlag,
     ) -> Self {
-        if cfg!(debug_assertions) {
-            polytope.bounded().unwrap();
-        }
+        debug_assert_eq!(polytope.bounded().unwrap(), ());
 
         let first = polytope.rank() == Rank::new(-1);
 
@@ -649,11 +653,18 @@ impl FlagSet {
         }
     }
 
+    /// Returns `true` if the flag set is empty.
+    pub fn is_empty(&self) -> bool {
+        self.flags.is_empty()
+    }
+
     /// Returns the number of flags contained in the flag set.
     pub fn len(&self) -> usize {
         self.flags.len()
     }
 
+    /// Returns the set of all flag sets obtained from this one after removing
+    /// exactly one element.
     pub fn subsets(&self, polytope: &Abstract) -> Vec<Self> {
         let mut subsets = Vec::new();
 
@@ -680,7 +691,7 @@ impl FlagSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::polytope::Polytope;
+    use crate::Polytope;
 
     /// Tests that a polytope has an expected number of flags, oriented or not.
     fn test(polytope: &mut Abstract, expected: usize) {
@@ -724,33 +735,30 @@ mod tests {
 
     #[test]
     fn simplex() {
-        use factorial::Factorial;
-
         for n in 0..=7 {
-            test(&mut Abstract::simplex(Rank::from(n)), (n + 1).factorial());
+            test(
+                &mut Abstract::simplex(Rank::from(n)),
+                crate::factorial(n + 1) as usize,
+            );
         }
     }
 
     #[test]
     fn hypercube() {
-        use factorial::Factorial;
-
         for n in 0..=7 {
             test(
                 &mut Abstract::hypercube(Rank::new(n as isize)),
-                (2u32.pow(n as u32) as usize) * n.factorial(),
+                (1 << n) * crate::factorial(n) as usize,
             );
         }
     }
 
     #[test]
     fn orthoplex() {
-        use factorial::Factorial;
-
         for n in 0..=7 {
             test(
                 &mut Abstract::orthoplex(Rank::new(n as isize)),
-                (2u32.pow(n as u32) as usize) * n.factorial(),
+                (1 << n) * crate::factorial(n) as usize,
             );
         }
     }

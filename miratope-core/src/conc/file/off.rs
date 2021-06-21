@@ -1,20 +1,19 @@
-use std::{collections::HashMap, fs, path::Path, str::FromStr};
+//! Contains the code that opens an OFF file and parses it into a polytope.
 
-use super::IoResult;
+use std::{collections::HashMap, fs, io::Result as IoResult, path::Path, str::FromStr};
+
 use crate::{
-    lang::name::{Con, Name},
-    polytope::{
-        concrete::{Concrete, ElementList, Point, Polytope, RankVec, Subelements},
-        r#abstract::{
-            elements::{AbstractBuilder, SubelementList},
-            rank::Rank,
-        },
-        COMPONENTS, ELEMENT_NAMES,
+    abs::{
+        elements::{AbstractBuilder, SubelementList},
+        rank::Rank,
     },
-    vec_like::VecLike,
+    conc::{Concrete, ElementList, Point, Polytope, RankVec, Subelements},
+    lang::name::{Con, Name},
+    COMPONENTS, ELEMENT_NAMES,
 };
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
+use vec_like::VecLike;
 
 /// A position in a file.
 #[derive(Clone, Copy, Default, Debug)]
@@ -62,9 +61,6 @@ pub enum OffError {
 
     /// Didn't find the OFF magic word.
     MagicWord(Position),
-
-    /// The file couldn't be parsed as UTF-8.
-    InvalidFile,
 }
 
 impl std::fmt::Display for OffError {
@@ -75,7 +71,6 @@ impl std::fmt::Display for OffError {
             Self::Parsing(pos) => write!(f, "could not parse number at {}", pos),
             Self::Rank(pos) => write!(f, "could not read rank at {}", pos),
             Self::MagicWord(pos) => write!(f, "no \"OFF\" detected at {}", pos),
-            Self::InvalidFile => write!(f, "could not parse file as UTF-8"),
         }
     }
 }
@@ -504,12 +499,20 @@ impl Default for OffOptions {
 
 /// An auxiliary struct to write a polytope to an OFF file.
 pub struct OffWriter<'a> {
+    /// The output OFF file, as a string. (Maybe we should use a file writer
+    /// or something similar instead?)
     off: String,
+
+    /// The polytope that we're converting into an OFF file.
     polytope: &'a Concrete,
+
+    /// Options for the text output.
     options: OffOptions,
 }
 
 impl<'a> OffWriter<'a> {
+    /// Initializes a new OFF writer from a polytope, with a given set of
+    /// options.
     pub fn new(polytope: &'a Concrete, options: OffOptions) -> Self {
         Self {
             off: String::new(),
@@ -671,6 +674,7 @@ impl<'a> OffWriter<'a> {
         }
     }
 
+    /// Consumes the OFF writer, returns the actual OFF file as a `String`.
     pub fn build(mut self) -> String {
         let rank = self.polytope.rank();
         let vertices = &self.polytope.vertices;
@@ -679,7 +683,7 @@ impl<'a> OffWriter<'a> {
         // Serialized name.
         self.off.push_str("# ");
         self.off
-            .push_str(&ron::to_string(self.polytope.name()).unwrap());
+            .push_str(&ron::to_string(&self.polytope.name).unwrap_or_default());
         self.off.push('\n');
 
         // Blatant advertising.
@@ -764,7 +768,6 @@ mod tests {
     /// Checks that a dyad has the correct amount of elements.
     fn dyad_nums() {
         let dyad = Concrete::from_off("1OFF 2 -1 1 0 1").unwrap();
-
         test_shape(dyad, vec![1, 2, 1])
     }
 

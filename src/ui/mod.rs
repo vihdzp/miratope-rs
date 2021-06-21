@@ -2,8 +2,7 @@
 
 use approx::abs_diff_eq;
 use bevy_egui::egui::{self, Ui, Widget};
-
-use crate::{geometry::Point, Consts, Float};
+use miratope_core::{geometry::Point, Consts, Float};
 
 pub mod camera;
 pub mod config;

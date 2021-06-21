@@ -1,7 +1,8 @@
+//! Declares the [`Concrete`] polytope type and all associated data structures.
+
 pub mod cycle;
 pub mod element_types;
 pub mod file;
-pub mod mesh;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -9,7 +10,7 @@ use std::{
 };
 
 use super::{
-    r#abstract::{
+    abs::{
         elements::{
             AbstractBuilder, ElementList, ElementRef, SubelementList, Subelements, Superelements,
         },
@@ -22,12 +23,12 @@ use super::{
 use crate::{
     geometry::{Hyperplane, Hypersphere, Matrix, Point, PointOrd, Segment, Subspace, Vector},
     lang::name::{Con, ConData, Name, NameData, Regular},
-    vec_like::VecLike,
     Consts, Float,
 };
 
 use approx::{abs_diff_eq, abs_diff_ne};
 use rayon::prelude::*;
+use vec_like::*;
 
 /// Represents a [concrete polytope](https://polytope.miraheze.org/wiki/Polytope),
 /// which is an [`Abstract`] together with its corresponding vertices.
@@ -58,7 +59,7 @@ impl Concrete {
         if cfg!(debug_assertions) {
             if let Some(vertex0) = vertices.get(0) {
                 for vertex1 in &vertices {
-                    assert_eq!(vertex0.len(), vertex1.len());
+                    debug_assert_eq!(vertex0.len(), vertex1.len());
                 }
             }
         }
@@ -122,6 +123,10 @@ impl Concrete {
 
     /// Builds the star polygon `{n / d}`. with unit circumradius. If `n` and `d`
     /// have a common factor, the result is a compound.
+    ///
+    /// # Panics
+    /// Will panic if either `n < 2` or if `d < 1`, in which case there's
+    /// nothing sensible to do.
     pub fn star_polygon(n: usize, d: usize) -> Self {
         assert!(n >= 2);
         assert!(d >= 1);
@@ -152,6 +157,7 @@ impl Concrete {
         }
     }
 
+    /// Recenters a polytope so that a certain point is at the origin.
     pub fn recenter_with(&mut self, p: &Point) {
         for v in &mut self.vertices {
             *v -= p;
@@ -241,6 +247,7 @@ impl Concrete {
         }
     }
 
+    /// Returns the length of a given edge.
     pub fn edge_len(&self, idx: usize) -> Option<Float> {
         let edge = self.abs.get_element(ElementRef::new(Rank::new(1), idx))?;
         Some((&self.vertices[edge.subs[0]] - &self.vertices[edge.subs[1]]).norm())
@@ -317,6 +324,9 @@ impl Concrete {
     /// place, or does nothing in case any facets go through the reciprocation
     /// center. In case of failure, returns the index of the facet through the
     /// projection center.
+    ///
+    /// # Panics
+    /// This method shouldn't panic. If it does, please file a bug.
     pub fn try_dual_mut_with(&mut self, sphere: &Hypersphere) -> DualResult<()> {
         // If we're dealing with a nullitope, the dual is itself.
         let rank = self.rank();
@@ -373,10 +383,7 @@ impl Concrete {
 
         // Takes the abstract dual.
         self.abs.dual_mut();
-        *self.name_mut() = self
-            .name()
-            .clone()
-            .dual(ConData::new(sphere.center.clone()));
+        self.name = self.name.clone().dual(ConData::new(sphere.center.clone()));
 
         Ok(())
     }
@@ -439,6 +446,12 @@ impl Concrete {
         Ok(self.antiprism_with_vertices(vertices, dual_vertices))
     }
 
+    /// Builds an antiprism, using a specified hypersphere to take a dual, and
+    /// with a given height.
+    ///
+    /// # Panics
+    /// Panics if any facets pass through the inversion center. If you want to
+    /// handle this possibility, use [`Self::try_antiprism_with`] instead.
     pub fn antiprism_with(&self, sphere: &Hypersphere, height: Float) -> Self {
         self.try_antiprism_with(sphere, height).unwrap()
     }
@@ -582,8 +595,6 @@ impl Concrete {
     /// Computes the volume of a polytope by adding up the contributions of all
     /// flags. Returns `None` if the volume is undefined.
     pub fn volume(&mut self) -> Option<Float> {
-        use factorial::Factorial;
-
         let rank = self.rank();
 
         // We leave the nullitope's volume undefined.
@@ -591,9 +602,9 @@ impl Concrete {
             return None;
         }
 
-        // The vertices, flattened if necessary.
-        let flat_vertices = self.flat_vertices();
-        let flat_vertices = flat_vertices.as_ref().unwrap_or(&self.vertices);
+        // The flattened vertices (may possibly be the original vertices).
+        let subspace = Subspace::from_points(self.vertices.iter());
+        let flat_vertices = subspace.flatten_vec(&self.vertices);
 
         match flat_vertices.get(0)?.len().cmp(&rank.into()) {
             // Degenerate polytopes have volume 0.
@@ -678,21 +689,7 @@ impl Concrete {
             }
         }
 
-        Some(volume / rank_usize.factorial() as Float)
-    }
-
-    pub fn flat_vertices(&self) -> Option<Vec<Point>> {
-        let subspace = Subspace::from_points(self.vertices.iter());
-
-        if subspace.is_full_rank() {
-            None
-        } else {
-            let mut flat_vertices = Vec::new();
-            for v in &self.vertices {
-                flat_vertices.push(subspace.flatten(v));
-            }
-            Some(flat_vertices)
-        }
+        Some(volume / crate::factorial(rank_usize) as Float)
     }
 
     /// Projects the vertices of the polytope into the lowest dimension possible.
@@ -714,13 +711,12 @@ impl Concrete {
 
     /// Takes the cross-section of a polytope through a given hyperplane.
     ///
+    /// # Panics
+    /// This method shouldn't panic. If it does, please file a bug.
+    ///
     /// # Todo
     /// We should make this function take a general [`Subspace`] instead.
     pub fn cross_section(&self, slice: &Hyperplane) -> Self {
-        debug_assert!(
-            slice.is_hyperplane(),
-            "Sections can only be taken from hyperplanes!"
-        );
         let mut vertices = Vec::new();
         let mut ranks = RankVec::with_rank_capacity(self.rank().minus_one());
 
@@ -842,28 +838,31 @@ impl Concrete {
     }
 }
 
-impl Polytope<Con> for Concrete {
-    /// Returns the rank of the polytope.
-    fn rank(&self) -> Rank {
-        self.abs.rank()
-    }
-
-    fn name(&self) -> &Name<Con> {
-        &self.name
-    }
-
-    fn name_mut(&mut self) -> &mut Name<Con> {
-        &mut self.name
-    }
-
-    fn abs(&self) -> &Abstract {
+impl AsRef<Abstract> for Concrete {
+    fn as_ref(&self) -> &Abstract {
         &self.abs
     }
+}
 
-    fn abs_mut(&mut self) -> &mut Abstract {
+impl AsMut<Abstract> for Concrete {
+    fn as_mut(&mut self) -> &mut Abstract {
         &mut self.abs
     }
+}
 
+impl AsRef<Name<Con>> for Concrete {
+    fn as_ref(&self) -> &Name<Con> {
+        &self.name
+    }
+}
+
+impl AsMut<Name<Con>> for Concrete {
+    fn as_mut(&mut self) -> &mut Name<Con> {
+        &mut self.name
+    }
+}
+
+impl Polytope<Con> for Concrete {
     /// Builds the unique polytope of rank −1.
     fn nullitope() -> Self {
         Self::new(Vec::new(), Abstract::nullitope()).with_name(Name::Nullitope)
@@ -931,16 +930,16 @@ impl Polytope<Con> for Concrete {
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks.
-    fn _append(&mut self, mut p: Self) {
-        self.abs.append(p.abs);
+    fn _comp_append(&mut self, mut p: Self) {
+        self.abs.comp_append(p.abs);
         self.vertices.append(&mut p.vertices);
     }
 
-    fn append(&mut self, p: Self) {
+    fn comp_append(&mut self, p: Self) {
         let name = mem::replace(&mut self.name, Name::Nullitope);
         self.name = Name::compound(vec![(1, name), (1, p.name.clone())]);
 
-        self._append(p);
+        self._comp_append(p);
     }
 
     /// Gets the element with a given rank and index as a polytope, or returns
@@ -1118,20 +1117,19 @@ impl std::ops::IndexMut<Rank> for Concrete {
 mod tests {
     use super::Concrete;
     use crate::{
+        abs::rank::Rank,
         lang::{En, Language},
-        polytope::{r#abstract::rank::Rank, Polytope},
-        Consts, Float,
+        Consts, Float, Polytope,
     };
 
     use approx::abs_diff_eq;
-    use factorial::Factorial;
 
     /// Tests that a polytope has an expected volume.
     fn test(poly: &mut Concrete, volume: Option<Float>) {
         if let Some(poly_volume) = poly.volume() {
             let volume = volume.expect(&format!(
                 "Expected no volume for {}, found volume {}!",
-                En::parse(poly.name(), Default::default()),
+                En::parse(&poly.name, Default::default()),
                 poly_volume
             ));
 
@@ -1139,14 +1137,14 @@ mod tests {
                 abs_diff_eq!(poly_volume, volume, epsilon = Float::EPS),
                 "Expected volume {} for {}, found volume {}.",
                 volume,
-                En::parse(poly.name(), Default::default()),
+                En::parse(&poly.name, Default::default()),
                 poly_volume
             );
         } else if let Some(volume) = volume {
             panic!(
                 "Expected volume {} for {}, found no volume!",
                 volume,
-                En::parse(poly.name(), Default::default()),
+                En::parse(&poly.name, Default::default()),
             );
         }
     }
@@ -1266,12 +1264,12 @@ mod tests {
 
     #[test]
     fn simplex() {
-        for n in 0u32..=5 {
+        for n in 0..=5 {
             test(
                 &mut Concrete::simplex(Rank::from(n)),
                 Some(
-                    ((n + 1) as Float / 2u32.pow(n as u32) as Float).sqrt()
-                        / n.factorial() as Float,
+                    ((n + 1) as Float / (1 << n) as Float).sqrt()
+                        / crate::factorial(n as usize) as Float,
                 ),
             );
         }
@@ -1286,10 +1284,10 @@ mod tests {
 
     #[test]
     fn orthoplex() {
-        for n in 0u32..=5 {
+        for n in 0..=5 {
             test(
                 &mut Concrete::orthoplex(Rank::from(n)),
-                Some(1.0 / n.factorial() as Float),
+                Some(1.0 / crate::factorial(n) as Float),
             );
         }
     }

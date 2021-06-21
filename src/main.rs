@@ -35,7 +35,7 @@
 //!
 //! Miratope is written in Rust, so if you don't already have the latest version and its Visual Studio C++ Build tools downloaded then you should do that first. Instructions for downloading can be found here: [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install). **You may have to restart your computer for Rust to fully install**.
 //!
-//! 1. Once you have Rust setup click the green button here on Github that says "Code".
+//! 1. Once you have Rust set up click the green button on [the Github page](https://github.com/OfficialURL/miratope-rs) that says "Code".
 //!    * If you already have Github Desktop, you can just click "Open with Github Desktop".
 //!    * If you don't, click "Download ZIP" and once it's done downloading, extract the `.zip` file.
 //! 2. Next, open a command line. On Windows you can do this by opening Run with `Win+R` and typing `cmd` in the search box.
@@ -60,57 +60,18 @@ use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::EguiPlugin;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
-use polytope::concrete::Concrete;
+use miratope_core::conc::Concrete;
 use ui::{
     camera::{CameraInputEvent, ProjectionType},
     MiratopePlugins,
 };
 
-mod geometry;
-mod lang;
+pub mod mesh;
 mod no_cull_pipeline;
-mod polytope;
 mod ui;
-pub mod vec_like;
-
-/// The link to the [Polytope Wiki](https://polytope.miraheze.org/wiki/).
-const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
 
 /// The link to the GitHub issues.
 const NEW_ISSUE: &str = "https://github.com/OfficialURL/miratope-rs/issues/new";
-
-/// A trait containing the constants associated to each floating point type.
-trait Consts {
-    type T;
-    const EPS: Self::T;
-    const PI: Self::T;
-    const TAU: Self::T;
-    const SQRT_2: Self::T;
-}
-
-/// Constants for `f32`.
-impl Consts for f32 {
-    type T = f32;
-    const EPS: f32 = 1e-5;
-    const PI: f32 = std::f32::consts::PI;
-    const TAU: f32 = std::f32::consts::TAU;
-    const SQRT_2: f32 = std::f32::consts::SQRT_2;
-}
-
-/// Constants for `f64`.
-impl Consts for f64 {
-    type T = f64;
-    const EPS: f64 = 1e-9;
-    const PI: f64 = std::f64::consts::PI;
-    const TAU: f64 = std::f64::consts::TAU;
-    const SQRT_2: f64 = std::f64::consts::SQRT_2;
-}
-
-/// The floating point type used for all calculations.
-type Float = f64;
-
-/// A wrapper around [`Float`] to allow for ordering and equality.
-type FloatOrd = ordered_float::OrderedFloat<Float>;
 
 /// Loads all of the necessary systems for the application to run.
 fn main() {
@@ -168,14 +129,14 @@ fn setup(
         .spawn()
         // Mesh
         .insert_bundle(PbrNoBackfaceBundle {
-            mesh: meshes.add(poly.mesh(ProjectionType::Perspective)),
+            mesh: meshes.add(mesh::mesh(&poly, ProjectionType::Perspective)),
             material: mesh_material,
             ..Default::default()
         })
         // Wireframe
         .with_children(|cb| {
             cb.spawn().insert_bundle(PbrNoBackfaceBundle {
-                mesh: meshes.add(poly.wireframe(ProjectionType::Perspective)),
+                mesh: meshes.add(mesh::wireframe(&poly, ProjectionType::Perspective)),
                 material: wf_material,
                 ..Default::default()
             });

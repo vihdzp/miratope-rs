@@ -7,14 +7,13 @@ use std::{
     iter,
 };
 
-use super::concrete::Concrete;
 use crate::{
     geometry::{Matrix, MatrixOrd, Point, PointOrd, VectorSlice},
     Consts, Float,
 };
 use cd::{Cd, CdResult, CoxMatrix};
 
-use approx::{abs_diff_ne, relative_eq};
+use approx::relative_eq;
 use nalgebra::{Dynamic, Quaternion, VecStorage};
 
 /// Converts a 3D rotation matrix into a quaternion. Uses the code from
@@ -145,6 +144,8 @@ impl Iterator for Group {
 }
 
 impl Group {
+    /// Initializes a new group with a given dimension and a given
+    /// [`GroupIter`].
     pub fn new<T: 'static + GroupIter>(dim: usize, iter: T) -> Self {
         Self {
             dim,
@@ -162,6 +163,7 @@ impl Group {
         self.count()
     }
 
+    /// Initializes a group from a given set of generators.
     pub fn from_gens(dim: usize, gens: Vec<Matrix>) -> Self {
         Self::new(dim, Box::new(GenIter::new(dim, gens)))
     }
@@ -188,6 +190,9 @@ impl Group {
     }
 
     /// Returns the swirl symmetry group of two 3D groups.
+    ///
+    /// # Panics
+    /// Panics if either of its arguments is not a group of 3D matrices.
     pub fn swirl(g: Self, h: Self) -> Self {
         if g.dim != 3 {
             panic!("g must be a group of 3D matrices.");
@@ -216,6 +221,11 @@ impl Group {
 
     /// Returns the exact same group, but now asserts that each generated
     /// element has the appropriate dimension. Used for debugging purposes.
+    ///
+    /// # Panics
+    /// The group returned by this method will cause a panic if any of the
+    /// matrices it generates does not have the same dimension as the group.
+    #[cfg(test)]
     pub fn debug(self) -> Self {
         const MSG: &str = "Size of matrix does not match expected dimension.";
         let dim = self.dim;
@@ -236,6 +246,10 @@ impl Group {
     }
 
     /// Shorthand for `Self::parse(input).unwrap().unwrap()`.
+    ///
+    /// # Panics
+    /// Panics if either the Coxeter diagram is invalid, or if doesn't describe
+    /// a valid group.
     pub fn parse_unwrap(input: &str) -> Self {
         Self::parse(input).unwrap().unwrap()
     }
@@ -255,16 +269,25 @@ impl Group {
     }
 
     /// Returns the I2(x) symmetry group.
+    ///
+    /// # Panics
+    /// This should never panic. If it does, please file a bug report.
     pub fn i2(x: Float) -> Self {
         Self::cox_group(CoxMatrix::i2(x)).unwrap()
     }
 
     /// Returns the An symmetry group.
+    ///
+    /// # Panics
+    /// This should never panic. If it does, please file a bug report.
     pub fn a(n: usize) -> Self {
         Self::cox_group(CoxMatrix::a(n)).unwrap()
     }
 
     /// Returns the Bn symmetry group.
+    ///
+    /// # Panics
+    /// This should never panic. If it does, please file a bug report.
     pub fn b(n: usize) -> Self {
         Self::cox_group(CoxMatrix::b(n)).unwrap()
     }
@@ -280,8 +303,9 @@ impl Group {
         }
     }
 
-    /// Generates a Coxeter group from its [`CdMatrix`], or returns `None` if
-    /// the group doesn't fit as a matrix group in spherical space.
+    /// Generates a Coxeter group from its [`CoxMatrix`](cd::CoxMatrix), or
+    /// returns `None` if the group doesn't fit as a matrix group in spherical
+    /// space.
     pub fn cox_group(cox: CoxMatrix) -> Option<Self> {
         Some(Self::new(cox.dim(), GenIter::from_cox(cox)?))
     }
@@ -292,29 +316,34 @@ impl Group {
         g: Self,
         h: Self,
         dim: usize,
-        product: (impl Fn((Matrix, Matrix)) -> Matrix + Clone + 'static),
+        product: (impl Fn(Matrix, Matrix) -> Matrix + Clone + 'static),
     ) -> Self {
-        Self::new(dim, itertools::iproduct!(g, h).map(product))
+        Self::new(
+            dim,
+            itertools::iproduct!(g, h).map(move |(mat1, mat2)| product(mat1, mat2)),
+        )
     }
 
     /// Returns the group determined by all products between elements of the
     /// first and the second group. **Is meant only for groups that commute with
     /// one another.**
     pub fn matrix_product(g: Self, h: Self) -> Option<Self> {
+        use std::ops::Mul;
+
         // The two matrices must have the same size.
         if g.dim != h.dim {
             return None;
         }
 
         let dim = g.dim;
-        Some(Self::fn_product(g, h, dim, |(mat1, mat2)| mat1 * mat2))
+        Some(Self::fn_product(g, h, dim, Matrix::mul))
     }
 
     /// Calculates the direct product of two groups. Pairs of matrices are then
     /// mapped to their direct sum.
     pub fn direct_product(g: Self, h: Self) -> Self {
         let dim = g.dim + h.dim;
-        Self::fn_product(g, h, dim, |(mat1, mat2)| direct_sum(mat1, mat2))
+        Self::fn_product(g, h, dim, direct_sum)
     }
 
     /// Generates the [wreath product](https://en.wikipedia.org/wiki/Wreath_product)
@@ -352,7 +381,7 @@ impl Group {
         let g_prod = vec![&g; h.len() - 1]
             .into_iter()
             .cloned()
-            .fold(g.clone(), |acc, g| Group::direct_product(g, acc));
+            .fold(g.clone(), Group::direct_product);
 
         Self::new(
             dim,
@@ -393,12 +422,12 @@ impl Group {
         points.into_iter().map(|x| x.0).collect()
     }
 
-    /// Generates a polytope as the convex hull of the orbit of a point under a
-    /// given symmetry group.
-    pub fn into_polytope(self, _: Point) -> Concrete {
+    // Generates a polytope as the convex hull of the orbit of a point under a
+    // given symmetry group.
+    /* pub fn into_polytope(self, _: Point) -> Concrete {
         todo!()
         // convex::convex_hull(self.orbit(p))
-    }
+    } */
 }
 
 /// The result of trying to get the next element in a group.
@@ -452,22 +481,6 @@ impl Iterator for GenIter {
             };
         }
     }
-}
-
-/// Determines whether two matrices are "approximately equal" elementwise.
-fn matrix_approx(mat1: &Matrix, mat2: &Matrix) -> bool {
-    let mat1 = mat1.iter();
-    let mut mat2 = mat2.iter();
-
-    for x in mat1 {
-        let y = mat2.next().expect("Matrices don't have the same size!");
-
-        if abs_diff_ne!(x, y, epsilon = Float::EPS) {
-            return false;
-        }
-    }
-
-    true
 }
 
 /// Builds a reflection matrix from a given vector.

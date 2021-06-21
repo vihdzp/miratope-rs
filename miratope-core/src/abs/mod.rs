@@ -1,11 +1,10 @@
+//! Declares the [`Abstract`] polytope type and all associated data structures.
+
 pub mod elements;
 pub mod flag;
 pub mod rank;
 
-use std::{
-    collections::{BTreeSet, HashMap, HashSet},
-    mem,
-};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use self::{
     elements::{
@@ -16,19 +15,22 @@ use self::{
     rank::{Rank, RankVec},
 };
 use super::{DualResult, Polytope};
-use crate::{
-    lang::name::{Abs, Name},
-    vec_like::VecLike,
-};
+use crate::lang::name::{Abs, Name};
 
 use rayon::prelude::*;
 use strum_macros::Display;
+use vec_like::VecLike;
+
+/// Represents the way in which two elements with one rank of difference are
+/// incident to one another. Used as a field in some [`AbstractError`] variants.
 
 #[derive(Debug, Display)]
 pub enum IncidenceType {
+    /// This element is a subelement of another.
     #[strum(serialize = "subelement")]
     Subelement,
 
+    /// This element is a superelement of another.
     #[strum(serialize = "superelement")]
     Superelement,
 }
@@ -38,34 +40,59 @@ pub enum IncidenceType {
 pub enum AbstractError {
     /// The polytope is not bounded, i.e. it doesn't have a single minimal and
     /// maximal element.
-    Bounded { min_count: usize, max_count: usize },
+    Bounded {
+        /// The number of minimal elements.
+        min_count: usize,
+
+        /// The number of maximal elements.
+        max_count: usize,
+    },
 
     /// The polytope has some invalid index, i.e. some element points to another
     /// non-existent element.
     Index {
+        /// The coordinates of the element at fault.
         el: ElementRef,
+
+        /// Whether the invalid index is a subelement or a superelement.
         incidence_type: IncidenceType,
+
+        /// The invalid index.
         index: usize,
     },
 
     /// The polytope has a consistency error, i.e. some element is incident to
     /// another but not viceversa.
     Consistency {
+        /// The coordinates of the element at fault.
         el: ElementRef,
+
+        /// Whether the invalid incidence is a subelement or a superelement.
         incidence_type: IncidenceType,
+
+        /// The invalid index.
         index: usize,
     },
 
     /// The polytope is not ranked, i.e. some element that's not minimal or not
     /// maximal lacks a subelement or superelement, respectively.
     Ranked {
+        /// The coordinates of the element at fault.
         el: ElementRef,
+
+        /// Whether the missing incidences are at subelements or superelements.
         incidence_type: IncidenceType,
     },
 
     /// The polytope is not dyadic, i.e. some section of height 1 does not have
     /// exactly 4 elements.
-    Dyadic { section: SectionRef, more: bool },
+    Dyadic {
+        /// The coordinates of the section at fault.
+        section: SectionRef,
+
+        /// Whether there were more than 4 elements in the section (or less).
+        more: bool,
+    },
 
     /// The polytope is not strictly connected, i.e. some section's flags don't
     /// form a connected graph under flag changes.
@@ -136,10 +163,49 @@ impl std::error::Error for AbstractError {}
 /// The return value for [`Abstract::is_valid`].
 pub type AbstractResult<T> = Result<T, AbstractError>;
 
-/// The [ranked poset](https://en.wikipedia.org/wiki/Graded_poset) corresponding
-/// to an [abstract polytope](https://polytope.miraheze.org/wiki/Abstract_polytope).
-/// It stores the indices of both the subelements and superelements of each
-/// element.
+/// Encodes the ranked poset corresponding to the abstract polytope. Internally,
+/// it wraps around a [`RankVec`] of [`ElementLists`](ElementList).
+///
+/// # What is an abstract polytope?
+/// Mathematically, an abstract polytope is a certain kind of **partially
+/// ordered set** (also known as a poset). A partially ordered set is a set P
+/// together with a relation ≤ on the set, satisfying three properties.
+/// 1. Reflexivity: *a* ≤ *a*.
+/// 2. Antisymmetry: *a* ≤ *b* and *b* ≤ *a* implies *a* = *b*.
+/// 3. Transitivity: *a* ≤ *b* and *b* ≤ *c* implies *a* ≤ *c*.
+///
+/// If either *a* ≤ *b* or *b* ≤ *a*, we say that *a* and *b* are incident. If
+/// *a* ≤ *c* and there's no *b* other than *a* or *c* such that *a* ≤ *b* ≤
+/// *c*, we say that *c* covers *a*.
+///
+/// An **abstract polytope** must also satisfy these three extra conditions:
+/// 1. Bounded: It has a minimal and maximal element.
+/// 2. Ranked: Every element *x* can be assigned a rank *r*(*x*) so that
+///    *r*(*x*) ≤ *r*(*y*) when *x* ≤ *y*, and *r*(*x*) + 1 = *r*(*y*) when *y*
+///    covers *x*.
+/// 3. Diamond property: If *a* ≤ *c* and *r*(*a*) + 2 = *r*(*c*), then there
+///    must be exactly two elements *b* such that *a* ≤ *b* ≤ *c*.
+///
+/// Each element in the poset represents an element in the polytope (that is, a
+/// vertex, edge, etc.) By convention, we choose the rank function so that the
+/// minimal element has rank &minus;1, which makes the rank of an element match
+/// its expected dimension (vertices are rank 0, edges are rank 1, etc.) The
+/// minimal and maximal element in the poset represent an "empty" element and
+/// the entire polytope, and are there mostly for convenience.
+///
+/// For more info, see [Wikipedia](https://en.wikipedia.org/wiki/Abstract_polytope)
+/// or the [Polytope Wiki](https://polytope.miraheze.org/wiki/Abstract_polytope)
+///
+/// # How are these represented?
+/// The core attribute of the `Abstract` type is the `ranks` attribute, which
+/// contains a `RankVec<ElementList>`.
+///
+/// A [`RankVec`] is a wrapper around a `Vec` that allows us to index by a
+/// [`Rank`]. That is, indexing starts at `-1`.
+///
+/// An [`ElementList`] is nothing but a list of [`Elements`](Element). Every
+/// element stores the indices of the incident [`Subelements`] of the previous
+/// rank, as well as the [`Superelements`] of the next rank.
 ///
 /// # How to use?
 /// The fact that we store both subelements and superelements is quite useful
@@ -157,15 +223,32 @@ pub type AbstractResult<T> = Result<T, AbstractError>;
 /// assumption that they're empty.
 #[derive(Debug, Clone)]
 pub struct Abstract {
+    /// The list of element lists in the polytope, ordered by [`Rank`].
     pub ranks: RankVec<ElementList>,
+
+    /// The name of the polytope, using the transformation rules for an abstract
+    /// polytope.
     name: Name<Abs>,
 
+    /// Whether every single element's subelements and superelements are sorted.
     sorted: bool,
 }
 
 impl Default for Abstract {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl AsRef<Vec<ElementList>> for Abstract {
+    fn as_ref(&self) -> &Vec<ElementList> {
+        self.ranks.as_ref()
+    }
+}
+
+impl AsMut<Vec<ElementList>> for Abstract {
+    fn as_mut(&mut self) -> &mut Vec<ElementList> {
+        self.ranks.as_mut()
     }
 }
 
@@ -187,6 +270,17 @@ impl From<RankVec<ElementList>> for Abstract {
     }
 }
 
+impl From<Vec<ElementList>> for Abstract {
+    fn from(vec: Vec<ElementList>) -> Self {
+        RankVec::from(vec).into()
+    }
+}
+
+impl VecLike<'_> for Abstract {
+    type VecItem = ElementList;
+    type VecIndex = Rank;
+}
+
 impl Abstract {
     /// Initializes a polytope with an empty element list.
     pub fn new() -> Self {
@@ -199,31 +293,47 @@ impl Abstract {
         RankVec::with_rank_capacity(rank).into()
     }
 
+    /// Returns `true` if we haven't added any elements to the polytope. Note
+    /// that such a polytope is considered invalid.
     pub fn is_empty(&self) -> bool {
         self.ranks.is_empty()
     }
 
+    /// Reserves capacity for at least `additional` more element lists to be
+    /// inserted in `self`.
     pub fn reserve(&mut self, additional: usize) {
         self.ranks.reserve(additional)
     }
 
     /// Returns a reference to the minimal element of the polytope.
+    ///
+    /// # Panics
+    /// Panics if the polytope has not been initialized.
     pub fn min(&self) -> &Element {
         self.get_element(ElementRef::new(Rank::new(-1), 0)).unwrap()
     }
 
     /// Returns a mutable reference to the minimal element of the polytope.
+    ///
+    /// # Panics
+    /// Panics if the polytope has not been initialized.
     pub fn min_mut(&mut self) -> &mut Element {
         self.get_element_mut(ElementRef::new(Rank::new(-1), 0))
             .unwrap()
     }
 
     /// Returns a reference to the maximal element of the polytope.
+    ///
+    /// # Panics
+    /// Panics if the polytope has not been initialized.
     pub fn max(&self) -> &Element {
         self.get_element(ElementRef::new(self.rank(), 0)).unwrap()
     }
 
     /// Returns a mutable reference to the maximal element of the polytope.
+    ///
+    /// # Panics
+    /// Panics if the polytope has not been initialized.
     pub fn max_mut(&mut self) -> &mut Element {
         self.get_element_mut(ElementRef::new(self.rank(), 0))
             .unwrap()
@@ -259,8 +369,8 @@ impl Abstract {
     }
 
     /// Pushes a new element list without superelements, assuming that the
-    /// superelements of the maximal rank **haven't** already been set. If they
-    /// have already been set, use [`push`](Self::push) instead.
+    /// superelements of the current maximal rank **haven't** already been set.
+    /// If they have already been set, use [`push`](Self::push) instead.
     pub fn push_subs(&mut self, subelements: SubelementList) {
         self.push(ElementList::with_capacity(subelements.len()));
 
@@ -463,11 +573,16 @@ impl Abstract {
         // Sets name.
         let mut abs = abs.build();
         let facet_count = abs.facet_count();
-        abs = abs.with_name(Name::antiprism(self.name.clone(), facet_count));
+        abs = abs.with_name(Box::new(self.name.clone()).antiprism(facet_count));
 
         (abs, vertices, dual_vertices)
     }
 
+    /// Returns the omnitruncate of a polytope, along with the flags that make
+    /// up its vertices.
+    ///
+    /// # Panics
+    /// This method shouldn't panic. If it does, please file a bug.
     pub fn omnitruncate_and_flags(&mut self) -> (Self, Vec<Flag>) {
         self.sort();
 
@@ -647,9 +762,13 @@ impl Abstract {
     /// Determines whether the polytope satisfies the diamond property. A valid
     /// non-fissary polytope should always return `true`.
     pub fn is_dyadic(&self) -> AbstractResult<()> {
+        /// The number of times we've found an element.
         #[derive(PartialEq)]
         enum Count {
+            /// We've found an element once.
             Once,
+
+            /// We've found an element twice.
             Twice,
         }
 
@@ -881,35 +1000,31 @@ impl Abstract {
     }
 }
 
-impl Polytope<Abs> for Abstract {
-    /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
-    fn rank(&self) -> Rank {
-        self.ranks.rank()
+impl AsRef<Abstract> for Abstract {
+    fn as_ref(&self) -> &Abstract {
+        self
     }
+}
 
-    /// Returns a reference to the [`Name`] of the polytope. This exists only
-    /// for trait purposes.
-    fn name(&self) -> &Name<Abs> {
+impl AsMut<Abstract> for Abstract {
+    fn as_mut(&mut self) -> &mut Abstract {
+        self
+    }
+}
+
+impl AsRef<Name<Abs>> for Abstract {
+    fn as_ref(&self) -> &Name<Abs> {
         &self.name
     }
+}
 
-    /// Returns a mutable reference to the [`Name`] of the polytope. This exists
-    /// only for trait purposes.
-    fn name_mut(&mut self) -> &mut Name<Abs> {
+impl AsMut<Name<Abs>> for Abstract {
+    fn as_mut(&mut self) -> &mut Name<Abs> {
         &mut self.name
     }
+}
 
-    /// Returns a reference to `self`. This exists only for trait purposes.
-    fn abs(&self) -> &Abstract {
-        self
-    }
-
-    /// Returns a mutable reference to `self`. This exists only for trait
-    /// purposes.
-    fn abs_mut(&mut self) -> &mut Abstract {
-        self
-    }
-
+impl Polytope<Abs> for Abstract {
     /// Returns an instance of the
     /// [nullitope](https://polytope.miraheze.org/wiki/Nullitope), the unique
     /// polytope of rank &minus;1.
@@ -988,7 +1103,7 @@ impl Polytope<Abs> for Abstract {
         }
 
         self.ranks.reverse();
-        self.name = self.name.clone().dual(Default::default());
+        self.name = Box::new(self.name.clone()).dual(Default::default());
         Ok(())
     }
 
@@ -1060,8 +1175,7 @@ impl Polytope<Abs> for Abstract {
         self.push_max();
 
         // Builds name.
-        let name = mem::replace(&mut self.name, Name::Nullitope);
-        self.name = name.petrial(self.facet_count());
+        self.name = self.name.clone().petrial(self.facet_count());
 
         // Checks for dyadicity, since that sometimes fails.
         self.is_dyadic().is_ok()
@@ -1086,7 +1200,7 @@ impl Polytope<Abs> for Abstract {
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks. *Updates neither the name nor the
     /// min/max elements.*
-    fn _append(&mut self, p: Self) {
+    fn _comp_append(&mut self, p: Self) {
         let rank = self.rank();
 
         // The polytopes must have the same ranks.
@@ -1122,11 +1236,10 @@ impl Polytope<Abs> for Abstract {
         }
     }
 
-    fn append(&mut self, p: Self) {
-        let name = mem::replace(&mut self.name, Name::Nullitope);
-        let new_name = Name::compound(vec![(1, name), (1, p.name.clone())]);
+    fn comp_append(&mut self, p: Self) {
+        let new_name = Name::compound(vec![(1, self.name.clone()), (1, p.name.clone())]);
 
-        self._append(p);
+        self._comp_append(p);
 
         *self.min_mut() = Element::min(self.vertex_count());
         *self.max_mut() = Element::max(self.facet_count());
@@ -1229,7 +1342,7 @@ impl std::ops::IndexMut<Rank> for Abstract {
 impl IntoIterator for Abstract {
     type Item = ElementList;
 
-    type IntoIter = crate::polytope::r#abstract::rank::IntoIter<ElementList>;
+    type IntoIter = crate::abs::rank::IntoIter<ElementList>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.ranks.rank_into_iter()
@@ -1274,13 +1387,13 @@ mod tests {
             poly.el_counts(),
             element_counts.into(),
             "{} element counts don't match expected value.",
-            En::parse_uppercase(poly.name(), Default::default())
+            En::parse_uppercase(&poly.name, Default::default())
         );
 
         assert!(
             poly.is_valid().is_ok(),
             "{} is not a valid polytope.",
-            En::parse_uppercase(poly.name(), Default::default())
+            En::parse_uppercase(&poly.name, Default::default())
         );
     }
 
@@ -1426,8 +1539,7 @@ mod tests {
 
             element_counts.push(1);
             for k in Rank::range_inclusive_iter(Rank::new(0), n) {
-                element_counts
-                    .push(choose(n.into(), k.into()) * 2u32.pow((n - k).into_u32()) as usize);
+                element_counts.push(choose(n.into(), k.into()) * (1 << (n - k).into_usize()));
             }
 
             test(&hypercube, element_counts);
@@ -1442,7 +1554,7 @@ mod tests {
             let mut element_counts = Vec::with_capacity(n.plus_one_usize());
 
             for k in Rank::range_inclusive_iter(0, n) {
-                element_counts.push(choose(n.into(), (n - k).into()) * 2u32.pow(k.into()) as usize);
+                element_counts.push(choose(n.into(), (n - k).into()) * (1 << k.into_usize()));
             }
             element_counts.push(1);
 
@@ -1457,7 +1569,7 @@ mod tests {
             assert!(
                 poly.is_valid().is_ok(),
                 "{} is not valid.",
-                En::parse(poly.name(), Default::default())
+                En::parse(&poly.name, Default::default())
             );
         }
     }
@@ -1465,7 +1577,7 @@ mod tests {
     #[test]
     /// Checks that duals are generated correctly.
     fn dual_check() {
-        use crate::vec_like::VecLike;
+        use vec_like::VecLike;
 
         for poly in test_polytopes().iter_mut() {
             let el_counts = poly.el_counts();
@@ -1479,14 +1591,14 @@ mod tests {
                 el_counts,
                 du_el_counts_rev,
                 "Dual element counts of {} don't match expected value.",
-                En::parse(poly.name(), Default::default())
+                En::parse(&poly.name, Default::default())
             );
 
             // The duals should also be valid polytopes.
             assert!(
                 poly.is_valid().is_ok(),
                 "Dual of polytope {} is invalid.",
-                En::parse(poly.name(), Default::default())
+                En::parse(&poly.name, Default::default())
             );
         }
     }
