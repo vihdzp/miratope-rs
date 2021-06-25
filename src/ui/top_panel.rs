@@ -247,7 +247,7 @@ pub fn show_top_panel(
     ): EguiWindows,
 ) {
     // The top bar.
-    egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx(), |ui| {
+    egui::TopPanel::top("top_panel").show(egui_ctx.ctx(), |ui| {
         menu::bar(ui, |ui| {
             // Operations on files.
             menu::menu(ui, "File", |ui| {
@@ -658,7 +658,7 @@ fn show_views(
         ui.add(
             egui::Slider::new(
                 &mut new_hyperplane_pos,
-                (minmax.0 + 0.0000001)..=(minmax.1 - 0.0000001),
+                (minmax.0 + 0.0000001)..=(minmax.1 - 0.0000001), // We do this to avoid nullitopes.
             )
             .text("Slice depth")
             .prefix("pos: "),

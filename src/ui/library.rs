@@ -499,94 +499,91 @@ fn show_library(
 ) {
     // Shows the polytope library.
     if let Some(library) = library.as_mut() {
-        egui::SidePanel::left("side_panel")
-            .default_width(350.0)
-            .max_width(450.0)
-            .show(egui_ctx.ctx(), |ui| {
-                egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
-                    let lib_path = PathBuf::from(lib_path.as_ref());
+        egui::SidePanel::left("side_panel", 450.0).show(egui_ctx.ctx(), |ui| {
+            egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
+                let lib_path = PathBuf::from(lib_path.as_ref());
 
-                    match library.show(ui, lib_path, *selected_language) {
-                        // No action needs to be taken.
-                        ShowResult::None => {}
+                match library.show(ui, lib_path, *selected_language) {
+                    // No action needs to be taken.
+                    ShowResult::None => {}
 
-                        // Loads a selected file.
-                        ShowResult::Load(file) => {
+                    // Loads a selected file.
+                    ShowResult::Load(file) => {
+                        if let Some(mut p) = query.iter_mut().next() {
+                            match Concrete::from_path(&file) {
+                                Ok(q) => *p = q,
+                                Err(err) => eprintln!("File open failed: {}", err),
+                            }
+                        }
+                    }
+
+                    // Loads a special polytope.
+                    ShowResult::Special(special) => match special {
+                        // Loads a regular star polygon.
+                        SpecialLibrary::Polygons(n, d) => {
                             if let Some(mut p) = query.iter_mut().next() {
-                                match Concrete::from_path(&file) {
-                                    Ok(q) => *p = q,
-                                    Err(err) => eprintln!("File open failed: {}", err),
+                                *p = Concrete::star_polygon(n, d);
+                            }
+                        }
+
+                        // Loads a uniform polygonal prism.
+                        SpecialLibrary::Prisms(n, d) => {
+                            if let Some(mut p) = query.iter_mut().next() {
+                                *p = Concrete::uniform_prism(n, d);
+                            }
+                        }
+
+                        // Loads a uniform polygonal antiprism.
+                        SpecialLibrary::Antiprisms(n, d) => {
+                            if let Some(mut p) = query.iter_mut().next() {
+                                *p = Concrete::uniform_antiprism(n, d);
+                            }
+                        }
+
+                        // Loads a (uniform 4D) duoprism.
+                        SpecialLibrary::Duoprisms(n1, d1, n2, d2) => {
+                            if let Some(mut p) = query.iter_mut().next() {
+                                let p1 = Concrete::star_polygon(n1, d1);
+
+                                if n1 == n2 && d1 == d2 {
+                                    *p = Concrete::duoprism(&p1, &p1);
+                                } else {
+                                    let p2 = Concrete::star_polygon(n2, d2);
+                                    *p = Concrete::duoprism(&p1, &p2);
                                 }
                             }
                         }
 
-                        // Loads a special polytope.
-                        ShowResult::Special(special) => match special {
-                            // Loads a regular star polygon.
-                            SpecialLibrary::Polygons(n, d) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = Concrete::star_polygon(n, d);
-                                }
+                        // Loads a uniform polygonal antiprism.
+                        SpecialLibrary::AntiprismPrisms(n, d) => {
+                            if let Some(mut p) = query.iter_mut().next() {
+                                *p = Concrete::uniform_antiprism(n, d).prism();
                             }
+                        }
 
-                            // Loads a uniform polygonal prism.
-                            SpecialLibrary::Prisms(n, d) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = Concrete::uniform_prism(n, d);
-                                }
+                        // Loads a simplex with a given rank.
+                        SpecialLibrary::Simplex(rank) => {
+                            if let Some(mut p) = query.iter_mut().next() {
+                                *p = Concrete::simplex(rank);
                             }
+                        }
 
-                            // Loads a uniform polygonal antiprism.
-                            SpecialLibrary::Antiprisms(n, d) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = Concrete::uniform_antiprism(n, d);
-                                }
+                        // Loads a hypercube with a given rank.
+                        SpecialLibrary::Hypercube(rank) => {
+                            if let Some(mut p) = query.iter_mut().next() {
+                                *p = Concrete::hypercube(rank);
                             }
+                        }
 
-                            // Loads a (uniform 4D) duoprism.
-                            SpecialLibrary::Duoprisms(n1, d1, n2, d2) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    let p1 = Concrete::star_polygon(n1, d1);
-
-                                    if n1 == n2 && d1 == d2 {
-                                        *p = Concrete::duoprism(&p1, &p1);
-                                    } else {
-                                        let p2 = Concrete::star_polygon(n2, d2);
-                                        *p = Concrete::duoprism(&p1, &p2);
-                                    }
-                                }
+                        // Loads an orthoplex with a given rank.
+                        SpecialLibrary::Orthoplex(rank) => {
+                            if let Some(mut p) = query.iter_mut().next() {
+                                *p = Concrete::orthoplex(rank);
                             }
-
-                            // Loads a uniform polygonal antiprism.
-                            SpecialLibrary::AntiprismPrisms(n, d) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = Concrete::uniform_antiprism(n, d).prism();
-                                }
-                            }
-
-                            // Loads a simplex with a given rank.
-                            SpecialLibrary::Simplex(rank) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = Concrete::simplex(rank);
-                                }
-                            }
-
-                            // Loads a hypercube with a given rank.
-                            SpecialLibrary::Hypercube(rank) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = Concrete::hypercube(rank);
-                                }
-                            }
-
-                            // Loads an orthoplex with a given rank.
-                            SpecialLibrary::Orthoplex(rank) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = Concrete::orthoplex(rank);
-                                }
-                            }
-                        },
-                    }
-                })
-            });
+                        }
+                    },
+                }
+            })
+        });
     }
 }

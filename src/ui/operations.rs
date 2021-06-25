@@ -14,7 +14,7 @@ use miratope_core::{
 
 use bevy::prelude::*;
 use bevy_egui::{
-    egui::{self, CtxRef, Layout, TextStyle, Ui, Widget},
+    egui::{self, CtxRef, Layout, Ui, Widget},
     EguiContext,
 };
 
@@ -796,7 +796,7 @@ impl UpdateWindow for AntiprismWindow {
 
         ui.horizontal(|ui| {
             ui.add(
-                egui::Checkbox::new(&mut self.retroprism, "Retroprism").text_style(TextStyle::Body),
+                egui::Checkbox::new(&mut self.retroprism, "Retroprism"), //.text_style(TextStyle::Body),
             );
         });
     }
