@@ -1,9 +1,6 @@
-use crate::{
-    abs::rank::Rank,
-    lang::name::{Name, NameType},
-};
+use crate::abs::rank::Rank;
 
-use super::{Bigender, GreekPrefix, Language, Options, Prefix};
+use super::{Bigender, GreekPrefix, Language, Options, Position, Prefix};
 
 /// The Spanish language.
 pub struct Es;
@@ -47,11 +44,18 @@ fn last_vowel_tilde(prefix: &str) -> String {
 }
 
 impl Language for Es {
+    type Count = super::Plural;
     type Gender = Bigender;
+
+    /// The default position to place adjectives. This will be used for the
+    /// default implementations, but it can be overridden in any specific case.
+    fn default_pos() -> Position {
+        Position::After
+    }
 
     /// Returns the suffix for a d-polytope. Only needs to work up to d = 20, we
     /// won't offer support any higher than that.
-    fn suffix(d: Rank, options: Options<Self::Gender>) -> String {
+    fn suffix(d: Rank, options: Options<Self::Count, Self::Gender>) -> String {
         const SUFFIXES: [&str; 21] = [
             "mon", "tel", "gon", "edr", "cor", "ter", "pet", "ex", "zet", "yot", "xen", "dac",
             "hendac", "doc", "tradac", "teradac", "petadac", "exdac", "zetadac", "yotadac",
@@ -66,53 +70,58 @@ impl Language for Es {
     }
 
     /// The name of a nullitope.
-    fn nullitope(options: Options<Self::Gender>) -> String {
-        format!(
-            "nul{}",
-            options.six(
-                "itopo",
-                "itopos",
-                "itópico",
-                "itópicos",
-                "itópica",
-                "itópicas"
-            )
+    fn nullitope(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.six(
+            "nulitopo",
+            "nulitopos",
+            "nulitópico",
+            "nulitópicos",
+            "nulitópica",
+            "nulitópicas",
         )
     }
 
     /// The name of a point.
-    fn point(options: Options<Self::Gender>) -> String {
-        format!("punt{}", options.four("o", "os", "ual", "uales"))
+    fn point(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.four("punto", "puntos", "puntual", "puntuales")
     }
 
     /// The name of a dyad.
-    fn dyad(options: Options<Self::Gender>) -> String {
-        format!(
-            "d{}",
-            options.six("íada", "íadas", "iádico", "iádicos", "iádica", "iádicas")
+    fn dyad(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.six(
+            "díada",
+            "díadas",
+            "diádico",
+            "diádicos",
+            "diádica",
+            "diádicas",
         )
     }
 
     /// The name of a triangle.
-    fn triangle(options: Options<Self::Gender>) -> String {
-        format!(
-            "tri{}",
-            options.four("ángulo", "ángulos", "angular", "angulares")
-        )
+    fn triangle(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.four("triángulo", "triángulos", "triangular", "triangulares")
     }
 
     /// The name of a square.
-    fn square(options: Options<Self::Gender>) -> String {
-        String::from("cuadrad") + options.six("o", "os", "o", "os", "a", "as")
+    fn square(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.six(
+            "cuadrado",
+            "cuadrados",
+            "cuadrado",
+            "cuadrados",
+            "cuadrada",
+            "cuadradas",
+        )
     }
 
     /// The name of a rectangle.
-    fn rectangle(options: Options<Self::Gender>) -> String {
-        String::from("rect") + options.four("ángulo", "ángulos", "angular", "angulares")
+    fn rectangle(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.four("rectángulo", "rectángulos", "rectangular", "rectangulares")
     }
 
     /// The generic name for a polytope with `n` facets in `d` dimensions.
-    fn generic(n: usize, d: Rank, options: Options<Self::Gender>) -> String {
+    fn generic(n: usize, d: Rank, options: Options<Self::Count, Self::Gender>) -> String {
         let mut prefix = Self::prefix(n);
 
         if d == Rank::new(2) && !options.adjective {
@@ -123,81 +132,46 @@ impl Language for Es {
     }
 
     /// The name for a pyramid.
-    fn pyramid(options: Options<Self::Gender>) -> String {
-        String::from("pir") + options.four("ámide", "ámides", "amidal", "amidales")
+    fn pyramid(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.four("pirámide", "pirámides", "piramidal", "piramidales")
     }
 
-    /// The name for a pyramid with a given base.
-    fn pyramid_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
-        format!(
-            "{} {}",
-            Self::pyramid(options),
-            Self::to_adj_with(base, options, Bigender::Female)
-        )
+    /// The gender of the "pyramid" noun. We assume this is shared by
+    /// "multipyramid".
+    fn pyramid_gender() -> Self::Gender {
+        Bigender::Female
     }
 
     /// The name for a prism.
-    fn prism(options: Options<Self::Gender>) -> String {
-        "prism".to_owned() + options.six("a", "as", "ático", "áticos", "ática", "áticas")
-    }
-
-    /// The name for a prism with a given base.
-    fn prism_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
-        format!(
-            "{} {}",
-            Self::prism(options),
-            Self::to_adj_with(base, options, Bigender::Male)
+    fn prism(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.six(
+            "prisma",
+            "prismas",
+            "prismático",
+            "prismáticos",
+            "prismática",
+            "prismáticas",
         )
     }
 
     /// The name for a tegum.
-    fn tegum(options: Options<Self::Gender>) -> String {
-        "teg".to_owned() + options.six("o", "os", "mático", "máticos", "mática", "máticas")
-    }
-
-    /// The name for a tegum with a given base.
-    fn tegum_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
-        format!(
-            "{} {}",
-            Self::tegum(options),
-            Self::to_adj_with(base, options, Bigender::Male)
+    fn tegum(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.six(
+            "tego",
+            "tegos",
+            "tegmático",
+            "tegmáticos",
+            "tegmática",
+            "tegmáticas",
         )
     }
 
-    fn multiproduct<T: NameType>(name: &Name<T>, options: Options<Self::Gender>) -> String {
-        // Gets the bases and the kind of multiproduct.
-        let (bases, kind, gender) = match name {
-            Name::Multipyramid(bases) => (bases, Self::pyramid(options), Bigender::Female),
-            Name::Multiprism(bases) => (bases, Self::prism(options), Bigender::Male),
-            Name::Multitegum(bases) => (bases, Self::tegum(options), Bigender::Male),
-            Name::Multicomb(bases) => (
-                bases,
-                String::from(options.four("panal", "panales", "de panal", "de panales")),
-                Bigender::Male,
-            ),
-            _ => panic!("Not a product!"),
-        };
-
-        let n = bases.len();
-        let prefix = match n {
-            2 => String::from("duo"),
-            3 => String::from("trio"),
-            _ => Self::prefix(n),
-        };
-        let kind = format!("{}{}", prefix, kind);
-
-        let mut str_bases = String::new();
-        let (last, bases) = bases.split_last().unwrap();
-        for base in bases {
-            str_bases.push_str(&Self::to_adj_with(base, options, gender));
-            str_bases.push('-');
-        }
-        str_bases.push_str(&Self::to_adj_with(last, options, gender));
-
-        format!("{} {}", kind, str_bases)
+    /// The name for a comb.
+    fn comb(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.two("panal", "panales")
     }
 
-    fn hyperblock(rank: Rank, options: Options<Self::Gender>) -> String {
+    fn hyperblock(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
         match rank.into_usize() {
             3 => format!("cuboid{}", options.four("e", "es", "al", "ales")),
             n => {
@@ -212,7 +186,7 @@ impl Language for Es {
     }
 
     /// The name for a hypercube with a given rank.
-    fn hypercube(rank: Rank, options: Options<Self::Gender>) -> String {
+    fn hypercube(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
         match rank.into_usize() {
             3 => format!(
                 "c{}",
@@ -240,8 +214,66 @@ impl Language for Es {
         }
     }
 
-    /// The name for an orthoplex with a given rank.
-    fn orthoplex(rank: Rank, options: Options<Self::Gender>) -> String {
-        Self::generic(1 << rank.into_usize(), rank, options)
+    /// The adjective for a "dual" polytope.
+    fn dual(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.two("dual", "duales")
+    }
+
+    /// The name for an antiprism.
+    fn antiprism(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.six(
+            "antiprisma",
+            "antiprismas",
+            "antiprismático",
+            "antiprismáticos",
+            "antiprismática",
+            "antiprismáticas",
+        )
+    }
+
+    /// The name for an antitegum.
+    fn antitegum(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.six(
+            "antitego",
+            "antitegos",
+            "antitegmático",
+            "antitegmáticos",
+            "antitegmática",
+            "antitegmáticas",
+        )
+    }
+
+    /// The adjective for a Petrial.
+    fn petrial(_options: Options<Self::Count, Self::Gender>) -> &'static str {
+        "Petrial"
+    }
+
+    /// The adjective for a "great" version of a polytope.
+    fn great(_options: Options<Self::Count, Self::Gender>) -> &'static str {
+        "gran"
+    }
+
+    /// The adjective for a "small" version of a polytope.
+    fn small(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.six(
+            "pequeño",
+            "pequeños",
+            "pequeño",
+            "pequeños",
+            "pequeña",
+            "pequeñas",
+        )
+    }
+
+    /// The adjective for a "stellated" version of a polytope.
+    fn stellated(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.six(
+            "estrellado",
+            "estrellados",
+            "estrellado",
+            "estrellados",
+            "estrellada",
+            "estrelladas",
+        )
     }
 }

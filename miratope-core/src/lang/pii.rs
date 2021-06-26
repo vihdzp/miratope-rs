@@ -1,6 +1,6 @@
 //! Reconstructed Proto-Indo Iranian. Credits to Gap.
 
-use super::{Agender, Language, Options, Prefix};
+use super::{Language, Options, Prefix};
 
 /// Reconstructed Proto-Indo Iranian.
 pub struct Pii;
@@ -8,9 +8,10 @@ pub struct Pii;
 impl Prefix for Pii {}
 
 impl Language for Pii {
-    type Gender = Agender;
+    type Count = super::Plural; // Probably not true.
+    type Gender = super::Agender;
 
-    fn nullitope(_options: Options<Self::Gender>) -> String {
+    fn nullitope(_options: Options<Self::Count, Self::Gender>) -> String {
         todo!()
     }
 }
