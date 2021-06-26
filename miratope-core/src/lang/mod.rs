@@ -478,7 +478,7 @@ pub enum Position {
 /// languages due to the profile of the people who worked on this. Any
 /// suggestions towards making this more general are welcome.
 pub trait Language: Prefix {
-    /// Whichever grammatical number system the language uses/
+    /// Whichever grammatical number system the language uses.
     type Count: Count;
 
     /// Whichever grammatical gender system the language uses.
