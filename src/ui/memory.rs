@@ -45,38 +45,35 @@ impl Memory {
                     Some(poly) => {
                         let mut clear = false;
 
-                        egui::CollapsingHeader::new(En::parse_uppercase(
-                            &poly.name,
-                            Default::default(),
-                        ))
-                        .id_source(idx)
-                        .show(ui, |ui| {
-                            // Clones a polytope from memory.
-                            if ui.button("Load").clicked() {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = poly.clone();
+                        egui::CollapsingHeader::new(En::parse_uppercase(&poly.name))
+                            .id_source(idx)
+                            .show(ui, |ui| {
+                                // Clones a polytope from memory.
+                                if ui.button("Load").clicked() {
+                                    if let Some(mut p) = query.iter_mut().next() {
+                                        *p = poly.clone();
+                                    }
                                 }
-                            }
 
-                            // Swaps the current polytope with the one on memory.
-                            if ui.button("Swap").clicked() {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    std::mem::swap(p.as_mut(), poly);
+                                // Swaps the current polytope with the one on memory.
+                                if ui.button("Swap").clicked() {
+                                    if let Some(mut p) = query.iter_mut().next() {
+                                        std::mem::swap(p.as_mut(), poly);
+                                    }
                                 }
-                            }
 
-                            // Clones a polytope into memory.
-                            if ui.button("Save").clicked() {
-                                if let Some(p) = query.iter_mut().next() {
-                                    *poly = p.clone();
+                                // Clones a polytope into memory.
+                                if ui.button("Save").clicked() {
+                                    if let Some(p) = query.iter_mut().next() {
+                                        *poly = p.clone();
+                                    }
                                 }
-                            }
 
-                            // Clears a polytope from memory.
-                            if ui.button("Clear").clicked() {
-                                clear = true;
-                            }
-                        });
+                                // Clears a polytope from memory.
+                                if ui.button("Clear").clicked() {
+                                    clear = true;
+                                }
+                            });
 
                         if clear {
                             *slot = None;

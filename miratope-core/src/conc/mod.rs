@@ -41,6 +41,7 @@ pub struct Concrete {
     pub abs: Abstract,
 
     /// The concrete name of the polytope.
+    #[cfg(feature = "lang")]
     pub name: Name<Con>,
 }
 
@@ -383,7 +384,17 @@ impl Concrete {
 
         // Takes the abstract dual.
         self.abs.dual_mut();
-        self.name = self.name.clone().dual(ConData::new(sphere.center.clone()));
+
+        // Builds the name.
+        #[cfg(feature = "lang")]
+        {
+            let facet_count = self.facet_count();
+            let rank = self.rank();
+            self.name =
+                self.name
+                    .clone()
+                    .dual(ConData::new(sphere.center.clone()), facet_count, rank);
+        }
 
         Ok(())
     }
@@ -430,9 +441,7 @@ impl Concrete {
             new_vertices[dual_vertex_indices[idx]] = v;
         }
 
-        let antiprism = Self::new(new_vertices, abs);
-        let facet_count = antiprism.facet_count();
-        antiprism.with_name(Name::antiprism(self.name.clone(), facet_count))
+        Self::new(new_vertices, abs).with_name(Name::antiprism(self.name.clone()))
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
@@ -902,9 +911,10 @@ impl Polytope<Con> for Concrete {
     fn petrial_mut(&mut self) -> bool {
         let res = self.abs.petrial_mut();
 
+        #[cfg(feature = "lang")]
         if res {
             let name = mem::replace(&mut self.name, Name::Nullitope);
-            self.name = name.petrial(self.facet_count());
+            self.name = name.petrial();
         }
 
         res
@@ -933,8 +943,8 @@ impl Polytope<Con> for Concrete {
     }
 
     fn comp_append(&mut self, p: Self) {
-        let name = mem::replace(&mut self.name, Name::Nullitope);
-        self.name = Name::compound(vec![(1, name), (1, p.name.clone())]);
+        // let name = mem::replace(&mut self.name, Name::Nullitope);
+        // self.name = Name::compound(vec![(1, name), (1, p.name.clone())]);
 
         self._comp_append(p);
     }
@@ -1122,11 +1132,11 @@ mod tests {
     use approx::abs_diff_eq;
 
     /// Tests that a polytope has an expected volume.
-    fn test(poly: &mut Concrete, volume: Option<Float>) {
+    fn test_volume(poly: &mut Concrete, volume: Option<Float>) {
         if let Some(poly_volume) = poly.volume() {
             let volume = volume.expect(&format!(
                 "Expected no volume for {}, found volume {}!",
-                En::parse(&poly.name, Default::default()),
+                En::parse(&poly.name),
                 poly_volume
             ));
 
@@ -1134,31 +1144,31 @@ mod tests {
                 abs_diff_eq!(poly_volume, volume, epsilon = Float::EPS),
                 "Expected volume {} for {}, found volume {}.",
                 volume,
-                En::parse(&poly.name, Default::default()),
+                En::parse(&poly.name),
                 poly_volume
             );
         } else if let Some(volume) = volume {
             panic!(
                 "Expected volume {} for {}, found no volume!",
                 volume,
-                En::parse(&poly.name, Default::default()),
+                En::parse(&poly.name),
             );
         }
     }
 
     #[test]
     fn nullitope() {
-        test(&mut Concrete::nullitope(), None)
+        test_volume(&mut Concrete::nullitope(), None)
     }
 
     #[test]
     fn point() {
-        test(&mut Concrete::point(), Some(1.0));
+        test_volume(&mut Concrete::point(), Some(1.0));
     }
 
     #[test]
     fn dyad() {
-        test(&mut Concrete::dyad(), Some(1.0));
+        test_volume(&mut Concrete::dyad(), Some(1.0));
     }
 
     fn polygon_area(n: usize, d: usize) -> Float {
@@ -1172,7 +1182,7 @@ mod tests {
         for n in 2..=10 {
             for d in 1..=n / 2 {
                 let mut poly = Concrete::star_polygon(n, d);
-                test(&mut poly, Some(polygon_area(n, d)));
+                test_volume(&mut poly, Some(polygon_area(n, d)));
             }
         }
     }
@@ -1190,7 +1200,7 @@ mod tests {
 
         for m in 0..polygons.len() {
             for n in 0..polygons.len() {
-                test(
+                test_volume(
                     &mut Concrete::duopyramid(&polygons[m], &polygons[n]),
                     Some(areas[m] * areas[n] / 30.0),
                 )
@@ -1211,7 +1221,7 @@ mod tests {
 
         for m in 0..polygons.len() {
             for n in 0..polygons.len() {
-                test(
+                test_volume(
                     &mut Concrete::duoprism(&polygons[m], &polygons[n]),
                     Some(areas[m] * areas[n]),
                 )
@@ -1232,7 +1242,7 @@ mod tests {
 
         for m in 0..polygons.len() {
             for n in 0..polygons.len() {
-                test(
+                test_volume(
                     &mut Concrete::duotegum(&polygons[m], &polygons[n]),
                     Some(areas[m] * areas[n] / 6.0),
                 )
@@ -1254,7 +1264,7 @@ mod tests {
         for m in 0..polygons.len() {
             for n in 0..polygons.len() {
                 let volume = (m == 0 || n == 0).then(|| 0.0);
-                test(&mut Concrete::duocomb(&polygons[m], &polygons[n]), volume)
+                test_volume(&mut Concrete::duocomb(&polygons[m], &polygons[n]), volume)
             }
         }
     }
@@ -1262,7 +1272,7 @@ mod tests {
     #[test]
     fn simplex() {
         for n in 0..=5 {
-            test(
+            test_volume(
                 &mut Concrete::simplex(Rank::from(n)),
                 Some(
                     ((n + 1) as Float / (1 << n) as Float).sqrt()
@@ -1275,14 +1285,14 @@ mod tests {
     #[test]
     fn hypercube() {
         for n in 0..=5 {
-            test(&mut Concrete::hypercube(Rank::new(n)), Some(1.0));
+            test_volume(&mut Concrete::hypercube(Rank::new(n)), Some(1.0));
         }
     }
 
     #[test]
     fn orthoplex() {
         for n in 0..=5 {
-            test(
+            test_volume(
                 &mut Concrete::orthoplex(Rank::from(n)),
                 Some(1.0 / crate::factorial(n) as Float),
             );

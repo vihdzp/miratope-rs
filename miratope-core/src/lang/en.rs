@@ -8,4 +8,6 @@ pub struct En;
 
 impl GreekPrefix for En {}
 
-impl Language for En {}
+impl Language for En {
+    type Gender = super::Agender;
+}

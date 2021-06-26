@@ -1,6 +1,6 @@
 //! Credits to Nayuta Ito
 
-use super::{Language, Options, Prefix};
+use super::{Agender, Language, Options, Prefix};
 use crate::abs::rank::Rank;
 
 pub struct Ja;
@@ -28,16 +28,18 @@ impl Prefix for Ja {
 }
 
 impl Language for Ja {
-    fn point(_options: Options) -> String {
+    type Gender = Agender;
+
+    fn point(_options: Options<Self::Gender>) -> String {
         String::from("点")
     }
 
     /// The name for a dyad.
-    fn dyad(_options: Options) -> String {
+    fn dyad(_options: Options<Self::Gender>) -> String {
         String::from("線分")
     }
 
-    fn generic(n: usize, rank: Rank, _options: Options) -> String {
+    fn generic(n: usize, rank: Rank, _options: Options<Self::Gender>) -> String {
         match rank.into() {
             2 => format!("{}形", Self::prefix(n)),
             3 => format!("{}面体", Self::prefix(n)),
@@ -52,19 +54,19 @@ impl Language for Ja {
         }
     }
 
-    fn triangle(options: Options) -> String {
+    fn triangle(options: Options<Self::Gender>) -> String {
         Self::generic(3, Rank::new(2), options)
     }
 
-    fn rectangle(_options: Options) -> String {
+    fn rectangle(_options: Options<Self::Gender>) -> String {
         String::from("長方形")
     }
 
-    fn square(_options: Options) -> String {
+    fn square(_options: Options<Self::Gender>) -> String {
         String::from("正方形")
     }
 
-    fn pyramid(_options: Options) -> String {
+    fn pyramid(_options: Options<Self::Gender>) -> String {
         String::from("錐")
     }
 }

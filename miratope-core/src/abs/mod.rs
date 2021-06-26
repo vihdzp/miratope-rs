@@ -572,8 +572,7 @@ impl Abstract {
 
         // Sets name.
         let mut abs = abs.build();
-        let facet_count = abs.facet_count();
-        abs = abs.with_name(Box::new(self.name.clone()).antiprism(facet_count));
+        abs = abs.with_name(Box::new(self.name.clone()).antiprism());
 
         (abs, vertices, dual_vertices)
     }
@@ -1103,7 +1102,11 @@ impl Polytope<Abs> for Abstract {
         }
 
         self.ranks.reverse();
-        self.name = Box::new(self.name.clone()).dual(Default::default());
+
+        // Builds the name.
+        let facet_count = self.facet_count();
+        let rank = self.rank();
+        self.name = Box::new(self.name.clone()).dual(Default::default(), facet_count, rank);
         Ok(())
     }
 
@@ -1175,7 +1178,10 @@ impl Polytope<Abs> for Abstract {
         self.push_max();
 
         // Builds name.
-        self.name = self.name.clone().petrial(self.facet_count());
+        #[cfg(feature = "lang")]
+        {
+            self.name = self.name.clone().petrial();
+        }
 
         // Checks for dyadicity, since that sometimes fails.
         self.is_dyadic().is_ok()
@@ -1237,14 +1243,14 @@ impl Polytope<Abs> for Abstract {
     }
 
     fn comp_append(&mut self, p: Self) {
-        let new_name = Name::compound(vec![(1, self.name.clone()), (1, p.name.clone())]);
+        // let new_name = Name::compound(vec![(1, self.name.clone()), (1, p.name.clone())]);
 
         self._comp_append(p);
 
         *self.min_mut() = Element::min(self.vertex_count());
         *self.max_mut() = Element::max(self.facet_count());
 
-        self.name = new_name;
+        // self.name = new_name;
     }
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
@@ -1387,13 +1393,13 @@ mod tests {
             poly.el_counts(),
             element_counts.into(),
             "{} element counts don't match expected value.",
-            En::parse_uppercase(&poly.name, Default::default())
+            En::parse_uppercase(&poly.name)
         );
 
         assert!(
             poly.is_valid().is_ok(),
             "{} is not a valid polytope.",
-            En::parse_uppercase(&poly.name, Default::default())
+            En::parse_uppercase(&poly.name)
         );
     }
 
@@ -1569,7 +1575,7 @@ mod tests {
             assert!(
                 poly.is_valid().is_ok(),
                 "{} is not valid.",
-                En::parse(&poly.name, Default::default())
+                En::parse(&poly.name)
             );
         }
     }
@@ -1591,14 +1597,14 @@ mod tests {
                 el_counts,
                 du_el_counts_rev,
                 "Dual element counts of {} don't match expected value.",
-                En::parse(&poly.name, Default::default())
+                En::parse(&poly.name)
             );
 
             // The duals should also be valid polytopes.
             assert!(
                 poly.is_valid().is_ok(),
                 "Dual of polytope {} is invalid.",
-                En::parse(&poly.name, Default::default())
+                En::parse(&poly.name)
             );
         }
     }

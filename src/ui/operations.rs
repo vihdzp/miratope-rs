@@ -327,7 +327,7 @@ pub trait DuoWindow: Window {
                 Slot::None => SELECT.to_string(),
 
                 // The loaded polytope is selected.
-                Slot::Loaded => En::parse_uppercase(&polytope.name, Default::default()),
+                Slot::Loaded => En::parse_uppercase(&polytope.name),
 
                 // Something is selected from the memory.
                 Slot::Memory(selected_idx) => match memory[*selected_idx].as_ref() {
@@ -337,7 +337,7 @@ pub trait DuoWindow: Window {
                         SELECT.to_string()
                     }
                     // Shows the name of the selected polytope.
-                    Some(poly) => En::parse_uppercase(&poly.name, Default::default()),
+                    Some(poly) => En::parse_uppercase(&poly.name),
                 },
             };
 
@@ -353,7 +353,7 @@ pub trait DuoWindow: Window {
                     ui.selectable_value(
                         &mut loaded_selected,
                         true,
-                        En::parse_uppercase(&polytope.name, Default::default()),
+                        En::parse_uppercase(&polytope.name),
                     );
 
                     // If the value was changed, update it.
@@ -373,7 +373,7 @@ pub trait DuoWindow: Window {
                         ui.selectable_value(
                             &mut slot_inner,
                             Some(slot_idx),
-                            En::parse_uppercase(&poly.name, Default::default()),
+                            En::parse_uppercase(&poly.name),
                         );
 
                         // If the value was changed, update it.

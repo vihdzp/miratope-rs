@@ -4,10 +4,7 @@ use super::{camera::ProjectionType, top_panel::SectionState};
 
 use bevy::prelude::*;
 use bevy_egui::EguiSettings;
-use miratope_core::{
-    conc::Concrete,
-    lang::{Options, SelectedLanguage},
-};
+use miratope_core::{conc::Concrete, lang::SelectedLanguage};
 
 /// The plugin in charge of the Miratope main window, and of drawing the
 /// polytope onto it.
@@ -72,7 +69,7 @@ pub fn update_changed_polytopes(
         windows
             .get_primary_mut()
             .unwrap()
-            .set_title(selected_language.parse(&poly.name, Options::default()));
+            .set_title(selected_language.parse(&poly.name));
 
         // Updates all wireframes.
         for child in children.iter() {

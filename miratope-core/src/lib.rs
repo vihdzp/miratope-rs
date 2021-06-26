@@ -15,6 +15,8 @@ pub mod abs;
 pub mod conc;
 pub mod geometry;
 pub mod group;
+
+#[cfg(feature = "lang")]
 pub mod lang;
 
 use std::iter;
@@ -127,7 +129,7 @@ pub trait Polytope<T: NameType>:
         format!(
             "{}{}",
             crate::WIKI_LINK,
-            lang::En::parse(name, Default::default()).replace(" ", "_")
+            lang::En::parse_with(name, Default::default()).replace(" ", "_")
         )
     }
 

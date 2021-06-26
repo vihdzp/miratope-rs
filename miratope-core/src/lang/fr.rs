@@ -1,53 +1,51 @@
 //! French translation. Credits to Blaxapate.
 
-use super::{Language, Options, Position, Prefix};
+use super::{Bigender, Language, Options, Prefix};
 
 pub struct Fr;
 
 impl Prefix for Fr {}
 
 impl Language for Fr {
-    fn adj_pos() -> Position {
-        Position::After
-    }
+    type Gender = Bigender;
 
-    fn nullitope(options: Options) -> String {
+    fn nullitope(options: Options<Self::Gender>) -> String {
         format!("nullitope{}", options.two("", "s"))
     }
 
-    fn point(options: Options) -> String {
+    fn point(options: Options<Self::Gender>) -> String {
         format!("point{}", options.two("", "s"))
     }
 
-    fn dyad(options: Options) -> String {
+    fn dyad(options: Options<Self::Gender>) -> String {
         format!("dyad{}", options.four("e", "es", "ique", "iques"))
     }
 
-    fn triangle(options: Options) -> String {
+    fn triangle(options: Options<Self::Gender>) -> String {
         format!("triang{}", options.four("le", "les", "ulaire", "ulaires"))
     }
 
-    fn rectangle(options: Options) -> String {
+    fn rectangle(options: Options<Self::Gender>) -> String {
         format!("rectangle{}", options.two("", "s"))
     }
 
-    fn square(options: Options) -> String {
+    fn square(options: Options<Self::Gender>) -> String {
         format!("carré{}", options.six("", "s", "", "s", "e", "es"))
     }
 
-    fn pyramid(options: Options) -> String {
+    fn pyramid(options: Options<Self::Gender>) -> String {
         format!("pyramid{}", options.two("", "s"))
     }
 
-    fn prism(options: Options) -> String {
+    fn prism(options: Options<Self::Gender>) -> String {
         format!("prisme{}", options.two("", "s"))
     }
 
-    fn tegum(options: Options) -> String {
+    fn tegum(options: Options<Self::Gender>) -> String {
         format!("tégume{}", options.four("", "s", "aire", "aires"))
     }
 
-    fn dual(options: Options) -> String {
+    fn dual(options: Options<Self::Gender>) -> String {
         format!("dua{}", options.six("l", "ux", "l", "ux", "le", "les"))
     }
 }

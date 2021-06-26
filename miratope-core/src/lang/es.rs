@@ -1,12 +1,9 @@
 use crate::{
     abs::rank::Rank,
-    lang::{
-        name::{Name, NameType},
-        Gender,
-    },
+    lang::name::{Name, NameType},
 };
 
-use super::{GreekPrefix, Language, Options, Position, Prefix};
+use super::{Bigender, GreekPrefix, Language, Options, Prefix};
 
 /// The Spanish language.
 pub struct Es;
@@ -63,14 +60,11 @@ fn last_vowel_tilde(prefix: String) -> String {
 }
 
 impl Language for Es {
-    /// The usual position for adjectives.
-    fn adj_pos() -> Position {
-        Position::After
-    }
+    type Gender = Bigender;
 
     /// Returns the suffix for a d-polytope. Only needs to work up to d = 20, we
     /// won't offer support any higher than that.
-    fn suffix(d: Rank, options: Options) -> String {
+    fn suffix(d: Rank, options: Options<Self::Gender>) -> String {
         const SUFFIXES: [&str; 21] = [
             "mon", "tel", "gon", "edr", "cor", "ter", "pet", "ex", "zet", "yot", "xen", "dac",
             "hendac", "doc", "tradac", "teradac", "petadac", "exdac", "zetadac", "yotadac",
@@ -85,7 +79,7 @@ impl Language for Es {
     }
 
     /// The name of a nullitope.
-    fn nullitope(options: Options) -> String {
+    fn nullitope(options: Options<Self::Gender>) -> String {
         format!(
             "nul{}",
             options.six(
@@ -100,12 +94,12 @@ impl Language for Es {
     }
 
     /// The name of a point.
-    fn point(options: Options) -> String {
+    fn point(options: Options<Self::Gender>) -> String {
         format!("punt{}", options.four("o", "os", "ual", "uales"))
     }
 
     /// The name of a dyad.
-    fn dyad(options: Options) -> String {
+    fn dyad(options: Options<Self::Gender>) -> String {
         format!(
             "d{}",
             options.six("íada", "íadas", "iádico", "iádicos", "iádica", "iádicas")
@@ -113,7 +107,7 @@ impl Language for Es {
     }
 
     /// The name of a triangle.
-    fn triangle(options: Options) -> String {
+    fn triangle(options: Options<Self::Gender>) -> String {
         format!(
             "tri{}",
             options.four("ángulo", "ángulos", "angular", "angulares")
@@ -121,54 +115,42 @@ impl Language for Es {
     }
 
     /// The name of a square.
-    fn square(options: Options) -> String {
-        format!("cuadrad{}", options.six("o", "os", "o", "os", "a", "as"))
+    fn square(options: Options<Self::Gender>) -> String {
+        String::from("cuadrad") + options.six("o", "os", "o", "os", "a", "as")
     }
 
     /// The name of a rectangle.
-    fn rectangle(options: Options) -> String {
-        format!(
-            "rect{}",
-            options.four("ángulo", "ángulos", "angular", "angulares")
-        )
+    fn rectangle(options: Options<Self::Gender>) -> String {
+        String::from("rect") + options.four("ángulo", "ángulos", "angular", "angulares")
     }
 
     /// The generic name for a polytope with `n` facets in `d` dimensions.
-    fn generic(n: usize, d: Rank, options: Options) -> String {
+    fn generic(n: usize, d: Rank, options: Options<Self::Gender>) -> String {
         let mut prefix = Self::prefix(n);
 
         if d == Rank::new(2) && !options.adjective {
             prefix = last_vowel_tilde(prefix);
         }
 
-        format!("{}{}", prefix, Self::suffix(d, options))
+        prefix + &Self::suffix(d, options)
     }
 
     /// The name for a pyramid.
-    fn pyramid(options: Options) -> String {
-        format!(
-            "pir{}",
-            options.four("ámide", "ámides", "amidal", "amidales")
-        )
+    fn pyramid(options: Options<Self::Gender>) -> String {
+        String::from("pir") + options.four("ámide", "ámides", "amidal", "amidales")
     }
 
     /// The name for a pyramid with a given base.
-    fn pyramid_of<T: NameType>(base: &Name<T>, options: Options) -> String {
+    fn pyramid_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
         format!(
             "{} {}",
             Self::pyramid(options),
-            Self::base_adj(
-                base,
-                Options {
-                    gender: options.gender | Gender::Female,
-                    ..options
-                }
-            )
+            Self::to_adj_with(base, options, Bigender::Female)
         )
     }
 
     /// The name for a prism.
-    fn prism(options: Options) -> String {
+    fn prism(options: Options<Self::Gender>) -> String {
         format!(
             "prism{}",
             options.six("a", "as", "ático", "áticos", "ática", "áticas")
@@ -176,22 +158,16 @@ impl Language for Es {
     }
 
     /// The name for a prism with a given base.
-    fn prism_of<T: NameType>(base: &Name<T>, options: Options) -> String {
+    fn prism_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
         format!(
             "{} {}",
             Self::prism(options),
-            Self::base_adj(
-                base,
-                Options {
-                    gender: options.gender | Gender::Male,
-                    ..options
-                }
-            )
+            Self::to_adj_with(base, options, Bigender::Male)
         )
     }
 
     /// The name for a tegum.
-    fn tegum(options: Options) -> String {
+    fn tegum(options: Options<Self::Gender>) -> String {
         format!(
             "teg{}",
             options.six("o", "os", "mático", "máticos", "mática", "máticas")
@@ -199,34 +175,27 @@ impl Language for Es {
     }
 
     /// The name for a tegum with a given base.
-    fn tegum_of<T: NameType>(base: &Name<T>, options: Options) -> String {
+    fn tegum_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
         format!(
             "{} {}",
             Self::tegum(options),
-            Self::base_adj(
-                base,
-                Options {
-                    gender: options.gender | Gender::Male,
-                    ..options
-                }
-            )
+            Self::to_adj_with(base, options, Bigender::Male)
         )
     }
 
-    fn multiproduct<T: NameType>(name: &Name<T>, options: Options) -> String {
+    fn multiproduct<T: NameType>(name: &Name<T>, options: Options<Self::Gender>) -> String {
         // Gets the bases and the kind of multiproduct.
         let (bases, kind, gender) = match name {
-            Name::Multipyramid(bases) => (bases, Self::pyramid(options), Gender::Female),
-            Name::Multiprism(bases) => (bases, Self::prism(options), Gender::Male),
-            Name::Multitegum(bases) => (bases, Self::tegum(options), Gender::Male),
+            Name::Multipyramid(bases) => (bases, Self::pyramid(options), Bigender::Female),
+            Name::Multiprism(bases) => (bases, Self::prism(options), Bigender::Male),
+            Name::Multitegum(bases) => (bases, Self::tegum(options), Bigender::Male),
             Name::Multicomb(bases) => (
                 bases,
                 String::from(options.four("panal", "panales", "de panal", "de panales")),
-                Gender::Male,
+                Bigender::Male,
             ),
             _ => panic!("Not a product!"),
         };
-        let gender = options.gender | gender;
 
         let n = bases.len();
         let prefix = match n {
@@ -237,18 +206,17 @@ impl Language for Es {
         let kind = format!("{}{}", prefix, kind);
 
         let mut str_bases = String::new();
-        let new_options = Options { gender, ..options };
         let (last, bases) = bases.split_last().unwrap();
         for base in bases {
-            str_bases.push_str(&Self::base_adj(base, new_options));
+            str_bases.push_str(&Self::to_adj_with(base, options, gender));
             str_bases.push('-');
         }
-        str_bases.push_str(&Self::base_adj(last, new_options));
+        str_bases.push_str(&Self::to_adj_with(last, options, gender));
 
         format!("{} {}", kind, str_bases)
     }
 
-    fn hyperblock(rank: Rank, options: Options) -> String {
+    fn hyperblock(rank: Rank, options: Options<Self::Gender>) -> String {
         match rank.into_usize() {
             3 => format!("cuboid{}", options.four("e", "es", "al", "ales")),
             n => {
@@ -263,7 +231,7 @@ impl Language for Es {
     }
 
     /// The name for a hypercube with a given rank.
-    fn hypercube(rank: Rank, options: Options) -> String {
+    fn hypercube(rank: Rank, options: Options<Self::Gender>) -> String {
         match rank.into_usize() {
             3 => format!(
                 "c{}",
@@ -292,46 +260,7 @@ impl Language for Es {
     }
 
     /// The name for an orthoplex with a given rank.
-    fn orthoplex(rank: Rank, options: Options) -> String {
+    fn orthoplex(rank: Rank, options: Options<Self::Gender>) -> String {
         Self::generic(1 << rank.into_usize(), rank, options)
-    }
-
-    fn compound<T: NameType>(components: &[(usize, Name<T>)], options: Options) -> String {
-        let ((last_rep, last_component), first_components) = components.split_last().unwrap();
-        let mut str = String::from(options.four(
-            "compuesto",
-            "compuestos",
-            "del compuesto",
-            "de los compuestos",
-        ));
-        str.push_str(" de");
-
-        let parse_component = |rep, component| {
-            Self::parse(
-                component,
-                Options {
-                    count: rep,
-                    ..Default::default()
-                },
-            )
-        };
-
-        let comma = if components.len() == 2 { "" } else { "," };
-        for (rep, component) in first_components {
-            str.push_str(&format!(
-                "{} {}{} ",
-                rep,
-                parse_component(*rep, component),
-                comma
-            ));
-        }
-
-        str.push_str(&format!(
-            "y {} {}",
-            last_rep,
-            parse_component(*last_rep, last_component)
-        ));
-
-        str
     }
 }

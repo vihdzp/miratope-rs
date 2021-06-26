@@ -23,6 +23,10 @@ strum_macros = "0.21"
 xml-rs = "0.8"
 zip = "0.5"
 
+[features]
+# This probably currently breaks if disabled.
+lang = []
+
 # Bevy egui integration with this latest version.
 [dependencies.bevy_egui]
 git = "https://github.com/jakobhellermann/bevy_egui"
