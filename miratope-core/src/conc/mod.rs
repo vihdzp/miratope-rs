@@ -678,7 +678,6 @@ impl Concrete {
                                 rank_usize,
                                 rank_usize,
                                 oriented_flag
-                                    .flag
                                     .into_iter()
                                     .enumerate()
                                     .map(|(rank, idx)| &flat_vertices[vertex_map[rank][idx]])

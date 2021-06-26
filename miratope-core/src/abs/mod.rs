@@ -276,7 +276,7 @@ impl From<Vec<ElementList>> for Abstract {
     }
 }
 
-impl VecLike<'_> for Abstract {
+impl VecLike for Abstract {
     type VecItem = ElementList;
     type VecIndex = Rank;
 }

@@ -289,6 +289,7 @@ impl Options<Bigender> {
 ///
 /// Defaults to just using `n-` as prefixes.
 pub trait Prefix {
+    /// Returns the prefix that stands for n-.
     fn prefix(n: usize) -> String {
         format!("{}-", n)
     }
@@ -365,11 +366,11 @@ pub trait GreekPrefix {
     /// Converts a number into its Greek prefix equivalent.
     fn greek_prefix(n: usize) -> String {
         match n {
-            0..=9 => Self::UNITS[n].to_string(),
-            11 => Self::HENDECA.to_string(),
-            12 => Self::DODECA.to_string(),
-            10 | 13..=19 => format!("{}{}", Self::UNITS[n % 10], Self::DECA),
-            20 => Self::ICOSA.to_string(),
+            0..=9 => Self::UNITS[n].to_owned(),
+            11 => Self::HENDECA.to_owned(),
+            12 => Self::DODECA.to_owned(),
+            10 | 13..=19 => Self::UNITS[n % 10].to_owned() + Self::DECA,
+            20 => Self::ICOSA.to_owned(),
             21..=29 => format!("{}{}", Self::ICOSI, Self::UNITS[n % 10]),
             30..=39 => format!("{}{}", Self::TRIACONTA, Self::UNITS[n % 10]),
             40..=99 => format!(
@@ -378,7 +379,7 @@ pub trait GreekPrefix {
                 Self::CONTA,
                 Self::UNITS[n % 10]
             ),
-            100 => Self::HECTO.to_string(),
+            100 => Self::HECTO.to_owned(),
             101..=199 => format!("{}{}", Self::HECATON, Self::greek_prefix(n % 100)),
             200..=299 => format!("{}{}", Self::DIACOSI, Self::greek_prefix(n % 100)),
             300..=399 => format!("{}{}", Self::TRIACOSI, Self::greek_prefix(n % 100)),
@@ -520,15 +521,22 @@ pub trait Language: Prefix {
         }
     }
 
-    /// Converts a name into an adjective. This is meant for languages without
-    /// gender. Otherwise, you should use [`Self::to_adj_with`].
+    /// Converts a name into an adjective. The options passed are those for the
+    /// term this adjective is modifying, which might either be a noun or
+    /// another adjective.
+    ///
+    /// This is meant for languages without gender. Otherwise, you should use
+    /// [`Self::to_adj_with`].
     fn to_adj<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
         Self::to_adj_with(base, options, Default::default())
     }
 
-    /// Converts a name into an adjective. If the options don't specify an
-    /// adjective, the specified gender is used. Otherwise, the adjective
-    /// inherits the gender from the options.
+    /// Converts a name into an adjective. The options passed are those for the
+    /// term this adjective is modifying, which might either be a noun or
+    /// another adjective.
+    ///
+    /// If the options don't specify an adjective, the specified gender is used.
+    /// Otherwise, the adjective inherits the gender from the options.
     fn to_adj_with<T: NameType>(
         base: &Name<T>,
         mut options: Options<Self::Gender>,
@@ -537,6 +545,7 @@ pub trait Language: Prefix {
         let adj = options.adjective;
         options.adjective = true;
 
+        // This is a noun, so we use the specified gender.
         if !adj {
             options.gender = gender;
         }
@@ -553,61 +562,54 @@ pub trait Language: Prefix {
             "iken", "ikod", "iktr",
         ];
 
-        format!(
-            "{}{}",
-            SUFFIXES[rank.into_usize()],
-            if rank == Rank::new(2) {
+        SUFFIXES[rank.into_usize()].to_owned()
+            + if rank == Rank::new(2) {
                 options.three("", "s", "al")
             } else if rank == Rank::new(3) {
                 options.three("on", "a", "al")
             } else {
                 options.three("on", "a", "ic")
             }
-        )
     }
 
     /// The name of a nullitope.
     fn nullitope(options: Options<Self::Gender>) -> String {
-        format!("nullitop{}", options.three("e", "es", "ic"))
+        "nullitop".to_owned() + options.three("e", "es", "ic")
     }
 
     /// The name of a point.
     fn point(options: Options<Self::Gender>) -> String {
-        format!("point{}", options.two("", "s"))
+        "point".to_owned() + options.two("", "s")
     }
 
     /// The name of a dyad.
     fn dyad(options: Options<Self::Gender>) -> String {
-        format!("dyad{}", options.three("", "s", "ic"))
+        "dyad".to_owned() + options.three("", "s", "ic")
     }
 
     /// The name of a triangle.
     fn triangle(options: Options<Self::Gender>) -> String {
-        format!("triang{}", options.three("le", "les", "ular"))
+        "triang".to_owned() + options.three("le", "les", "ular")
     }
 
     /// The name of a square.
     fn square(options: Options<Self::Gender>) -> String {
-        format!("square{}", options.two("", "s"))
+        "square".to_owned() + options.two("", "s")
     }
 
     /// The name of a rectangle.
     fn rectangle(options: Options<Self::Gender>) -> String {
-        format!("rectang{}", options.three("le", "les", "ular"))
+        "rectang".to_owned() + options.three("le", "les", "ular")
     }
 
     /// The generic name for a polytope with a given facet count and rank.
     fn generic(facet_count: usize, rank: Rank, options: Options<Self::Gender>) -> String {
-        format!(
-            "{}{}",
-            Self::prefix(facet_count),
-            Self::suffix(rank, options)
-        )
+        Self::prefix(facet_count) + &Self::suffix(rank, options)
     }
 
     /// The name of a pyramid.
     fn pyramid(options: Options<Self::Gender>) -> String {
-        format!("pyramid{}", options.three("", "s", "al"))
+        "pyramid".to_owned() + options.three("", "s", "al")
     }
 
     /// The name for a pyramid with a given base.
@@ -617,7 +619,7 @@ pub trait Language: Prefix {
 
     /// The name for a prism.
     fn prism(options: Options<Self::Gender>) -> String {
-        format!("prism{}", options.three("", "s", "atic"))
+        "prism".to_owned() + options.three("", "s", "atic")
     }
 
     /// The name for a prism with a given base.
@@ -627,7 +629,7 @@ pub trait Language: Prefix {
 
     /// The name for a tegum.
     fn tegum(options: Options<Self::Gender>) -> String {
-        format!("teg{}", options.three("um", "ums", "matic"))
+        "teg{}".to_owned() + options.three("um", "ums", "matic")
     }
 
     /// The name for a tegum with a given base.
@@ -637,7 +639,7 @@ pub trait Language: Prefix {
 
     /// The name for an antiprism.
     fn antiprism(options: Options<Self::Gender>) -> String {
-        format!("antiprism{}", options.three("", "s", "atic"))
+        "antiprism".to_owned() + options.three("", "s", "atic")
     }
 
     /// The name for an antiprism with a given base.
@@ -647,7 +649,7 @@ pub trait Language: Prefix {
 
     /// The name for an antitegum.
     fn antitegum(options: Options<Self::Gender>) -> String {
-        format!("antiteg{}", options.three("um", "ums", "matic"))
+        "antiteg".to_owned() + options.three("um", "ums", "matic")
     }
 
     /// The name for an antitegum with a given base.
@@ -657,7 +659,7 @@ pub trait Language: Prefix {
 
     /// The name for a Petrial.
     fn petrial(options: Options<Self::Gender>) -> String {
-        format!("Petrial{}", options.three("", "s", ""))
+        "Petrial".to_owned() + options.three("", "s", "")
     }
 
     /// The name for a Petrial with a given base.
@@ -681,7 +683,7 @@ pub trait Language: Prefix {
             3 => String::from("trio"),
             _ => Self::prefix(n),
         };
-        let kind = format!("{}{}", prefix, kind);
+        let kind = prefix + &kind;
 
         let mut str_bases = String::new();
 
@@ -775,11 +777,33 @@ pub trait Language: Prefix {
 /// We should maybe make `dyn Language` work eventually.
 #[derive(Clone, Copy, Debug, EnumIter, Serialize, Deserialize)]
 pub enum SelectedLanguage {
+    /// English
     En,
+
+    /// Spanish
     Es,
+
+    /// French
     Fr,
+
+    /// Japanese
     Ja,
+
+    /// Proto Indo-Iranian
     Pii,
+}
+
+impl ToString for SelectedLanguage {
+    fn to_string(&self) -> String {
+        match self {
+            Self::En => "English",
+            Self::Es => "Spanish",
+            Self::Fr => "French",
+            Self::Ja => "Japanese",
+            Self::Pii => "Proto Indo-Iranian",
+        }
+        .to_owned()
+    }
 }
 
 impl SelectedLanguage {
@@ -790,16 +814,6 @@ impl SelectedLanguage {
             Self::Fr => Fr::parse_uppercase(name),
             Self::Ja => Ja::parse(name),
             Self::Pii => Pii::parse_uppercase(name),
-        }
-    }
-
-    pub fn to_string(self) -> &'static str {
-        match self {
-            Self::En => "English",
-            Self::Es => "Spanish",
-            Self::Fr => "French",
-            Self::Ja => "Japanese",
-            Self::Pii => "Proto Indo-Iranian",
         }
     }
 }

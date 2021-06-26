@@ -219,7 +219,7 @@ impl<'a> Iterator for FlagIter<'a> {
     }
 }
 
-#[derive(Clone, Eq)]
+#[derive(Clone, Default, Eq)]
 /// A flag together with an orientation. Any flag change flips the orientation.
 /// If the polytope associated to the flag is non-orientable, the orientation
 /// will be garbage data.
@@ -241,6 +241,57 @@ impl From<Flag> for OrientedFlag {
             orientation: Default::default(),
         }
     }
+}
+
+impl From<Vec<usize>> for OrientedFlag {
+    fn from(vec: Vec<usize>) -> Self {
+        Flag::from(vec).into()
+    }
+}
+
+impl AsRef<Vec<usize>> for OrientedFlag {
+    fn as_ref(&self) -> &Vec<usize> {
+        self.flag.as_ref()
+    }
+}
+
+impl AsMut<Vec<usize>> for OrientedFlag {
+    fn as_mut(&mut self) -> &mut Vec<usize> {
+        self.flag.as_mut()
+    }
+}
+
+/// Allows indexing an oriented flag by rank.
+impl Index<usize> for OrientedFlag {
+    type Output = usize;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.flag[index]
+    }
+}
+
+/// Allows mutably indexing an oriented flag by rank.
+impl IndexMut<usize> for OrientedFlag {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.flag[index]
+    }
+}
+
+/// Iterates over the entries of an oriented flag.
+impl IntoIterator for OrientedFlag {
+    type Item = usize;
+
+    type IntoIter = std::vec::IntoIter<usize>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.flag.into_iter()
+    }
+}
+
+impl VecLike for OrientedFlag {
+    type VecItem = usize;
+
+    type VecIndex = usize;
 }
 
 impl Hash for OrientedFlag {
@@ -268,22 +319,6 @@ impl PartialOrd for OrientedFlag {
 impl Ord for OrientedFlag {
     fn cmp(&self, other: &Self) -> Ordering {
         self.flag.cmp(&other.flag)
-    }
-}
-
-/// Allows indexing an oriented flag by rank.
-impl Index<usize> for OrientedFlag {
-    type Output = usize;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.flag[index]
-    }
-}
-
-/// Allows mutably indexing an oriented flag by rank.
-impl IndexMut<usize> for OrientedFlag {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.flag[index]
     }
 }
 

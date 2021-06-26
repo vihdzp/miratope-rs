@@ -15,7 +15,7 @@ pub trait NameType: Debug + Clone + PartialEq + Serialize {
 
     /// Either `AbsData<Regular>` or `ConData<Regular>`. Workaround until generic
     /// associated types are stable.
-    type DataRegular: NameData<Regular>;
+    type DataRegular: NameData<Regular> + Default;
 
     /// Whether the name marker is for an abstract polytope.
     fn is_abstract() -> bool;
@@ -23,7 +23,7 @@ pub trait NameType: Debug + Clone + PartialEq + Serialize {
 
 /// A trait for data associated to a name. It can either be [`AbsData`], which
 /// is zero size and compares `true` with anything, or [`ConData`], which stores
-/// an actual value which is used for comparisons.
+/// an actual value of type `T` which is used for comparisons.
 ///
 /// The idea is that `NameData` should be used to store whichever conditions on
 /// concrete polytopes always hold on abstract polytopes.
@@ -105,6 +105,12 @@ impl<T: PartialEq> PartialEq for ConData<T> {
     }
 }
 
+impl<T: PartialEq + Debug + Clone + Serialize + Default> Default for ConData<T> {
+    fn default() -> Self {
+        Self::new(Default::default())
+    }
+}
+
 impl<T: PartialEq + Debug + Clone + Serialize> NameData<T> for ConData<T> {
     /// Initializes a new `ConData` that holds a given value.
     fn new(value: T) -> Self {
@@ -124,7 +130,7 @@ impl<T: PartialEq + Debug + Clone + Serialize> NameData<T> for ConData<T> {
 
 /// A name representing a concrete polytope.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct Con(bool);
+pub struct Con;
 
 impl NameType for Con {
     type DataPoint = ConData<Point>;
@@ -148,6 +154,12 @@ pub enum Regular {
 
     /// The polytope is not regular.
     No,
+}
+
+impl Default for Regular {
+    fn default() -> Self {
+        Self::No
+    }
 }
 
 impl Regular {
@@ -328,25 +340,7 @@ impl<T: NameType> Name<T> {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
-            2 => match n {
-                3 => Self::Triangle {
-                    regular: T::DataRegular::new(Regular::No),
-                },
-                4 => {
-                    if T::is_abstract() {
-                        Self::Square
-                    } else {
-                        Self::Polygon {
-                            regular: T::DataRegular::new(Regular::No),
-                            n: 4,
-                        }
-                    }
-                }
-                _ => Self::Polygon {
-                    regular: T::DataRegular::new(Regular::No),
-                    n,
-                },
-            },
+            2 => Self::polygon(Default::default(), n),
             _ => Self::Generic {
                 facet_count: n,
                 rank,
@@ -357,13 +351,13 @@ impl<T: NameType> Name<T> {
     /// Builds a pyramid name from a given name.
     pub fn pyramid(self) -> Self {
         match self {
-            Self::Nullitope => Self::Nullitope,
+            Self::Nullitope => Self::Point,
             Self::Point => Self::Dyad,
             Self::Dyad => Self::Triangle {
-                regular: T::DataRegular::new(Regular::No),
+                regular: Default::default(),
             },
             Self::Triangle { regular } => {
-                if T::is_abstract() || regular.contains(&Regular::No) {
+                if regular.contains(&Regular::No) {
                     Self::Simplex {
                         regular,
                         rank: Rank::new(3),
@@ -373,7 +367,7 @@ impl<T: NameType> Name<T> {
                 }
             }
             Self::Simplex { regular, rank } => {
-                if T::is_abstract() || regular.contains(&Regular::No) {
+                if regular.contains(&Regular::No) {
                     Self::Simplex {
                         regular,
                         rank: rank.plus_one(),
@@ -398,11 +392,11 @@ impl<T: NameType> Name<T> {
             Self::Point => Self::Dyad,
             Self::Dyad => Self::rectangle(),
             Self::Rectangle => Self::Hyperblock {
-                regular: T::DataRegular::new(Regular::No),
+                regular: Default::default(),
                 rank: Rank::new(3),
             },
             Self::Hyperblock { regular, rank } => {
-                if T::is_abstract() || regular.contains(&Regular::No) {
+                if regular.contains(&Regular::No) {
                     Self::Hyperblock {
                         regular,
                         rank: rank.plus_one(),
@@ -427,11 +421,11 @@ impl<T: NameType> Name<T> {
             Self::Point => Self::Dyad,
             Self::Dyad => Self::orthodiagonal(),
             Self::Orthodiagonal => Self::Orthoplex {
-                regular: T::DataRegular::new(Regular::No),
+                regular: Default::default(),
                 rank: Rank::new(3),
             },
             Self::Orthoplex { regular, rank } => {
-                if T::is_abstract() || regular.contains(&Regular::No) {
+                if regular.contains(&Regular::No) {
                     Self::Orthoplex {
                         regular,
                         rank: rank.plus_one(),
@@ -457,7 +451,7 @@ impl<T: NameType> Name<T> {
             Self::Dyad => Self::Orthodiagonal,
             Self::Simplex { rank, regular: _ } => Self::Orthoplex {
                 rank: rank.plus_one(),
-                regular: T::DataRegular::new(Regular::No),
+                regular: Default::default(),
             },
             _ => Self::Antiprism {
                 base: Box::new(self),
@@ -483,7 +477,7 @@ impl<T: NameType> Name<T> {
                     }
                 } else {
                     Name::$dual {
-                        regular: T::DataRegular::new(Regular::No),
+                        regular: Default::default(),
                         $($other_fields)*
                     }
                 }
@@ -531,7 +525,7 @@ impl<T: NameType> Name<T> {
             // Other hardcoded cases.
             Self::Triangle { regular } => regular_dual!(regular, Triangle),
             Self::Square | Self::Rectangle => Self::orthodiagonal(),
-            Self::Orthodiagonal => Self::polygon(T::DataRegular::new(Regular::No), 4),
+            Self::Orthodiagonal => Self::polygon(Default::default(), 4),
 
             // Duals of duals become the original polytopes if possible, and
             // default to generic names otherwise.
@@ -701,10 +695,7 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one pyramid, we combine all of them into a
         // single simplex.
         if pyramid_count >= Rank::new(2) {
-            new_bases.push(Name::simplex(
-                T::DataRegular::new(Regular::No),
-                pyramid_count.minus_one(),
-            ));
+            new_bases.push(Name::simplex(Default::default(), pyramid_count.minus_one()));
         }
 
         // Sorts the bases by convention.
@@ -749,10 +740,7 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one prism, we combine all of them into a
         // single hyperblock.
         if prism_count >= Rank::new(2) {
-            new_bases.push(Name::hyperblock(
-                T::DataRegular::new(Regular::No),
-                prism_count,
-            ));
+            new_bases.push(Name::hyperblock(Default::default(), prism_count));
         }
 
         // Sorts the bases by convention.
@@ -797,10 +785,7 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one tegum, we combine all of them into a
         // single orthoplex.
         if tegum_count >= Rank::new(2) {
-            new_bases.push(Self::orthoplex(
-                T::DataRegular::new(Regular::No),
-                tegum_count,
-            ));
+            new_bases.push(Self::orthoplex(Default::default(), tegum_count));
         }
 
         // Sorts the bases by convention.

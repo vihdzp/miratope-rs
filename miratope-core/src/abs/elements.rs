@@ -36,7 +36,7 @@ impl ElementRef {
 }
 
 /// Common boilerplate code for [`Subelements`] and [`Superelements`].
-pub trait Subsupelements<'a>: Sized + VecLike<'a, VecItem = usize> {
+pub trait Subsupelements: Sized + VecLike<VecItem = usize> {
     /// Constructs a subelement or superelement list consisting of the indices
     /// from `0` to `n - 1`.
     fn count(n: usize) -> Self {
@@ -58,7 +58,7 @@ pub trait Subsupelements<'a>: Sized + VecLike<'a, VecItem = usize> {
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Subelements(pub Vec<usize>);
 impl_veclike!(Subelements, Item = usize, Index = usize);
-impl<'a> Subsupelements<'a> for Subelements {}
+impl Subsupelements for Subelements {}
 
 /// Represents a list of superelements in a polytope. Each element is
 /// represented as its index in the [`ElementList`] of the next rank. Is used as
@@ -68,7 +68,7 @@ impl<'a> Subsupelements<'a> for Subelements {}
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Superelements(pub Vec<usize>);
 impl_veclike!(Superelements, Item = usize, Index = usize);
-impl<'a> Subsupelements<'a> for Superelements {}
+impl Subsupelements for Superelements {}
 
 /// Represents an element in a polytope (also known as a face), which stores the
 /// indices of both its [`Subelements`] and its [`Superelements`]. These make up

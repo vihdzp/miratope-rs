@@ -15,7 +15,10 @@ impl VecIndex for usize {
 
 /// A trait for any type that acts as a wrapper around a `Vec<T>`. Will
 /// automatically implement all corresponding methods.
-pub trait VecLike<'a>:
+///
+/// TODO: only the From, AsRef, and AsMut traits are strictly required, and all
+/// others could be derived from them. Do a macro?
+pub trait VecLike:
     Default
     + From<Vec<Self::VecItem>>
     + AsRef<Vec<Self::VecItem>>
@@ -49,7 +52,7 @@ pub trait VecLike<'a>:
     /// Returns true if `self` contains an element with the given value.
     fn contains(&self, x: &Self::VecItem) -> bool
     where
-        <Self as VecLike<'a>>::VecItem: PartialEq,
+        <Self as VecLike>::VecItem: PartialEq,
     {
         self.as_ref().contains(x)
     }
@@ -89,11 +92,11 @@ pub trait VecLike<'a>:
         self.as_mut().insert(index.index(), element)
     }
 
-    fn iter(&'a self) -> std::slice::Iter<'a, <Self as VecLike<'a>>::VecItem> {
+    fn iter(&self) -> std::slice::Iter<<Self as VecLike>::VecItem> {
         self.as_ref().iter()
     }
 
-    fn iter_mut(&'a mut self) -> std::slice::IterMut<'a, <Self as VecLike<'a>>::VecItem> {
+    fn iter_mut(&mut self) -> std::slice::IterMut<<Self as VecLike>::VecItem> {
         self.as_mut().iter_mut()
     }
 
@@ -120,7 +123,7 @@ pub trait VecLike<'a>:
     /// Sorts `self`.
     fn sort(&mut self)
     where
-        <Self as VecLike<'a>>::VecItem: Ord,
+        <Self as VecLike>::VecItem: Ord,
     {
         self.as_mut().sort()
     }
@@ -128,7 +131,7 @@ pub trait VecLike<'a>:
     /// Sorts `self`, but may not preserve the order of equal elements.
     fn sort_unstable(&mut self)
     where
-        <Self as VecLike<'a>>::VecItem: Ord,
+        <Self as VecLike>::VecItem: Ord,
     {
         self.as_mut().sort_unstable()
     }
@@ -137,7 +140,7 @@ pub trait VecLike<'a>:
     /// order of equal elements.
     fn sort_unstable_by_key<K, F>(&mut self, f: F)
     where
-        <Self as VecLike<'a>>::VecItem: Ord,
+        <Self as VecLike>::VecItem: Ord,
         F: FnMut(&Self::VecItem) -> K,
         K: Ord,
     {
@@ -181,9 +184,11 @@ pub trait VecLike<'a>:
 /// struct Wrapper<T>(Vec<T>);
 /// impl_veclike!(@for [T] Wrapper<T>, item = T, index = usize);
 /// ```
+///
+/// TODO: probably turn this into something that can be derived.
 macro_rules! impl_veclike {
     ($(@for [$($generics: tt)*])? $Type: ty, Item = $VecItem: ty, Index = $VecIndex: ty $(,)?) => {
-        impl<'a, $($($generics)*)?> vec_like::VecLike<'a> for $Type {
+        impl<'a, $($($generics)*)?> vec_like::VecLike for $Type {
             type VecItem = $VecItem;
             type VecIndex = $VecIndex;
         }
