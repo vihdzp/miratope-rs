@@ -228,7 +228,7 @@ pub struct Abstract {
 
     /// The name of the polytope, using the transformation rules for an abstract
     /// polytope.
-    name: Name<Abs>,
+    pub name: Name<Abs>,
 
     /// Whether every single element's subelements and superelements are sorted.
     sorted: bool,
@@ -934,7 +934,7 @@ impl Abstract {
                             let mut subs = Subelements::new();
 
                             // Products of p's subelements with q.
-                            if p_els_rank != Rank::new(0) || min {
+                            if min || p_els_rank != Rank::new(0) {
                                 for &s in &p_el.subs {
                                     subs.push(get_element_index(
                                         p_els_rank.minus_one(),
@@ -946,7 +946,7 @@ impl Abstract {
                             }
 
                             // Products of q's subelements with p.
-                            if q_els_rank != Rank::new(0) || min {
+                            if min || q_els_rank != Rank::new(0) {
                                 for &s in &q_el.subs {
                                     subs.push(get_element_index(
                                         p_els_rank,

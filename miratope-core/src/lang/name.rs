@@ -1,6 +1,6 @@
 //! Module that defines a language-independent representation of polytope names.
 
-use std::{fmt::Debug, marker::PhantomData};
+use std::{fmt::Debug, marker::PhantomData, mem};
 
 use crate::{abs::rank::Rank, geometry::Point, Consts, Float};
 
@@ -43,6 +43,7 @@ pub trait NameData<T>: PartialEq + Debug + Clone + Serialize {
 #[derive(Copy, Debug, Serialize, Deserialize)]
 pub struct AbsData<T>(PhantomData<T>);
 
+/// The default value is the only possible value.
 impl<T> Default for AbsData<T> {
     fn default() -> Self {
         Self(PhantomData)
@@ -99,12 +100,14 @@ impl NameType for Abs {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ConData<T>(T);
 
+/// Compares data by what is contained in it.
 impl<T: PartialEq> PartialEq for ConData<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
 
+/// Uses the default value of whatever is inside.
 impl<T: PartialEq + Debug + Clone + Serialize + Default> Default for ConData<T> {
     fn default() -> Self {
         Self::new(Default::default())
@@ -156,6 +159,7 @@ pub enum Regular {
     No,
 }
 
+/// We don't treat something as regular by default.
 impl Default for Regular {
     fn default() -> Self {
         Self::No
@@ -195,12 +199,14 @@ pub enum Name<T: NameType> {
     },
 
     /// A square.
+    // Maybe we should store its center?
     Square,
 
     /// A rectangle (a 2-cuboid).
+    // Maybe we should store its center?
     Rectangle,
 
-    /// An orthodiagonal quadrilateral (a 2-orthoplex).
+    /// An orthodiagonal quadrilateral (a dyadic duotegum).
     Orthodiagonal,
 
     /// A polygon with **at least 4** sides if irregular, or **at least 5**
@@ -223,19 +229,23 @@ pub enum Name<T: NameType> {
     Tegum(Box<Name<T>>),
 
     /// A multipyramid based on a list of polytopes. The list must contain **at
-    /// least 2** elements, and contain nothing that can be interpreted as a
+    /// least two** elements, and contain nothing that can be interpreted as a
     /// multipyramid.
     Multipyramid(Vec<Name<T>>),
 
-    /// A multiprism based on a list of polytopes. The list must contain at
-    /// least two elements, be "sorted", and contain nothing that can be
-    /// interpreted as a multiprism.
+    /// A multiprism based on a list of polytopes. The list must contain **at
+    /// least two** elements, and contain nothing that can be interpreted as a
+    /// multiprism.
     Multiprism(Vec<Name<T>>),
 
-    /// A multitegum based on a list of polytopes.
+    /// A multitegum based on a list of polytopes. The list must contain **at
+    /// least two** elements, and contain nothing that can be interpreted as a
+    /// multitegum.
     Multitegum(Vec<Name<T>>),
 
-    /// A multicomb based on a list of polytopes.
+    /// A multicomb based on a list of polytopes. The list must contain **at
+    /// least two** elements, and contain nothing that can be interpreted as a
+    /// multicomb.
     Multicomb(Vec<Name<T>>),
 
     /// An antiprism based on a polytope.
@@ -301,10 +311,11 @@ impl<T: NameType> Name<T> {
             // Petrials must always be 3D, but we have no way to check this.
 
             // Operations must be at least 3D, otherwise they have other names.
-            Self::Simplex { regular: _, rank }
-            | Self::Hyperblock { regular: _, rank }
-            | Self::Orthoplex { regular: _, rank } => *rank >= Rank::new(3),
+            Self::Simplex { rank, .. }
+            | Self::Hyperblock { rank, .. }
+            | Self::Orthoplex { rank, .. } => *rank >= Rank::new(3),
 
+            // Multioperations must contain at least two bases and nothing nested.
             Self::Multipyramid(bases)
             | Self::Multiprism(bases)
             | Self::Multitegum(bases)
@@ -316,19 +327,17 @@ impl<T: NameType> Name<T> {
 
                 // No base should have the same variant as self.
                 for base in bases {
-                    if std::mem::discriminant(base) == std::mem::discriminant(self) {
+                    if mem::discriminant(base) == mem::discriminant(self) {
                         return false;
                     }
                 }
 
-                // We can't check that the bases are ordered, but they better be!
-
                 true
             }
-            Self::Generic {
+            &Self::Generic {
                 facet_count: n,
                 rank,
-            } => *n >= 2 && *rank >= Rank::new(3) && *rank <= Rank::new(20),
+            } => n >= 2 && rank >= Rank::new(3) && rank <= Rank::new(20),
             _ => true,
         }
     }
@@ -337,10 +346,15 @@ impl<T: NameType> Name<T> {
     /// given rank.
     pub fn generic(n: usize, rank: Rank) -> Self {
         match rank.into_isize() {
+            // Hardcoded names.
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
+
+            // We use the same scheme as for irregular polygons in the 2D case.
             2 => Self::polygon(Default::default(), n),
+
+            // Otherwise, we use a generic name.
             _ => Self::Generic {
                 facet_count: n,
                 rank,
@@ -351,11 +365,15 @@ impl<T: NameType> Name<T> {
     /// Builds a pyramid name from a given name.
     pub fn pyramid(self) -> Self {
         match self {
+            // Hardcoded cases.
             Self::Nullitope => Self::Point,
             Self::Point => Self::Dyad,
             Self::Dyad => Self::Triangle {
                 regular: Default::default(),
             },
+
+            // We make irregular triangles into irregular simplices, and regular
+            // triangles into triangular pyramids.
             Self::Triangle { regular } => {
                 if regular.contains(&Regular::No) {
                     Self::Simplex {
@@ -366,6 +384,9 @@ impl<T: NameType> Name<T> {
                     Self::Pyramid(Box::new(Self::Triangle { regular }))
                 }
             }
+
+            // We make irregular simplices into irregular simplices, and regular
+            // simplices into simplicial pyramids.
             Self::Simplex { regular, rank } => {
                 if regular.contains(&Regular::No) {
                     Self::Simplex {
@@ -376,11 +397,17 @@ impl<T: NameType> Name<T> {
                     Self::Pyramid(Box::new(Self::Simplex { regular, rank }))
                 }
             }
-            Self::Pyramid(base) => Self::multipyramid(vec![*base, Self::Dyad]),
+
+            // We integrate pyramids into a single multipyramid.
+            Self::Pyramid(base) => Self::multipyramid(vec![Self::Dyad, *base]),
+
+            // We integrate multipyramids into a single multipyramid.
             Self::Multipyramid(mut bases) => {
                 bases.push(Self::Point);
                 Self::multipyramid(bases)
             }
+
+            // We default to just making a pyramid out of the base.
             _ => Self::Pyramid(Box::new(self)),
         }
     }
@@ -388,6 +415,7 @@ impl<T: NameType> Name<T> {
     /// Builds a prism name from a given name.
     pub fn prism(self) -> Self {
         match self {
+            // Hardcoded cases.
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
             Self::Dyad => Self::rectangle(),
@@ -395,6 +423,9 @@ impl<T: NameType> Name<T> {
                 regular: Default::default(),
                 rank: Rank::new(3),
             },
+
+            // We make an irregular hyperblock into an irregular hyperblock, and
+            // a regular one into a hypercube prism.
             Self::Hyperblock { regular, rank } => {
                 if regular.contains(&Regular::No) {
                     Self::Hyperblock {
@@ -405,11 +436,17 @@ impl<T: NameType> Name<T> {
                     Self::Prism(Box::new(Self::Hyperblock { regular, rank }))
                 }
             }
-            Self::Prism(base) => Self::multiprism(vec![*base, Self::rectangle()]),
+
+            // We integrate prisms into a single multiprism.
+            Self::Prism(base) => Self::multiprism(vec![Self::rectangle(), *base]),
+
+            // We integrate multiprisms into a single multiprism.
             Self::Multiprism(mut bases) => {
                 bases.push(Self::Dyad);
                 Self::multiprism(bases)
             }
+
+            // We default to just making a prism out of the base.
             _ => Self::Prism(Box::new(self)),
         }
     }
@@ -417,6 +454,7 @@ impl<T: NameType> Name<T> {
     /// Builds a tegum name from a given name.
     pub fn tegum(self) -> Self {
         match self {
+            // Hardcoded cases.
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
             Self::Dyad => Self::orthodiagonal(),
@@ -424,6 +462,9 @@ impl<T: NameType> Name<T> {
                 regular: Default::default(),
                 rank: Rank::new(3),
             },
+
+            // We make an irregular orthoplex into an irregular orthoplex, and
+            // a regular one into an orthoplex prism.
             Self::Orthoplex { regular, rank } => {
                 if regular.contains(&Regular::No) {
                     Self::Orthoplex {
@@ -434,11 +475,17 @@ impl<T: NameType> Name<T> {
                     Self::Tegum(Box::new(Self::Orthoplex { regular, rank }))
                 }
             }
-            Self::Tegum(base) => Self::multitegum(vec![*base, Self::Orthodiagonal]),
+
+            // We integrate tegums into a single multitegum.
+            Self::Tegum(base) => Self::multitegum(vec![Self::orthodiagonal(), *base]),
+
+            // We integrate multitegums into a single multitegum.
             Self::Multitegum(mut bases) => {
                 bases.push(Self::Dyad);
                 Self::multitegum(bases)
             }
+
+            // We default to just making a tegum out of the base.
             _ => Self::Tegum(Box::new(self)),
         }
     }
@@ -446,13 +493,18 @@ impl<T: NameType> Name<T> {
     /// Builds an antiprism name from a given name.
     pub fn antiprism(self) -> Self {
         match self {
+            // Hardcoded cases.
             Self::Nullitope => Self::Point,
             Self::Point => Self::Dyad,
             Self::Dyad => Self::Orthodiagonal,
-            Self::Simplex { rank, regular: _ } => Self::Orthoplex {
+
+            // Simplices become irregular orthoplices.
+            Self::Simplex { rank, .. } => Self::Orthoplex {
                 rank: rank.plus_one(),
                 regular: Default::default(),
             },
+
+            // We default to just making an antiprism out of the base.
             _ => Self::Antiprism {
                 base: Box::new(self),
             },
@@ -582,6 +634,7 @@ impl<T: NameType> Name<T> {
         }
     }
 
+    /// Makes a Petrial out of the name.
     pub fn petrial(self) -> Self {
         match self {
             // Petrials are involutions.
@@ -631,13 +684,7 @@ impl<T: NameType> Name<T> {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
-            2 => {
-                if regular.satisfies(Regular::is_yes) {
-                    Self::Square
-                } else {
-                    Self::Rectangle
-                }
-            }
+            2 => Self::rectangle(),
             _ => Self::Hyperblock { regular, rank },
         }
     }
@@ -648,13 +695,7 @@ impl<T: NameType> Name<T> {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
-            2 => {
-                if regular.satisfies(Regular::is_yes) {
-                    Self::Square
-                } else {
-                    Self::Orthodiagonal
-                }
-            }
+            2 => Self::orthodiagonal(),
             _ => Self::Orthoplex { regular, rank },
         }
     }
@@ -674,19 +715,21 @@ impl<T: NameType> Name<T> {
         }
     }
 
+    /// Makes a multipyramid out of a set of names. Uses the names in roughly
+    /// the same order as were given.
     pub fn multipyramid(bases: Vec<Name<T>>) -> Self {
         let mut new_bases = Vec::new();
         let mut pyramid_count = Rank::new(0);
 
         // Figures out which bases of the multipyramid are multipyramids
         // themselves, and accounts for them accordingly.
-        for base in bases.into_iter() {
+        for base in bases {
             match base {
                 Self::Nullitope => {}
                 Self::Point => pyramid_count += Rank::new(1),
                 Self::Dyad => pyramid_count += Rank::new(2),
-                Self::Triangle { regular: _ } => pyramid_count += Rank::new(3),
-                Self::Simplex { regular: _, rank } => pyramid_count += rank + Rank::new(1),
+                Self::Triangle { .. } => pyramid_count += Rank::new(3),
+                Self::Simplex { rank, .. } => pyramid_count += rank + Rank::new(1),
                 Self::Multipyramid(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
             }
@@ -698,9 +741,7 @@ impl<T: NameType> Name<T> {
             new_bases.push(Name::simplex(Default::default(), pyramid_count.minus_one()));
         }
 
-        // Sorts the bases by convention.
-        // new_bases.sort_by(&Self::base_cmp);
-
+        // Either the final name, or the single base.
         let multipyramid = match new_bases.len() {
             0 => Self::Nullitope,
             1 => new_bases.swap_remove(0),
@@ -717,23 +758,25 @@ impl<T: NameType> Name<T> {
         }
     }
 
+    /// Makes a multiprism out of a set of names. Uses the names in roughly
+    /// the same order as were given.
     pub fn multiprism(bases: Vec<Name<T>>) -> Self {
         let mut new_bases = Vec::new();
         let mut prism_count = Rank::new(0);
 
-        // Figures out which bases of the multipyramid are multipyramids
-        // themselves, and accounts for them accordingly.
-        for base in bases.into_iter() {
-            match base {
+        // Figures out which bases of the multiprism are multiprisms themselves,
+        // and accounts for them accordingly.
+        for name in bases {
+            match name {
                 Self::Nullitope => {
                     return Self::Nullitope;
                 }
                 Self::Point => {}
                 Self::Dyad => prism_count += Rank::new(1),
                 Self::Square | Self::Rectangle => prism_count += Rank::new(2),
-                Self::Hyperblock { regular: _, rank } => prism_count += rank,
+                Self::Hyperblock { rank, .. } => prism_count += rank,
                 Self::Multiprism(mut extra_bases) => new_bases.append(&mut extra_bases),
-                _ => new_bases.push(base),
+                _ => new_bases.push(name),
             }
         }
 
@@ -743,9 +786,7 @@ impl<T: NameType> Name<T> {
             new_bases.push(Name::hyperblock(Default::default(), prism_count));
         }
 
-        // Sorts the bases by convention.
-        // new_bases.sort_by(&Self::base_cmp);
-
+        // Either the final name, or the single base.
         let multiprism = match new_bases.len() {
             0 => Self::Point,
             1 => new_bases.swap_remove(0),
@@ -762,13 +803,15 @@ impl<T: NameType> Name<T> {
         }
     }
 
+    /// Makes a multitegum out of a set of names. Uses the names in roughly
+    /// the same order as were given.
     pub fn multitegum(bases: Vec<Name<T>>) -> Self {
         let mut new_bases = Vec::new();
         let mut tegum_count = Rank::new(0);
 
-        // Figures out which bases of the multipyramid are multipyramids
-        // themselves, and accounts for them accordingly.
-        for base in bases.into_iter() {
+        // Figures out which bases of the multitegum are multitegums themselves,
+        // and accounts for them accordingly.
+        for base in bases {
             match base {
                 Self::Nullitope => {
                     return Self::Nullitope;
@@ -776,7 +819,7 @@ impl<T: NameType> Name<T> {
                 Self::Point => {}
                 Self::Dyad => tegum_count += Rank::new(1),
                 Self::Square | Self::Orthodiagonal => tegum_count += Rank::new(2),
-                Self::Orthoplex { regular: _, rank } => tegum_count += rank,
+                Self::Orthoplex { rank, .. } => tegum_count += rank,
                 Self::Multitegum(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
             }
@@ -788,9 +831,7 @@ impl<T: NameType> Name<T> {
             new_bases.push(Self::orthoplex(Default::default(), tegum_count));
         }
 
-        // Sorts the bases by convention.
-        // new_bases.sort_by(&Self::base_cmp);
-
+        // Either the final name, or the single base.
         let multitegum = match new_bases.len() {
             0 => Self::Point,
             1 => new_bases.swap_remove(0),
@@ -807,12 +848,14 @@ impl<T: NameType> Name<T> {
         }
     }
 
+    /// Makes a multicomb out of a set of names. Uses the names in roughly
+    /// the same order as were given.
     pub fn multicomb(bases: Vec<Self>) -> Self {
         let mut new_bases = Vec::new();
 
-        // Figures out which bases of the multipyramid are multipyramids
-        // themselves, and accounts for them accordingly.
-        for base in bases.into_iter() {
+        // Figures out which bases of the multicomb are multicombs themselves,
+        // and accounts for them accordingly.
+        for base in bases {
             if let Self::Multicomb(mut extra_bases) = base {
                 new_bases.append(&mut extra_bases);
             } else {
@@ -820,9 +863,7 @@ impl<T: NameType> Name<T> {
             }
         }
 
-        // Sorts the bases by convention.
-        // new_bases.sort_by(&Self::base_cmp);
-
+        // Either the final name, or the single base.
         match new_bases.len() {
             0 => Self::Point,
             1 => new_bases.swap_remove(0),

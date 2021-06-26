@@ -293,6 +293,15 @@ pub trait Prefix {
     fn prefix(n: usize) -> String {
         format!("{}-", n)
     }
+
+    /// Returns the prefix that stands for n- in a multiproduct.
+    fn multiprefix(n: usize) -> String {
+        match n {
+            2 => String::from("duo"),
+            3 => String::from("trio"),
+            _ => Self::prefix(n),
+        }
+    }
 }
 
 /// Trait shared by languages that allow for greek prefixes or anything similar.
@@ -502,19 +511,15 @@ pub trait Language: Prefix {
         }
     }
 
-    /// The default position to place adjectives.
+    /// The default position to place adjectives. This will be used for the
+    /// default implementations, but it can be overridden in any specific case.
     fn default_pos() -> Position {
         Position::Before
     }
 
-    /// Combines an adjective and a noun the default way.
-    fn combine(adj: &str, noun: &str) -> String {
-        Self::combine_with(adj, noun, Self::default_pos())
-    }
-
     /// Combines an adjective and a noun, placing the adjective in a given
     /// [`Position`] with respect to the noun.
-    fn combine_with(adj: &str, noun: &str, pos: Position) -> String {
+    fn combine(adj: &str, noun: &str, pos: Position) -> String {
         match pos {
             Position::Before => format!("{} {}", adj, noun),
             Position::After => format!("{} {}", noun, adj),
@@ -612,9 +617,18 @@ pub trait Language: Prefix {
         "pyramid".to_owned() + options.three("", "s", "al")
     }
 
+    /// The position at which the "pyramid" adjective goes.
+    fn pyramid_pos() -> Position {
+        Self::default_pos()
+    }
+
     /// The name for a pyramid with a given base.
     fn pyramid_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
-        Self::combine(&Self::to_adj(base, options), &Self::pyramid(options))
+        Self::combine(
+            &Self::to_adj(base, options),
+            &Self::pyramid(options),
+            Self::pyramid_pos(),
+        )
     }
 
     /// The name for a prism.
@@ -622,9 +636,18 @@ pub trait Language: Prefix {
         "prism".to_owned() + options.three("", "s", "atic")
     }
 
+    /// The position at which the "prism" adjective goes.
+    fn prism_pos() -> Position {
+        Self::default_pos()
+    }
+
     /// The name for a prism with a given base.
     fn prism_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
-        Self::combine(&Self::to_adj(base, options), &Self::prism(options))
+        Self::combine(
+            &Self::to_adj(base, options),
+            &Self::prism(options),
+            Self::prism_pos(),
+        )
     }
 
     /// The name for a tegum.
@@ -632,9 +655,18 @@ pub trait Language: Prefix {
         "teg{}".to_owned() + options.three("um", "ums", "matic")
     }
 
+    /// The position at which the "tegum" adjective goes.
+    fn tegum_pos() -> Position {
+        Self::default_pos()
+    }
+
     /// The name for a tegum with a given base.
     fn tegum_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
-        Self::combine(&Self::to_adj(base, options), &Self::tegum(options))
+        Self::combine(
+            &Self::to_adj(base, options),
+            &Self::tegum(options),
+            Self::tegum_pos(),
+        )
     }
 
     /// The name for an antiprism.
@@ -642,9 +674,18 @@ pub trait Language: Prefix {
         "antiprism".to_owned() + options.three("", "s", "atic")
     }
 
+    /// The position at which the "antiprism" adjective goes.
+    fn antiprism_pos() -> Position {
+        Self::prism_pos()
+    }
+
     /// The name for an antiprism with a given base.
     fn antiprism_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
-        Self::combine(&Self::to_adj(base, options), &Self::antiprism(options))
+        Self::combine(
+            &Self::to_adj(base, options),
+            &Self::antiprism(options),
+            Self::antiprism_pos(),
+        )
     }
 
     /// The name for an antitegum.
@@ -652,9 +693,18 @@ pub trait Language: Prefix {
         "antiteg".to_owned() + options.three("um", "ums", "matic")
     }
 
+    /// The position at which the "antitegum" adjective goes.
+    fn antitegum_pos() -> Position {
+        Self::tegum_pos()
+    }
+
     /// The name for an antitegum with a given base.
     fn antitegum_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
-        Self::combine(&Self::to_adj(base, options), &Self::antitegum(options))
+        Self::combine(
+            &Self::to_adj(base, options),
+            &Self::antitegum(options),
+            Self::antitegum_pos(),
+        )
     }
 
     /// The name for a Petrial.
@@ -662,11 +712,21 @@ pub trait Language: Prefix {
         "Petrial".to_owned() + options.three("", "s", "")
     }
 
-    /// The name for a Petrial with a given base.
-    fn petrial_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
-        Self::combine(&Self::petrial(options), &Self::parse_with(base, options))
+    /// The position at which the "Petrial" adjective goes.
+    fn petrial_pos() -> Position {
+        Self::default_pos()
     }
 
+    /// The name for a Petrial with a given base.
+    fn petrial_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
+        Self::combine(
+            &Self::petrial(options),
+            &Self::parse_with(base, options),
+            Self::petrial_pos(),
+        )
+    }
+
+    /// Makes the name for a general multiproduct
     fn multiproduct<T: NameType>(name: &Name<T>, options: Options<Self::Gender>) -> String {
         // Gets the bases and the kind of multiproduct.
         let (bases, kind) = match name {
@@ -674,16 +734,13 @@ pub trait Language: Prefix {
             Name::Multiprism(bases) => (bases, Self::prism(options)),
             Name::Multitegum(bases) => (bases, Self::tegum(options)),
             Name::Multicomb(bases) => (bases, format!("comb{}", options.two("", "s"))),
-            _ => panic!("Not a product!"),
+
+            // This method shouldn't be called in any other case.
+            _ => unreachable!(),
         };
 
         let n = bases.len();
-        let prefix = match n {
-            2 => String::from("duo"),
-            3 => String::from("trio"),
-            _ => Self::prefix(n),
-        };
-        let kind = prefix + &kind;
+        let kind = Self::multiprefix(n) + &kind;
 
         let mut str_bases = String::new();
 
@@ -692,6 +749,8 @@ pub trait Language: Prefix {
             str_bases.push_str(&Self::to_adj(base, options));
             str_bases.push('-');
         }
+
+        // Do cases depending on the default position?
         str_bases.push_str(&Self::to_adj(last, options));
 
         format!("{} {}", str_bases, kind)
@@ -743,24 +802,48 @@ pub trait Language: Prefix {
         String::from("great")
     }
 
+    fn great_pos() -> Position {
+        Self::default_pos()
+    }
+
     fn great_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
-        Self::combine(&Self::great(options), &Self::parse_with(base, options))
+        Self::combine(
+            &Self::great(options),
+            &Self::parse_with(base, options),
+            Self::great_pos(),
+        )
     }
 
     fn small(_options: Options<Self::Gender>) -> String {
         String::from("small")
     }
 
+    fn small_pos() -> Position {
+        Self::default_pos()
+    }
+
     fn small_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
-        Self::combine(&Self::small(options), &Self::parse_with(base, options))
+        Self::combine(
+            &Self::small(options),
+            &Self::parse_with(base, options),
+            Self::small_pos(),
+        )
     }
 
     fn stellated(_options: Options<Self::Gender>) -> String {
         String::from("stellated")
     }
 
+    fn stellated_pos() -> Position {
+        Self::default_pos()
+    }
+
     fn stellated_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
-        Self::combine(&Self::stellated(options), &Self::parse_with(base, options))
+        Self::combine(
+            &Self::stellated(options),
+            &Self::parse_with(base, options),
+            Self::stellated_pos(),
+        )
     }
 
     /// The name for the dual of another polytope.
@@ -768,9 +851,18 @@ pub trait Language: Prefix {
         String::from("dual")
     }
 
+    /// The position at which the "dual" adjective goes.
+    fn dual_pos() -> Position {
+        Self::default_pos()
+    }
+
     /// The name for the dual of another polytope.
     fn dual_of<T: NameType>(base: &Name<T>, options: Options<Self::Gender>) -> String {
-        Self::combine(&Self::dual(options), &Self::parse_with(base, options))
+        Self::combine(
+            &Self::dual(options),
+            &Self::parse_with(base, options),
+            Self::dual_pos(),
+        )
     }
 }
 

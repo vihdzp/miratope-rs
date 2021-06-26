@@ -28,32 +28,19 @@ impl GreekPrefix for Es {
 
 /// In Spanish, polygon names have the last vowel in their prefix accented.
 /// This function places such accent.
-fn last_vowel_tilde(prefix: String) -> String {
+fn last_vowel_tilde(prefix: &str) -> String {
     let mut chars = prefix.chars().collect::<Vec<_>>();
     for c in chars.iter_mut().rev() {
-        match c {
-            'a' => {
-                *c = 'á';
-                break;
-            }
-            'e' => {
-                *c = 'é';
-                break;
-            }
-            'i' => {
-                *c = 'í';
-                break;
-            }
-            'o' => {
-                *c = 'ó';
-                break;
-            }
-            'u' => {
-                *c = 'ú';
-                break;
-            }
-            _ => {}
-        }
+        *c = match c {
+            'a' => 'á',
+            'e' => 'é',
+            'i' => 'í',
+            'o' => 'ó',
+            'u' => 'ú',
+            _ => continue,
+        };
+
+        break;
     }
 
     chars.into_iter().collect()
@@ -129,7 +116,7 @@ impl Language for Es {
         let mut prefix = Self::prefix(n);
 
         if d == Rank::new(2) && !options.adjective {
-            prefix = last_vowel_tilde(prefix);
+            prefix = last_vowel_tilde(&prefix);
         }
 
         prefix + &Self::suffix(d, options)
@@ -151,10 +138,7 @@ impl Language for Es {
 
     /// The name for a prism.
     fn prism(options: Options<Self::Gender>) -> String {
-        format!(
-            "prism{}",
-            options.six("a", "as", "ático", "áticos", "ática", "áticas")
-        )
+        "prism".to_owned() + options.six("a", "as", "ático", "áticos", "ática", "áticas")
     }
 
     /// The name for a prism with a given base.
@@ -168,10 +152,7 @@ impl Language for Es {
 
     /// The name for a tegum.
     fn tegum(options: Options<Self::Gender>) -> String {
-        format!(
-            "teg{}",
-            options.six("o", "os", "mático", "máticos", "mática", "máticas")
-        )
+        "teg".to_owned() + options.six("o", "os", "mático", "máticos", "mática", "máticas")
     }
 
     /// The name for a tegum with a given base.

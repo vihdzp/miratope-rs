@@ -41,6 +41,7 @@ impl Memory {
                                 }
                             });
                     }
+
                     // Shows a slot with a polytope on it.
                     Some(poly) => {
                         let mut clear = false;
