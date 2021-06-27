@@ -2173,6 +2173,7 @@ dependencies = [
  "egui 0.13.0",
  "lyon",
  "miratope-core",
+ "miratope-lang",
  "rfd",
  "ron",
  "serde",
@@ -2203,6 +2204,22 @@ dependencies = [
  "vec-like",
  "xml-rs",
  "zip",
+]
+
+[[package]]
+name = "miratope-lang"
+version = "0.1.0"
+dependencies = [
+ "bevy_egui",
+ "gcd",
+ "itertools",
+ "miratope-core",
+ "nalgebra",
+ "ron",
+ "serde",
+ "strum 0.21.0",
+ "strum_macros 0.21.1",
+ "vec-like",
 ]
 
 [[package]]

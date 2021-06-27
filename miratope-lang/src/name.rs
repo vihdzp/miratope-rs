@@ -1,13 +1,15 @@
 //! Module that defines a language-independent representation of polytope names.
 
-use std::{fmt::Debug, marker::PhantomData, mem};
+use std::{fmt::Debug, fs, marker::PhantomData, mem};
 
-use crate::{abs::rank::Rank, geometry::Point, Consts, Float};
-
-use serde::{Deserialize, Serialize};
+use miratope_core::{abs::rank::Rank, geometry::Point, Consts, Float};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// A type marker that determines whether a name describes an abstract or
 /// concrete polytope.
+///
+/// For some reason, adding `DeserializeOwned` causes the trait to jank out.
+/// This means we need to keep typing it everywhere.
 pub trait NameType: Debug + Clone + PartialEq + Serialize {
     /// Either `AbsData<Point>` or `ConData<Point>`. Workaround until generic
     /// associated types are stable.
@@ -21,13 +23,15 @@ pub trait NameType: Debug + Clone + PartialEq + Serialize {
     fn is_abstract() -> bool;
 }
 
+pub trait NameTypeOwned: NameType + DeserializeOwned {}
+
 /// A trait for data associated to a name. It can either be [`AbsData`], which
 /// is zero size and compares `true` with anything, or [`ConData`], which stores
 /// an actual value of type `T` which is used for comparisons.
 ///
 /// The idea is that `NameData` should be used to store whichever conditions on
 /// concrete polytopes always hold on abstract polytopes.
-pub trait NameData<T>: PartialEq + Debug + Clone + Serialize {
+pub trait NameData<T>: PartialEq + Debug + Clone + Serialize + DeserializeOwned {
     /// Initializes a new `NameData` with a given value.
     fn new(value: T) -> Self;
 
@@ -96,6 +100,8 @@ impl NameType for Abs {
     }
 }
 
+impl NameTypeOwned for Abs {}
+
 /// Data associated with a concrete polytope.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ConData<T>(T);
@@ -108,13 +114,13 @@ impl<T: PartialEq> PartialEq for ConData<T> {
 }
 
 /// Uses the default value of whatever is inside.
-impl<T: PartialEq + Debug + Clone + Serialize + Default> Default for ConData<T> {
+impl<T: PartialEq + Debug + Clone + Serialize + DeserializeOwned + Default> Default for ConData<T> {
     fn default() -> Self {
         Self::new(Default::default())
     }
 }
 
-impl<T: PartialEq + Debug + Clone + Serialize> NameData<T> for ConData<T> {
+impl<T: PartialEq + Debug + Clone + Serialize + DeserializeOwned> NameData<T> for ConData<T> {
     /// Initializes a new `ConData` that holds a given value.
     fn new(value: T) -> Self {
         Self(value)
@@ -143,6 +149,8 @@ impl NameType for Con {
         false
     }
 }
+
+impl NameTypeOwned for Con {}
 
 /// Determines whether a `Name` refers to a concrete regular polytope. This is
 /// often indirectly stored as a `NameData<Regular>`, so that all abstract
@@ -279,7 +287,13 @@ pub enum Name<T: NameType> {
     /// A polytope with a given facet count and rank, in that order. The facet
     /// count must be **at least 2,** and the dimension must be **at least 3**
     /// and **at most 20.**
-    Generic { facet_count: usize, rank: Rank },
+    Generic {
+        /// The number of facets of the polytope.
+        facet_count: usize,
+
+        /// The rank of the polytope.
+        rank: Rank,
+    },
 
     /// A smaller variant of a polytope.
     Small(Box<Name<T>>),
@@ -291,7 +305,37 @@ pub enum Name<T: NameType> {
     Stellated(Box<Name<T>>),
 }
 
-impl<T: NameType> Name<T> {
+impl<T: NameType> Default for Name<T> {
+    fn default() -> Self {
+        Self::Nullitope
+    }
+}
+
+impl<T: NameTypeOwned> Name<T> {
+    /// Gets the name from the first line of an OFF file.
+    pub fn from_src(first_line: &str) -> Option<Self> {
+        let mut fl_iter = first_line.char_indices();
+
+        if let Some((_, '#')) = fl_iter.next() {
+            let (idx, _) = fl_iter.next()?;
+            if let Ok(new_name) = ron::from_str(&first_line[idx..]) {
+                return Some(new_name);
+            }
+        }
+
+        None
+    }
+
+    /// Reads a name, serialized from the first line of an OFF file.
+    pub fn from_off<U: AsRef<std::path::Path>>(path: U) -> Option<Self> {
+        use std::io::{BufRead, BufReader};
+
+        let file = BufReader::new(fs::File::open(path).ok()?);
+        let first_line = file.lines().next()?.ok()?;
+
+        Name::from_src(&first_line)
+    }
+
     /// Determines whether a `Name` is valid, that is, all of the conditions
     /// specified on its variants hold. Used for debugging.
     pub fn is_valid(&self) -> bool {

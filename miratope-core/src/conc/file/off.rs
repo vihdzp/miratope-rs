@@ -1,6 +1,6 @@
 //! Contains the code that opens an OFF file and parses it into a polytope.
 
-use std::{collections::HashMap, fs, io::Result as IoResult, path::Path, str::FromStr};
+use std::{collections::HashMap, io::Result as IoResult, path::Path, str::FromStr};
 
 use crate::{
     abs::{
@@ -8,7 +8,6 @@ use crate::{
         rank::Rank,
     },
     conc::{Concrete, ElementList, Point, Polytope, RankVec, Subelements},
-    lang::name::{Con, Name},
     COMPONENTS, ELEMENT_NAMES,
 };
 
@@ -390,6 +389,7 @@ impl<'a> OffReader<'a> {
         Ok(els_subs)
     }
 
+    /*
     /// Returns the [`Name`] stored in the OFF file, if any.
     fn name(&self) -> Option<Name<Con>> {
         self.src()
@@ -397,7 +397,7 @@ impl<'a> OffReader<'a> {
             .next()
             .map(Concrete::name_from_src)
             .flatten()
-    }
+    }*/
 
     /// Builds a concrete polytope from the OFF reader.
     pub fn build(mut self) -> OffResult<Concrete> {
@@ -441,17 +441,25 @@ impl<'a> OffReader<'a> {
         }
 
         // Builds the concrete polytope.
-        let name = self.name();
-        let mut poly = Concrete::new(vertices, self.abs.build());
-
-        if let Some(name) = name {
-            poly.name = name;
-        }
-
-        Ok(poly)
+        Ok(Concrete::new(vertices, self.abs.build()))
     }
 }
 
+pub trait FromOff: Sized {
+    /// Converts an OFF file into a new struct of type `Self`.
+    ///
+    /// # Todo
+    /// Maybe don't load the entire file at once?
+    fn from_off(src: &str) -> OffResult<Self>;
+}
+
+impl FromOff for Concrete {
+    fn from_off(src: &str) -> OffResult<Self> {
+        OffReader::new(src).build()
+    }
+}
+
+/*
 impl Concrete {
     /// Gets the name from the first line of an OFF file.
     fn name_from_src(first_line: &str) -> Option<Name<Con>> {
@@ -477,12 +485,7 @@ impl Concrete {
 
         Self::name_from_src(&first_line)
     }
-
-    /// Builds a polytope from the string representation of an OFF file.
-    pub fn from_off(src: &str) -> OffResult<Self> {
-        OffReader::new(src).build()
-    }
-}
+}*/
 
 /// A set of options to be used when saving the OFF file.
 #[derive(Clone, Copy)]
@@ -681,10 +684,10 @@ impl<'a> OffWriter<'a> {
         let abs = &self.polytope.abs;
 
         // Serialized name.
-        self.off.push_str("# ");
+        /* self.off.push_str("# ");
         self.off
             .push_str(&ron::to_string(&self.polytope.name).unwrap_or_default());
-        self.off.push('\n');
+        self.off.push('\n'); */
 
         // Blatant advertising.
         if self.options.comments {

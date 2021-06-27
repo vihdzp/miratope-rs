@@ -9,12 +9,12 @@ use std::{
 use super::config::LibPath;
 use miratope_core::{
     abs::rank::Rank,
-    conc::Concrete,
-    lang::{
-        name::{Con, Name},
-        SelectedLanguage,
-    },
+    conc::{Concrete, ConcretePolytope},
     Polytope,
+};
+use miratope_lang::{
+    name::{Con, Name},
+    SelectedLanguage,
 };
 
 use bevy::prelude::*;
@@ -321,7 +321,7 @@ impl Library {
     /// Loads the data from a file at a given path.
     pub fn new_file(path: &impl AsRef<OsStr>) -> Self {
         let path = PathBuf::from(&path);
-        let name = if let Some(name) = Concrete::name_from_off(&path) {
+        let name = if let Some(name) = Name::from_off(&path) {
             DisplayName::Name(name)
         } else {
             DisplayName::Literal(String::from(

@@ -10,10 +10,13 @@ use bevy_egui::{
     EguiContext,
 };
 use miratope_core::{
-    conc::Concrete,
+    conc::{Concrete, ConcretePolytope},
     geometry::{Hyperplane, Point, Vector},
-    lang::SelectedLanguage,
     Float, Polytope,
+};
+use miratope_lang::{
+    poly::{conc::NamedConcrete, NamedPolytope},
+    SelectedLanguage,
 };
 use rfd::FileDialog;
 use strum::IntoEnumIterator;
@@ -44,7 +47,7 @@ pub enum SectionState {
     /// The view is active.
     Active {
         /// The polytope from which the cross-section originates.
-        original_polytope: Concrete,
+        original_polytope: NamedConcrete,
 
         /// The range of the slider.
         minmax: (Float, Float),
@@ -219,7 +222,7 @@ pub type EguiWindows<'a> = (
 pub fn show_top_panel(
     // Info about the application state.
     egui_ctx: Res<EguiContext>,
-    mut query: Query<&mut Concrete>,
+    mut query: Query<&mut NamedConcrete>,
     mut windows: ResMut<Windows>,
     keyboard: Res<Input<KeyCode>>,
 
@@ -491,7 +494,7 @@ pub fn show_top_panel(
                     // Outputs the element types, currently just prints to console.
                     if ui.button("Counts").clicked() {
                         if let Some(p) = query.iter_mut().next() {
-                            p.print_element_types();
+                            p.con().print_element_types();
                         }
                     }
                 });
@@ -549,7 +552,7 @@ pub fn show_top_panel(
             menu::menu(ui, "Wiki", |ui| {
                 // Goes to the wiki main page.
                 if ui.button("Main Page").clicked() {
-                    if let Err(err) = webbrowser::open(miratope_core::WIKI_LINK) {
+                    if let Err(err) = webbrowser::open(miratope_lang::WIKI_LINK) {
                         eprintln!("Website opening failed: {}", err);
                     }
                 }
@@ -636,7 +639,7 @@ pub fn show_top_panel(
 /// cross-section view.
 fn show_views(
     ui: &mut Ui,
-    mut query: Query<&mut Concrete>,
+    mut query: Query<&mut NamedConcrete>,
     mut section_state: ResMut<SectionState>,
     mut section_direction: ResMut<SectionDirection>,
 ) {

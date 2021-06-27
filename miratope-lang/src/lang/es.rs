@@ -1,6 +1,6 @@
-use crate::abs::rank::Rank;
+use crate::{Bigender, GreekPrefix, Language, Options, Position, Prefix};
 
-use super::{Bigender, GreekPrefix, Language, Options, Position, Prefix};
+use miratope_core::abs::rank::Rank;
 
 /// The Spanish language.
 pub struct Es;
@@ -44,7 +44,7 @@ fn last_vowel_tilde(prefix: &str) -> String {
 }
 
 impl Language for Es {
-    type Count = super::Plural;
+    type Count = crate::Plural;
     type Gender = Bigender;
 
     /// The default position to place adjectives. This will be used for the

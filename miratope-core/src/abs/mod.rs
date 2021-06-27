@@ -11,11 +11,10 @@ use self::{
         AbstractBuilder, Element, ElementHash, ElementList, ElementRef, SectionHash, SectionRef,
         SubelementList, Subelements, Superelements,
     },
-    flag::{Flag, FlagEvent, FlagSet},
+    flag::{Flag, FlagSet},
     rank::{Rank, RankVec},
 };
 use super::{DualResult, Polytope};
-use crate::lang::name::{Abs, Name};
 
 use rayon::prelude::*;
 use strum_macros::Display;
@@ -104,12 +103,12 @@ impl std::fmt::Display for AbstractError {
         match self {
             // The polytope is not bounded.
             AbstractError::Bounded {
-                min_count: min,
-                max_count: max,
+                min_count,
+                max_count,
             } => write!(
                 f,
                 "Polytope is unbounded: found {} minimal elements and {} maximal elements",
-                min, max
+                min_count, max_count
             ),
 
             // The polytope has an invalid index.
@@ -221,23 +220,13 @@ pub type AbstractResult<T> = Result<T, AbstractError>;
 /// [`Abstract::push_subs`] method, which will push a list of subelements and
 /// automatically set the superelements of the previous rank, under the
 /// assumption that they're empty.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Abstract {
     /// The list of element lists in the polytope, ordered by [`Rank`].
     pub ranks: RankVec<ElementList>,
 
-    /// The name of the polytope, using the transformation rules for an abstract
-    /// polytope.
-    pub name: Name<Abs>,
-
     /// Whether every single element's subelements and superelements are sorted.
-    sorted: bool,
-}
-
-impl Default for Abstract {
-    fn default() -> Self {
-        Self::new()
-    }
+    pub sorted: bool,
 }
 
 impl AsRef<Vec<ElementList>> for Abstract {
@@ -254,17 +243,8 @@ impl AsMut<Vec<ElementList>> for Abstract {
 
 impl From<RankVec<ElementList>> for Abstract {
     fn from(ranks: RankVec<ElementList>) -> Self {
-        let name = if ranks.len() >= 2 {
-            let rank = ranks.rank();
-            let n = ranks[rank.minus_one()].len();
-            Name::generic(n, rank)
-        } else {
-            Name::Nullitope
-        };
-
         Self {
             ranks,
-            name,
             sorted: false,
         }
     }
@@ -570,11 +550,7 @@ impl Abstract {
             abs.push(subelements);
         }
 
-        // Sets name.
-        let mut abs = abs.build();
-        abs = abs.with_name(Box::new(self.name.clone()).antiprism());
-
-        (abs, vertices, dual_vertices)
+        (abs.build(), vertices, dual_vertices)
     }
 
     /// Returns the omnitruncate of a polytope, along with the flags that make
@@ -982,55 +958,25 @@ impl Abstract {
             product.push(elements);
         }
 
-        // Sets the name of the polytope.
-        let bases = vec![p.name.clone(), q.name.clone()];
-
-        product.build().with_name(if max {
-            if min {
-                Name::multipyramid(bases)
-            } else {
-                Name::multiprism(bases)
-            }
-        } else if min {
-            Name::multitegum(bases)
-        } else {
-            Name::multicomb(bases)
-        })
+        product.build()
     }
 }
 
-impl AsRef<Abstract> for Abstract {
-    fn as_ref(&self) -> &Abstract {
+impl Polytope for Abstract {
+    fn abs(&self) -> &Abstract {
         self
     }
-}
 
-impl AsMut<Abstract> for Abstract {
-    fn as_mut(&mut self) -> &mut Abstract {
+    fn abs_mut(&mut self) -> &mut Abstract {
         self
     }
-}
 
-impl AsRef<Name<Abs>> for Abstract {
-    fn as_ref(&self) -> &Name<Abs> {
-        &self.name
-    }
-}
-
-impl AsMut<Name<Abs>> for Abstract {
-    fn as_mut(&mut self) -> &mut Name<Abs> {
-        &mut self.name
-    }
-}
-
-impl Polytope<Abs> for Abstract {
     /// Returns an instance of the
     /// [nullitope](https://polytope.miraheze.org/wiki/Nullitope), the unique
     /// polytope of rank &minus;1.
     fn nullitope() -> Self {
         Self {
             ranks: vec![ElementList::min(0)].into(),
-            name: Name::Nullitope,
             sorted: true,
         }
     }
@@ -1041,7 +987,6 @@ impl Polytope<Abs> for Abstract {
     fn point() -> Self {
         Self {
             ranks: vec![ElementList::min(1), ElementList::max(1)].into(),
-            name: Name::Point,
             sorted: true,
         }
     }
@@ -1056,7 +1001,7 @@ impl Polytope<Abs> for Abstract {
         abs.push_vertices(2);
         abs.push_max();
 
-        let mut abs = abs.build().with_name(Name::Dyad);
+        let mut abs = abs.build();
         abs.sorted = true;
         abs
     }
@@ -1081,7 +1026,7 @@ impl Polytope<Abs> for Abstract {
         poly.push(edges);
         poly.push_max();
 
-        let mut poly = poly.build().with_name(Name::polygon(Default::default(), n));
+        let mut poly = poly.build();
         poly.sorted = true;
         poly
     }
@@ -1102,11 +1047,6 @@ impl Polytope<Abs> for Abstract {
         }
 
         self.ranks.reverse();
-
-        // Builds the name.
-        let facet_count = self.facet_count();
-        let rank = self.rank();
-        self.name = Box::new(self.name.clone()).dual(Default::default(), facet_count, rank);
         Ok(())
     }
 
@@ -1204,9 +1144,8 @@ impl Polytope<Abs> for Abstract {
     }
 
     /// "Appends" a polytope into another, creating a compound polytope. Fails
-    /// if the polytopes have different ranks. *Updates neither the name nor the
-    /// min/max elements.*
-    fn _comp_append(&mut self, p: Self) {
+    /// if the polytopes have different ranks.
+    fn comp_append(&mut self, p: Self) {
         let rank = self.rank();
 
         // The polytopes must have the same ranks.
@@ -1240,17 +1179,10 @@ impl Polytope<Abs> for Abstract {
                 self.push_at(r, el);
             }
         }
-    }
 
-    fn comp_append(&mut self, p: Self) {
-        // let new_name = Name::compound(vec![(1, self.name.clone()), (1, p.name.clone())]);
-
-        self._comp_append(p);
-
+        // We don't need to do this every single time.
         *self.min_mut() = Element::min(self.vertex_count());
         *self.max_mut() = Element::max(self.facet_count());
-
-        // self.name = new_name;
     }
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
@@ -1313,20 +1245,6 @@ impl Polytope<Abs> for Abstract {
         self[Rank::new(-1)].push(min);
         self.ranks.insert(Rank::new(-1), ElementList::max(2));
     }
-
-    /// Determines whether a given polytope is
-    /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
-    fn orientable(&mut self) -> bool {
-        self.sort();
-
-        for flag_event in self.flag_events() {
-            if matches!(flag_event, FlagEvent::NonOrientable) {
-                return false;
-            }
-        }
-
-        true
-    }
 }
 
 /// Permits indexing an abstract polytope by rank.
@@ -1358,7 +1276,6 @@ impl IntoIterator for Abstract {
 #[cfg(test)]
 mod tests {
     use super::{super::Polytope, rank::Rank, Abstract};
-    use crate::lang::{En, Language};
 
     /// Returns a bunch of varied polytopes to run general tests on. Use only
     /// for tests that should work on **everything** you give it!
@@ -1393,13 +1310,13 @@ mod tests {
             poly.el_counts(),
             element_counts.into(),
             "{} element counts don't match expected value.",
-            En::parse_uppercase(&poly.name)
+            "TBA: name"
         );
 
         assert!(
             poly.is_valid().is_ok(),
             "{} is not a valid polytope.",
-            En::parse_uppercase(&poly.name)
+            "TBA: name"
         );
     }
 
@@ -1572,11 +1489,7 @@ mod tests {
     /// Checks that various polytopes are generated correctly.
     fn general_check() {
         for poly in test_polytopes().iter_mut() {
-            assert!(
-                poly.is_valid().is_ok(),
-                "{} is not valid.",
-                En::parse(&poly.name)
-            );
+            assert!(poly.is_valid().is_ok(), "{} is not valid.", "TBA: name");
         }
     }
 
@@ -1594,17 +1507,16 @@ mod tests {
             let mut du_el_counts_rev = poly.el_counts();
             du_el_counts_rev.reverse();
             assert_eq!(
-                el_counts,
-                du_el_counts_rev,
+                el_counts, du_el_counts_rev,
                 "Dual element counts of {} don't match expected value.",
-                En::parse(&poly.name)
+                "TBA: name"
             );
 
             // The duals should also be valid polytopes.
             assert!(
                 poly.is_valid().is_ok(),
                 "Dual of polytope {} is invalid.",
-                En::parse(&poly.name)
+                "TBA: name"
             );
         }
     }

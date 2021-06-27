@@ -13,7 +13,7 @@ use miratope_core::{
     abs::{elements::ElementList, rank::Rank},
     conc::{
         cycle::{Cycle, CycleBuilder},
-        Concrete,
+        Concrete, ConcretePolytope,
     },
     geometry::{Point, Subspace, Vector},
     Consts, Float, Polytope,

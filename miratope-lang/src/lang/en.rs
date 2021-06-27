@@ -1,6 +1,6 @@
-use crate::abs::rank::Rank;
+use crate::{GreekPrefix, Language, Options, Prefix};
 
-use super::{GreekPrefix, Language, Options, Prefix};
+use miratope_core::abs::rank::Rank;
 
 /// The English language.
 pub struct En;
@@ -8,8 +8,8 @@ pub struct En;
 impl GreekPrefix for En {}
 
 impl Language for En {
-    type Count = super::Plural;
-    type Gender = super::Agender;
+    type Count = crate::Plural;
+    type Gender = crate::Agender;
 
     fn suffix(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
         const SUFFIXES: [&str; 25] = [

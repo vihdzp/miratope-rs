@@ -1,15 +1,15 @@
 use bevy::prelude::Query;
 use bevy_egui::egui;
-use miratope_core::{conc::Concrete, lang::En};
+use miratope_lang::{lang::En, poly::conc::NamedConcrete};
 
 pub const MEMORY_SLOTS: usize = 8;
 
 /// Represents the memory slots to store polytopes.
 #[derive(Default)]
-pub struct Memory([Option<Concrete>; MEMORY_SLOTS]);
+pub struct Memory([Option<NamedConcrete>; MEMORY_SLOTS]);
 
 impl std::ops::Index<usize> for Memory {
-    type Output = Option<Concrete>;
+    type Output = Option<NamedConcrete>;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.0[index]
@@ -18,13 +18,13 @@ impl std::ops::Index<usize> for Memory {
 
 impl Memory {
     /// Returns an iterator over the memory slots.
-    pub fn iter(&self) -> std::slice::Iter<Option<Concrete>> {
+    pub fn iter(&self) -> std::slice::Iter<Option<NamedConcrete>> {
         self.0.iter()
     }
 
     /// Shows the memory menu in a specified Ui.
-    pub fn show(&mut self, ui: &mut egui::Ui, query: &mut Query<&mut Concrete>) {
-        use miratope_core::lang::Language;
+    pub fn show(&mut self, ui: &mut egui::Ui, query: &mut Query<&mut NamedConcrete>) {
+        use miratope_lang::Language;
 
         egui::menu::menu(ui, "Memory", |ui| {
             for (idx, slot) in self.0.iter_mut().enumerate() {

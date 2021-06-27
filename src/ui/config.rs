@@ -7,12 +7,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use miratope_core::lang::SelectedLanguage;
-
 use bevy::{app::AppExit, prelude::*};
 use bevy_egui::{egui, EguiContext};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
+
+use miratope_lang::SelectedLanguage;
 
 /// The default path in which we look for the Miratope library.
 const DEFAULT_PATH: &str = "./lib";

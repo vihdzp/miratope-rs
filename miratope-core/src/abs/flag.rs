@@ -597,6 +597,11 @@ impl FlagEvent {
             Self::NonOrientable => None,
         }
     }
+
+    /// Returns whether `self` matches `Self::NonOrientable`.
+    pub fn non_orientable(&self) -> bool {
+        matches!(self, Self::NonOrientable)
+    }
 }
 
 impl<'a> Iterator for OrientedFlagIter<'a> {

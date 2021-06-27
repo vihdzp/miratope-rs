@@ -91,6 +91,7 @@ impl Concrete {
     /// # Todo
     /// Can we perhaps return a single error type?
     pub fn from_path<U: AsRef<std::path::Path>>(fp: &U) -> FileResult<Self> {
+        use crate::conc::file::off::FromOff;
         use std::{ffi::OsStr, fs};
 
         let ext = fp

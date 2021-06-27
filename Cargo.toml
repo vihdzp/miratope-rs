@@ -1,5 +1,5 @@
 [workspace]
-members = ["miratope-core", "vec-like"]
+members = ["miratope-core", "miratope-lang", "vec-like"]
 
 [package]
 name = "miratope"
@@ -16,7 +16,8 @@ authors = [
 edition = "2018"
 
 [dependencies]
-miratope-core = { path = "miratope-core", features = ["bevy_egui", "lang"] }
+miratope-core = { path = "miratope-core", features = ["bevy_egui"] }
+miratope-lang = { path = "miratope-lang" }
 vec-like = { path = "vec-like" }
 approx = "0.5"
 directories = "3.0"

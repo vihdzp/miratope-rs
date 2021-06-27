@@ -58,15 +58,16 @@ use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::EguiPlugin;
+use miratope_core::conc::file::off::FromOff;
+use miratope_lang::poly::conc::NamedConcrete;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
-use miratope_core::conc::Concrete;
 use ui::{
     camera::{CameraInputEvent, ProjectionType},
     MiratopePlugins,
 };
 
-pub mod mesh;
+mod mesh;
 mod no_cull_pipeline;
 mod ui;
 
@@ -96,7 +97,7 @@ fn setup(
     mut pipelines: ResMut<Assets<PipelineDescriptor>>,
 ) {
     // Default polytope.
-    let poly = Concrete::from_off(include_str!("default.off")).unwrap();
+    let poly = NamedConcrete::from_off(include_str!("default.off")).unwrap();
 
     // Disables backface culling.
     pipelines.set_untracked(
@@ -129,14 +130,14 @@ fn setup(
         .spawn()
         // Mesh
         .insert_bundle(PbrNoBackfaceBundle {
-            mesh: meshes.add(mesh::mesh(&poly, ProjectionType::Perspective)),
+            mesh: meshes.add(mesh::mesh(&poly.con, ProjectionType::Perspective)),
             material: mesh_material,
             ..Default::default()
         })
         // Wireframe
         .with_children(|cb| {
             cb.spawn().insert_bundle(PbrNoBackfaceBundle {
-                mesh: meshes.add(mesh::wireframe(&poly, ProjectionType::Perspective)),
+                mesh: meshes.add(mesh::wireframe(&poly.con, ProjectionType::Perspective)),
                 material: wf_material,
                 ..Default::default()
             });
