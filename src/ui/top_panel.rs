@@ -250,7 +250,7 @@ pub fn show_top_panel(
     ): EguiWindows,
 ) {
     // The top bar.
-    egui::TopPanel::top("top_panel").show(egui_ctx.ctx(), |ui| {
+    egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx(), |ui| {
         menu::bar(ui, |ui| {
             // Operations on files.
             menu::menu(ui, "File", |ui| {
@@ -399,6 +399,7 @@ pub fn show_top_panel(
 
                     if ui.button("Omnitruncate").clicked() {
                         if let Some(mut p) = query.iter_mut().next() {
+                            p.abs_mut().sort();
                             *p = p.omnitruncate();
                         }
                     }
@@ -529,6 +530,8 @@ pub fn show_top_panel(
                     // Gets the volume of the polytope.
                     if ui.button("Volume").clicked() {
                         if let Some(mut p) = query.iter_mut().next() {
+                            p.abs_mut().sort();
+
                             if let Some(vol) = p.volume() {
                                 println!("The volume is {}.", vol);
                             } else {

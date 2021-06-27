@@ -161,6 +161,11 @@ pub struct FlagIter<'a> {
 impl<'a> FlagIter<'a> {
     /// Initializes an iterator over all flags of a polytope.
     pub fn new(polytope: &'a Abstract) -> Self {
+        assert!(
+            polytope.sorted,
+            "You must make sure that the polytope is sorted before iterating over its flags."
+        );
+
         let r = polytope.rank().try_usize().unwrap_or(0);
         Self {
             polytope,

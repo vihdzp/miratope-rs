@@ -125,7 +125,7 @@ impl Polytope for NamedConcrete {
         Some(Self::new_generic(self.con.petrie_polygon_with(flag)?))
     }
 
-    fn omnitruncate(&mut self) -> Self {
+    fn omnitruncate(&self) -> Self {
         Self::new_generic(self.con.omnitruncate())
     }
 

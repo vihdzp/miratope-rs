@@ -118,7 +118,7 @@ impl Polytope for NamedAbstract {
         Some(Self::new_generic(self.abs.petrie_polygon_with(flag)?))
     }
 
-    fn omnitruncate(&mut self) -> Self {
+    fn omnitruncate(&self) -> Self {
         Self::new_generic(self.abs.omnitruncate())
     }
 

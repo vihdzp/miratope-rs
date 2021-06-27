@@ -46,14 +46,13 @@ features = [
 
 # Bevy egui integration with this latest version.
 [dependencies.bevy_egui]
-git = "https://github.com/jakobhellermann/bevy_egui"
+git = "https://github.com/OfficialURL/bevy_egui"
 branch = "bevy-main"
 
-# Enables having multiple systems calling the egui ctx at once.
 [dependencies.egui]
+version = "0.13.0"
 default-features = false
 features = ["multi_threaded"]
-version = "0.13.0"
 
 [patch.crates-io]
 # Fixes winit issue #1779.

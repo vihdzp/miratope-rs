@@ -26,6 +26,363 @@ use approx::{abs_diff_eq, abs_diff_ne};
 use rayon::prelude::*;
 use vec_like::*;
 
+/// Represents a [concrete polytope](https://polytope.miraheze.org/wiki/Polytope),
+/// which is an [`Abstract`] together with its corresponding vertices.
+#[derive(Debug, Clone)]
+pub struct Concrete {
+    /// The list of vertices as points in Euclidean space.
+    pub vertices: Vec<Point>,
+
+    /// The underlying abstract polytope.
+    pub abs: Abstract,
+}
+
+impl std::ops::Index<Rank> for Concrete {
+    type Output = ElementList;
+
+    /// Gets the list of elements with a given rank.
+    fn index(&self, rank: Rank) -> &Self::Output {
+        &self.abs[rank]
+    }
+}
+
+impl std::ops::IndexMut<Rank> for Concrete {
+    /// Gets the list of elements with a given rank.
+    fn index_mut(&mut self, rank: Rank) -> &mut Self::Output {
+        &mut self.abs[rank]
+    }
+}
+
+impl Concrete {
+    /// Initializes a new concrete polytope from a set of vertices and an
+    /// underlying abstract polytope. Does some debug assertions on the input.
+    pub fn new(vertices: Vec<Point>, abs: Abstract) -> Self {
+        // There must be as many abstract vertices as concrete ones.
+        debug_assert_eq!(
+            abs.vertex_count(),
+            vertices.len(),
+            "Abstract vertex count doesn't match concrete vertex count!"
+        );
+
+        // All vertices must have the same dimension.
+        if cfg!(debug_assertions) {
+            if let Some(vertex0) = vertices.get(0) {
+                for vertex1 in &vertices {
+                    debug_assert_eq!(vertex0.len(), vertex1.len());
+                }
+            }
+        }
+
+        // With no further info, we create a generic name for the polytope.
+        Self { vertices, abs }
+    }
+}
+
+impl Polytope for Concrete {
+    /// Returns a reference to the underlying [`Abstract`].
+    fn abs(&self) -> &Abstract {
+        &self.abs
+    }
+
+    /// Returns a mutable reference to the underlying [`Abstract`].
+    fn abs_mut(&mut self) -> &mut Abstract {
+        &mut self.abs
+    }
+
+    /// Builds the unique polytope of rank −1.
+    fn nullitope() -> Self {
+        Self::new(Vec::new(), Abstract::nullitope())
+    }
+
+    /// Builds the unique polytope of rank 0.
+    fn point() -> Self {
+        Self::new(vec![vec![].into()], Abstract::point())
+    }
+
+    /// Builds a dyad with unit edge length, centered at the origin.
+    fn dyad() -> Self {
+        Self::dyad_with(1.0)
+    }
+
+    /// Builds a convex regular polygon with `n` sides and unit edge length,
+    /// centered at the origin.
+    fn polygon(n: usize) -> Self {
+        Self::grunbaum_star_polygon(n, 1)
+    }
+
+    /// Returns the [dual](https://polytope.miraheze.org/wiki/Dual_polytope) of
+    /// a polytope using the unit hypersphere, or the index of a facet through
+    /// the origin if unsuccessful.
+    fn try_dual(&self) -> DualResult<Self> {
+        let mut clone = self.clone();
+        clone.try_dual_mut().map(|_| clone)
+    }
+
+    /// Builds the [dual](https://polytope.miraheze.org/wiki/Dual_polytope) of a
+    /// polytope in place using the unit hypersphere. If unsuccessful, leaves
+    /// the polytope unchanged and returns the index of a facet through the
+    /// origin.
+    fn try_dual_mut(&mut self) -> DualResult<()> {
+        self.try_dual_mut_with(&Hypersphere::unit(self.dim().unwrap_or(1)))
+    }
+
+    /// Builds the [Petrial](https://polytope.miraheze.org/wiki/Petrial) of a
+    /// polytope in place. If unsuccessful, leaves the polytope unchanged and
+    /// returns `false`.
+    fn petrial_mut(&mut self) -> bool {
+        self.abs.petrial_mut()
+    }
+
+    /// Builds the Petrie polygon of a polytope from a given flag, or returns
+    /// `None` if it's invalid.
+    fn petrie_polygon_with(&mut self, flag: Flag) -> Option<Self> {
+        let vertices = self.abs.petrie_polygon_vertices(flag)?;
+        let n = vertices.len();
+
+        Some(Self::new(
+            vertices
+                .into_iter()
+                .map(|idx| self.vertices[idx].clone())
+                .collect(),
+            Abstract::polygon(n),
+        ))
+    }
+
+    /// "Appends" a polytope into another, creating a compound polytope.
+    ///
+    /// # Panics
+    /// This method will panic if the polytopes have different ranks.
+    fn comp_append(&mut self, mut p: Self) {
+        self.abs.comp_append(p.abs);
+        self.vertices.append(&mut p.vertices);
+    }
+
+    /// Gets the element with a given rank and index as a polytope, or returns
+    /// `None` if such an element doesn't exist.
+    fn element(&self, el: ElementRef) -> Option<Self> {
+        let (vertices, abs) = self.abs.element_and_vertices(el)?;
+
+        Some(Self::new(
+            vertices
+                .into_iter()
+                .map(|idx| self.vertices[idx].clone())
+                .collect(),
+            abs,
+        ))
+    }
+
+    // TODO: A method that builds an omnitruncate together with a map from flags
+    // to vertices? We got some math details to figure out.
+    fn omnitruncate(&self) -> Self {
+        let (abs, flags) = self.abs.omnitruncate_and_flags();
+        let dim = self.dim().unwrap();
+
+        // Maps each element to the polytope to some vertex.
+        let mut element_vertices = vec![self.vertices.clone()];
+        for r in Rank::range_inclusive_iter(Rank::new(1), self.rank()) {
+            let mut rank_vertices = Vec::new();
+
+            for el in &self[r] {
+                let mut p = Point::zeros(dim);
+                let subs = &el.subs;
+
+                for &sub in subs {
+                    p += &element_vertices[r.into_usize() - 1][sub];
+                }
+
+                rank_vertices.push(p / subs.len() as Float);
+            }
+
+            element_vertices.push(rank_vertices);
+        }
+
+        let vertices: Vec<_> = flags
+            .into_iter()
+            .map(|flag| {
+                flag.into_iter()
+                    .enumerate()
+                    .map(|(r, idx)| &element_vertices[r][idx])
+                    .sum()
+            })
+            .collect();
+
+        Self::new(vertices, abs)
+    }
+
+    /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
+    /// with unit height from two polytopes. Does not offset either polytope.
+    fn duopyramid(p: &Self, q: &Self) -> Self {
+        Self::duopyramid_with(
+            p,
+            q,
+            &Point::zeros(p.dim_or()),
+            &Point::zeros(q.dim_or()),
+            1.0,
+        )
+    }
+
+    /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
+    /// from two polytopes.
+    fn duoprism(p: &Self, q: &Self) -> Self {
+        Self::new(
+            duoprism_vertices(&p.vertices, &q.vertices),
+            Abstract::duoprism(&p.abs, &q.abs),
+        )
+    }
+
+    /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
+    /// from two polytopes.
+    fn duotegum(p: &Self, q: &Self) -> Self {
+        Self::duotegum_with(p, q, &Point::zeros(p.dim_or()), &Point::zeros(q.dim_or()))
+    }
+
+    /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
+    /// from two polytopes.
+    fn duocomb(p: &Self, q: &Self) -> Self {
+        Self::new(
+            duoprism_vertices(&p.vertices, &q.vertices),
+            Abstract::duocomb(&p.abs, &q.abs),
+        )
+    }
+
+    /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
+    /// polytope.
+    fn ditope(&self) -> Self {
+        Self::new(self.vertices.clone(), self.abs.ditope())
+    }
+
+    /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
+    /// polytope in place.
+    fn ditope_mut(&mut self) {
+        self.abs.ditope_mut();
+    }
+
+    /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
+    /// given polytope.
+    fn hosotope(&self) -> Self {
+        Self::new(
+            vec![vec![-0.5].into(), vec![0.5].into()],
+            self.abs.hosotope(),
+        )
+    }
+
+    /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
+    /// given polytope in place.
+    fn hosotope_mut(&mut self) {
+        self.vertices = vec![vec![-0.5].into(), vec![0.5].into()];
+        self.abs.hosotope_mut();
+    }
+
+    /// Attempts to build an antiprism based on a given polytope. Uses the unit
+    /// hypersphere to take the dual, and places the bases at a distance of 1.
+    /// If it fails, it returns the index of a facet through the inversion
+    /// center.
+    ///
+    /// If you want more control over the arguments, you can use
+    /// [`Self::try_antiprism_with`].
+    fn try_antiprism(&self) -> DualResult<Self> {
+        Self::try_antiprism_with(&self, &Hypersphere::unit(self.dim().unwrap_or(1)), 1.0)
+    }
+
+    /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
+    /// given rank.
+    fn simplex(rank: Rank) -> Self {
+        if rank == Rank::new(-1) {
+            Self::nullitope()
+        } else {
+            let dim = rank.into_usize();
+            let mut vertices = Vec::with_capacity(dim + 1);
+
+            // Adds all points with a single entry equal to √2/2, and all others
+            // equal to 0.
+            for i in 0..dim {
+                let mut v = Point::zeros(dim);
+                v[i] = Float::SQRT_2 / 2.0;
+                vertices.push(v);
+            }
+
+            // Adds the remaining vertex, all of whose coordinates are equal.
+            let dim_f = dim as Float;
+            let a = (1.0 - (dim_f + 1.0).sqrt()) * Float::SQRT_2 / (2.0 * dim_f);
+            vertices.push(vec![a; dim].into());
+
+            let mut simplex = Concrete::new(vertices, Abstract::simplex(rank));
+            simplex.recenter();
+            simplex
+        }
+    }
+}
+
+/// Generates the vertices for either a tegum or a pyramid product with two
+/// given vertex sets and a given height.
+///
+/// The vertices are the padded vertices of `q`, followed by the padded
+/// vertices of `p`.
+fn duopyramid_vertices(
+    p: &[Point],
+    q: &[Point],
+    p_pad: &Point,
+    q_pad: &Point,
+    height: Float,
+    tegum: bool,
+) -> Vec<Point> {
+    // Duotegums with points should just return the original polytopes.
+    if tegum {
+        if p.get(0).map(|vp| vp.len()) == Some(0) {
+            return q.to_owned();
+        } else if q.get(0).map(|vq| vq.len()) == Some(0) {
+            return p.to_owned();
+        }
+    }
+
+    let half_height = height / 2.0;
+
+    q.iter()
+        // To every point in q, we append zeros to the left.
+        .map(|vq| {
+            let mut v: Vec<_> = p_pad.iter().copied().chain(vq.iter().copied()).collect();
+            if !tegum {
+                v.push(-half_height);
+            }
+            v.into()
+        })
+        // To every point in p, we append zeros to the right.
+        .chain(p.iter().map(|vp| {
+            let mut v: Vec<_> = vp.iter().copied().chain(q_pad.iter().copied()).collect();
+            if !tegum {
+                v.push(half_height);
+            }
+            v.into()
+        }))
+        .collect()
+}
+
+/// Generates the vertices for a duoprism with two given vertex sets.
+fn duoprism_vertices(p: &[Point], q: &[Point]) -> Vec<Point> {
+    // The dimension of the points in p.
+    let p_dim = if let Some(vp) = p.get(0) {
+        vp.len()
+    } else {
+        return Vec::new();
+    };
+
+    // The dimension of the points in q.
+    let q_dim = if let Some(vq) = q.get(0) {
+        vq.len()
+    } else {
+        return Vec::new();
+    };
+
+    // The dimension of our new points.
+    let dim = p_dim + q_dim;
+
+    // We take all elements in the cartesian product p × q, and chain each
+    // pair together.
+    itertools::iproduct!(p.iter(), q.iter())
+        .map(|(vp, vq)| Point::from_iterator(dim, vp.iter().chain(vq.iter()).copied()))
+        .collect::<Vec<_>>()
+}
+
 /// A trait for concrete polytopes.
 ///
 /// This trait exists so that we can reuse this code for `miratope_lang`. The
@@ -63,6 +420,8 @@ pub trait ConcretePolytope: Polytope {
     /// Builds a dyad with a specified height.
     fn dyad_with(height: Float) -> Self;
 
+    /// Builds the Grünbaumian star polygon `{n / d}` with unit circumradius,
+    /// rotated by an angle.
     fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: Float) -> Self;
 
     /// Builds the Grünbaumian star polygon `{n / d}` with unit circumradius. If
@@ -246,12 +605,15 @@ pub trait ConcretePolytope: Polytope {
 
     /// Checks whether a polytope is equilateral to a fixed precision.
     fn is_equilateral(&self) -> bool {
+        // Checks whether self is equilateral with the edge length of any edge.
         if let Some(vertices) = self
             .con()
             .element_vertices_ref(ElementRef::new(Rank::new(1), 0))
         {
             self.is_equilateral_with_len((vertices[0] - vertices[1]).norm())
-        } else {
+        }
+        // If there are no edges, we return true.
+        else {
             true
         }
     }
@@ -301,6 +663,12 @@ pub trait ConcretePolytope: Polytope {
     /// Builds a tegum with two specified apices.
     fn tegum_with(&self, apex1: Point, apex2: Point) -> Self;
 
+    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism),
+    /// using the specified sets of vertices for the base and the dual base.
+    ///
+    /// The vertices of the base should be specified in the same order as those
+    /// of the original polytope. The vertices of the dual face should be
+    /// specified in the same order as the facets of the original polytope.
     fn antiprism_with_vertices<T: Iterator<Item = Point>, U: Iterator<Item = Point>>(
         &self,
         vertices: T,
@@ -308,7 +676,8 @@ pub trait ConcretePolytope: Polytope {
     ) -> Self;
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
-    /// based on a given polytope.
+    /// based on a given polytope. Uses the specified [`Hypersphere`] to build
+    /// the dual base, and separates the bases by the given height.
     fn try_antiprism_with(&self, sphere: &Hypersphere, height: Float) -> DualResult<Self> {
         let half_height = height / 2.0;
         let vertices = self.vertices().iter().map(|v| v.push(-half_height));
@@ -368,76 +737,6 @@ pub trait ConcretePolytope: Polytope {
         )
     }
 
-    /// Generates the vertices for either a tegum or a pyramid product with two
-    /// given vertex sets and a given height.
-    ///
-    /// The vertices are the padded vertices of `q`, followed by the padded
-    /// vertices of `p`.
-    fn duopyramid_vertices(
-        p: &[Point],
-        q: &[Point],
-        p_pad: &Point,
-        q_pad: &Point,
-        height: Float,
-        tegum: bool,
-    ) -> Vec<Point> {
-        // Duotegums with points should just return the original polytopes.
-        if tegum {
-            if p.get(0).map(|vp| vp.len()) == Some(0) {
-                return q.to_owned();
-            } else if q.get(0).map(|vq| vq.len()) == Some(0) {
-                return p.to_owned();
-            }
-        }
-
-        let half_height = height / 2.0;
-
-        q.iter()
-            // To every point in q, we append zeros to the left.
-            .map(|vq| {
-                let mut v: Vec<_> = p_pad.iter().copied().chain(vq.iter().copied()).collect();
-                if !tegum {
-                    v.push(-half_height);
-                }
-                v.into()
-            })
-            // To every point in p, we append zeros to the right.
-            .chain(p.iter().map(|vp| {
-                let mut v: Vec<_> = vp.iter().copied().chain(q_pad.iter().copied()).collect();
-                if !tegum {
-                    v.push(half_height);
-                }
-                v.into()
-            }))
-            .collect()
-    }
-
-    /// Generates the vertices for a duoprism with two given vertex sets.
-    fn duoprism_vertices(p: &[Point], q: &[Point]) -> Vec<Point> {
-        // The dimension of the points in p.
-        let p_dim = if let Some(vp) = p.get(0) {
-            vp.len()
-        } else {
-            return Vec::new();
-        };
-
-        // The dimension of the points in q.
-        let q_dim = if let Some(vq) = q.get(0) {
-            vq.len()
-        } else {
-            return Vec::new();
-        };
-
-        // The dimension of our new points.
-        let dim = p_dim + q_dim;
-
-        // We take all elements in the cartesian product p × q, and chain each
-        // pair together.
-        itertools::iproduct!(p.iter(), q.iter())
-            .map(|(vp, vq)| Point::from_iterator(dim, vp.iter().chain(vq.iter()).copied()))
-            .collect::<Vec<_>>()
-    }
-
     /// Generates a duopyramid from two given polytopes with a given height and
     /// a given offset.
     fn duopyramid_with(
@@ -448,11 +747,15 @@ pub trait ConcretePolytope: Polytope {
         height: Float,
     ) -> Self;
 
+    /// Generates a duopyramid from two given polytopes with a given offset.
     fn duotegum_with(p: &Self, q: &Self, p_offset: &Point, q_offset: &Point) -> Self;
 
     /// Computes the volume of a polytope by adding up the contributions of all
     /// flags. Returns `None` if the volume is undefined.
-    fn volume(&mut self) -> Option<Float> {
+    ///
+    /// # Panics
+    /// This method will panic if the polytope is not sorted.
+    fn volume(&self) -> Option<Float> {
         let rank = self.rank();
 
         // We leave the nullitope's volume undefined.
@@ -503,11 +806,6 @@ pub trait ConcretePolytope: Polytope {
 
         // All of the flags we've found so far.
         let mut all_flags = HashSet::new();
-
-        if !self.abs().sorted {
-            panic!("Unsorted!")
-        }
-        //   self.abs_mut().sort();
 
         // We iterate over all flags in the polytope.
         for flag in self.flags() {
@@ -561,17 +859,6 @@ pub trait ConcretePolytope: Polytope {
     fn flatten_into(&mut self, subspace: &Subspace);
 
     fn cross_section(&self, slice: &Hyperplane) -> Self;
-}
-
-/// Represents a [concrete polytope](https://polytope.miraheze.org/wiki/Polytope),
-/// which is an [`Abstract`] together with its corresponding vertices.
-#[derive(Debug, Clone)]
-pub struct Concrete {
-    /// The list of vertices as points in Euclidean space.
-    pub vertices: Vec<Point>,
-
-    /// The underlying abstract polytope.
-    pub abs: Abstract,
 }
 
 impl ConcretePolytope for Concrete {
@@ -700,6 +987,12 @@ impl ConcretePolytope for Concrete {
         poly
     }
 
+    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism),
+    /// using the specified sets of vertices for the base and the dual base.
+    ///
+    /// The vertices of the base should be specified in the same order as those
+    /// of the original polytope. The vertices of the dual face should be
+    /// specified in the same order as the facets of the original polytope.
     fn antiprism_with_vertices<T: Iterator<Item = Point>, U: Iterator<Item = Point>>(
         &self,
         vertices: T,
@@ -730,7 +1023,7 @@ impl ConcretePolytope for Concrete {
         height: Float,
     ) -> Self {
         Self::new(
-            Self::duopyramid_vertices(&p.vertices, &q.vertices, p_offset, q_offset, height, false),
+            duopyramid_vertices(&p.vertices, &q.vertices, p_offset, q_offset, height, false),
             Abstract::duopyramid(&p.abs, &q.abs),
         )
     }
@@ -739,7 +1032,7 @@ impl ConcretePolytope for Concrete {
     /// from two polytopes.
     fn duotegum_with(p: &Self, q: &Self, p_offset: &Point, q_offset: &Point) -> Self {
         Self::new(
-            Self::duopyramid_vertices(&p.vertices, &q.vertices, p_offset, q_offset, 0.0, true),
+            duopyramid_vertices(&p.vertices, &q.vertices, p_offset, q_offset, 0.0, true),
             Abstract::duotegum(&p.abs, &q.abs),
         )
     }
@@ -884,263 +1177,6 @@ impl ConcretePolytope for Concrete {
         }
 
         Self::new(vertices, abs.build())
-    }
-}
-
-impl Concrete {
-    /// Initializes a new concrete polytope from a set of vertices and an
-    /// underlying abstract polytope. Does some debug assertions on the input.
-    pub fn new(vertices: Vec<Point>, abs: Abstract) -> Self {
-        // There must be as many abstract vertices as concrete ones.
-        debug_assert_eq!(
-            abs.vertex_count(),
-            vertices.len(),
-            "Abstract vertex count doesn't match concrete vertex count!"
-        );
-
-        // All vertices must have the same dimension.
-        if cfg!(debug_assertions) {
-            if let Some(vertex0) = vertices.get(0) {
-                for vertex1 in &vertices {
-                    debug_assert_eq!(vertex0.len(), vertex1.len());
-                }
-            }
-        }
-
-        // With no further info, we create a generic name for the polytope.
-        Self { vertices, abs }
-    }
-}
-
-impl Polytope for Concrete {
-    fn abs(&self) -> &Abstract {
-        &self.abs
-    }
-
-    fn abs_mut(&mut self) -> &mut Abstract {
-        &mut self.abs
-    }
-
-    /// Builds the unique polytope of rank −1.
-    fn nullitope() -> Self {
-        Self::new(Vec::new(), Abstract::nullitope())
-    }
-
-    /// Builds the unique polytope of rank 0.
-    fn point() -> Self {
-        Self::new(vec![vec![].into()], Abstract::point())
-    }
-
-    /// Builds a dyad with unit edge length.
-    fn dyad() -> Self {
-        Self::dyad_with(1.0)
-    }
-
-    /// Builds a convex regular polygon with `n` sides and unit edge length.
-    fn polygon(n: usize) -> Self {
-        Self::grunbaum_star_polygon(n, 1)
-    }
-
-    /// Returns the dual of a polytope, or `None` if any facets pass through the
-    /// origin.
-    fn try_dual(&self) -> DualResult<Self> {
-        let mut clone = self.clone();
-        clone.try_dual_mut().map(|_| clone)
-    }
-
-    /// Builds the dual of a polytope in place, or does nothing in case any
-    /// facets go through the origin. Returns the dual if successful, and `None`
-    /// otherwise.
-    fn try_dual_mut(&mut self) -> DualResult<()> {
-        self.try_dual_mut_with(&Hypersphere::unit(self.dim().unwrap_or(1)))
-    }
-
-    fn petrial_mut(&mut self) -> bool {
-        self.abs.petrial_mut()
-    }
-
-    /// Builds the Petrie polygon of a polytope from a given flag, or returns
-    /// `None` if it's invalid.
-    fn petrie_polygon_with(&mut self, flag: Flag) -> Option<Self> {
-        let vertices = self.abs.petrie_polygon_vertices(flag)?;
-        let n = vertices.len();
-
-        Some(Self::new(
-            vertices
-                .into_iter()
-                .map(|idx| self.vertices[idx].clone())
-                .collect(),
-            Abstract::polygon(n),
-        ))
-    }
-
-    /// "Appends" a polytope into another, creating a compound polytope. Fails
-    /// if the polytopes have different ranks.
-    fn comp_append(&mut self, mut p: Self) {
-        self.abs.comp_append(p.abs);
-        self.vertices.append(&mut p.vertices);
-    }
-
-    /// Gets the element with a given rank and index as a polytope, or returns
-    /// `None` if such an element doesn't exist.
-    fn element(&self, el: ElementRef) -> Option<Self> {
-        let (vertices, abs) = self.abs.element_and_vertices(el)?;
-
-        Some(Self::new(
-            vertices
-                .into_iter()
-                .map(|idx| self.vertices[idx].clone())
-                .collect(),
-            abs,
-        ))
-    }
-
-    fn omnitruncate(&mut self) -> Self {
-        let (abs, flags) = self.abs.omnitruncate_and_flags();
-        let dim = self.dim().unwrap();
-
-        // Maps each element to the polytope to some vertex.
-        let mut element_vertices = vec![self.vertices.clone()];
-        for r in Rank::range_inclusive_iter(Rank::new(1), self.rank()) {
-            let mut rank_vertices = Vec::new();
-
-            for el in &self[r] {
-                let mut p = Point::zeros(dim);
-                let subs = &el.subs;
-
-                for &sub in subs {
-                    p += &element_vertices[r.into_usize() - 1][sub];
-                }
-
-                rank_vertices.push(p / subs.len() as Float);
-            }
-
-            element_vertices.push(rank_vertices);
-        }
-
-        let vertices: Vec<_> = flags
-            .into_iter()
-            .map(|flag| {
-                flag.into_iter()
-                    .enumerate()
-                    .map(|(r, idx)| &element_vertices[r][idx])
-                    .sum()
-            })
-            .collect();
-
-        Self::new(vertices, abs)
-    }
-
-    /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
-    /// with unit height from two polytopes.
-    fn duopyramid(p: &Self, q: &Self) -> Self {
-        Self::duopyramid_with(
-            p,
-            q,
-            &Point::zeros(p.dim_or()),
-            &Point::zeros(q.dim_or()),
-            1.0,
-        )
-    }
-
-    /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
-    /// from two polytopes.
-    fn duoprism(p: &Self, q: &Self) -> Self {
-        Self::new(
-            Self::duoprism_vertices(&p.vertices, &q.vertices),
-            Abstract::duoprism(&p.abs, &q.abs),
-        )
-    }
-
-    /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
-    /// from two polytopes.
-    fn duotegum(p: &Self, q: &Self) -> Self {
-        Self::duotegum_with(p, q, &Point::zeros(p.dim_or()), &Point::zeros(q.dim_or()))
-    }
-
-    /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
-    /// from two polytopes.
-    fn duocomb(p: &Self, q: &Self) -> Self {
-        Self::new(
-            Self::duoprism_vertices(&p.vertices, &q.vertices),
-            Abstract::duocomb(&p.abs, &q.abs),
-        )
-    }
-
-    /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
-    /// polytope.
-    fn ditope(&self) -> Self {
-        Self::new(self.vertices.clone(), self.abs.ditope())
-    }
-
-    /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
-    /// polytope in place.
-    fn ditope_mut(&mut self) {
-        self.abs.ditope_mut();
-    }
-
-    /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
-    /// given polytope.
-    fn hosotope(&self) -> Self {
-        Self::new(
-            vec![vec![-0.5].into(), vec![0.5].into()],
-            self.abs.hosotope(),
-        )
-    }
-
-    /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
-    /// given polytope in place.
-    fn hosotope_mut(&mut self) {
-        self.vertices = vec![vec![-0.5].into(), vec![0.5].into()];
-        self.abs.hosotope_mut();
-    }
-
-    fn try_antiprism(&self) -> DualResult<Self> {
-        Self::try_antiprism_with(&self, &Hypersphere::unit(self.dim().unwrap_or(1)), 1.0)
-    }
-
-    /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
-    /// given rank.
-    fn simplex(rank: Rank) -> Self {
-        if rank == Rank::new(-1) {
-            Self::nullitope()
-        } else {
-            let dim = rank.into_usize();
-            let mut vertices = Vec::with_capacity(dim + 1);
-
-            // Adds all points with a single entry equal to √2/2, and all others
-            // equal to 0.
-            for i in 0..dim {
-                let mut v = Point::zeros(dim);
-                v[i] = Float::SQRT_2 / 2.0;
-                vertices.push(v);
-            }
-
-            // Adds the remaining vertex, all of whose coordinates are equal.
-            let dim_f = dim as Float;
-            let a = (1.0 - (dim_f + 1.0).sqrt()) * Float::SQRT_2 / (2.0 * dim_f);
-            vertices.push(vec![a; dim].into());
-
-            let mut simplex = Concrete::new(vertices, Abstract::simplex(rank));
-            simplex.recenter();
-            simplex
-        }
-    }
-}
-
-impl std::ops::Index<Rank> for Concrete {
-    type Output = ElementList;
-
-    /// Gets the list of elements with a given rank.
-    fn index(&self, rank: Rank) -> &Self::Output {
-        &self.abs[rank]
-    }
-}
-
-impl std::ops::IndexMut<Rank> for Concrete {
-    /// Gets the list of elements with a given rank.
-    fn index_mut(&mut self, rank: Rank) -> &mut Self::Output {
-        &mut self.abs[rank]
     }
 }
 

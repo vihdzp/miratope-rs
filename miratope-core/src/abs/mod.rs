@@ -557,10 +557,8 @@ impl Abstract {
     /// up its vertices.
     ///
     /// # Panics
-    /// This method shouldn't panic. If it does, please file a bug.
-    pub fn omnitruncate_and_flags(&mut self) -> (Self, Vec<Flag>) {
-        self.sort();
-
+    /// This method will panic if the polytope isn't sorted.
+    pub fn omnitruncate_and_flags(&self) -> (Self, Vec<Flag>) {
         let mut flag_sets = vec![FlagSet::new(self)];
         let mut new_flag_sets = Vec::new();
         let rank = self.rank();
@@ -1139,12 +1137,14 @@ impl Polytope for Abstract {
     }
 
     /// Returns the flag omnitruncate of a polytope.
-    fn omnitruncate(&mut self) -> Self {
+    fn omnitruncate(&self) -> Self {
         self.omnitruncate_and_flags().0
     }
 
-    /// "Appends" a polytope into another, creating a compound polytope. Fails
-    /// if the polytopes have different ranks.
+    /// "Appends" a polytope into another, creating a compound polytope.
+    ///
+    /// # Panics
+    /// This method will panic if the polytopes have different ranks.
     fn comp_append(&mut self, p: Self) {
         let rank = self.rank();
 

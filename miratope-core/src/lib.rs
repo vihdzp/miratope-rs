@@ -323,7 +323,7 @@ pub trait Polytope: Sized + Clone {
     }
 
     /// Returns the omnitruncate of a polytope.
-    fn omnitruncate(&mut self) -> Self;
+    fn omnitruncate(&self) -> Self;
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.
@@ -362,8 +362,7 @@ pub trait Polytope: Sized + Clone {
     /// through the inversion center.
     fn try_antiprism(&self) -> DualResult<Self>;
 
-    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
-    /// based on a given polytope.
+    /// Calls [`Self::try_antiprism`] and unwraps the result.
     fn antiprism(&self) -> Self {
         self.try_antiprism().unwrap()
     }
