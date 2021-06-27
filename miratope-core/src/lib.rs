@@ -51,6 +51,12 @@ pub trait Consts {
 
     /// sqrt(2)
     const SQRT_2: Self;
+
+    /// sqrt(3)
+    const SQRT_3: Self;
+
+    /// sqrt(5)
+    const SQRT_5: Self;
 }
 
 /// Constants for `f32`.
@@ -59,6 +65,8 @@ impl Consts for f32 {
     const PI: f32 = std::f32::consts::PI;
     const TAU: f32 = std::f32::consts::TAU;
     const SQRT_2: f32 = std::f32::consts::SQRT_2;
+    const SQRT_3: f32 = 1.7320508;
+    const SQRT_5: f32 = 2.236068;
 }
 
 /// Constants for `f64`.
@@ -67,6 +75,8 @@ impl Consts for f64 {
     const PI: f64 = std::f64::consts::PI;
     const TAU: f64 = std::f64::consts::TAU;
     const SQRT_2: f64 = std::f64::consts::SQRT_2;
+    const SQRT_3: f64 = 1.7320508075688772;
+    const SQRT_5: f64 = 2.23606797749979;
 }
 
 /// The floating point type used for all calculations.

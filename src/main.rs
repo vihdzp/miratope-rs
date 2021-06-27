@@ -53,6 +53,9 @@
 //!
 //! ## Why is the rendering buggy?
 //! Proper rendering, even in 3D, is a work in progress.
+//!
+//! ## Can I use this code for my own purposes?
+//! Of course! Check out the [`miratope_core`] crate.
 
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
