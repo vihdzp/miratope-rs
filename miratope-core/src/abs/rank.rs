@@ -2,7 +2,7 @@
 
 use std::{fmt::Display, hash::Hash, iter, slice, vec};
 
-use serde::{Deserialize, Serialize};
+use serde::{de::Visitor, Deserialize, Serialize};
 use vec_like::*;
 
 /// Represents the [rank](https://polytope.miraheze.org/w/index.php?title=Rank)
@@ -10,10 +10,53 @@ use vec_like::*;
 ///
 /// Externally, it behaves as a number from -1 onwards. Internally, it contains
 /// an unsigned integer, representing the rank plus 1.
-#[derive(
-    PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Debug, Hash, Serialize, Deserialize,
-)]
+///
+/// # Todo
+/// We might want to store this as a `u8` in order to save space.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Debug, Hash)]
 pub struct Rank(usize);
+
+/// Serializes a [`Rank`] as an `i8`.
+impl Serialize for Rank {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_i8((*self).into())
+    }
+}
+
+struct RankVisitor;
+
+impl<'de> Visitor<'de> for RankVisitor {
+    type Value = Rank;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("an integer between -1 and 254")
+    }
+
+    fn visit_i8<E>(self, value: i8) -> Result<Self::Value, E> {
+        Ok(Rank::from(value))
+    }
+
+    fn visit_i32<E>(self, value: i32) -> Result<Self::Value, E> {
+        Ok(Rank::from(value))
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+        Ok(Rank::from(value))
+    }
+}
+
+/// Deserializes a [`Rank`] as an `i8`.
+impl<'de> Deserialize<'de> for Rank {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_i8(RankVisitor)
+    }
+}
 
 impl Rank {
     /// Initializes a `Rank` from an `isize`.

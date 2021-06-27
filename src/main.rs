@@ -61,7 +61,7 @@ use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::EguiPlugin;
-use miratope_core::conc::file::off::FromOff;
+use miratope_core::conc::file::FromFile;
 use miratope_lang::poly::conc::NamedConcrete;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 

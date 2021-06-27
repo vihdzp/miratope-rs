@@ -3,7 +3,8 @@ use std::mem;
 use super::NamedPolytope;
 use crate::name::{Con, ConData, Name, NameData, Regular};
 
-use miratope_core::conc::file::off::{FromOff, OffError, OffResult};
+use miratope_core::conc::file::off::{OffError, OffResult};
+use miratope_core::conc::file::FromFile;
 use miratope_core::conc::ConcretePolytope;
 use miratope_core::{abs::Abstract, conc::Concrete, geometry::Point, Polytope};
 
@@ -17,7 +18,7 @@ pub struct NamedConcrete {
     pub name: Name<Con>,
 }
 
-impl FromOff for NamedConcrete {
+impl FromFile for NamedConcrete {
     fn from_off(src: &str) -> OffResult<Self> {
         let con = Concrete::from_off(src)?;
 
@@ -30,6 +31,10 @@ impl FromOff for NamedConcrete {
         } else {
             Err(OffError::Empty)
         }
+    }
+
+    fn from_ggb(file: std::fs::File) -> miratope_core::conc::file::ggb::GgbResult<Self> {
+        Ok(Self::new_generic(Concrete::from_ggb(file)?))
     }
 }
 

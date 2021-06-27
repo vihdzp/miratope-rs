@@ -270,6 +270,11 @@ impl Language for Es {
         )
     }
 
+    /// The position of the "small" adjective.
+    fn small_pos() -> Position {
+        Position::Before
+    }
+
     /// The adjective for a "stellated" version of a polytope.
     fn stellated(options: Options<Self::Count, Self::Gender>) -> &'static str {
         options.six(

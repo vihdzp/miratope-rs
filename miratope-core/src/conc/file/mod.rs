@@ -3,14 +3,17 @@
 pub mod ggb;
 pub mod off;
 
-use self::ggb::GgbError;
+use self::{
+    ggb::{GgbError, GgbResult},
+    off::{OffReader, OffResult},
+};
 
 use super::Concrete;
 use off::OffError;
 use zip::result::ZipError;
 
 pub use std::io::Error as IoError;
-use std::string::FromUtf8Error;
+use std::{fs::File, string::FromUtf8Error};
 
 /// Any error encountered while trying to load a polytope.
 #[derive(Debug)]
@@ -85,13 +88,20 @@ impl<'a> From<ZipError> for FileError<'a> {
 /// The result of loading a polytope from a file.
 pub type FileResult<'a, T> = Result<T, FileError<'a>>;
 
-impl Concrete {
-    /// Loads a polytope from a file path.
+/// A trait for polytopes that can be read from an OFF file or a GGB file.
+pub trait FromFile: Sized {
+    /// Converts an OFF file into a new struct of type `Self`.
     ///
     /// # Todo
-    /// Can we perhaps return a single error type?
-    pub fn from_path<U: AsRef<std::path::Path>>(fp: &U) -> FileResult<Self> {
-        use crate::conc::file::off::FromOff;
+    /// Maybe don't load the entire file at once?
+    fn from_off(src: &str) -> OffResult<Self>;
+
+    /// Attempts to read a GGB file. If succesful, outputs a polytope in at most
+    /// 3D.
+    fn from_ggb(file: File) -> GgbResult<Self>;
+
+    /// Loads a polytope from a file path.
+    fn from_path<U: AsRef<std::path::Path>>(fp: &U) -> FileResult<Self> {
         use std::{ffi::OsStr, fs};
 
         let ext = fp
@@ -112,6 +122,30 @@ impl Concrete {
 
             // Could not recognize the file extension.
             ext => Err(FileError::InvalidExtension(ext)),
+        }
+    }
+}
+
+impl FromFile for Concrete {
+    fn from_off(src: &str) -> OffResult<Self> {
+        OffReader::new(src).build()
+    }
+
+    /// Attempts to read a GGB file. If succesful, outputs a polytope in at most
+    /// 3D.
+    fn from_ggb(mut file: File) -> GgbResult<Self> {
+        use std::io::Read;
+
+        if let Ok(xml) = String::from_utf8(
+            zip::read::ZipArchive::new(&mut file)?
+                .by_name("geogebra.xml")?
+                .bytes()
+                .map(|b| b.unwrap_or(0))
+                .collect(),
+        ) {
+            ggb::parse_xml(&xml)
+        } else {
+            Err(GgbError::InvalidGgb)
         }
     }
 }

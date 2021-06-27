@@ -10,7 +10,7 @@ use bevy_egui::{
     EguiContext,
 };
 use miratope_core::{
-    conc::{Concrete, ConcretePolytope},
+    conc::{file::FromFile, ConcretePolytope},
     geometry::{Hyperplane, Point, Vector},
     Float, Polytope,
 };
@@ -182,9 +182,9 @@ pub fn file_dialog(
             FileDialogMode::Open => {
                 if let Some(path) = file_dialog.pick_file() {
                     if let Some(mut p) = query.iter_mut().next() {
-                        match Concrete::from_path(&path) {
+                        match NamedConcrete::from_path(&path) {
                             Ok(q) => {
-                                *p = NamedConcrete::new_generic(q); // TODO maybe don't do this
+                                *p = q;
                                 p.recenter();
                             }
                             Err(err) => eprintln!("File open failed: {}", err),

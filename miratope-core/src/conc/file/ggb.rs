@@ -3,10 +3,7 @@
 // This code is unfinished.
 #![allow(dead_code)]
 
-use std::{
-    fs::File,
-    io::{Read, Result as IoResult},
-};
+use std::io::Result as IoResult;
 
 use crate::{conc::Concrete, geometry::Point};
 
@@ -209,7 +206,7 @@ fn read_face() -> Face {
 }
 
 /// Parses the `geogebra.xml` file to produce a polytope.
-fn parse_xml(xml: &str) -> GgbResult<Concrete> {
+pub(super) fn parse_xml(xml: &str) -> GgbResult<Concrete> {
     let mut vertices = Vec::new();
     let mut edges = Vec::new();
     let mut xml = XmlReader::new(xml);
@@ -252,24 +249,6 @@ fn parse_xml(xml: &str) -> GgbResult<Concrete> {
 
             // The file has finished being read. Time for processing!
             None => todo!(),
-        }
-    }
-}
-
-impl Concrete {
-    /// Attempts to read a GGB file. If succesful, outputs a polytope in at most
-    /// 3D.
-    pub fn from_ggb(mut file: File) -> GgbResult<Self> {
-        if let Ok(xml) = String::from_utf8(
-            zip::read::ZipArchive::new(&mut file)?
-                .by_name("geogebra.xml")?
-                .bytes()
-                .map(|b| b.unwrap_or(0))
-                .collect(),
-        ) {
-            parse_xml(&xml)
-        } else {
-            Err(GgbError::InvalidGgb)
         }
     }
 }

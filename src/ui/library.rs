@@ -9,7 +9,7 @@ use std::{
 use super::config::LibPath;
 use miratope_core::{
     abs::rank::Rank,
-    conc::{Concrete, ConcretePolytope},
+    conc::{file::FromFile, ConcretePolytope},
     Polytope,
 };
 use miratope_lang::{
@@ -514,8 +514,8 @@ fn show_library(
                         // Loads a selected file.
                         ShowResult::Load(file) => {
                             if let Some(mut p) = query.iter_mut().next() {
-                                match Concrete::from_path(&file) {
-                                    Ok(q) => *p = NamedConcrete::new_generic(q), // TODO maybe don't do this
+                                match NamedConcrete::from_path(&file) {
+                                    Ok(q) => *p = q,
                                     Err(err) => eprintln!("File open failed: {}", err),
                                 }
                             }

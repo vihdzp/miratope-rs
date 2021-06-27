@@ -378,10 +378,9 @@ impl<T: NameTypeOwned> Name<T> {
 
                 true
             }
-            &Self::Generic {
-                facet_count: n,
-                rank,
-            } => n >= 2 && rank >= Rank::new(3) && rank <= Rank::new(20),
+            &Self::Generic { facet_count, rank } => {
+                facet_count >= 2 && rank >= Rank::new(3) && rank <= Rank::new(20)
+            }
             _ => true,
         }
     }

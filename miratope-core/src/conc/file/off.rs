@@ -445,20 +445,6 @@ impl<'a> OffReader<'a> {
     }
 }
 
-pub trait FromOff: Sized {
-    /// Converts an OFF file into a new struct of type `Self`.
-    ///
-    /// # Todo
-    /// Maybe don't load the entire file at once?
-    fn from_off(src: &str) -> OffResult<Self>;
-}
-
-impl FromOff for Concrete {
-    fn from_off(src: &str) -> OffResult<Self> {
-        OffReader::new(src).build()
-    }
-}
-
 /*
 impl Concrete {
     /// Gets the name from the first line of an OFF file.
@@ -742,6 +728,8 @@ impl Concrete {
 
 #[cfg(test)]
 mod tests {
+    use crate::conc::file::FromFile;
+
     use super::*;
 
     /// Used to test a particular polytope.
