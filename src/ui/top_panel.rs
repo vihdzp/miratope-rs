@@ -160,7 +160,7 @@ impl FileDialogState {
 
 /// The system in charge of showing the file dialog.
 pub fn file_dialog(
-    mut query: Query<&mut Concrete>,
+    mut query: Query<&mut NamedConcrete>,
     file_dialog_state: Res<FileDialogState>,
     file_dialog: NonSend<FileDialogToken>,
 ) {
@@ -171,7 +171,7 @@ pub fn file_dialog(
                 if let Some(path) = file_dialog.save_file(file_dialog_state.name.as_ref().unwrap())
                 {
                     if let Some(p) = query.iter_mut().next() {
-                        if let Err(err) = p.to_path(&path, Default::default()) {
+                        if let Err(err) = p.con().to_path(&path, Default::default()) {
                             eprintln!("File saving failed: {}", err);
                         }
                     }
@@ -184,7 +184,7 @@ pub fn file_dialog(
                     if let Some(mut p) = query.iter_mut().next() {
                         match Concrete::from_path(&path) {
                             Ok(q) => {
-                                *p = q;
+                                *p = NamedConcrete::new_generic(q); // TODO maybe don't do this
                                 p.recenter();
                             }
                             Err(err) => eprintln!("File open failed: {}", err),

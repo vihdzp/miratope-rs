@@ -174,7 +174,10 @@ impl Polytope for NamedConcrete {
     }
 
     fn try_antiprism(&self) -> miratope_core::DualResult<Self> {
-        todo!()
+        Ok(Self::new(
+            self.con().try_antiprism()?,
+            Name::antiprism(self.name.clone()),
+        ))
     }
 }
 

@@ -98,6 +98,7 @@ impl Polytope for NamedAbstract {
     }
 
     fn comp_append(&mut self, _p: Self) {
+        // Compound names are TBA
         todo!()
     }
 
@@ -166,7 +167,10 @@ impl Polytope for NamedAbstract {
     }
 
     fn try_antiprism(&self) -> miratope_core::DualResult<Self> {
-        todo!()
+        Ok(Self::new(
+            self.abs().try_antiprism()?,
+            Name::antiprism(self.name.clone()),
+        ))
     }
 }
 

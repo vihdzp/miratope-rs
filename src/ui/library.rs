@@ -14,6 +14,7 @@ use miratope_core::{
 };
 use miratope_lang::{
     name::{Con, Name},
+    poly::conc::NamedConcrete,
     SelectedLanguage,
 };
 
@@ -492,7 +493,7 @@ impl Library {
 /// The system that shows the Miratope library.
 fn show_library(
     egui_ctx: Res<EguiContext>,
-    mut query: Query<&mut Concrete>,
+    mut query: Query<&mut NamedConcrete>,
     mut library: ResMut<Option<Library>>,
     lib_path: Res<LibPath>,
     selected_language: Res<SelectedLanguage>,
@@ -511,7 +512,7 @@ fn show_library(
                     ShowResult::Load(file) => {
                         if let Some(mut p) = query.iter_mut().next() {
                             match Concrete::from_path(&file) {
-                                Ok(q) => *p = q,
+                                Ok(q) => *p = NamedConcrete::new_generic(q), // TODO maybe don't do this
                                 Err(err) => eprintln!("File open failed: {}", err),
                             }
                         }
@@ -522,35 +523,35 @@ fn show_library(
                         // Loads a regular star polygon.
                         SpecialLibrary::Polygons(n, d) => {
                             if let Some(mut p) = query.iter_mut().next() {
-                                *p = Concrete::star_polygon(n, d);
+                                *p = NamedConcrete::star_polygon(n, d);
                             }
                         }
 
                         // Loads a uniform polygonal prism.
                         SpecialLibrary::Prisms(n, d) => {
                             if let Some(mut p) = query.iter_mut().next() {
-                                *p = Concrete::uniform_prism(n, d);
+                                *p = NamedConcrete::uniform_prism(n, d);
                             }
                         }
 
                         // Loads a uniform polygonal antiprism.
                         SpecialLibrary::Antiprisms(n, d) => {
                             if let Some(mut p) = query.iter_mut().next() {
-                                *p = Concrete::uniform_antiprism(n, d);
+                                *p = NamedConcrete::uniform_antiprism(n, d);
                             }
                         }
 
                         // Loads a (uniform 4D) duoprism.
                         SpecialLibrary::Duoprisms(n1, d1, n2, d2) => {
                             if let Some(mut p) = query.iter_mut().next() {
-                                let p1 = Concrete::star_polygon(n1, d1);
+                                let p1 = NamedConcrete::star_polygon(n1, d1);
 
                                 // Avoids duplicate work if possible.
                                 if n1 == n2 && d1 == d2 {
-                                    *p = Concrete::duoprism(&p1, &p1);
+                                    *p = NamedConcrete::duoprism(&p1, &p1);
                                 } else {
-                                    let p2 = Concrete::star_polygon(n2, d2);
-                                    *p = Concrete::duoprism(&p1, &p2);
+                                    let p2 = NamedConcrete::star_polygon(n2, d2);
+                                    *p = NamedConcrete::duoprism(&p1, &p2);
                                 }
                             }
                         }
@@ -558,28 +559,28 @@ fn show_library(
                         // Loads a uniform polygonal antiprism.
                         SpecialLibrary::AntiprismPrisms(n, d) => {
                             if let Some(mut p) = query.iter_mut().next() {
-                                *p = Concrete::uniform_antiprism(n, d).prism();
+                                *p = NamedConcrete::uniform_antiprism(n, d).prism();
                             }
                         }
 
                         // Loads a simplex with a given rank.
                         SpecialLibrary::Simplex(rank) => {
                             if let Some(mut p) = query.iter_mut().next() {
-                                *p = Concrete::simplex(rank);
+                                *p = NamedConcrete::simplex(rank);
                             }
                         }
 
                         // Loads a hypercube with a given rank.
                         SpecialLibrary::Hypercube(rank) => {
                             if let Some(mut p) = query.iter_mut().next() {
-                                *p = Concrete::hypercube(rank);
+                                *p = NamedConcrete::hypercube(rank);
                             }
                         }
 
                         // Loads an orthoplex with a given rank.
                         SpecialLibrary::Orthoplex(rank) => {
                             if let Some(mut p) = query.iter_mut().next() {
-                                *p = Concrete::orthoplex(rank);
+                                *p = NamedConcrete::orthoplex(rank);
                             }
                         }
                     },
