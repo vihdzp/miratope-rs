@@ -253,6 +253,11 @@ impl Language for Es {
         "gran"
     }
 
+    /// The position of the "great" adjective.
+    fn great_pos() -> Position {
+        Position::Before
+    }
+
     /// The adjective for a "small" version of a polytope.
     fn small(options: Options<Self::Count, Self::Gender>) -> &'static str {
         options.six(
