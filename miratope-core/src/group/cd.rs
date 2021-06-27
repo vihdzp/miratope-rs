@@ -272,7 +272,8 @@ impl Node {
         matches!(self, Self::Ringed(_))
     }
 
-    /// Converts the character into a node value, by using Wendy's scheme.
+    /// Converts the character into a node value, using [Wendy Krieger's
+    /// scheme](https://polytope.miraheze.org/wiki/Coxeter_diagram#Different_edge_lengths).
     ///
     /// # Todo
     /// Make this customizable?
@@ -303,8 +304,8 @@ impl Node {
 
     /// Attempts to convert a character into a [`Node`]. Returns a
     /// [`CdError::InvalidSymbol`] if it fails.
-    pub fn from_char_or(c: char, idx: usize) -> CdResult<Self> {
-        Self::from_char(c).ok_or(CdError::InvalidSymbol { pos: idx })
+    pub fn from_char_or(c: char, pos: usize) -> CdResult<Self> {
+        Self::from_char(c).ok_or(CdError::InvalidSymbol { pos })
     }
 }
 
@@ -342,7 +343,7 @@ impl Edge {
     }
 
     /// Initializes a new edge from a given integral value. If this is invalid,
-    /// returns a [`CdError::InvalidEdge`].
+    /// returns a [`CdError::InvalidEdge`] using the specified position.
     pub fn int(num: u32, pos: usize) -> CdResult<Self> {
         Self::rational(num, 1, pos)
     }
@@ -419,12 +420,8 @@ pub struct EdgeRef {
 
 impl EdgeRef {
     /// Initializes a new edge reference from its fields.
-    pub fn new(first: NodeRef, last: NodeRef, edge: Edge) -> Self {
-        Self {
-            first,
-            other: last,
-            edge,
-        }
+    pub fn new(first: NodeRef, other: NodeRef, edge: Edge) -> Self {
+        Self { first, other, edge }
     }
 
     /// Returns the index in the graph of both node references. Requires knowing
@@ -492,12 +489,15 @@ impl<'a> CdBuilder<'a> {
     /// Initializes a new CD builder from a string.
     fn new(diagram: &'a str) -> Self {
         Self {
+            // The diagram and the iterator over the diagram.
             diagram,
             iter: diagram.char_indices().peekable(),
 
+            // The final CD and its edges.
             cd: Cd::new(),
             edge_queue: VecDeque::new(),
 
+            // The previous and next node to be built.
             prev_node: None,
             next_edge: None,
         }

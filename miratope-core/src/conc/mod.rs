@@ -26,17 +26,24 @@ use approx::{abs_diff_eq, abs_diff_ne};
 use rayon::prelude::*;
 use vec_like::*;
 
-/// A trait for concrete polytopes. This trait exists to make the code in
-/// `miratope-lang` much easier.
+/// A trait for concrete polytopes.
+///
+/// This trait exists so that we can reuse this code for `miratope_lang`. The
+/// traits that are not auto-implemented require us to manually set names over
+/// there.
 pub trait ConcretePolytope: Polytope {
+    /// Returns a reference to the underlying [`Concrete`] polytope.
     fn con(&self) -> &Concrete;
 
+    /// Returns a mutable reference to the underlying [`Concrete`] polytope.
     fn con_mut(&mut self) -> &mut Concrete;
 
+    /// Returns a reference to the vertices of the polytope.
     fn vertices(&self) -> &Vec<Point> {
         &self.con().vertices
     }
 
+    /// Returns a mutable reference to the vertices of the polytope.
     fn vertices_mut(&mut self) -> &mut Vec<Point> {
         &mut self.con_mut().vertices
     }
@@ -53,12 +60,14 @@ pub trait ConcretePolytope: Polytope {
         self.dim().unwrap_or(0)
     }
 
+    /// Builds a dyad with a specified height.
     fn dyad_with(height: Float) -> Self;
 
     fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: Float) -> Self;
 
     /// Builds the Grünbaumian star polygon `{n / d}` with unit circumradius. If
-    /// `n` and `d` have a common factor, the result is a multiply-wound polygon.
+    /// `n` and `d` have a common factor, the result is a multiply-wound
+    /// polygon.
     fn grunbaum_star_polygon(n: usize, d: usize) -> Self {
         Self::grunbaum_star_polygon_with_rot(n, d, 0.0)
     }
@@ -116,8 +125,8 @@ pub trait ConcretePolytope: Polytope {
         self
     }
 
-    /// Calculates the circumsphere of a polytope. Returns it if the polytope
-    /// has one, and returns `None` otherwise.
+    /// Calculates the circumsphere of a polytope. Returns `None` if the
+    /// polytope isn't circumscribable.
     fn circumsphere(&self) -> Option<Hypersphere> {
         let mut vertices = self.vertices().iter();
 
@@ -152,16 +161,18 @@ pub trait ConcretePolytope: Polytope {
         })
     }
 
-    /// Gets the gravicenter of a polytope, or `None` in the case of the
-    /// nullitope.
+    /// Calculates the gravicenter of a polytope, or returns `None` in the case
+    /// of the nullitope.
     fn gravicenter(&self) -> Option<Point> {
         let mut g = Point::zeros(self.dim()? as usize);
         let vertices = &self.con().vertices;
 
+        // Adds up all vertices.
         for v in vertices {
             g += v;
         }
 
+        // Takes the average.
         Some(g / (vertices.len() as Float))
     }
 

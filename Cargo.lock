@@ -2195,7 +2195,6 @@ dependencies = [
  "nalgebra",
  "ordered-float",
  "petgraph",
- "rand",
  "rayon",
  "ron",
  "serde",
@@ -2210,9 +2209,6 @@ dependencies = [
 name = "miratope-lang"
 version = "0.1.0"
 dependencies = [
- "bevy_egui",
- "gcd",
- "itertools",
  "miratope-core",
  "nalgebra",
  "ron",

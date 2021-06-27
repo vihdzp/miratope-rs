@@ -14,7 +14,6 @@ nalgebra = { git = "https://github.com/dimforge/nalgebra", branch = "dev", versi
 ] }
 ordered-float = "2.4"
 petgraph = "0.5"
-rand = "0.8"
 rayon = "1.5"
 ron = "0.6"
 serde = { version = "1.0", features = ["derive"] }

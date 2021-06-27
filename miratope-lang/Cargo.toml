@@ -6,8 +6,6 @@ edition = "2018"
 [dependencies]
 miratope-core = { path = "../miratope-core" }
 vec-like = { path = "../vec-like" }
-gcd = "2.0"
-itertools = "0.10"
 nalgebra = { git = "https://github.com/dimforge/nalgebra", branch = "dev", version = "0.27", features = [
     "serde-serialize"
 ] }
@@ -15,9 +13,3 @@ ron = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 strum = "0.21"
 strum_macros = "0.21"
-
-# Bevy egui integration with this latest version.
-[dependencies.bevy_egui]
-git = "https://github.com/jakobhellermann/bevy_egui"
-branch = "bevy-main"
-optional = true
