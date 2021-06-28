@@ -3,7 +3,10 @@
 use std::collections::{BTreeMap, HashMap};
 
 use crate::{
-    abs::rank::Rank,
+    abs::{
+        elements::ElementRef,
+        rank::{Rank, RankVec},
+    },
     conc::{Concrete, ConcretePolytope},
     Consts, Float, FloatOrd, Polytope,
 };
@@ -12,97 +15,10 @@ use approx::abs_diff_eq;
 use vec_like::*;
 
 #[derive(PartialOrd, Ord, PartialEq, Eq, Hash)]
-/// Contains both the "type" of a set of elements, and the number of elements of
-/// such type.
-pub struct ElementCount {
-    /// The index of the type of these elements.
-    type_index: usize,
 
-    /// The number of elements of a given type.
+struct ElementType {
+    example: usize,
     count: usize,
-}
-
-#[derive(Default)]
-struct ElementCountBuilder(BTreeMap<usize, usize>);
-
-impl ElementCountBuilder {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn insert(&mut self, type_index: usize) {
-        if let Some(count) = self.0.get_mut(&type_index) {
-            *count += 1;
-        } else {
-            self.0.insert(type_index, 1);
-        }
-    }
-
-    pub fn build(self) -> ElementData {
-        let mut res = Vec::new();
-        for (type_index, count) in self.0 {
-            res.push(ElementCount { type_index, count });
-        }
-        ElementData::ElementCounts(res)
-    }
-}
-
-/// The info for any of the "element types" in the polytope. We store metadata
-/// about every element of the polytope, and consider these elements as having
-/// the same "type" if the metadata matches up.
-#[derive(PartialEq, Eq, Hash)]
-pub enum ElementData {
-    /// Every point has the same type for now.
-    Point,
-
-    /// An edge's type is given by its length.
-    Edge(FloatOrd),
-
-    /// Any other element's type is given by the number of subelements of each
-    /// type that it contains.
-    ElementCounts(Vec<ElementCount>),
-}
-
-impl ElementData {
-    /// The number of facets in a polytope with a given metadata.
-    pub fn facet_count(&self) -> usize {
-        match self {
-            ElementData::Point => 1,
-            ElementData::Edge(_) => 2,
-            ElementData::ElementCounts(element_counts) => {
-                element_counts.iter().map(|el_count| el_count.count).sum()
-            }
-        }
-    }
-}
-
-/// The elements that share a given [`ElementData`].
-pub struct ElementType {
-    /// The indices of all elements that share the same data.
-    indices: Vec<usize>,
-
-    /// The data common to all elements of this type.
-    data: ElementData,
-}
-
-impl ElementType {
-    /// Returns the number of elements with this type.
-    pub fn count(&self) -> usize {
-        self.indices.len()
-    }
-
-    /// Returns the edge length of the element data, if applicable.
-    ///
-    /// # Panics
-    /// Panics if the data of this element type isn't an
-    /// [`Edge`](ElementData::Edge).
-    pub fn len(&self) -> Float {
-        if let ElementData::Edge(len) = self.data {
-            len.0
-        } else {
-            panic!("Expected edge!")
-        }
-    }
 }
 
 // We'll move this over to the translation module... some day.
@@ -119,150 +35,142 @@ const EL_SUFFIXES: [&str; 24] = [
 ];
 
 impl Concrete {
-    /// Gets the element "types" of a polytope.
-    fn element_types(&self) -> Vec<Vec<ElementType>> {
-        use std::collections::hash_map::Entry;
-
-        let rank = self.rank();
-        let mut output;
-        if let Some(rank_usize) = rank.try_usize() {
-            output = Vec::with_capacity(rank_usize);
-        } else {
-            return Vec::new();
+    /*  element type of an element is <index>
+    - initialize all elements to <0>
+    - repeat:
+    - iterate over ranks:
+        - start an indexed hashmap that'll store metadata
+        - iterate over elements:
+        - get a vector where indexes are the previous rank's type indexes and values are numbers of subelements of that type
+        - get its metadata - <current index, vector^> - could add heuristics like edge lengths to this metadata sometimes
+        - if metadata matches one already in the hashmap, give it that index,
+            - if not, add a new entry in hashmap and increment index
+    - iterate over ranks backwards, use superelements instead of subelements
+    - get number of types in total, if it's the same as previous loop, stop
+    */
+    fn element_types(&self) -> RankVec<Vec<ElementType>> {
+        let mut type_of_element = RankVec::<Vec<usize>>::new();
+        let mut types = RankVec::<Vec<ElementType>>::new();
+        let mut type_counts = RankVec::<usize>::new();
+        for r in Rank::range_iter(-1, self.rank()) {
+            type_of_element.push(vec![0; self.el_count(r)]);
+            types.push(Vec::<ElementType>::new());
+            type_counts.push(1);
         }
 
-        // There's only one point type, for now.
-        output.push(vec![ElementType {
-            indices: (0..self.vertex_count()).collect(),
-            data: ElementData::Point,
-        }]);
+        let mut passes = 0;
+        let mut number_of_types = 0;
+        loop {
+            for r in Rank::range_iter(1, self.rank()) {
+                let count = self.el_count(r);
+                let mut types_rank: Vec<ElementType> = Vec::<ElementType>::new();
+                let mut dict: HashMap<(usize, Vec<usize>), usize> = HashMap::new();
+                let mut c = 0;
 
-        if rank == Rank::new(0) {
-            return output;
-        }
+                for (i, el) in self[r].iter().enumerate() {
+                    let mut sub_types = vec![0; type_counts[r.minus_one()]];
 
-        // Gets the edge lengths of all edges in the polytope.
-        let mut edge_lengths: BTreeMap<FloatOrd, Vec<usize>> = BTreeMap::new();
-        let edge_count = self.el_count(Rank::new(1));
-
-        for edge_idx in 0..edge_count {
-            let len = FloatOrd::from(self.edge_len(edge_idx).unwrap());
-
-            // Searches for the greatest length smaller than the current one.
-            if let Some((prev_len, indices)) = edge_lengths.range_mut(..len).next_back() {
-                if abs_diff_eq!(prev_len.0, len.0, epsilon = Float::EPS) {
-                    indices.push(edge_idx);
-                    continue;
-                }
-            }
-
-            // Searches for the smallest length greater than the current one.
-            if let Some((next_len, indices)) = edge_lengths.range_mut(len..).next() {
-                if abs_diff_eq!(next_len.0, len.0, epsilon = Float::EPS) {
-                    indices.push(edge_idx);
-                    continue;
-                }
-            }
-
-            edge_lengths.insert(len, vec![edge_idx]);
-        }
-
-        // Creates a map from edge indices to indices of types.
-        let mut prev_types = Vec::new();
-        let mut edge_types = Vec::new();
-        prev_types.resize(edge_count, 0);
-        for (type_index, (len, indices)) in edge_lengths.into_iter().enumerate() {
-            for &idx in &indices {
-                prev_types[idx] = type_index;
-            }
-            edge_types.push(ElementType {
-                indices,
-                data: ElementData::Edge(len),
-            })
-        }
-        output.push(edge_types);
-
-        for elements in self
-            .abs
-            .ranks
-            .iter()
-            .take(self.rank().plus_one_usize())
-            .skip(3)
-        {
-            // A map from element data to the indices of the elements with such data.
-            let mut types = HashMap::new();
-
-            // We build the map.
-            for (idx, el) in elements.iter().enumerate() {
-                let mut element_count_builder = ElementCountBuilder::new();
-                for &sub in &el.subs {
-                    element_count_builder.insert(prev_types[sub]);
-                }
-                let data = element_count_builder.build();
-
-                match types.entry(data) {
-                    Entry::Vacant(entry) => {
-                        entry.insert(vec![idx]);
+                    for sub in el.subs.iter() {
+                        let sub_type = type_of_element[r.minus_one()][*sub];
+                        sub_types[sub_type] += 1;
                     }
-                    Entry::Occupied(mut entry) => {
-                        entry.get_mut().push(idx);
+
+                    let my_type = type_of_element[r][i];
+                    match dict.get(&(my_type, sub_types.clone())) {
+                        Some(idx) => {
+                            type_of_element[r][i] = *idx;
+                            types_rank[*idx].count += 1;
+                        }
+                        None => {
+                            dict.insert((my_type, sub_types), c);
+                            type_of_element[r][i] = c;
+                            types_rank.push(ElementType {
+                                example: i,
+                                count: 1,
+                            });
+                            c += 1;
+                        }
                     }
                 }
+                type_counts[r] = c;
+                types[r] = types_rank;
             }
 
-            // We create the element types from the map.
-            let mut element_types = Vec::with_capacity(types.len());
-            prev_types = Vec::new(); // This can probably be taken out.
-            prev_types.resize(elements.len(), 0);
-            for (type_index, (data, indices)) in types.into_iter().enumerate() {
-                for &idx in &indices {
-                    prev_types[idx] = type_index;
+            for r in Rank::range_iter(0, self.rank().minus_one()).rev() {
+                let count = self.el_count(r);
+                let mut types_rank: Vec<ElementType> = Vec::new();
+                let mut dict: HashMap<(usize, Vec<usize>), usize> = HashMap::new();
+                let mut c = 0;
+
+                for (i, el) in self[r].iter().enumerate() {
+                    let mut sup_types = vec![0; type_counts[r.plus_one()]];
+
+                    for sup in el.sups.iter() {
+                        let sup_type = type_of_element[r.plus_one()][*sup];
+                        sup_types[sup_type] += 1;
+                    }
+
+                    let my_type = type_of_element[r][i];
+                    match dict.get(&(my_type, sup_types.clone())) {
+                        Some(idx) => {
+                            type_of_element[r][i] = *idx;
+                            types_rank[*idx].count += 1;
+                        }
+                        None => {
+                            dict.insert((my_type, sup_types), c);
+                            type_of_element[r][i] = c;
+                            types_rank.push(ElementType {
+                                example: i,
+                                count: 1,
+                            });
+                            c += 1;
+                        }
+                    }
                 }
-                element_types.push(ElementType { indices, data });
+                type_counts[r] = c;
+                types[r] = types_rank;
             }
-
-            output.push(element_types);
+            let number_of_types_new: usize = type_counts.iter().sum();
+            if number_of_types_new == number_of_types {
+                break;
+            } else {
+                number_of_types = number_of_types_new;
+            }
+            passes += 1;
         }
-
-        output
+        types
     }
 
     /// Prints all element types of a polytope into the console.
     pub fn print_element_types(&self) {
         // An iterator over the element types of each rank.
-        let mut type_iter = self.element_types().into_iter().enumerate();
+        let type_iter = self.element_types().into_iter().skip(1).enumerate();
 
-        // Prints points.
-        if let Some((r, types)) = type_iter.next() {
+        for (r, types) in type_iter {
             println!("{}", EL_NAMES[r]);
             for t in types {
-                println!("{}", t.count());
-            }
-            println!();
-        } else {
-            return;
-        }
-
-        // Prints edges.
-        if let Some((r, types)) = type_iter.next() {
-            println!("{}", EL_NAMES[r]);
-            for t in types {
-                println!("{} × length {}", t.count(), t.len());
-            }
-            println!();
-        } else {
-            return;
-        }
-
-        // Prints everything else.
-        for (d, types) in type_iter {
-            println!("{}", EL_NAMES[d]);
-            for t in types {
+                let i = t.example;
                 println!(
-                    "{} × {}-{}",
-                    t.count(),
-                    t.data.facet_count(),
-                    EL_SUFFIXES[d]
+                    "{} × {}-{} , {}-{}",
+                    t.count,
+                    self.abs
+                        .get_element(ElementRef {
+                            rank: r.into(),
+                            idx: i
+                        })
+                        .unwrap()
+                        .subs
+                        .len(),
+                    EL_SUFFIXES[r],
+                    self.abs
+                        .get_element(ElementRef {
+                            rank: r.into(),
+                            idx: i
+                        })
+                        .unwrap()
+                        .sups
+                        .len(),
+                    EL_SUFFIXES[self.rank().into_usize() - r - 1],
                 );
             }
             println!();
