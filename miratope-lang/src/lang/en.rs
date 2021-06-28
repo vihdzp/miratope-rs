@@ -1,3 +1,4 @@
+//! Implements the English language.
 use crate::{GreekPrefix, Language, Options, Prefix};
 
 use miratope_core::abs::rank::Rank;
@@ -6,6 +7,79 @@ use miratope_core::abs::rank::Rank;
 pub struct En;
 
 impl GreekPrefix for En {}
+
+impl Prefix for En {
+    /// Converts a number into its Greek prefix equivalent.
+    ///
+    /// # Safety
+    /// If this method ever returns a non-ASCII String, it might cause UB in
+    /// [`Self::hypercube_prefix`].
+    fn prefix(n: usize) -> String {
+        let prefix = Self::greek_prefix(n);
+        debug_assert!(prefix.is_ascii(), "The prefix must be ASCII.");
+        prefix
+    }
+
+    /// The same as the usual Greek prefix, except that we use "duo" instead of
+    /// "di" and "trio" instead of "tri".
+    fn multi_prefix(n: usize) -> String {
+        match n {
+            2 => String::from("duo"),
+            3 => String::from("trio"),
+            _ => Self::prefix(n),
+        }
+    }
+
+    /// In the case `n == 4`, we return "tesse". Otherwise, this is the same as
+    /// the usual Greek prefix, except that we apply the following
+    /// transformation rules:
+    /// - If the last letter is a vowel, we convert it into an 'e'.
+    ///   - If the next to last letter is a 'c', we convert it into a 'k'.
+    /// - Otherwise, we add an 'e'.
+    ///
+    /// # Safety
+    /// If [`Self::prefix`] returns a non-ASCII string, it might cause UB in
+    /// this method.
+    fn hypercube_prefix(n: usize) -> String {
+        if n == 4 {
+            return "tesse".to_owned();
+        }
+
+        let mut prefix = Self::prefix(n);
+        let mut chars = prefix.char_indices().rev();
+
+        // The last letter.
+        let (idx_last, c) = chars.next().unwrap();
+        debug_assert!(c.is_ascii());
+
+        // Converts a vowel into an e.
+        if super::is_vowel(c) {
+            // The previous to last letter.
+            let (idx_prev, c) = chars.next().unwrap();
+            debug_assert!(c.is_ascii());
+
+            // Converts a c into a k.
+            if c == 'c' {
+                // SAFETY: `Self::prefix` consists of ASCII characters only.
+                unsafe {
+                    prefix.as_bytes_mut()[idx_prev] = 'k' as u8;
+                }
+            }
+
+            // SAFETY: `Self::prefix` consists of ASCII characters only.
+            unsafe {
+                prefix.as_bytes_mut()[idx_last] = 'e' as u8;
+            }
+
+            prefix
+        }
+        // Adds an 'e'.
+        else {
+            prefix.push('e');
+            prefix
+        }
+    }
+}
 
 impl Language for En {
     type Count = crate::Plural;
@@ -93,36 +167,24 @@ impl Language for En {
         "Petrial"
     }
 
+    /// The name for a cuboid.
+    fn cuboid(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.three("cuboid", "cuboids", "cuboidal")
+    }
+
+    /// The name for a cube.
+    fn cube(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        options.three("cube", "cubes", "cubic")
+    }
+
     /// The name for a hyperblock with a given rank.
     fn hyperblock(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
-        match rank.into_usize() {
-            3 => format!("cuboid{}", options.three("", "s", "al")),
-            n => {
-                format!("{}block{}", Self::prefix(n), options.two("", "s"))
-            }
-        }
+        format!("{}block{}", Self::prefix(rank.into()), options.two("", "s"))
     }
 
     /// The name for a hypercube with a given rank.
     fn hypercube(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
-        match rank.into_usize() {
-            3 => format!("cub{}", options.three("e", "s", "ic")),
-            4 => format!("tesseract{}", options.three("", "s", "ic")),
-            n => {
-                let prefix = Self::prefix(n).chars().collect::<Vec<_>>();
-
-                // Penta -> Pente, or Deca -> Deke
-                let (_, str0) = prefix.split_last().unwrap();
-                let (c1, str1) = str0.split_last().unwrap();
-
-                let suffix = options.three("", "s", "ic");
-                if *c1 == 'c' {
-                    format!("{}keract{}", str1.iter().collect::<String>(), suffix)
-                } else {
-                    format!("{}eract{}", str0.iter().collect::<String>(), suffix)
-                }
-            }
-        }
+        Self::hypercube_prefix(rank.into()) + options.three("ract", "racts", "ractic")
     }
 
     /// The adjective for a "great" version of a polytope.
@@ -148,7 +210,7 @@ impl Language for En {
 
 #[cfg(test)]
 mod tests {
-    use crate::name::{Abs, AbsData, Name};
+    use crate::name::{Abs, Name};
 
     use super::*;
 
@@ -156,12 +218,12 @@ mod tests {
     /// TODO: expand this test.
     fn names() {
         assert_eq!(
-            En::parse(&Name::<Abs>::polygon(AbsData::default(), 5)),
+            En::parse(&Name::<Abs>::polygon(Default::default(), 5)),
             "pentagon"
         );
 
         assert_eq!(
-            En::parse(&Name::<Abs>::simplex(AbsData::default(), Rank::new(5)).prism()),
+            En::parse(&Name::<Abs>::simplex(Default::default(), Rank::new(5)).prism()),
             "hexateric prism"
         );
     }

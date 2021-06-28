@@ -134,6 +134,19 @@ impl Polytope for NamedConcrete {
         Self::new_generic(self.con.omnitruncate())
     }
 
+    fn prism(&self) -> Self {
+        Self::new(self.con().prism(), self.name.clone().prism())
+    }
+
+    fn tegum(&self) -> Self {
+        Self::new(self.con().tegum(), self.name.clone().tegum())
+    }
+
+    fn pyramid(&self) -> Self {
+        Self::new(self.con().pyramid(), self.name.clone().pyramid())
+    }
+
+
     fn duopyramid(p: &Self, q: &Self) -> Self {
         Self::new(
             Concrete::duopyramid(&p.con, &q.con),
@@ -183,6 +196,43 @@ impl Polytope for NamedConcrete {
             self.con().try_antiprism()?,
             Name::antiprism(self.name.clone()),
         ))
+    }
+
+    fn simplex(rank: miratope_core::abs::rank::Rank) -> Self {
+        Self::new(
+            Concrete::simplex(rank),
+            Name::simplex(
+                ConData::new(Regular::Yes {
+                    center: Point::zeros(rank.try_usize().unwrap_or_default()),
+                }),
+                rank,
+            ),
+        )
+    }
+
+    fn hypercube(rank: miratope_core::abs::rank::Rank) -> Self {
+        println!("yes");
+        Self::new(
+            Concrete::hypercube(rank),
+            Name::hyperblock(
+                ConData::new(Regular::Yes {
+                    center: Point::zeros(rank.try_usize().unwrap_or_default()),
+                }),
+                rank,
+            ),
+        )
+    }
+
+    fn orthoplex(rank: miratope_core::abs::rank::Rank) -> Self {
+        Self::new(
+            Concrete::orthoplex(rank),
+            Name::orthoplex(
+                ConData::new(Regular::Yes {
+                    center: Point::zeros(rank.try_usize().unwrap_or_default()),
+                }),
+                rank,
+            ),
+        )
     }
 }
 

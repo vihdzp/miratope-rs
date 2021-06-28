@@ -40,8 +40,9 @@ pub trait NameData<T>: PartialEq + Debug + Clone + Serialize {
     fn satisfies<F: Fn(&T) -> bool>(&self, f: F) -> bool;
 }
 
-/// Phantom data associated with an abstract polytope. Internally stores nothing,
-/// and compares as `true` with anything else.
+/// Phantom data associated with an abstract polytope.
+///
+/// Will compare as equal to anything else, and will satisfy any predicate.
 #[derive(Copy, Debug, Serialize, Deserialize)]
 pub struct AbsData<T>(PhantomData<T>);
 
@@ -85,7 +86,7 @@ impl<T: Debug> NameData<T> for AbsData<T> {
     }
 }
 
-/// A name representing an abstract polytope.
+/// A type marker for a name representing an abstract polytope.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Abs;
 
@@ -133,7 +134,7 @@ impl<T: PartialEq + Debug + Clone + Serialize + DeserializeOwned> NameData<T> fo
     }
 }
 
-/// A name representing a concrete polytope.
+/// A type marker for a name representing a concrete polytope.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Con;
 
@@ -266,7 +267,10 @@ pub enum Name<T: NameType> {
     },
 
     /// The Petrial of a polyhedron.
-    Petrial { base: Box<Name<T>> },
+    Petrial {
+        /// The polytope the Petrial is based upon.
+        base: Box<Name<T>>,
+    },
 
     /// The dual of a specified polytope.
     Dual {
@@ -286,7 +290,13 @@ pub enum Name<T: NameType> {
         rank: Rank,
     },
 
-    /// A hyperblock of a given rank, **at least 3.**
+    /// A cuboid.
+    Cuboid {
+        /// Stores whether the cuboid is regular, and its center if it is.        
+        regular: T::DataRegular,
+    },
+
+    /// A hyperblock of a given rank, **at least 4.**
     Hyperblock {
         /// Stores whether the hyperblock is regular, and its center if it is.        
         regular: T::DataRegular,
@@ -367,24 +377,21 @@ impl<T: NameType> Name<T> {
     /// specified on its variants hold. Used for debugging.
     pub fn is_valid(&self) -> bool {
         match self {
-            Self::Polygon { regular, n } => {
-                if *n == 2 {
-                    return true;
-                }
-
-                if regular.satisfies(Regular::is_yes) {
-                    *n >= 5
-                } else {
-                    *n >= 4
-                }
-            }
+            // Polygons must not be interpretable as triangles or squares.
+            Self::Polygon { regular, n } => match *n {
+                2 | 5..=usize::MAX => true,
+                4 => !regular.satisfies(Regular::is_yes),
+                _ => false,
+            },
 
             // Petrials must always be 3D, but we have no way to check this.
 
-            // Operations must be at least 3D, otherwise they have other names.
-            Self::Simplex { rank, .. }
-            | Self::Hyperblock { rank, .. }
-            | Self::Orthoplex { rank, .. } => *rank >= Rank::new(3),
+            // Simplices and orthoplices must be at least 3D, otherwise they
+            // have other names.
+            Self::Simplex { rank, .. } | Self::Orthoplex { rank, .. } => *rank >= Rank::new(3),
+
+            // Hyperblocks can't be 3D, since Cuboids are a separate thing.
+            Self::Hyperblock { rank, .. } => *rank >= Rank::new(4),
 
             // Multioperations must contain at least two bases and nothing nested.
             Self::Multipyramid(bases)
@@ -494,10 +501,22 @@ impl<T: NameType> Name<T> {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
             Self::Dyad => Self::rectangle(),
-            Self::Rectangle => Self::Hyperblock {
+            Self::Rectangle => Self::Cuboid {
                 regular: Default::default(),
-                rank: Rank::new(3),
             },
+
+            // We make an irregular cuboid into an irregular cuboid, and
+            // a regular one into a cubic prism.
+            Self::Cuboid { regular } => {
+                if regular.contains(&Regular::No) {
+                    Self::Hyperblock {
+                        regular: Default::default(),
+                        rank: Rank::new(4),
+                    }
+                } else {
+                    Self::Prism(Box::new(Self::Cuboid { regular }))
+                }
+            }
 
             // We make an irregular hyperblock into an irregular hyperblock, and
             // a regular one into a hypercube prism.
@@ -759,7 +778,14 @@ impl<T: NameType> Name<T> {
             -1 => Self::Nullitope,
             0 => Self::Point,
             1 => Self::Dyad,
-            2 => Self::rectangle(),
+            2 => {
+                if regular.satisfies(Regular::is_yes) {
+                    Self::Square
+                } else {
+                    Self::rectangle()
+                }
+            }
+            3 => Self::Cuboid { regular },
             _ => Self::Hyperblock { regular, rank },
         }
     }
@@ -794,17 +820,17 @@ impl<T: NameType> Name<T> {
     /// the same order as were given.
     pub fn multipyramid(bases: Vec<Name<T>>) -> Self {
         let mut new_bases = Vec::new();
-        let mut pyramid_count = Rank::new(0);
+        let mut pyramid_count = 0;
 
         // Figures out which bases of the multipyramid are multipyramids
         // themselves, and accounts for them accordingly.
         for base in bases {
             match base {
                 Self::Nullitope => {}
-                Self::Point => pyramid_count += Rank::new(1),
-                Self::Dyad => pyramid_count += Rank::new(2),
-                Self::Triangle { .. } => pyramid_count += Rank::new(3),
-                Self::Simplex { rank, .. } => pyramid_count += rank + Rank::new(1),
+                Self::Point => pyramid_count += 1,
+                Self::Dyad => pyramid_count += 2,
+                Self::Triangle { .. } => pyramid_count += 3,
+                Self::Simplex { rank, .. } => pyramid_count += rank.plus_one_usize(),
                 Self::Multipyramid(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
             }
@@ -812,8 +838,11 @@ impl<T: NameType> Name<T> {
 
         // If we're taking more than one pyramid, we combine all of them into a
         // single simplex.
-        if pyramid_count >= Rank::new(2) {
-            new_bases.push(Name::simplex(Default::default(), pyramid_count.minus_one()));
+        if pyramid_count >= 2 {
+            new_bases.push(Name::simplex(
+                Default::default(),
+                Rank::from(pyramid_count - 1),
+            ));
         }
 
         // Either the final name, or the single base.
@@ -824,7 +853,7 @@ impl<T: NameType> Name<T> {
         };
 
         // If we take exactly one pyramid, we apply it at the end.
-        if pyramid_count == Rank::new(1) {
+        if pyramid_count == 1 {
             Self::Pyramid(Box::new(multipyramid))
         }
         // Otherwise, we already combined them.
@@ -837,7 +866,7 @@ impl<T: NameType> Name<T> {
     /// the same order as were given.
     pub fn multiprism(bases: Vec<Name<T>>) -> Self {
         let mut new_bases = Vec::new();
-        let mut prism_count = Rank::new(0);
+        let mut prism_count = 0;
 
         // Figures out which bases of the multiprism are multiprisms themselves,
         // and accounts for them accordingly.
@@ -847,9 +876,10 @@ impl<T: NameType> Name<T> {
                     return Self::Nullitope;
                 }
                 Self::Point => {}
-                Self::Dyad => prism_count += Rank::new(1),
-                Self::Square | Self::Rectangle => prism_count += Rank::new(2),
-                Self::Hyperblock { rank, .. } => prism_count += rank,
+                Self::Dyad => prism_count += 1,
+                Self::Square | Self::Rectangle => prism_count += 2,
+                Self::Cuboid { .. } => prism_count += 3,
+                Self::Hyperblock { rank, .. } => prism_count += rank.into_usize(),
                 Self::Multiprism(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(name),
             }
@@ -857,8 +887,11 @@ impl<T: NameType> Name<T> {
 
         // If we're taking more than one prism, we combine all of them into a
         // single hyperblock.
-        if prism_count >= Rank::new(2) {
-            new_bases.push(Name::hyperblock(Default::default(), prism_count));
+        if prism_count >= 2 {
+            new_bases.push(Name::hyperblock(
+                Default::default(),
+                Rank::from(prism_count),
+            ));
         }
 
         // Either the final name, or the single base.
@@ -869,7 +902,7 @@ impl<T: NameType> Name<T> {
         };
 
         // If we take exactly one prism, we apply it at the end.
-        if prism_count == Rank::new(1) {
+        if prism_count == 1 {
             Self::Prism(Box::new(multiprism))
         }
         // Otherwise, we already combined them.
@@ -882,7 +915,7 @@ impl<T: NameType> Name<T> {
     /// the same order as were given.
     pub fn multitegum(bases: Vec<Name<T>>) -> Self {
         let mut new_bases = Vec::new();
-        let mut tegum_count = Rank::new(0);
+        let mut tegum_count = 0;
 
         // Figures out which bases of the multitegum are multitegums themselves,
         // and accounts for them accordingly.
@@ -892,9 +925,9 @@ impl<T: NameType> Name<T> {
                     return Self::Nullitope;
                 }
                 Self::Point => {}
-                Self::Dyad => tegum_count += Rank::new(1),
-                Self::Square | Self::Orthodiagonal => tegum_count += Rank::new(2),
-                Self::Orthoplex { rank, .. } => tegum_count += rank,
+                Self::Dyad => tegum_count += 1,
+                Self::Square | Self::Orthodiagonal => tegum_count += 2,
+                Self::Orthoplex { rank, .. } => tegum_count += rank.into_usize(),
                 Self::Multitegum(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
             }
@@ -902,8 +935,8 @@ impl<T: NameType> Name<T> {
 
         // If we're taking more than one tegum, we combine all of them into a
         // single orthoplex.
-        if tegum_count >= Rank::new(2) {
-            new_bases.push(Self::orthoplex(Default::default(), tegum_count));
+        if tegum_count >= 2 {
+            new_bases.push(Self::orthoplex(Default::default(), Rank::from(tegum_count)));
         }
 
         // Either the final name, or the single base.
@@ -914,7 +947,7 @@ impl<T: NameType> Name<T> {
         };
 
         // If we take exactly one tegum, we apply it at the end.
-        if tegum_count == Rank::new(1) {
+        if tegum_count == 1 {
             Self::Tegum(Box::new(multitegum))
         }
         // Otherwise, we already combined them.

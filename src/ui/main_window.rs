@@ -4,7 +4,6 @@ use super::{camera::ProjectionType, top_panel::SectionState};
 
 use bevy::prelude::*;
 use bevy_egui::EguiSettings;
-use miratope_core::conc::Concrete;
 use miratope_lang::{poly::conc::NamedConcrete, SelectedLanguage};
 
 /// The plugin in charge of the Miratope main window, and of drawing the
@@ -21,8 +20,8 @@ impl Plugin for MainWindowPlugin {
 
 pub fn update_visible(
     keyboard: Res<Input<KeyCode>>,
-    mut polies_vis: Query<&mut Visible, With<Concrete>>,
-    mut wfs_vis: Query<&mut Visible, Without<Concrete>>,
+    mut polies_vis: Query<&mut Visible, With<NamedConcrete>>,
+    mut wfs_vis: Query<&mut Visible, Without<NamedConcrete>>,
 ) {
     if keyboard.just_pressed(KeyCode::V) {
         if let Some(mut visible) = polies_vis.iter_mut().next() {

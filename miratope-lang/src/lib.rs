@@ -19,34 +19,41 @@
 //!
 //! ```
 //! # use miratope_core::abs::rank::Rank;
-//! # use miratope_lang::{lang::En, Language, name::{Abs, AbsData, Name}};
+//! # use miratope_lang::{lang::En, Language, name::{Abs, Name}};
 //! let pecube: Name<Abs> = Name::multiprism(vec![
-//!     Name::polygon(AbsData::default(), 5), // 5-gon
-//!     Name::hyperblock(AbsData::default(), Rank::new(3)) // 3-hypercube
+//!     Name::polygon(Default::default(), 5), // 5-gon
+//!     Name::hyperblock(Default::default(), Rank::new(3)) // 3-hypercube
 //! ]);
 //! # assert_eq!(En::parse(&pecube), "pentagonal-cubic duoprism");
 //! ```
 //!
-//! For more information, see the [`Name`] module's documentation.
+//! For more information, see the [`Name`] struct's documentation.
 //!
 //! The [`parse`](Language::parse) function takes in this name, and uses the
 //! corresponding methods to parse and combine each of its parts:
 //!
 //! ```
 //! # use miratope_core::abs::rank::Rank;
-//! # use miratope_lang::{lang::En, Language, name::{Abs, AbsData, Name}};
+//! # use miratope_lang::{lang::En, Language, name::{Abs, Name}};
 //! # let pecube: Name<Abs> = Name::multiprism(vec![
-//! #     Name::polygon(AbsData::default(), 5), // abstract 5-gon
-//! #     Name::hyperblock(AbsData::default(), Rank::new(3)) // abstract 3-hypercube
+//! #     Name::polygon(Default::default(), 5), // abstract 5-gon
+//! #     Name::hyperblock(Default::default(), Rank::new(3)) // abstract 3-hypercube
 //! # ]);
 //! assert_eq!(En::parse(&pecube), "pentagonal-cubic duoprism");
 //! ```
 //!
 //! # What do I need to code?
-//! You'll need to implement the [`Language`] trait for your language. This
-//! trait will assume the position and gender of all adjectives by default, for
-//! convenience with languages such as English. However, these can be overriden
-//! by manually implementing the methods ending in `_gender` and `_position`.
+//! You'll first need to implement the [`Prefix`] trait for your language. This
+//! will specify how numerical prefixes will be translated. If your language
+//! uses Greek-like prefixes (as in **penta**-gon or **hexe**-ract), you'll want
+//! to implement this trait via [`GreekPrefix`].
+//!
+//! You'll then need to fully implement the [`Language`] trait for your
+//! language. This trait will by default assume the default [`Position`] and
+//! [`Gender`] of all adjectives, for convenience with languages such as English
+//! (which has no grammatical gender, and always put adjectives before nouns).
+//! However, these can be overriden by manually implementing the methods ending
+//! in `_gender` and `_position`.
 
 pub mod lang;
 pub mod name;
@@ -66,12 +73,12 @@ pub const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
 /// these propagate from nouns to adjectives, i.e. an adjective that describes
 /// a given noun is declensed with the gender of the noun.
 ///
-/// The most common implementations of this trait are [`Agender`] and
-/// [`Bigender`].
+/// The most common implementations of this trait are [`Agender`] (for languages
+/// without grammatical gender) and [`Bigender`] (for languages with a
+/// male/female distinction).
 ///
-/// Genders must have a default value that can be used to initialize the
-/// [`Options`]. This default value should not impact the parsed name, and can
-/// thus be chosen arbitrarily.
+/// Genders must have a default value that will be given by adjectives by
+/// default. This can then be overridden on a case-by-case basis.
 pub trait Gender: Copy + Default {}
 
 /// The gender system for a non-gendered language.
@@ -300,6 +307,10 @@ impl Options<Plural, Bigender> {
 /// Greek-like system for prefixes (e.g. "penta", "hexa"), you should implement
 /// this trait via [`GreekPrefix`] instead.
 ///
+/// In some instances, we require small variations on the main prefix system.
+/// These fallback to the main prefix system by default, but can be overridden
+/// if needed.
+///
 /// Defaults to just using `n-` as prefixes.
 pub trait Prefix {
     /// Returns the prefix that stands for n-.
@@ -307,15 +318,20 @@ pub trait Prefix {
         format!("{}-", n)
     }
 
-    /// Returns the prefix that stands for n- in a multiproduct. This usually
-    /// just means replacing "bi" with "duo" and "tri" with "trio". Not sure
-    /// where this came from.
-    fn multiprefix(n: usize) -> String {
-        match n {
-            2 => String::from("duo"),
-            3 => String::from("trio"),
-            _ => Self::prefix(n),
-        }
+    /// Returns the prefix that stands for n- in a polygon, whenever we aren't
+    /// writing an adjective.
+    fn polygon_prefix(n: usize) -> String {
+        Self::prefix(n)
+    }
+
+    /// Returns the prefix that stands for n- in a multiproduct.
+    fn multi_prefix(n: usize) -> String {
+        Self::prefix(n)
+    }
+
+    /// Returns the prefix that stands for n- in an n-eract (hypercube).
+    fn hypercube_prefix(n: usize) -> String {
+        Self::prefix(n)
     }
 }
 
@@ -433,13 +449,6 @@ pub trait GreekPrefix {
     }
 }
 
-/// Greek prefixes serve as prefixes.
-impl<T: GreekPrefix> Prefix for T {
-    fn prefix(n: usize) -> String {
-        T::greek_prefix(n)
-    }
-}
-
 /// The position at which an adjective will go with respect to a noun.
 #[derive(Clone, Copy, Debug)]
 pub enum Position {
@@ -490,6 +499,13 @@ pub trait Language: Prefix {
 
             // Regular families
             Name::Simplex { rank, .. } => Self::simplex(*rank, options),
+            Name::Cuboid { regular } => {
+                if regular.satisfies(Regular::is_yes) {
+                    Self::cube(options).to_owned()
+                } else {
+                    Self::cuboid(options).to_owned()
+                }
+            }
             Name::Hyperblock { regular, rank } => {
                 if regular.satisfies(Regular::is_yes) {
                     Self::hypercube(*rank, options)
@@ -745,8 +761,8 @@ pub trait Language: Prefix {
             _ => unreachable!(),
         };
 
-        // Prepends a multiprefix.
-        let kind = Self::multiprefix(bases.len()) + kind;
+        // Prepends a multi_prefix.
+        let kind = Self::multi_prefix(bases.len()) + kind;
 
         // Concatenates the bases as adjectives, adding hyphens between them.
         let mut str_bases = String::new();
@@ -764,6 +780,12 @@ pub trait Language: Prefix {
     fn simplex(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
         Self::generic(rank.plus_one_usize(), rank, options)
     }
+
+    /// The name for a cuboid.
+    fn cuboid(options: Options<Self::Count, Self::Gender>) -> &'static str;
+
+    /// The name for a cube.
+    fn cube(options: Options<Self::Count, Self::Gender>) -> &'static str;
 
     /// The name for a hyperblock with a given rank.
     fn hyperblock(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String;

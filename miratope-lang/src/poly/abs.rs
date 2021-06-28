@@ -122,6 +122,18 @@ impl Polytope for NamedAbstract {
         Self::new_generic(self.abs.omnitruncate())
     }
 
+    fn prism(&self) -> Self {
+        Self::new(self.abs().prism(), self.name.clone().prism())
+    }
+
+    fn tegum(&self) -> Self {
+        Self::new(self.abs().tegum(), self.name.clone().tegum())
+    }
+
+    fn pyramid(&self) -> Self {
+        Self::new(self.abs().pyramid(), self.name.clone().pyramid())
+    }
+
     fn duopyramid(p: &Self, q: &Self) -> Self {
         Self::new(
             Abstract::duopyramid(&p.abs, &q.abs),
@@ -171,6 +183,27 @@ impl Polytope for NamedAbstract {
             self.abs().try_antiprism()?,
             Name::antiprism(self.name.clone()),
         ))
+    }
+
+    fn simplex(rank: miratope_core::abs::rank::Rank) -> Self {
+        Self::new(
+            Abstract::simplex(rank),
+            Name::simplex(Default::default(), rank),
+        )
+    }
+
+    fn hypercube(rank: miratope_core::abs::rank::Rank) -> Self {
+        Self::new(
+            Abstract::hypercube(rank),
+            Name::hyperblock(Default::default(), rank),
+        )
+    }
+
+    fn orthoplex(rank: miratope_core::abs::rank::Rank) -> Self {
+        Self::new(
+            Abstract::orthoplex(rank),
+            Name::orthoplex(Default::default(), rank),
+        )
     }
 }
 
