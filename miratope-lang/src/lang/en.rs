@@ -1,5 +1,5 @@
 //! Implements the English language.
-use crate::{GreekPrefix, Language, Options, Prefix};
+use crate::{GreekPrefix, Language, Position, Prefix, options::Options};
 
 use miratope_core::abs::rank::Rank;
 
@@ -82,8 +82,14 @@ impl Prefix for En {
 }
 
 impl Language for En {
-    type Count = crate::Plural;
-    type Gender = crate::Agender;
+    type Count = crate::options::Plural;
+    type Gender = crate::options::Agender;
+
+    /// The default position to place adjectives. This will be used for the
+    /// default implementations, but it can be overridden in any specific case.
+    fn default_pos() -> Position {
+        Position::Before
+    }
 
     fn suffix(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
         const SUFFIXES: [&str; 25] = [
@@ -160,6 +166,10 @@ impl Language for En {
     /// The name for an antitegum.
     fn antitegum(options: Options<Self::Count, Self::Gender>) -> &'static str {
         options.three("antitegum", "antitegums", "antitegmatic")
+    }
+
+    fn hosotope(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
+        "hoso".to_owned() + &Self::suffix(rank, options)
     }
 
     /// The name for a Petrial. This word can't ever be used as a noun.

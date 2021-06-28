@@ -1,5 +1,8 @@
 //! Implements the Spanish language.
-use crate::{Bigender, GreekPrefix, Language, Options, Position, Prefix};
+use crate::{
+    options::{Bigender, Options},
+    GreekPrefix, Language, Position, Prefix,
+};
 
 use miratope_core::abs::rank::Rank;
 
@@ -107,7 +110,7 @@ impl Prefix for Es {
 }
 
 impl Language for Es {
-    type Count = crate::Plural;
+    type Count = crate::options::Plural;
     type Gender = Bigender;
 
     /// The default position to place adjectives. This will be used for the
@@ -283,6 +286,10 @@ impl Language for Es {
             "antitegmática",
             "antitegmáticas",
         )
+    }
+
+    fn hosotope(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
+        "hoso".to_owned() + &Self::suffix(rank, options)
     }
 
     /// The adjective for a Petrial.

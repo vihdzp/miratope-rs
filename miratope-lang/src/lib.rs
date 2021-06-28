@@ -53,254 +53,23 @@
 //! [`Gender`] of all adjectives, for convenience with languages such as English
 //! (which has no grammatical gender, and always put adjectives before nouns).
 //! However, these can be overriden by manually implementing the methods ending
-//! in `_gender` and `_position`.
+//! in `_gender` and `_pos`.
 
 pub mod lang;
 pub mod name;
+pub mod options;
 pub mod poly;
 
-use crate::lang::{En, Es};
+use crate::options::Options;
 use name::{Name, NameData, NameType, Regular};
 
 use miratope_core::abs::rank::Rank;
+use options::{Count, Gender};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 /// The link to the [Polytope Wiki](https://polytope.miraheze.org/wiki/).
 pub const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
-
-/// Represents the grammatical genders in any given language. We assume that
-/// these propagate from nouns to adjectives, i.e. an adjective that describes
-/// a given noun is declensed with the gender of the noun.
-///
-/// The most common implementations of this trait are [`Agender`] (for languages
-/// without grammatical gender) and [`Bigender`] (for languages with a
-/// male/female distinction).
-///
-/// Genders must have a default value that will be given by adjectives by
-/// default. This can then be overridden on a case-by-case basis.
-pub trait Gender: Copy + Default {}
-
-/// The gender system for a non-gendered language.
-#[derive(Clone, Copy, Default)]
-pub struct Agender;
-
-impl Gender for Agender {}
-
-/// The gender system for a language with a male/female distinction.
-#[derive(Clone, Copy)]
-pub enum Bigender {
-    /// Male gender.
-    Male,
-
-    /// Female gender.
-    Female,
-}
-
-impl Default for Bigender {
-    fn default() -> Self {
-        Self::Male
-    }
-}
-
-impl Gender for Bigender {}
-
-/// The gender system for a language with a male/female/neuter distinction.
-#[derive(Clone, Copy)]
-pub enum Trigender {
-    /// Male gender.
-    Male,
-
-    /// Female gender.
-    Female,
-
-    /// Neuter gender.
-    Neuter,
-}
-
-impl Default for Trigender {
-    fn default() -> Self {
-        Self::Neuter
-    }
-}
-
-impl Gender for Trigender {}
-
-/// Represents the grammatical numbers in any given language. These propagate
-/// from nouns to adjectives, i.e. an adjective that describes a given noun is
-/// declensed with the count of the noun.
-pub trait Count: Copy {
-    /// The grammatical number corresponding to a given number count.
-    fn from_count(n: usize) -> Self;
-}
-
-/// The number system for a language with a singular/plural distinction.
-#[derive(Clone, Copy)]
-pub enum Plural {
-    /// Exactly one object.
-    One,
-
-    /// Two or more objects.
-    More,
-}
-
-impl Plural {
-    /// Returns whether `self` matches `Self::One`.
-    pub fn is_one(self) -> bool {
-        matches!(self, Self::One)
-    }
-}
-
-impl Count for Plural {
-    fn from_count(n: usize) -> Self {
-        if n == 1 {
-            Self::One
-        } else {
-            Self::More
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-/// Represents the different modifiers that can be applied to a term.
-///
-/// This struct is internal and is modified as any given [`Name`] is parsed.
-/// We might want to make a "public" version of this struct. Or not.
-pub struct Options<C: Count, G: Gender> {
-    /// Determines whether the polytope acts as an adjective.
-    pub adjective: bool,
-
-    /// The grammatical number corresponding to the number of polytopes.
-    pub count: C,
-
-    /// The grammatical gender of the polytope.
-    pub gender: G,
-}
-
-impl<C: Count, G: Gender> Default for Options<C, G> {
-    /// The options default to a single polytope, as a noun, in the default gender.
-    fn default() -> Self {
-        Options {
-            adjective: false,
-            count: C::from_count(1),
-            gender: Default::default(),
-        }
-    }
-}
-
-impl<G: Gender> Options<Plural, G> {
-    /// Chooses a suffix from two options:
-    ///
-    /// * Base form.
-    /// * A plural.
-    ///
-    /// The adjectives will take the same form as the nouns.
-    fn two<'a>(&self, base: &'a str, plural: &'a str) -> &'a str {
-        if self.count.is_one() {
-            base
-        } else {
-            plural
-        }
-    }
-
-    /// Chooses a suffix from three options:
-    ///
-    /// * Base form.
-    /// * A plural.
-    /// * An adjective for both the singular and plural.
-    fn three<'a>(&self, base: &'a str, plural: &'a str, adj: &'a str) -> &'a str {
-        if self.adjective {
-            adj
-        } else if self.count.is_one() {
-            base
-        } else {
-            plural
-        }
-    }
-
-    /// Chooses a suffix from four options:
-    ///
-    /// * Base form.
-    /// * A plural.
-    /// * A singular adjective.
-    /// * A plural adjective.
-    fn four<'a>(
-        &self,
-        base: &'a str,
-        plural: &'a str,
-        adj: &'a str,
-        plural_adj: &'a str,
-    ) -> &'a str {
-        if self.adjective {
-            if self.count.is_one() {
-                adj
-            } else {
-                plural_adj
-            }
-        } else if self.count.is_one() {
-            base
-        } else {
-            plural
-        }
-    }
-}
-
-impl Options<Plural, Bigender> {
-    /// Chooses a suffix for an adjective from four options:
-    ///
-    /// * A singular adjective (male).
-    /// * A plural adjective (male).
-    /// * A singular adjective (female).
-    /// * A plural adjective (female).
-    ///
-    /// Assumes that the word will be used as an adjective, regardless of
-    /// `self.adjective`.
-    fn four_adj<'a>(
-        &self,
-        adj_m: &'a str,
-        plural_adj_m: &'a str,
-        adj_f: &'a str,
-        plural_adj_f: &'a str,
-    ) -> &'a str {
-        if self.count.is_one() {
-            match self.gender {
-                Bigender::Male => adj_m,
-                Bigender::Female => adj_f,
-            }
-        } else {
-            match self.gender {
-                Bigender::Male => plural_adj_m,
-                Bigender::Female => plural_adj_f,
-            }
-        }
-    }
-
-    /// Chooses a suffix from six options:
-    ///
-    /// * Base form.
-    /// * A plural.
-    /// * A singular adjective (male).
-    /// * A plural adjective (male).
-    /// * A singular adjective (female).
-    /// * A plural adjective (female).
-    fn six<'a>(
-        &self,
-        base: &'a str,
-        plural: &'a str,
-        adj_m: &'a str,
-        plural_adj_m: &'a str,
-        adj_f: &'a str,
-        plural_adj_f: &'a str,
-    ) -> &'a str {
-        if self.adjective {
-            self.four_adj(adj_m, plural_adj_m, adj_f, plural_adj_f)
-        } else if self.count.is_one() {
-            base
-        } else {
-            plural
-        }
-    }
-}
 
 /// Trait that allows one to build a prefix from any natural number. Every
 /// [`Language`] must implement this trait. If the language implements a
@@ -459,6 +228,17 @@ pub enum Position {
     After,
 }
 
+impl std::ops::Not for Position {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Self::Before => Self::After,
+            Self::After => Self::Before,
+        }
+    }
+}
+
 /// The trait shared by all languages.
 ///
 /// We strived to make this trait as general as possible while still making code
@@ -521,6 +301,8 @@ pub trait Language: Prefix {
             Name::Tegum(base) => Self::tegum_of(base, options),
             Name::Antiprism { base, .. } => Self::antiprism_of(base, options),
             Name::Antitegum { base, .. } => Self::antitegum_of(base, options),
+            Name::Ditope { base, rank } => Self::ditope_of(base, *rank, options),
+            Name::Hosotope { base, rank } => Self::hosotope_of(base, *rank, options),
             Name::Petrial { base, .. } => Self::petrial_of(base, options),
 
             // Multimodifiers
@@ -543,28 +325,13 @@ pub trait Language: Prefix {
     /// ASCII, it makes it uppercase.
     fn parse_uppercase<T: NameType>(name: &Name<T>) -> String {
         let mut result = Self::parse(name);
-
-        // The first character of the result.
-        let c = result.chars().next();
-
-        if let Some(c) = c {
-            if c.is_ascii() {
-                // Safety: c and c.to_ascii_uppercase() are a single byte.
-                // Therefore, we can just replace one by the other.
-                unsafe {
-                    result.as_bytes_mut()[0] = c.to_ascii_uppercase() as u8;
-                }
-            }
-        }
-
+        lang::uppercase_mut(&mut result);
         result
     }
 
     /// The default position to place adjectives. This will be used for the
     /// default implementations, but it can be overridden in any specific case.
-    fn default_pos() -> Position {
-        Position::Before
-    }
+    fn default_pos() -> Position;
 
     /// Combines an adjective and a noun, placing the adjective in a given
     /// [`Position`] with respect to the noun.
@@ -865,6 +632,60 @@ pub trait Language: Prefix {
         )
     }
 
+    /// The name for a ditope.
+    fn ditope(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
+        Self::generic(2, rank, options)
+    }
+
+    /// The position at which the "ditope" noun goes.
+    fn ditope_pos() -> Position {
+        !Self::default_pos()
+    }
+
+    /// The gender of the "ditope" noun.
+    fn ditope_gender(_rank: Rank) -> Self::Gender {
+        Default::default()
+    }
+
+    /// The name for a ditope with a given base.
+    fn ditope_of<T: NameType>(
+        base: &Name<T>,
+        rank: Rank,
+        options: Options<Self::Count, Self::Gender>,
+    ) -> String {
+        Self::combine(
+            &Self::to_adj(base, options, Self::ditope_gender(rank)),
+            &Self::ditope(rank, options),
+            !Self::ditope_pos(),
+        )
+    }
+
+    /// The name for a hosotope.
+    fn hosotope(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String;
+
+    /// The position at which the "hosotope" noun goes.
+    fn hosotope_pos() -> Position {
+        !Self::default_pos()
+    }
+
+    /// The gender of the "hosotope" noun.
+    fn hosotope_gender(_rank: Rank) -> Self::Gender {
+        Default::default()
+    }
+
+    /// The name for a hosotope with a given base.
+    fn hosotope_of<T: NameType>(
+        base: &Name<T>,
+        rank: Rank,
+        options: Options<Self::Count, Self::Gender>,
+    ) -> String {
+        Self::combine(
+            &Self::to_adj(base, options, Self::hosotope_gender(rank)),
+            &Self::hosotope(rank, options),
+            !Self::hosotope_pos(),
+        )
+    }
+
     /// The adjective for a Petrial.
     fn petrial(options: Options<Self::Count, Self::Gender>) -> &'static str;
 
@@ -954,6 +775,9 @@ pub enum SelectedLanguage {
 
     /// Spanish
     Es,
+
+    /// German
+    De,
     // French
     // Fr,
 
@@ -969,6 +793,7 @@ impl std::fmt::Display for SelectedLanguage {
         f.write_str(match self {
             Self::En => "English",
             Self::Es => "Spanish",
+            Self::De => "German",
             // Self::Fr => "French",
             // Self::Ja => "Japanese",
             // Self::Pii => "Proto Indo-Iranian",
@@ -978,9 +803,12 @@ impl std::fmt::Display for SelectedLanguage {
 
 impl SelectedLanguage {
     pub fn parse<T: NameType>(&self, name: &Name<T>) -> String {
+        use crate::lang::*;
+
         match self {
             Self::En => En::parse_uppercase(name),
             Self::Es => Es::parse_uppercase(name),
+            Self::De => De::parse_uppercase(name),
             // Self::Fr => Fr::parse_uppercase(name),
             // Self::Ja => Ja::parse(name),
             // Self::Pii => Pii::parse_uppercase(name),
