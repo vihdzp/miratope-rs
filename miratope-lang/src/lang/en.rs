@@ -39,18 +39,16 @@ impl Prefix for En {
         let mut chars = prefix.char_indices().rev();
 
         if let Some((idx_last, c_last)) = chars.next() {
-            if !super::is_vowel(c_last) {
-                // Append an 'e' if it doesn't end with a vowel.
-                prefix.push('e');
-            } else {
+            if super::is_vowel(c_last) {
                 if let Some((idx_prev, 'c')) = chars.next() {
                     prefix.replace_range(idx_prev..idx_last, "k");
                 }
 
-                // Change the final vowel to an 'e'.
+                // Change the final vowel to an 'e' by first popping before appending.
                 prefix.pop();
-                prefix.push('e');
             }
+            // Append an 'e'.
+            prefix.push('e');
         }
 
         prefix
