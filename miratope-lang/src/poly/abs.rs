@@ -1,3 +1,4 @@
+use std::borrow::{Borrow, BorrowMut};
 use std::mem;
 
 use super::NamedPolytope;
@@ -207,12 +208,16 @@ impl Polytope for NamedAbstract {
     }
 }
 
-impl NamedPolytope<Abs> for NamedAbstract {
-    fn name(&self) -> &Name<Abs> {
+impl Borrow<Name<Abs>> for NamedAbstract {
+    fn borrow(&self) -> &Name<Abs> {
         &self.name
     }
+}
 
-    fn name_mut(&mut self) -> &mut Name<Abs> {
+impl BorrowMut<Name<Abs>> for NamedAbstract {
+    fn borrow_mut(&mut self) -> &mut Name<Abs> {
         &mut self.name
     }
 }
+
+impl NamedPolytope<Abs> for NamedAbstract {}
