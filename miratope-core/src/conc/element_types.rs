@@ -1,17 +1,16 @@
 //! The code used to tally up the "element types" in a polytope.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use crate::{
     abs::{
         elements::ElementRef,
         rank::{Rank, RankVec},
     },
-    conc::{Concrete, ConcretePolytope},
-    Consts, Float, FloatOrd, Polytope,
+    conc::Concrete,
+    Polytope,
 };
 
-use approx::abs_diff_eq;
 use vec_like::*;
 
 #[derive(PartialOrd, Ord, PartialEq, Eq, Hash)]
@@ -58,11 +57,10 @@ impl Concrete {
             type_counts.push(1);
         }
 
-        let mut passes = 0;
+        let mut _passes = 0;
         let mut number_of_types = 0;
         loop {
             for r in Rank::range_iter(1, self.rank()) {
-                let count = self.el_count(r);
                 let mut types_rank: Vec<ElementType> = Vec::<ElementType>::new();
                 let mut dict: HashMap<(usize, Vec<usize>), usize> = HashMap::new();
                 let mut c = 0;
@@ -97,7 +95,6 @@ impl Concrete {
             }
 
             for r in Rank::range_iter(0, self.rank().minus_one()).rev() {
-                let count = self.el_count(r);
                 let mut types_rank: Vec<ElementType> = Vec::new();
                 let mut dict: HashMap<(usize, Vec<usize>), usize> = HashMap::new();
                 let mut c = 0;
@@ -136,7 +133,7 @@ impl Concrete {
             } else {
                 number_of_types = number_of_types_new;
             }
-            passes += 1;
+            _passes += 1;
         }
         types
     }
