@@ -104,73 +104,87 @@ pub trait Prefix {
     }
 }
 
+#[macro_export]
+macro_rules! greek_prefixes {
+    ($(#[$um:meta])* UNITS = $u:expr; $($(#[$idm:meta])* $id:ident = $e:expr;)*) => {
+        $(#[$um])*
+        const UNITS: [&'static str; 10] = $u;
+        $(
+            $(#[$idm])*
+            const $id: &'static str = $e;
+        )*
+    };
+}
+
 /// Trait shared by languages that allow for greek prefixes or anything similar.
 /// Every `struct` implementing this trait automatically implements [`Prefix`]
 /// as well.
 ///
 /// Defaults to the English ["Wikipedian system."](https://polytope.miraheze.org/wiki/Nomenclature#Wikipedian_system)
 pub trait GreekPrefix {
-    /// The prefixes for a single digit number.
-    const UNITS: [&'static str; 10] = [
-        "", "hena", "di", "tri", "tetra", "penta", "hexa", "hepta", "octa", "ennea",
-    ];
+    greek_prefixes! {
+        /// The prefixes for a single digit number.
+        UNITS = [
+            "", "hena", "di", "tri", "tetra", "penta", "hexa", "hepta", "octa", "ennea",
+        ];
 
-    /// Represents the number 10 for numbers between 10 and 19.
-    const DECA: &'static str = "deca";
+        /// Represents the number 10 for numbers between 10 and 19.
+        DECA = "deca";
 
-    /// Represents a factor of 10.
-    const CONTA: &'static str = "conta";
+        /// Represents a factor of 10.
+        CONTA = "conta";
 
-    /// The prefix for 11.
-    const HENDECA: &'static str = "hendeca";
+        /// The prefix for 11.
+        HENDECA = "hendeca";
 
-    /// The prefix for 12.
-    const DODECA: &'static str = "dodeca";
+        /// The prefix for 12.
+        DODECA = "dodeca";
 
-    /// The prefix for 20.
-    const ICOSA: &'static str = "icosa";
+        /// The prefix for 20.
+        ICOSA = "icosa";
 
-    /// Represents the number 20 for numbers between 21 and 29.
-    const ICOSI: &'static str = "icosi";
+        /// Represents the number 20 for numbers between 21 and 29.
+        ICOSI = "icosi";
 
-    /// The prefix for 30.
-    const TRIACONTA: &'static str = "triaconta";
+        /// The prefix for 30.
+        TRIACONTA = "triaconta";
 
-    /// The prefix for 100.
-    const HECTO: &'static str = "hecto";
+        /// The prefix for 100.
+        HECTO = "hecto";
 
-    /// Represents the number 100 for numbers between 101 and 199.
-    const HECATON: &'static str = "hecaton";
+        /// Represents the number 100 for numbers between 101 and 199.
+        HECATON = "hecaton";
 
-    /// Represents a factor of 100.
-    const COSA: &'static str = "cosa";
+        /// Represents a factor of 100.
+        COSA = "cosa";
 
-    /// The prefix for 200.
-    const DIACOSI: &'static str = "diacosi";
+        /// The prefix for 200.
+        DIACOSI = "diacosi";
 
-    /// The prefix for 300.
-    const TRIACOSI: &'static str = "triacosi";
+        /// The prefix for 300.
+        TRIACOSI = "triacosi";
 
-    /// Represents the number 100 for numbers between 400 and 999.
-    const COSI: &'static str = "cosi";
+        /// Represents the number 100 for numbers between 400 and 999.
+        COSI = "cosi";
 
-    /// The prefix for 1000.    
-    const CHILIA: &'static str = "chilia";
+        /// The prefix for 1000.
+        CHILIA = "chilia";
 
-    /// The prefix for 2000.
-    const DISCHILIA: &'static str = "dischilia";
+        /// The prefix for 2000.
+        DISCHILIA = "dischilia";
 
-    /// The prefix for 3000.
-    const TRISCHILIA: &'static str = "trischilia";
+        /// The prefix for 3000.
+        TRISCHILIA = "trischilia";
 
-    /// The prefix for 10000.  
-    const MYRIA: &'static str = "myria";
+        /// The prefix for 10000.
+        MYRIA = "myria";
 
-    /// The prefix for 20000.
-    const DISMYRIA: &'static str = "dismyria";
+        /// The prefix for 20000.
+        DISMYRIA = "dismyria";
 
-    /// The prefix for 30000.
-    const TRISMYRIA: &'static str = "trismyria";
+        /// The prefix for 30000.
+        TRISMYRIA = "trismyria";
+    }
 
     /// Converts a number into its Greek prefix equivalent.
     fn greek_prefix(n: usize) -> String {

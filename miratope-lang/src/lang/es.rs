@@ -1,5 +1,6 @@
 //! Implements the Spanish language.
 use crate::{
+    greek_prefixes,
     options::{Bigender, Options},
     GreekPrefix, Language, Position, Prefix,
 };
@@ -10,21 +11,17 @@ use miratope_core::abs::rank::Rank;
 pub struct Es;
 
 impl GreekPrefix for Es {
-    const UNITS: [&'static str; 10] = [
-        "", "hena", "di", "tri", "tetra", "penta", "hexa", "hepta", "octa", "enea",
-    ];
-
-    const CHILIA: &'static str = "quilia";
-
-    const DISCHILIA: &'static str = "disquilia";
-
-    const TRISCHILIA: &'static str = "trisquilia";
-
-    const MYRIA: &'static str = "miria";
-
-    const DISMYRIA: &'static str = "dismiria";
-
-    const TRISMYRIA: &'static str = "trismiria";
+    greek_prefixes! {
+        UNITS = [
+            "", "hena", "di", "tri", "tetra", "penta", "hexa", "hepta", "octa", "enea",
+        ];
+        CHILIA = "quilia";
+        DISCHILIA = "disquilia";
+        TRISCHILIA = "trisquilia";
+        MYRIA = "miria";
+        DISMYRIA = "dismiria";
+        TRISMYRIA = "trismiria";
+    }
 }
 
 impl Prefix for Es {
