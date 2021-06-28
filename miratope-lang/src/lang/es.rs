@@ -260,14 +260,7 @@ impl Language for Es {
 
     /// The adjective for a "small" version of a polytope.
     fn small(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.six(
-            "pequeño",
-            "pequeños",
-            "pequeño",
-            "pequeños",
-            "pequeña",
-            "pequeñas",
-        )
+        options.four_adj("pequeño", "pequeños", "pequeña", "pequeñas")
     }
 
     /// The position of the "small" adjective.
@@ -277,13 +270,6 @@ impl Language for Es {
 
     /// The adjective for a "stellated" version of a polytope.
     fn stellated(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.six(
-            "estrellado",
-            "estrellados",
-            "estrellado",
-            "estrellados",
-            "estrellada",
-            "estrelladas",
-        )
+        options.four_adj("estrellado", "estrellados", "estrellada", "estrelladas")
     }
 }

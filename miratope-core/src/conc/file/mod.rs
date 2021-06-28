@@ -55,30 +55,35 @@ impl<'a> std::fmt::Display for FileError<'a> {
 
 impl<'a> std::error::Error for FileError<'a> {}
 
+/// [`OffError`] is a type of [`FileError`].
 impl<'a> From<OffError> for FileError<'a> {
     fn from(err: OffError) -> Self {
         Self::OffError(err)
     }
 }
 
+/// [`GgbError`] is a type of [`FileError`].
 impl<'a> From<GgbError> for FileError<'a> {
     fn from(err: GgbError) -> Self {
         Self::GgbError(err)
     }
 }
 
+/// [`FromUtf8Error`] is a type of [`FileError`].
 impl<'a> From<FromUtf8Error> for FileError<'a> {
     fn from(err: FromUtf8Error) -> Self {
         Self::InvalidFile(err)
     }
 }
 
+/// [`IoError`] is a type of [`FileError`].
 impl<'a> From<IoError> for FileError<'a> {
     fn from(err: IoError) -> Self {
         Self::IoError(err)
     }
 }
 
+/// [`ZipError`] is a type of [`FileError`].
 impl<'a> From<ZipError> for FileError<'a> {
     fn from(err: ZipError) -> Self {
         Self::ZipError(err)

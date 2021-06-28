@@ -274,6 +274,35 @@ impl<G: Gender> Options<Plural, G> {
 }
 
 impl Options<Plural, Bigender> {
+    /// Chooses a suffix for an adjective from four options:
+    ///
+    /// * A singular adjective (male).
+    /// * A plural adjective (male).
+    /// * A singular adjective (female).
+    /// * A plural adjective (female).
+    ///
+    /// Assumes that the word will be used as an adjective, regardless of
+    /// `self.adjective`.
+    fn four_adj<'a>(
+        &self,
+        adj_m: &'a str,
+        plural_adj_m: &'a str,
+        adj_f: &'a str,
+        plural_adj_f: &'a str,
+    ) -> &'a str {
+        if self.count.is_one() {
+            match self.gender {
+                Bigender::Male => adj_m,
+                Bigender::Female => adj_f,
+            }
+        } else {
+            match self.gender {
+                Bigender::Male => plural_adj_m,
+                Bigender::Female => plural_adj_f,
+            }
+        }
+    }
+
     /// Chooses a suffix from six options:
     ///
     /// * Base form.
@@ -292,17 +321,7 @@ impl Options<Plural, Bigender> {
         plural_adj_f: &'a str,
     ) -> &'a str {
         if self.adjective {
-            if self.count.is_one() {
-                match self.gender {
-                    Bigender::Male => adj_m,
-                    Bigender::Female => adj_f,
-                }
-            } else {
-                match self.gender {
-                    Bigender::Male => plural_adj_m,
-                    Bigender::Female => plural_adj_f,
-                }
-            }
+            self.four_adj(adj_m, plural_adj_m, adj_f, plural_adj_f)
         } else if self.count.is_one() {
             base
         } else {

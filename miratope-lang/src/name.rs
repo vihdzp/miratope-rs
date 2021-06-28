@@ -257,11 +257,17 @@ pub enum Name<T: NameType> {
     Multicomb(Vec<Name<T>>),
 
     /// An antiprism based on a polytope.
-    Antiprism { base: Box<Name<T>> },
+    Antiprism {
+        /// The polytope the antiprism is based upon.
+        base: Box<Name<T>>,
+    },
 
     /// An antitegum based on a polytope.
     Antitegum {
+        /// The polytope the antitegum is based upon.
         base: Box<Name<T>>,
+
+        /// The center used for dualizing.
         center: T::DataPoint,
     },
 
@@ -270,19 +276,40 @@ pub enum Name<T: NameType> {
 
     /// The dual of a specified polytope.
     Dual {
+        /// The polytope the dual is based upon.
         base: Box<Name<T>>,
+
+        /// The center used for dualizing.
         center: T::DataPoint,
     },
 
     /// A simplex of a given dimension, **at least 3.**
-    Simplex { regular: T::DataRegular, rank: Rank },
+    Simplex {
+        /// Stores whether the simplex is regular, and its center if it is.
+        regular: T::DataRegular,
+
+        /// The rank of the simplex.
+        rank: Rank,
+    },
 
     /// A hyperblock of a given rank, **at least 3.**
-    Hyperblock { regular: T::DataRegular, rank: Rank },
+    Hyperblock {
+        /// Stores whether the hyperblock is regular, and its center if it is.        
+        regular: T::DataRegular,
+
+        /// The rank of the hyperblock.
+        rank: Rank,
+    },
 
     /// An orthoplex (polytope whose opposite vertices form an orthogonal basis)
     /// of a given dimension, **at least 3.**
-    Orthoplex { regular: T::DataRegular, rank: Rank },
+    Orthoplex {
+        /// Stores whether the orthoplex is regular, and its center if it is.        
+        regular: T::DataRegular,
+
+        /// The rank of the orthoplex.
+        rank: Rank,
+    },
 
     /// A polytope with a given facet count and rank, in that order. The facet
     /// count must be **at least 2,** and the dimension must be **at least 3**

@@ -145,3 +145,24 @@ impl Language for En {
         "dual"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::name::{Abs, AbsData, Name};
+
+    use super::*;
+
+    #[test]
+    /// TODO: expand this test.
+    fn names() {
+        assert_eq!(
+            En::parse(&Name::<Abs>::polygon(AbsData::default(), 5)),
+            "pentagon"
+        );
+
+        assert_eq!(
+            En::parse(&Name::<Abs>::simplex(AbsData::default(), Rank::new(5)).prism()),
+            "hexateric prism"
+        );
+    }
+}
