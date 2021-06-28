@@ -1,5 +1,5 @@
 //! Implements the English language.
-use crate::{GreekPrefix, Language, Position, Prefix, options::Options};
+use crate::{options::Options, GreekPrefix, Language, Position, Prefix};
 
 use miratope_core::abs::rank::Rank;
 
@@ -62,22 +62,21 @@ impl Prefix for En {
             if c == 'c' {
                 // SAFETY: `Self::prefix` consists of ASCII characters only.
                 unsafe {
-                    prefix.as_bytes_mut()[idx_prev] = 'k' as u8;
+                    prefix.as_bytes_mut()[idx_prev] = b'k';
                 }
             }
 
             // SAFETY: `Self::prefix` consists of ASCII characters only.
             unsafe {
-                prefix.as_bytes_mut()[idx_last] = 'e' as u8;
+                prefix.as_bytes_mut()[idx_last] = b'e';
             }
-
-            prefix
         }
         // Adds an 'e'.
         else {
             prefix.push('e');
-            prefix
         }
+
+        prefix
     }
 }
 

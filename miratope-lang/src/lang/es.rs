@@ -90,13 +90,13 @@ impl Prefix for Es {
             if c == 'c' {
                 // SAFETY: `Self::prefix` consists of ASCII characters only.
                 unsafe {
-                    prefix.as_bytes_mut()[idx_prev] = 'q' as u8;
-                    prefix.as_bytes_mut()[idx_last] = 'u' as u8;
+                    prefix.as_bytes_mut()[idx_prev] = b'q';
+                    prefix.as_bytes_mut()[idx_last] = b'u';
                 }
             } else {
                 // SAFETY: `Self::prefix` consists of ASCII characters only.
                 unsafe {
-                    prefix.as_bytes_mut()[idx_last] = 'e' as u8;
+                    prefix.as_bytes_mut()[idx_last] = b'e';
                 }
 
                 return prefix;

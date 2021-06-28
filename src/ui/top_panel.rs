@@ -372,6 +372,24 @@ pub fn show_top_panel(
                                 }
                             }
                         }
+
+                        ui.separator();
+
+                        // Converts the active polytope into its ditope.
+                        if ui.button("Ditope").clicked() {
+                            if let Some(mut p) = query.iter_mut().next() {
+                                p.ditope_mut();
+                                println!("Ditope succeeded!");
+                            }
+                        }
+
+                        // Converts the active polytope into its hosotope.
+                        if ui.button("Hosotope").clicked() {
+                            if let Some(mut p) = query.iter_mut().next() {
+                                p.hosotope_mut();
+                                println!("Hosotope succeeded!");
+                            }
+                        }
                     });
 
                     // Operations that take two polytopes an arguments.

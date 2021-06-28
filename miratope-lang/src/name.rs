@@ -182,8 +182,9 @@ impl Regular {
 /// Many of the variants are subject to complicated invariants which help keep
 /// the translation code more modular by separation of concerns. If you
 /// instanciate a `Name` directly, **you ought to guarantee that these
-/// invariants hold.** Convenience methods are provided, which will guarantee
-/// these invariants for you.
+/// invariants hold.** Convenience methods are provided, often with the same
+/// name as their respective variants, which will guarantee these invariants for
+/// you.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Name<T: NameType> {
     /// A nullitope.
@@ -281,6 +282,24 @@ pub enum Name<T: NameType> {
         center: T::DataPoint,
     },
 
+    /// A ditope based on a specified polytope.
+    Ditope {
+        /// The polytope the ditope is based upon.
+        base: Box<Name<T>>,
+
+        /// The rank of the ditope.
+        rank: Rank,
+    },
+
+    /// A hosotope based on a specified polytope.
+    Hosotope {
+        /// The polytope the hosotope is based upon.
+        base: Box<Name<T>>,
+
+        /// The rank of the hosotope.
+        rank: Rank,
+    },
+
     /// A simplex of a given dimension, **at least 3.**
     Simplex {
         /// Stores whether the simplex is regular, and its center if it is.
@@ -370,7 +389,7 @@ impl<T: NameType> Name<T> {
         let file = BufReader::new(fs::File::open(path).ok()?);
         let first_line = file.lines().next()?.ok()?;
 
-        Name::from_src(&first_line)
+        Self::from_src(&first_line)
     }
 
     /// Determines whether a `Name` is valid, that is, all of the conditions
@@ -617,12 +636,12 @@ impl<T: NameType> Name<T> {
                     } => center.satisfies(|c| (c - original_center).norm() < Float::EPS),
                     Regular::No => true,
                 }) {
-                    Name::$dual {
+                    Self::$dual {
                         $regular,
                         $($other_fields)*
                     }
                 } else {
-                    Name::$dual {
+                    Self::$dual {
                         regular: Default::default(),
                         $($other_fields)*
                     }
@@ -634,10 +653,10 @@ impl<T: NameType> Name<T> {
         macro_rules! modifier_dual {
             ($base: ident, $modifier: ident, $dual: ident) => {
                 if T::is_abstract() {
-                    Name::$dual(Box::new($base.dual(center, facet_count, rank)))
+                    Self::$dual(Box::new($base.dual(center, facet_count, rank)))
                 } else {
-                    Name::Dual {
-                        base: Box::new(Name::$modifier($base)),
+                    Self::Dual {
+                        base: Box::new(Self::$modifier($base)),
                         center,
                     }
                 }
@@ -728,14 +747,50 @@ impl<T: NameType> Name<T> {
         }
     }
 
+    /// Makes a ditope out of the name.
+    pub fn ditope(self, rank: Rank) -> Self {
+        match self {
+            // We do nothing in the case of the nullitope.
+            Self::Nullitope => Self::Nullitope,
+
+            // Hardcoded cases.
+            Self::Point => Self::Dyad,
+            Self::Dyad => Self::polygon(Default::default(), 2),
+
+            // In any other case, we just box the polytope.
+            _ => Self::Ditope {
+                base: Box::new(self),
+                rank,
+            },
+        }
+    }
+
+    /// Makes a ditope out of the name.
+    pub fn hosotope(self, rank: Rank) -> Self {
+        match self {
+            // We do nothing in the case of the nullitope.
+            Self::Nullitope => Self::Nullitope,
+
+            // Hardcoded cases.
+            Self::Point => Self::Dyad,
+            Self::Dyad => Self::polygon(Default::default(), 2),
+
+            // In any other case, we just box the polytope.
+            _ => Self::Hosotope {
+                base: Box::new(self),
+                rank,
+            },
+        }
+    }
+
     /// Makes a Petrial out of the name.
     pub fn petrial(self) -> Self {
         match self {
             // Petrials are involutions.
-            Name::Petrial { base } => *base,
+            Self::Petrial { base } => *base,
 
             // In any other case, we just box the polytope.
-            _ => Name::Petrial {
+            _ => Self::Petrial {
                 base: Box::new(self),
             },
         }
@@ -839,7 +894,7 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one pyramid, we combine all of them into a
         // single simplex.
         if pyramid_count >= 2 {
-            new_bases.push(Name::simplex(
+            new_bases.push(Self::simplex(
                 Default::default(),
                 Rank::from(pyramid_count - 1),
             ));
@@ -888,7 +943,7 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one prism, we combine all of them into a
         // single hyperblock.
         if prism_count >= 2 {
-            new_bases.push(Name::hyperblock(
+            new_bases.push(Self::hyperblock(
                 Default::default(),
                 Rank::from(prism_count),
             ));

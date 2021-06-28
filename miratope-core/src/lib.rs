@@ -359,7 +359,11 @@ pub trait Polytope: Sized + Clone {
 
     /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
     /// polytope.
-    fn ditope(&self) -> Self;
+    fn ditope(&self) -> Self {
+        let mut clone = self.clone();
+        clone.ditope_mut();
+        clone
+    }
 
     /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
     /// polytope in place.
@@ -367,7 +371,11 @@ pub trait Polytope: Sized + Clone {
 
     /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
     /// given polytope.
-    fn hosotope(&self) -> Self;
+    fn hosotope(&self) -> Self {
+        let mut clone = self.clone();
+        clone.hosotope_mut();
+        clone
+    }
 
     /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
     /// given polytope in place.

@@ -246,12 +246,6 @@ impl Polytope for Concrete {
     }
 
     /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
-    /// polytope.
-    fn ditope(&self) -> Self {
-        Self::new(self.vertices.clone(), self.abs.ditope())
-    }
-
-    /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
     /// polytope in place.
     fn ditope_mut(&mut self) {
         self.abs.ditope_mut();

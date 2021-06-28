@@ -146,7 +146,6 @@ impl Polytope for NamedConcrete {
         Self::new(self.con().pyramid(), self.name.clone().pyramid())
     }
 
-
     fn duopyramid(p: &Self, q: &Self) -> Self {
         Self::new(
             Concrete::duopyramid(&p.con, &q.con),
@@ -175,20 +174,14 @@ impl Polytope for NamedConcrete {
         )
     }
 
-    fn ditope(&self) -> Self {
-        todo!()
-    }
-
     fn ditope_mut(&mut self) {
-        todo!()
-    }
-
-    fn hosotope(&self) -> Self {
-        todo!()
+        self.con_mut().ditope_mut();
+        self.name = Name::ditope(mem::take(&mut self.name), self.rank());
     }
 
     fn hosotope_mut(&mut self) {
-        todo!()
+        self.con_mut().hosotope_mut();
+        self.name = Name::hosotope(mem::take(&mut self.name), self.rank());
     }
 
     fn try_antiprism(&self) -> miratope_core::DualResult<Self> {

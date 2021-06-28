@@ -1193,35 +1193,29 @@ impl Polytope for Abstract {
     }
 
     /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
-    /// polytope.
-    fn ditope(&self) -> Self {
-        let mut clone = self.clone();
-        clone.ditope_mut();
-        clone
-    }
-
-    /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
-    /// polytope in place.
+    /// polytope in place. Does nothing in the case of the nullitope.
     fn ditope_mut(&mut self) {
         let rank = self.rank();
-        self.push_subs_at(rank, self.max().subs.clone());
-        self.push_max();
+        if rank != Rank::new(-1) {
+            self.push_subs_at(rank, self.max().subs.clone());
+            self.push_max();
+        }
     }
 
     /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
-    /// given polytope.
-    fn hosotope(&self) -> Self {
-        let mut clone = self.clone();
-        clone.hosotope_mut();
-        clone
-    }
-
-    /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
-    /// given polytope in place.
+    /// given polytope in place. Does nothing in case of the nullitope.
     fn hosotope_mut(&mut self) {
-        let min = self.min().clone();
-        self[Rank::new(-1)].push(min);
-        self.ranks.insert(Rank::new(-1), ElementList::max(2));
+        if self.rank() != Rank::new(-1) {
+            self.min_mut().subs.push(0);
+            let min = self.min().clone();
+            self[Rank::new(-1)].push(min);
+
+            for v in &mut self[Rank::new(0)] {
+                v.subs.push(1);
+            }
+
+            self.ranks.insert(Rank::new(-1), ElementList::min(2));
+        }
     }
 }
 
