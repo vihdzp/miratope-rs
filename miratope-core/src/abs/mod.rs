@@ -1099,12 +1099,6 @@ impl Polytope for Abstract {
         self.push_subs(faces);
         self.push_max();
 
-        // Builds name.
-        #[cfg(feature = "lang")]
-        {
-            self.name = self.name.clone().petrial();
-        }
-
         // Checks for dyadicity, since that sometimes fails.
         self.is_dyadic().is_ok()
     }

@@ -23,4 +23,4 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - run: cargo fmt -- --check --all && cargo clippy -- -Dwarnings --all && cargo test --all
+      - run: cargo fmt --all -- --check && cargo clippy --all -- -Dwarnings && cargo test --all --

@@ -141,6 +141,16 @@ impl Element {
 pub struct ElementList(Vec<Element>);
 impl_veclike!(ElementList, Item = Element, Index = usize);
 
+impl<'a> rayon::iter::IntoParallelIterator for &'a mut ElementList {
+    type Iter = rayon::slice::IterMut<'a, Element>;
+
+    type Item = &'a mut Element;
+
+    fn into_par_iter(self) -> Self::Iter {
+        self.as_mut().into_par_iter()
+    }
+}
+
 impl ElementList {
     /// Returns the element list for the nullitope in a polytope with a given
     /// vertex count.

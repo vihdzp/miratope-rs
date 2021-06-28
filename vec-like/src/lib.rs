@@ -174,15 +174,20 @@ pub trait VecLike:
 /// This macro can either be called like this:
 ///
 /// ```
-/// struct Wrapper(Vec<Item>);
-/// impl_veclike!(Wrapper, item = Item, index = usize);
+/// use vec_like::{VecLike, impl_veclike};
+///
+/// struct VecItem;
+/// struct Wrapper(Vec<VecItem>);
+/// impl_veclike!(Wrapper, Item = VecItem, Index = usize);
 /// ```
 ///
 /// Or like this:
 ///
 /// ```
+/// use vec_like::{VecLike, impl_veclike};
+///
 /// struct Wrapper<T>(Vec<T>);
-/// impl_veclike!(@for [T] Wrapper<T>, item = T, index = usize);
+/// impl_veclike!(@for [T] Wrapper<T>, Item = T, Index = usize);
 /// ```
 ///
 /// TODO: probably turn this into something that can be derived.
@@ -260,16 +265,6 @@ macro_rules! impl_veclike {
 
             fn into_iter(self) -> Self::IntoIter {
                 self.iter_mut()
-            }
-        }
-
-        impl<'a, $($($generics: Send)*)?> rayon::iter::IntoParallelIterator for &'a mut $Type {
-            type Iter = rayon::slice::IterMut<'a, $VecItem>;
-
-            type Item = &'a mut $VecItem;
-
-            fn into_par_iter(self) -> Self::Iter {
-                self.as_mut().into_par_iter()
             }
         }
     };
