@@ -399,7 +399,7 @@ pub fn show_top_panel(
 
                     if ui.button("Omnitruncate").clicked() {
                         if let Some(mut p) = query.iter_mut().next() {
-                            p.abs_mut().sort();
+                            p.abs_sort();
                             *p = p.omnitruncate();
                         }
                     }
@@ -530,7 +530,7 @@ pub fn show_top_panel(
                     // Gets the volume of the polytope.
                     if ui.button("Volume").clicked() {
                         if let Some(mut p) = query.iter_mut().next() {
-                            p.abs_mut().sort();
+                            p.abs_sort();
 
                             if let Some(vol) = p.volume() {
                                 println!("The volume is {}.", vol);

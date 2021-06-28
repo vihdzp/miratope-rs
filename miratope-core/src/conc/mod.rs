@@ -1189,6 +1189,8 @@ mod tests {
 
     /// Tests that a polytope has an expected volume.
     fn test_volume(poly: &mut Concrete, volume: Option<Float>) {
+        poly.abs_sort();
+
         if let Some(poly_volume) = poly.volume() {
             let volume = volume.expect(&format!(
                 "Expected no volume for {}, found volume {}!",

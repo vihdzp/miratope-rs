@@ -738,6 +738,8 @@ mod tests {
 
     /// Tests that a polytope has an expected number of flags, oriented or not.
     fn test(polytope: &mut Abstract, expected: usize) {
+        polytope.abs_sort();
+
         let flag_count = polytope.flags().count();
         assert_eq!(
             expected, flag_count,
@@ -745,7 +747,6 @@ mod tests {
             expected, flag_count
         );
 
-        polytope.sort();
         let flag_count = polytope.flag_events().filter_flags().count();
         assert_eq!(
             expected, flag_count,

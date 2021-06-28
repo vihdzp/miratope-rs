@@ -1,38 +1,30 @@
-// This part of the code is still REALLY unstable. No point in documenting stuff
-// thoroughly just yet.
-#![allow(clippy::missing_docs_in_private_items)]
-#![allow(clippy::missing_panics_doc)]
-#![allow(missing_docs)]
-
 //! A module dedicated to parsing the names of polytopes into different
 //! languages.
 //!
 //! A great part of the terms we use to describe polytopes are recently coined
 //! neologisms and words that haven't entered the wider mathematical sphere.
 //! Furthermore, there are some rather large families of words (like those for
-//! polygons) that must be translated into the target language. This makes
-//! translating Miratope much harder than translating most other software would
-//! be. In what follows, we've left extensive documentation, in the hope that it
+//! polygons) that must be algorithmically translated into the target language.
+//! This makes translating Miratope much harder than translating most other
+//! software would be.
+//!
+//! In what follows, we've left extensive documentation, in the hope that it
 //! makes the work of anyone trying to translate Miratope much easier.
 //!
 //! # How does translation work?
 //! Every polytope in Miratope is stored alongside its [`Name`]. Names can be
 //! thought of as nodes in a tree, which represents how the polytope has been
-//! built up. For instance, a pentagonal-cubic duoprism would have a name like
-//! this:
+//! built up. For instance, an (abstract) pentagonal-cubic duoprism would have a
+//! name like this:
 //!
 //! ```
-//! let pecube = Name::multiprism(vec![
-//!     Name::polygon(5, 1),  // 5-gon
-//!     Name::hypercube(3) // 3-hypercube
+//! # use miratope_core::abs::rank::Rank;
+//! # use miratope_lang::{lang::En, Language, name::{Abs, AbsData, Name}};
+//! let pecube: Name<Abs> = Name::multiprism(vec![
+//!     Name::polygon(AbsData::default(), 5),  // 5-gon
+//!     Name::hyperblock(AbsData::default(), Rank::new(3)) // 3-hypercube
 //! ]);
-//! # use miratope_core::lang::{En, Options, Language, name::Name};
-//! # assert_eq!(En::parse(&pecube, Options {
-//! #     adjective: false,
-//! #     count: 1,
-//! #     gender: Gender::Male,
-//! #     parentheses: false
-//! # }), "pentagonal-cubic duoprism");
+//! # assert_eq!(En::parse(&pecube), "pentagonal-cubic duoprism");
 //! ```
 //!
 //! For more information, see the [`Name`] module's documentation.
@@ -48,17 +40,13 @@
 //! and uses the corresponding methods to parse and combine each of its parts:
 //!
 //! ```
-//! # use miratope_core::lang::{En, Options, Language, name::Name};
-//! # let pecube = Name::multiprism(vec![
-//! #     Name::polygon(5, 1),  // 5-gon
-//! #     Name::hypercube(3) // 3-hypercube
-//! # ]);
-//! assert_eq!(En::parse(&pecube, Options {
-//!     adjective: false,
-//!     count: 1,
-//!     gender: Gender::Male,
-//!     parentheses: false
-//! }), "pentagonal-cubic duoprism");
+//! # use miratope_core::abs::rank::Rank;
+//! # use miratope_lang::{lang::En, Language, name::{Abs, AbsData, Name}};
+//! let pecube: Name<Abs> = Name::multiprism(vec![
+//!     Name::polygon(AbsData::default(), 5),  // abstract 5-gon
+//!     Name::hyperblock(AbsData::default(), Rank::new(3)) // abstract 3-hypercube
+//! ]);
+//! assert_eq!(En::parse(&pecube), "pentagonal-cubic duoprism");
 //! ```
 //!
 //! # What do I need to code?

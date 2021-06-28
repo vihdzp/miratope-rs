@@ -126,6 +126,22 @@ pub trait Polytope: Sized + Clone {
         &mut self.abs_mut().ranks
     }
 
+    /// Sorts the subelements and superelements of the entire polytope. This is
+    /// usually called before iterating over the flags of the polytope.
+    fn abs_sort(&mut self) {
+        if self.abs().sorted {
+            return;
+        }
+
+        for elements in self.ranks_mut().iter_mut() {
+            for el in elements.iter_mut() {
+                el.sort();
+            }
+        }
+
+        self.abs_mut().sorted = true;
+    }
+
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
     fn rank(&self) -> Rank {
         self.ranks().rank()
@@ -371,7 +387,7 @@ pub trait Polytope: Sized + Clone {
     /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
     fn orientable(&mut self) -> bool {
         let abs = self.abs_mut();
-        abs.sort();
+        abs.abs_sort();
 
         for flag_event in abs.flag_events() {
             if flag_event.non_orientable() {

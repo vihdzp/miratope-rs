@@ -372,22 +372,6 @@ impl Abstract {
         self.ranks.pop()
     }
 
-    /// Sorts the subelements and superelements of the entire polytope. This is
-    /// usually called before iterating over the flags of the polytope.
-    pub fn sort(&mut self) {
-        if self.sorted {
-            return;
-        }
-
-        for elements in self.ranks.iter_mut() {
-            for el in elements.iter_mut() {
-                el.sort();
-            }
-        }
-
-        self.sorted = true;
-    }
-
     /// Returns a reference to an element of the polytope. To actually get the
     /// entire polytope it defines, use [`element`](Self::element).
     pub fn get_element(&self, el: ElementRef) -> Option<&Element> {
@@ -423,7 +407,7 @@ impl Abstract {
         let mut vertices = Vec::new();
         let mut vertex_hash = HashSet::new();
 
-        self.sort();
+        self.abs_sort();
 
         loop {
             // Applies 0-changes up to (rank-1)-changes in order.
@@ -1066,7 +1050,7 @@ impl Polytope for Abstract {
         let mut traversed_flags = BTreeSet::new();
         let mut faces = SubelementList::new();
 
-        self.sort();
+        self.abs_sort();
         for mut flag in self.flags() {
             // If we've found the face associated to this flag before, we skip.
             if !traversed_flags.insert(flag.clone()) {
