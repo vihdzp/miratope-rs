@@ -1,7 +1,7 @@
 //! Contains the named abstract and concrete polytope types.
 
-use std::borrow::BorrowMut;
 use miratope_core::Polytope;
+use std::borrow::BorrowMut;
 
 use crate::{
     lang::En,
