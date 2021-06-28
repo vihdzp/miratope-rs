@@ -21,7 +21,7 @@ impl Prefix for En {
     }
 
     /// The same as the usual Greek prefix, except that we use "duo" instead of
-    /// "di" and "trio" instead of "tri".
+    /// "di" and "trio" instead of "tri". Not sure why.
     fn multi_prefix(n: usize) -> String {
         match n {
             2 => String::from("duo"),

@@ -25,6 +25,12 @@ impl GreekPrefix for Es {
 }
 
 impl Prefix for Es {
+    /// Converts a number into its Greek prefix equivalent.
+    ///
+    /// # Safety
+    /// If this method ever returns a non-ASCII String, it might cause UB in
+    /// [`Self::hypercube_prefix`]. Since letters such as á, é, í, ó, ú, ü are
+    /// not in the ASCII range, we need to be **really careful** here.
     fn prefix(n: usize) -> String {
         Self::greek_prefix(n)
     }

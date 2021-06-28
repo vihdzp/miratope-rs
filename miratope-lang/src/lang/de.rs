@@ -130,8 +130,8 @@ impl Language for De {
         SUFFIXES[d.into_usize()].to_owned() + options.four("o", "os", "al", "ales")
     }
 
-    fn nullitope(_options: Options<Self::Count, Self::Gender>) -> &'static str {
-        todo!()
+    fn nullitope(options: Options<Self::Count, Self::Gender>) -> &'static str {
+        five!(options, "Nullitop", "Nullitope", "nullitopisch")
     }
 
     fn point(options: Options<Self::Count, Self::Gender>) -> &'static str {
