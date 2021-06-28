@@ -781,7 +781,6 @@ pub trait Language: Prefix {
     }
 }
 
-/// We should maybe make `dyn Language` work eventually.
 #[derive(Clone, Copy, Debug, EnumIter, Serialize, Deserialize)]
 pub enum SelectedLanguage {
     /// English
