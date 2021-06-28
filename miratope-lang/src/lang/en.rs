@@ -10,14 +10,8 @@ impl GreekPrefix for En {}
 
 impl Prefix for En {
     /// Converts a number into its Greek prefix equivalent.
-    ///
-    /// # Safety
-    /// If this method ever returns a non-ASCII String, it might cause UB in
-    /// [`Self::hypercube_prefix`].
     fn prefix(n: usize) -> String {
-        let prefix = Self::greek_prefix(n);
-        debug_assert!(prefix.is_ascii(), "The prefix must be ASCII.");
-        prefix
+        Self::greek_prefix(n)
     }
 
     /// The same as the usual Greek prefix, except that we use "duo" instead of
@@ -36,10 +30,6 @@ impl Prefix for En {
     /// - If the last letter is a vowel, we convert it into an 'e'.
     ///   - If the next to last letter is a 'c', we convert it into a 'k'.
     /// - Otherwise, we add an 'e'.
-    ///
-    /// # Safety
-    /// If [`Self::prefix`] returns a non-ASCII string, it might cause UB in
-    /// this method.
     fn hypercube_prefix(n: usize) -> String {
         if n == 4 {
             return "tesse".to_owned();
@@ -48,32 +38,19 @@ impl Prefix for En {
         let mut prefix = Self::prefix(n);
         let mut chars = prefix.char_indices().rev();
 
-        // The last letter.
-        let (idx_last, c) = chars.next().unwrap();
-        debug_assert!(c.is_ascii());
-
-        // Converts a vowel into an e.
-        if super::is_vowel(c) {
-            // The previous to last letter.
-            let (idx_prev, c) = chars.next().unwrap();
-            debug_assert!(c.is_ascii());
-
-            // Converts a c into a k.
-            if c == 'c' {
-                // SAFETY: `Self::prefix` consists of ASCII characters only.
-                unsafe {
-                    prefix.as_bytes_mut()[idx_prev] = b'k';
+        if let Some((idx_last, c_last)) = chars.next() {
+            if !super::is_vowel(c_last) {
+                // Append an 'e' if it doesn't end with a vowel.
+                prefix.push('e');
+            } else {
+                if let Some((idx_prev, 'c')) = chars.next() {
+                    prefix.replace_range(idx_prev..idx_last, "k");
                 }
-            }
 
-            // SAFETY: `Self::prefix` consists of ASCII characters only.
-            unsafe {
-                prefix.as_bytes_mut()[idx_last] = b'e';
+                // Change the final vowel to an 'e'.
+                prefix.pop();
+                prefix.push('e');
             }
-        }
-        // Adds an 'e'.
-        else {
-            prefix.push('e');
         }
 
         prefix

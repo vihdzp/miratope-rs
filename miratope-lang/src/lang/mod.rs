@@ -9,17 +9,15 @@ pub use en::En;
 pub use es::Es;
 
 pub(crate) fn uppercase_mut(str: &mut String) {
+    let mut indices = str.char_indices();
     // The first character of the result.
-    let c = str.chars().next();
-
-    if let Some(c) = c {
-        if c.is_ascii() {
-            // Safety: c and c.to_ascii_uppercase() are a single byte.
-            // Therefore, we can just replace one by the other.
-            unsafe {
-                str.as_bytes_mut()[0] = c.to_ascii_uppercase() as u8;
-            }
-        }
+    if let Some((idx_first, c_first)) = indices.next() {
+        let range = if let Some((idx_next, _)) = indices.next() {
+            idx_first..idx_next
+        } else {
+            idx_first..idx_first + c_first.len_utf8()
+        };
+        str.replace_range(range, &c_first.to_uppercase().to_string());
     }
 }
 
