@@ -2,7 +2,19 @@
 //! `Vec<T>`s, and an [`impl_veclike`] macro that automatically implements this
 //! trait for a type.
 
-/// A trait for anything that should work as an index in a vector.
+/// A trait for anything that should work as an index in a vector. Any type that
+/// implements this trait should be quickly convertible into a `usize`.
+///
+/// An implementation of this trait might look like this:
+/// ```
+/// struct Number(u8);
+///
+/// impl vec_like::VecIndex for Number {
+///     fn index(self) -> usize {
+///         self.0 as usize
+///     }   
+/// }
+/// ```
 pub trait VecIndex {
     fn index(self) -> usize;
 }

@@ -21,7 +21,7 @@
 //! # use miratope_core::abs::rank::Rank;
 //! # use miratope_lang::{lang::En, Language, name::{Abs, AbsData, Name}};
 //! let pecube: Name<Abs> = Name::multiprism(vec![
-//!     Name::polygon(AbsData::default(), 5),  // 5-gon
+//!     Name::polygon(AbsData::default(), 5), // 5-gon
 //!     Name::hyperblock(AbsData::default(), Rank::new(3)) // 3-hypercube
 //! ]);
 //! # assert_eq!(En::parse(&pecube), "pentagonal-cubic duoprism");
@@ -29,54 +29,31 @@
 //!
 //! For more information, see the [`Name`] module's documentation.
 //!
-//! To parse a name into a target language, one must specify the following set
-//! of options:
-//!
-//! * `adjective`: Does the polytope act like an adjective?
-//! * `count`: How many of the polytope are there?
-//! * `gender`: What (if applicable) is the grammatical gender of the polytope?
-//!
-//! The [`parse`](Language::parse) function takes in this name and arguments,
-//! and uses the corresponding methods to parse and combine each of its parts:
+//! The [`parse`](Language::parse) function takes in this name, and uses the
+//! corresponding methods to parse and combine each of its parts:
 //!
 //! ```
 //! # use miratope_core::abs::rank::Rank;
 //! # use miratope_lang::{lang::En, Language, name::{Abs, AbsData, Name}};
-//! let pecube: Name<Abs> = Name::multiprism(vec![
-//!     Name::polygon(AbsData::default(), 5),  // abstract 5-gon
-//!     Name::hyperblock(AbsData::default(), Rank::new(3)) // abstract 3-hypercube
-//! ]);
+//! # let pecube: Name<Abs> = Name::multiprism(vec![
+//! #     Name::polygon(AbsData::default(), 5), // abstract 5-gon
+//! #     Name::hyperblock(AbsData::default(), Rank::new(3)) // abstract 3-hypercube
+//! # ]);
 //! assert_eq!(En::parse(&pecube), "pentagonal-cubic duoprism");
 //! ```
 //!
 //! # What do I need to code?
-//! Though the [`parse`](Language::parse) function is the main way to convert
-//! polytopes into their names, in reality, it's just a big `match` statement
-//! that calls specific functions to parse every specific polytope type. These
-//! are the functions that need to be coded in the target language.
-//!
-//! The list of functions you'll definitely need to translate are the following:
-//!
-//! - [`nullitope`](Language::nullitope)
-//! - [`point`](Language::point)
-//! - [`dyad`](Language::dyad)
-//! - [`triangle`](Language::triangle)
-//! - [`square`](Language::square)
-//! - [`rectangle`](Language::rectangle)
-//! - [`generic`](Language::generic)
-//! - [`pyramid`](Language::pyramid)
-//! - [`prism`](Language::prism)
-//! - [`tegum`](Language::tegum)
-//! - [`hyperblock`](Language::hyperblock)
-//! - [`hypercube`](Language::hypercube)
-//! - [`dual`](Language::dual)
+//! You'll need to implement the [`Language`] trait for your language. This
+//! trait will assume the position and gender of all adjectives by default, for
+//! convenience with languages such as English. However, these can be overriden
+//! by manually implementing the methods ending in `_gender` and `_position`.
 
 pub mod lang;
 pub mod name;
 pub mod poly;
 
 use crate::lang::{En, Es};
-use name::{Name, NameData, NameTypeOwned, Regular};
+use name::{Name, NameData, NameType, Regular};
 
 use miratope_core::abs::rank::Rank;
 use serde::{Deserialize, Serialize};
@@ -487,12 +464,12 @@ pub trait Language: Prefix {
     type Gender: Gender;
 
     /// Parses the [`Name`] in the specified language.
-    fn parse<T: NameTypeOwned>(name: &Name<T>) -> String {
+    fn parse<T: NameType>(name: &Name<T>) -> String {
         Self::parse_with(name, Default::default())
     }
 
     /// Parses the [`Name`] in the specified language, with the given [`Options`].
-    fn parse_with<T: NameTypeOwned>(
+    fn parse_with<T: NameType>(
         name: &Name<T>,
         options: Options<Self::Count, Self::Gender>,
     ) -> String {
@@ -548,7 +525,7 @@ pub trait Language: Prefix {
 
     /// Parses the [`Name`] in the specified language. If the first character is
     /// ASCII, it makes it uppercase.
-    fn parse_uppercase<T: NameTypeOwned>(name: &Name<T>) -> String {
+    fn parse_uppercase<T: NameType>(name: &Name<T>) -> String {
         let mut result = Self::parse(name);
 
         // The first character of the result.
@@ -588,7 +565,7 @@ pub trait Language: Prefix {
     ///
     /// If the options don't specify an adjective, the specified gender is used.
     /// Otherwise, the adjective inherits the gender from the options.
-    fn to_adj<T: NameTypeOwned>(
+    fn to_adj<T: NameType>(
         base: &Name<T>,
         mut options: Options<Self::Count, Self::Gender>,
         gender: Self::Gender,
@@ -651,7 +628,7 @@ pub trait Language: Prefix {
     }
 
     /// The name for a pyramid with a given base.
-    fn pyramid_of<T: NameTypeOwned>(
+    fn pyramid_of<T: NameType>(
         base: &Name<T>,
         options: Options<Self::Count, Self::Gender>,
     ) -> String {
@@ -678,7 +655,7 @@ pub trait Language: Prefix {
     }
 
     /// The name for a prism with a given base.
-    fn prism_of<T: NameTypeOwned>(
+    fn prism_of<T: NameType>(
         base: &Name<T>,
         options: Options<Self::Count, Self::Gender>,
     ) -> String {
@@ -705,7 +682,7 @@ pub trait Language: Prefix {
     }
 
     /// The name for a tegum with a given base.
-    fn tegum_of<T: NameTypeOwned>(
+    fn tegum_of<T: NameType>(
         base: &Name<T>,
         options: Options<Self::Count, Self::Gender>,
     ) -> String {
@@ -733,7 +710,7 @@ pub trait Language: Prefix {
     // the word "multicomb."
 
     /// Makes the name for a general multiproduct
-    fn multiproduct<T: NameTypeOwned>(
+    fn multiproduct<T: NameType>(
         name: &Name<T>,
         options: Options<Self::Count, Self::Gender>,
     ) -> String {
@@ -808,10 +785,7 @@ pub trait Language: Prefix {
     }
 
     /// The name for the dual of another polytope.
-    fn dual_of<T: NameTypeOwned>(
-        base: &Name<T>,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
+    fn dual_of<T: NameType>(base: &Name<T>, options: Options<Self::Count, Self::Gender>) -> String {
         Self::combine(
             &Self::dual(options),
             &Self::parse_with(base, options),
@@ -833,7 +807,7 @@ pub trait Language: Prefix {
     }
 
     /// The name for an antiprism with a given base.
-    fn antiprism_of<T: NameTypeOwned>(
+    fn antiprism_of<T: NameType>(
         base: &Name<T>,
         options: Options<Self::Count, Self::Gender>,
     ) -> String {
@@ -858,7 +832,7 @@ pub trait Language: Prefix {
     }
 
     /// The name for an antitegum with a given base.
-    fn antitegum_of<T: NameTypeOwned>(
+    fn antitegum_of<T: NameType>(
         base: &Name<T>,
         options: Options<Self::Count, Self::Gender>,
     ) -> String {
@@ -878,7 +852,7 @@ pub trait Language: Prefix {
     }
 
     /// The name for a Petrial with a given base.
-    fn petrial_of<T: NameTypeOwned>(
+    fn petrial_of<T: NameType>(
         base: &Name<T>,
         options: Options<Self::Count, Self::Gender>,
     ) -> String {
@@ -898,7 +872,7 @@ pub trait Language: Prefix {
     }
 
     /// The name for a great polytope with a given base.
-    fn great_of<T: NameTypeOwned>(
+    fn great_of<T: NameType>(
         base: &Name<T>,
         options: Options<Self::Count, Self::Gender>,
     ) -> String {
@@ -918,7 +892,7 @@ pub trait Language: Prefix {
     }
 
     /// The name for a small polytope with a given base.
-    fn small_of<T: NameTypeOwned>(
+    fn small_of<T: NameType>(
         base: &Name<T>,
         options: Options<Self::Count, Self::Gender>,
     ) -> String {
@@ -938,7 +912,7 @@ pub trait Language: Prefix {
     }
 
     /// The name for a stellated polytope from a given base.
-    fn stellated_of<T: NameTypeOwned>(
+    fn stellated_of<T: NameType>(
         base: &Name<T>,
         options: Options<Self::Count, Self::Gender>,
     ) -> String {
@@ -981,7 +955,7 @@ impl std::fmt::Display for SelectedLanguage {
 }
 
 impl SelectedLanguage {
-    pub fn parse<T: NameTypeOwned>(&self, name: &Name<T>) -> String {
+    pub fn parse<T: NameType>(&self, name: &Name<T>) -> String {
         match self {
             Self::En => En::parse_uppercase(name),
             Self::Es => Es::parse_uppercase(name),

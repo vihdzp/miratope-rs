@@ -5,25 +5,23 @@ use std::{fmt::Debug, fs, marker::PhantomData, mem};
 use miratope_core::{abs::rank::Rank, geometry::Point, Consts, Float};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-/// A type marker that determines whether a name describes an abstract or
-/// concrete polytope.
+/// The trait for a type marker that determines whether a name describes an
+/// abstract or concrete polytope.
 ///
 /// For some reason, adding `DeserializeOwned` causes the trait to jank out.
 /// This means we need to keep typing it everywhere.
 pub trait NameType: Debug + Clone + PartialEq + Serialize {
     /// Either `AbsData<Point>` or `ConData<Point>`. Workaround until generic
     /// associated types are stable.
-    type DataPoint: NameData<Point>;
+    type DataPoint: NameData<Point> + DeserializeOwned;
 
     /// Either `AbsData<Regular>` or `ConData<Regular>`. Workaround until generic
     /// associated types are stable.
-    type DataRegular: NameData<Regular> + Default;
+    type DataRegular: NameData<Regular> + Default + DeserializeOwned;
 
     /// Whether the name marker is for an abstract polytope.
     fn is_abstract() -> bool;
 }
-
-pub trait NameTypeOwned: NameType + DeserializeOwned {}
 
 /// A trait for data associated to a name. It can either be [`AbsData`], which
 /// is zero size and compares `true` with anything, or [`ConData`], which stores
@@ -31,7 +29,7 @@ pub trait NameTypeOwned: NameType + DeserializeOwned {}
 ///
 /// The idea is that `NameData` should be used to store whichever conditions on
 /// concrete polytopes always hold on abstract polytopes.
-pub trait NameData<T>: PartialEq + Debug + Clone + Serialize + DeserializeOwned {
+pub trait NameData<T>: PartialEq + Debug + Clone + Serialize {
     /// Initializes a new `NameData` with a given value.
     fn new(value: T) -> Self;
 
@@ -100,8 +98,6 @@ impl NameType for Abs {
     }
 }
 
-impl NameTypeOwned for Abs {}
-
 /// Data associated with a concrete polytope.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ConData<T>(T);
@@ -149,8 +145,6 @@ impl NameType for Con {
         false
     }
 }
-
-impl NameTypeOwned for Con {}
 
 /// Determines whether a `Name` refers to a concrete regular polytope. This is
 /// often indirectly stored as a `NameData<Regular>`, so that all abstract
@@ -338,9 +332,12 @@ impl<T: NameType> Default for Name<T> {
     }
 }
 
-impl<T: NameTypeOwned> Name<T> {
+impl<T: NameType> Name<T> {
     /// Gets the name from the first line of an OFF file.
-    pub fn from_src(first_line: &str) -> Option<Self> {
+    pub fn from_src(first_line: &str) -> Option<Self>
+    where
+        T: DeserializeOwned,
+    {
         let mut fl_iter = first_line.char_indices();
 
         if let Some((_, '#')) = fl_iter.next() {
@@ -354,7 +351,10 @@ impl<T: NameTypeOwned> Name<T> {
     }
 
     /// Reads a name, serialized from the first line of an OFF file.
-    pub fn from_off<U: AsRef<std::path::Path>>(path: U) -> Option<Self> {
+    pub fn from_off<U: AsRef<std::path::Path>>(path: U) -> Option<Self>
+    where
+        T: DeserializeOwned,
+    {
         use std::io::{BufRead, BufReader};
 
         let file = BufReader::new(fs::File::open(path).ok()?);
@@ -405,9 +405,14 @@ impl<T: NameTypeOwned> Name<T> {
 
                 true
             }
+
+            // Generic polytopes must have at least 2 facets, and rank between
+            // 3 and 20.
             &Self::Generic { facet_count, rank } => {
                 facet_count >= 2 && rank >= Rank::new(3) && rank <= Rank::new(20)
             }
+
+            // For lack of info, we return true otherwise.
             _ => true,
         }
     }
