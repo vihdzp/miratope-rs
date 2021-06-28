@@ -86,7 +86,7 @@ impl Prefix for Es {
             let (idx_prev, c) = chars.next().unwrap();
             debug_assert!(c.is_ascii());
 
-            // Converts a c into a que.
+            // Converts a c into a qu.
             if c == 'c' {
                 // SAFETY: `Self::prefix` consists of ASCII characters only.
                 unsafe {
