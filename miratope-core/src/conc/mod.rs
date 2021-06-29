@@ -489,7 +489,7 @@ pub trait ConcretePolytope: Polytope {
 
         for vertex in vertices {
             // If the new vertex does not lie on the hyperplane of the others:
-            if let Some(basis_vector) = subspace.add_basis(&vertex) {
+            if let Some(basis_vector) = subspace.add(&vertex) {
                 // Calculates the new circumcenter.
                 let distance = ((&center - vertex).norm_squared()
                     - (&center - &first_vertex).norm_squared())

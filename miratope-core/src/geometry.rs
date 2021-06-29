@@ -140,29 +140,12 @@ impl Subspace {
     }
 
     /// Adds a point to the subspace. If it already lies in the subspace, the
-    /// subspace remains unchanged. Otherwise, a new basis vector is added.
-    /// Returns whether the rank increases.
-    ///
-    /// # Todo:
-    /// Implement the [Gram-Schmidt process](https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process#Numerical_stability).
-    pub fn add(&mut self, p: &Point) -> bool {
-        let mut v = p - self.project(p);
-        let res = v.normalize_mut() > Float::EPS;
-
-        if res {
-            self.basis.push(v);
-        }
-
-        res
-    }
-
-    /// Adds a point to the subspace. If it already lies in the subspace, the
     /// subspace remains unchanged and we return `None`. Otherwise, a new basis
     /// vector is added, and we return a reference to it.
     ///
     /// # Todo:
     /// Implement the [Gram-Schmidt process](https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process#Numerical_stability).
-    pub fn add_basis(&mut self, p: &Point) -> Option<&Point> {
+    pub fn add(&mut self, p: &Point) -> Option<&Point> {
         let mut v = p - self.project(p);
 
         if v.normalize_mut() > Float::EPS {
@@ -189,7 +172,7 @@ impl Subspace {
         for p in iter {
             // If the subspace is of full rank, we don't need to check any
             // more points.
-            if subspace.add(&p) && subspace.is_full_rank() {
+            if subspace.add(&p).is_some() && subspace.is_full_rank() {
                 return subspace;
             }
         }
@@ -218,7 +201,7 @@ impl Subspace {
         );
 
         for p in points {
-            if subspace.add(p) && subspace.rank() > rank {
+            if subspace.add(p).is_some() && subspace.rank() > rank {
                 return None;
             }
         }
