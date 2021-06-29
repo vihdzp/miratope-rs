@@ -13,11 +13,27 @@ use crate::{
 
 use vec_like::*;
 
+/// Every element in a polytope can be assigned a "type" depending on its
+/// attributes. This struct stores a representative of a single type of
+/// elements.
 #[derive(PartialOrd, Ord, PartialEq, Eq, Hash)]
-
 struct ElementType {
+    /// The index of the representative for this element type.
     example: usize,
+
+    /// The number of elements of this type.
     count: usize,
+}
+
+/// Stores the metadata associated with an element type.
+#[derive(PartialEq, Eq, Hash)]
+struct TypeData {
+    /// The index of the type that this element held in the last pass.
+    prev_index: usize,
+
+    /// The indices of the types of either the subelements or superelements,
+    /// depending on what part of the algorithm we're in.
+    type_counts: Vec<usize>,
 }
 
 // We'll move this over to the translation module... some day.
@@ -28,7 +44,7 @@ const EL_NAMES: [&str; 24] = [
 ];
 
 const EL_SUFFIXES: [&str; 24] = [
-    "", "", "gon", "hedron", "choron", "teron", "peton", "exon", "zetton", "yotton", "xennon",
+    "", "telon", "gon", "hedron", "choron", "teron", "peton", "exon", "zetton", "yotton", "xennon",
     "dakon", "hendon", "dokon", "tradakon", "tedakon", "pedakon", "exdakon", "zedakon", "yodakon",
     "nedakon", "ikon", "ikenon", "ikodon",
 ];
@@ -48,93 +64,115 @@ impl Concrete {
     - get number of types in total, if it's the same as previous loop, stop
     */
     fn element_types(&self) -> RankVec<Vec<ElementType>> {
-        let mut type_of_element = RankVec::<Vec<usize>>::new();
-        let mut types = RankVec::<Vec<ElementType>>::new();
-        let mut type_counts = RankVec::<usize>::new();
-        for r in Rank::range_iter(-1, self.rank()) {
-            type_of_element.push(vec![0; self.el_count(r)]);
-            types.push(Vec::<ElementType>::new());
+        // Stores the different types, the counts of each, and the indices of
+        // the types associated to each element.
+        let mut types = RankVec::new();
+        let mut type_counts = RankVec::new();
+        let mut type_of_element = RankVec::new();
+
+        // Initializes every element with the zeroth type.
+        for el_count in self.el_counts() {
+            type_of_element.push(vec![0; el_count]);
+            types.push(Vec::new());
             type_counts.push(1);
         }
 
-        let mut _passes = 0;
-        let mut number_of_types = 0;
+        let mut type_count = self.rank().plus_one_usize();
+
+        // To limit the number of passes, we can turn this into a `for` loop.
         loop {
+            // We build element types from the bottom up.
             for r in Rank::range_iter(1, self.rank()) {
-                let mut types_rank: Vec<ElementType> = Vec::<ElementType>::new();
-                let mut dict: HashMap<(usize, Vec<usize>), usize> = HashMap::new();
-                let mut c = 0;
-
-                for (i, el) in self[r].iter().enumerate() {
-                    let mut sub_types = vec![0; type_counts[r.minus_one()]];
-
-                    for sub in el.subs.iter() {
-                        let sub_type = type_of_element[r.minus_one()][*sub];
-                        sub_types[sub_type] += 1;
-                    }
-
-                    let my_type = type_of_element[r][i];
-                    match dict.get(&(my_type, sub_types.clone())) {
-                        Some(idx) => {
-                            type_of_element[r][i] = *idx;
-                            types_rank[*idx].count += 1;
-                        }
-                        None => {
-                            dict.insert((my_type, sub_types), c);
-                            type_of_element[r][i] = c;
-                            types_rank.push(ElementType {
-                                example: i,
-                                count: 1,
-                            });
-                            c += 1;
-                        }
-                    }
-                }
-                type_counts[r] = c;
-                types[r] = types_rank;
-            }
-
-            for r in Rank::range_iter(0, self.rank().minus_one()).rev() {
+                // All element types of this rank.
                 let mut types_rank: Vec<ElementType> = Vec::new();
-                let mut dict: HashMap<(usize, Vec<usize>), usize> = HashMap::new();
-                let mut c = 0;
+                let mut dict = HashMap::new();
 
                 for (i, el) in self[r].iter().enumerate() {
-                    let mut sup_types = vec![0; type_counts[r.plus_one()]];
+                    let mut sub_type_counts = vec![0; type_counts[r.minus_one()]];
 
-                    for sup in el.sups.iter() {
-                        let sup_type = type_of_element[r.plus_one()][*sup];
-                        sup_types[sup_type] += 1;
+                    for &sub in el.subs.iter() {
+                        let sub_type = type_of_element[r.minus_one()][sub];
+                        sub_type_counts[sub_type] += 1;
                     }
 
-                    let my_type = type_of_element[r][i];
-                    match dict.get(&(my_type, sup_types.clone())) {
-                        Some(idx) => {
-                            type_of_element[r][i] = *idx;
-                            types_rank[*idx].count += 1;
+                    let type_data = TypeData {
+                        prev_index: type_of_element[r][i],
+                        type_counts: sub_type_counts,
+                    };
+
+                    match dict.get(&type_data) {
+                        // This is an existing element type.
+                        Some(&type_idx) => {
+                            type_of_element[r][i] = type_idx;
+                            types_rank[type_idx].count += 1;
                         }
+
+                        // This is a new element type.
                         None => {
-                            dict.insert((my_type, sup_types), c);
-                            type_of_element[r][i] = c;
+                            dict.insert(type_data, types_rank.len());
+                            type_of_element[r][i] = types_rank.len();
                             types_rank.push(ElementType {
                                 example: i,
                                 count: 1,
                             });
-                            c += 1;
                         }
                     }
                 }
-                type_counts[r] = c;
+
+                type_counts[r] = types_rank.len();
                 types[r] = types_rank;
             }
-            let number_of_types_new: usize = type_counts.iter().sum();
-            if number_of_types_new == number_of_types {
-                break;
-            } else {
-                number_of_types = number_of_types_new;
+
+            // We do basically the same thing, from the top down.
+            for r in Rank::range_iter(0, self.rank().minus_one()).rev() {
+                // All element types of this rank.
+                let mut types_rank: Vec<ElementType> = Vec::new();
+                let mut dict = HashMap::new();
+
+                for (i, el) in self[r].iter().enumerate() {
+                    let mut sup_type_counts = vec![0; type_counts[r.plus_one()]];
+
+                    for &sup in el.sups.iter() {
+                        let sup_type = type_of_element[r.plus_one()][sup];
+                        sup_type_counts[sup_type] += 1;
+                    }
+
+                    let type_data = TypeData {
+                        prev_index: type_of_element[r][i],
+                        type_counts: sup_type_counts,
+                    };
+
+                    match dict.get(&type_data) {
+                        // This is an existing element type.
+                        Some(&type_idx) => {
+                            type_of_element[r][i] = type_idx;
+                            types_rank[type_idx].count += 1;
+                        }
+
+                        // This is a new element type.
+                        None => {
+                            dict.insert(type_data, types_rank.len());
+                            type_of_element[r][i] = types_rank.len();
+                            types_rank.push(ElementType {
+                                example: i,
+                                count: 1,
+                            });
+                        }
+                    }
+                }
+
+                type_counts[r] = types_rank.len();
+                types[r] = types_rank;
             }
-            _passes += 1;
+
+            let new_type_count: usize = type_counts.iter().sum();
+            if new_type_count == type_count {
+                break;
+            }
+
+            type_count = new_type_count;
         }
+
         types
     }
 
