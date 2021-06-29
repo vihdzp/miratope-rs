@@ -187,7 +187,7 @@ impl Language for Es {
 
     /// The generic name for a polytope with `n` facets in `d` dimensions.
     fn generic(n: usize, d: Rank, options: Options<Self::Count, Self::Gender>) -> String {
-        (if d == Rank::new(2) && !options.adjective {
+        (if d == Rank::new(2) && options.class.is_noun() {
             Self::polygon_prefix(n)
         } else {
             Self::prefix(n)

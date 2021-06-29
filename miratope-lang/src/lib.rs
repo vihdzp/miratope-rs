@@ -21,8 +21,8 @@
 //! # use miratope_core::abs::rank::Rank;
 //! # use miratope_lang::{lang::En, Language, name::{Abs, Name}};
 //! let pecube: Name<Abs> = Name::multiprism(vec![
-//!     Name::polygon(Default::default(), 5), // 5-gon
-//!     Name::hyperblock(Default::default(), Rank::new(3)) // 3-hypercube
+//!     Name::polygon(Default::default(), 5), // abstract 5-gon
+//!     Name::hyperblock(Default::default(), Rank::new(3)) // abstract 3-hypercube
 //! ]);
 //! # assert_eq!(En::parse(&pecube), "pentagonal-cubic duoprism");
 //! ```
@@ -64,7 +64,7 @@ use crate::options::Options;
 use name::{Name, NameData, NameType, Regular};
 
 use miratope_core::abs::rank::Rank;
-use options::{Count, Gender};
+use options::{Count, Gender, WordClass};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
@@ -242,6 +242,7 @@ pub enum Position {
     After,
 }
 
+/// Inverts a position.
 impl std::ops::Not for Position {
     type Output = Self;
 
@@ -267,11 +268,18 @@ pub trait Language: Prefix {
     type Gender: Gender;
 
     /// Parses the [`Name`] in the specified language.
+    ///
+    /// Internally, this method just calls [`Self::parse_with`] with the default
+    /// [`Options`].  
     fn parse<T: NameType>(name: &Name<T>) -> String {
         Self::parse_with(name, Default::default())
     }
 
-    /// Parses the [`Name`] in the specified language, with the given [`Options`].
+    /// Parses the [`Name`] in the specified language, with the given
+    /// [`Options`]. This is meant for internal use only.
+    ///
+    /// This method is really just an enormous match statement, which delegates
+    /// work to all of the other methods in the trait.
     fn parse_with<T: NameType>(
         name: &Name<T>,
         options: Options<Self::Count, Self::Gender>,
@@ -367,12 +375,9 @@ pub trait Language: Prefix {
         mut options: Options<Self::Count, Self::Gender>,
         gender: Self::Gender,
     ) -> String {
-        let adj = options.adjective;
-        options.adjective = true;
-
         // This is a noun, so we use the specified gender.
-        if !adj {
-            options.gender = gender;
+        if options.class.is_noun() {
+            options.class = WordClass::Adjective(gender)
         }
 
         Self::parse_with(base, options)

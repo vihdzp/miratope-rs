@@ -207,8 +207,29 @@ mod tests {
         );
 
         assert_eq!(
-            En::parse(&Name::<Abs>::simplex(Default::default(), Rank::new(5)).prism()),
-            "hexateric prism"
+            En::parse(&Name::<Abs>::simplex(Default::default(), Rank::new(5)).tegum()),
+            "hexateric tegum"
+        );
+
+        assert_eq!(
+            En::parse(&Name::<Abs>::hyperblock(Default::default(), Rank::new(4)).pyramid()),
+            "tesseractic pyramid"
+        );
+
+        assert_eq!(
+            En::parse(&Name::<Abs>::orthoplex(Default::default(), Rank::new(5)).prism()),
+            "triacontaditeric prism"
+        );
+
+        assert_eq!(
+            En::parse(&Name::<Abs>::multiprism(vec![
+                Name::polygon(
+                    Default::default(),
+                    5
+                );
+                3
+            ])),
+            "pentagonal-pentagonal-pentagonal trioprism"
         );
     }
 }

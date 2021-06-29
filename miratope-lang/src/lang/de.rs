@@ -8,7 +8,7 @@ use crate::{
 use miratope_core::abs::rank::Rank;
 
 /// The gender system for German.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Trigender {
     /// Male gender.
     Male,
@@ -41,8 +41,10 @@ impl Options<Plural, Trigender> {
     /// Assumes that the word will be used as an adjective, regardless of
     /// `self.adjective`.
     fn three_adj<'a>(&self, adj_m: &'a str, adj_f: &'a str, adj_n: &'a str) -> &'a str {
+        let gender = self.class.unwrap_adj();
+
         if self.count.is_one() {
-            match self.gender {
+            match gender {
                 Trigender::Male => adj_m,
                 Trigender::Female => adj_f,
                 Trigender::Neuter => adj_n,
@@ -67,7 +69,7 @@ impl Options<Plural, Trigender> {
         adj_f: &'a str,
         adj_n: &'a str,
     ) -> &'a str {
-        if self.adjective {
+        if self.class.is_adj() {
             self.three_adj(adj_m, adj_f, adj_n)
         } else if self.count.is_one() {
             base
@@ -185,7 +187,7 @@ impl Language for De {
     fn hyperblock(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
         let mut result = Self::prefix(rank.into()) + "block";
 
-        if !options.adjective {
+        if options.class.is_noun() {
             super::uppercase_mut(&mut result);
         }
 
@@ -195,7 +197,7 @@ impl Language for De {
     fn hypercube(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
         let mut result = Self::hypercube_prefix(rank.into()) + "rakt";
 
-        if !options.adjective {
+        if options.class.is_noun() {
             super::uppercase_mut(&mut result);
         }
 

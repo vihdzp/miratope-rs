@@ -1,3 +1,6 @@
+//! Contains all of the code that configures the [`Options`] for most languages.
+//! This includes the traits for grammatical gender and count.
+
 /// Represents the grammatical genders in any given language. We assume that
 /// these propagate from nouns to adjectives, i.e. an adjective that describes
 /// a given noun is declensed with the gender of the noun.
@@ -8,16 +11,16 @@
 ///
 /// Genders must have a default value that will be given by adjectives by
 /// default. This can then be overridden on a case-by-case basis.
-pub trait Gender: Copy + Default {}
+pub trait Gender: Copy + std::fmt::Debug + Default {}
 
 /// The gender system for a non-gendered language.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Agender;
 
 impl Gender for Agender {}
 
 /// The gender system for a language with a male/female distinction.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Bigender {
     /// Male gender.
     Male,
@@ -33,6 +36,41 @@ impl Default for Bigender {
 }
 
 impl Gender for Bigender {}
+
+/// The word class of whatever we're currently parsing.
+#[derive(Clone, Copy, Debug)]
+pub enum WordClass<G: Gender> {
+    /// We're parsing a noun.
+    Noun,
+
+    /// We're parsing an adjective, and we should use the specified gender to
+    /// declense it.
+    Adjective(G),
+}
+
+impl<G: Gender> WordClass<G> {
+    pub fn is_noun(&self) -> bool {
+        matches!(self, Self::Noun)
+    }
+
+    pub fn is_adj(&self) -> bool {
+        matches!(self, Self::Adjective(_))
+    }
+
+    pub fn unwrap_adj(&self) -> G {
+        if let &Self::Adjective(gender) = self {
+            gender
+        } else {
+            panic!("Expected adjective, found {:?}", self)
+        }
+    }
+}
+
+impl<G: Gender> Default for WordClass<G> {
+    fn default() -> Self {
+        Self::Noun
+    }
+}
 
 /// Represents the grammatical numbers in any given language. These propagate
 /// from nouns to adjectives, i.e. an adjective that describes a given noun is
@@ -69,29 +107,24 @@ impl Count for Plural {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
 /// Represents the different modifiers that can be applied to a term.
 ///
 /// This struct is internal and is modified as any given [`Name`] is parsed.
 /// We might want to make a "public" version of this struct. Or not.
+#[derive(Clone, Copy, Debug)]
 pub struct Options<C: Count, G: Gender> {
-    /// Determines whether the polytope acts as an adjective.
-    pub adjective: bool,
+    /// The word class corresponding to the polytope.
+    pub class: WordClass<G>,
 
     /// The grammatical number corresponding to the number of polytopes.
     pub count: C,
-
-    /// The grammatical gender of the polytope.
-    pub gender: G,
 }
 
 impl<C: Count, G: Gender> Default for Options<C, G> {
-    /// The options default to a single polytope, as a noun, in the default gender.
     fn default() -> Self {
-        Options {
-            adjective: false,
+        Self {
+            class: Default::default(),
             count: C::from_count(1),
-            gender: Default::default(),
         }
     }
 }
@@ -117,7 +150,7 @@ impl<G: Gender> Options<Plural, G> {
     /// * A plural.
     /// * An adjective for both the singular and plural.
     pub fn three<'a>(&self, base: &'a str, plural: &'a str, adj: &'a str) -> &'a str {
-        if self.adjective {
+        if self.class.is_adj() {
             adj
         } else if self.count.is_one() {
             base
@@ -139,7 +172,7 @@ impl<G: Gender> Options<Plural, G> {
         adj: &'a str,
         plural_adj: &'a str,
     ) -> &'a str {
-        if self.adjective {
+        if self.class.is_adj() {
             if self.count.is_one() {
                 adj
             } else {
@@ -161,8 +194,8 @@ impl Options<Plural, Bigender> {
     /// * A singular adjective (female).
     /// * A plural adjective (female).
     ///
-    /// Assumes that the word will be used as an adjective, regardless of
-    /// `self.adjective`.
+    /// # Panics
+    /// This method will panic if `self.class` is not an adjective.
     pub fn four_adj<'a>(
         &self,
         adj_m: &'a str,
@@ -170,13 +203,15 @@ impl Options<Plural, Bigender> {
         adj_f: &'a str,
         plural_adj_f: &'a str,
     ) -> &'a str {
+        let gender = self.class.unwrap_adj();
+
         if self.count.is_one() {
-            match self.gender {
+            match gender {
                 Bigender::Male => adj_m,
                 Bigender::Female => adj_f,
             }
         } else {
-            match self.gender {
+            match gender {
                 Bigender::Male => plural_adj_m,
                 Bigender::Female => plural_adj_f,
             }
@@ -200,7 +235,7 @@ impl Options<Plural, Bigender> {
         adj_f: &'a str,
         plural_adj_f: &'a str,
     ) -> &'a str {
-        if self.adjective {
+        if self.class.is_adj() {
             self.four_adj(adj_m, plural_adj_m, adj_f, plural_adj_f)
         } else if self.count.is_one() {
             base

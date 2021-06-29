@@ -394,6 +394,7 @@ impl<T: NameType> Name<T> {
 
     /// Determines whether a `Name` is valid, that is, all of the conditions
     /// specified on its variants hold. Used for debugging.
+    #[cfg(debug_assertions)]
     pub fn is_valid(&self) -> bool {
         match self {
             // Polygons must not be interpretable as triangles or squares.
