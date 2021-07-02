@@ -182,6 +182,10 @@ impl Concrete {
         let type_iter = self.element_types().into_iter().skip(1).enumerate();
 
         for (r, types) in type_iter {
+            if r == self.rank().into_usize() {
+                println!();
+                break;
+            }
             println!("{}", EL_NAMES[r]);
             for t in types {
                 let i = t.example;
