@@ -73,14 +73,12 @@ impl<T: Debug> NameData<T> for AbsData<T> {
         Default::default()
     }
 
-    /// Returns `true` no matter what, as if `self` pretended to hold the given
-    /// value.
+    /// Returns `true` no matter what, as if `self` actually held the given value.
     fn contains(&self, _: &T) -> bool {
         true
     }
 
-    /// Returns `true` no matter what, as if `self` pretended to satisfy the
-    /// given predicate.
+    /// Returns `true` no matter what, as if `self` actually satisfied the given predicate.
     fn satisfies<F: Fn(&T) -> bool>(&self, _: F) -> bool {
         true
     }
@@ -100,22 +98,8 @@ impl NameType for Abs {
 }
 
 /// Data associated with a concrete polytope.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConData<T>(T);
-
-/// Compares data by what is contained in it.
-impl<T: PartialEq> PartialEq for ConData<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-/// Uses the default value of whatever is inside.
-impl<T: PartialEq + Debug + Clone + Serialize + DeserializeOwned + Default> Default for ConData<T> {
-    fn default() -> Self {
-        Self::new(Default::default())
-    }
-}
 
 impl<T: PartialEq + Debug + Clone + Serialize + DeserializeOwned> NameData<T> for ConData<T> {
     /// Initializes a new `ConData` that holds a given value.
@@ -185,6 +169,8 @@ impl Regular {
 /// invariants hold.** Convenience methods are provided, often with the same
 /// name as their respective variants, which will guarantee these invariants for
 /// you.
+///
+/// For more info on concrete usage of this type, see the [`parse`] function.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Name<T: NameType> {
     /// A nullitope.

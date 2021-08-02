@@ -10,7 +10,9 @@ vec-like = { path = "../vec-like" }
 nalgebra = { git = "https://github.com/dimforge/nalgebra", branch = "dev", version = "0.27", features = [
     "serde-serialize"
 ] }
+paste = "1"
 ron = "0.6"
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 strum = "0.21"
 strum_macros = "0.21"
+doc-comment = "0.3"

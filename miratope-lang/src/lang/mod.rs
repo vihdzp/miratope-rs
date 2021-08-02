@@ -1,15 +1,16 @@
 //! The folder containing all of the different languages Miratope has been
 //! translated into. Each file contains one specific language.
 
-pub mod de;
+//pub mod de;
 pub mod en;
-pub mod es;
-pub use de::De;
+//pub mod es;
+//pub use de::De;
 pub use en::En;
-pub use es::Es;
+//pub use es::Es;
 
 pub(crate) fn uppercase_mut(str: &mut String) {
     let mut indices = str.char_indices();
+
     // The first character of the result.
     if let Some((idx_first, c_first)) = indices.next() {
         let range = if let Some((idx_next, _)) = indices.next() {

@@ -80,7 +80,7 @@ impl<'a> XmlReader<'a> {
     /// <element type="point3d" label="A">
     /// ```
     fn read_point(&mut self, attributes: &[OwnedAttribute]) -> GgbResult<Vertex> {
-        let label = attribute(&attributes, "label").unwrap_or_default();
+        let label = attribute(attributes, "label").unwrap_or_default();
         let coord_attributes = self.read_until("coords")?;
 
         /// Reads any of the coordinates of a point, saves it in a variable with

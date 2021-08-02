@@ -172,7 +172,7 @@ impl Subspace {
         for p in iter {
             // If the subspace is of full rank, we don't need to check any
             // more points.
-            if subspace.add(&p).is_some() && subspace.is_full_rank() {
+            if subspace.add(p).is_some() && subspace.is_full_rank() {
                 return subspace;
             }
         }
@@ -314,8 +314,8 @@ impl Hyperplane {
     /// Returns the intersection of itself and a line segment, or `None` if it
     /// doesn't exist.
     pub fn intersect(&self, line: Segment) -> Option<Point> {
-        let d0 = self.distance(&line.0);
-        let d1 = self.distance(&line.1);
+        let d0 = self.distance(line.0);
+        let d1 = self.distance(line.1);
 
         // This right here is some really sensitive code. If we screw up
         // handling the edge cases, cross-sections through elements will crash.

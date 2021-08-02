@@ -294,7 +294,7 @@ pub fn mesh(poly: &Concrete, projection_type: ProjectionType) -> Mesh {
     // polytope and the triangulation.
     let triangulation = Triangulation::new(poly);
     let vertices = vertex_coords(
-        &poly,
+        poly,
         poly.vertices
             .iter()
             .chain(triangulation.extra_vertices.iter()),
@@ -324,7 +324,7 @@ pub fn wireframe(poly: &Concrete, projection_type: ProjectionType) -> Mesh {
     let edge_count = poly.el_count(Rank::new(1));
 
     // We add a single vertex so that Miratope doesn't crash.
-    let vertices = vertex_coords(&poly, poly.vertices.iter(), projection_type);
+    let vertices = vertex_coords(poly, poly.vertices.iter(), projection_type);
     let mut indices = Vec::with_capacity(edge_count * 2);
 
     // Adds the edges to the wireframe.

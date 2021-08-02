@@ -46,7 +46,7 @@ features = [
 
 # Bevy egui integration with this latest version.
 [dependencies.bevy_egui]
-git = "https://github.com/OfficialURL/bevy_egui"
+git = "https://github.com/jakobhellermann/bevy_egui"
 branch = "bevy-main"
 
 [dependencies.egui]

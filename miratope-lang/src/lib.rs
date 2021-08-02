@@ -55,18 +55,22 @@
 //! However, these can be overriden by manually implementing the methods ending
 //! in `_gender` and `_pos`.
 
+pub mod gender;
 pub mod lang;
 pub mod name;
-pub mod options;
 pub mod poly;
 
-use crate::options::Options;
 use name::{Name, NameData, NameType, Regular};
 
+use gender::Gender;
 use miratope_core::abs::rank::Rank;
-use options::{Count, Gender};
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
+
+#[macro_use]
+extern crate doc_comment;
+
+use paste::paste;
 
 /// The link to the [Polytope Wiki](https://polytope.miraheze.org/wiki/).
 pub const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
@@ -105,6 +109,7 @@ pub trait Prefix {
 }
 
 #[macro_export]
+/// Allows for easier implementation of the [`GreekPrefix`] trait.
 macro_rules! greek_prefixes {
     ($(#[$um:meta])* UNITS = $u:expr; $($(#[$idm:meta])* $id:ident = $e:expr;)*) => {
         $(#[$um])*
@@ -253,86 +258,498 @@ impl std::ops::Not for Position {
     }
 }
 
-/// The trait shared by all languages.
+impl Position {
+    /// Combines an adjective and a noun, placing the adjective in a given
+    /// position with respect to the noun.
+    fn combine(self, adj: &str, noun: &str) -> String {
+        match self {
+            Self::Before => format!("{} {}", adj, noun),
+            Self::After => format!("{} {}", noun, adj),
+        }
+    }
+}
+
+/// The output of parsing a noun.
+pub struct ParseOutput<G: Gender> {
+    /// The grammatical gender of the output.
+    gender: G,
+
+    /// The parsed noun.
+    output: String,
+}
+
+impl<G: Gender> ParseOutput<G> {
+    /// Initializes a new `ParseOutput` from its fields.
+    pub fn new(gender: G, output: String) -> Self {
+        Self { gender, output }
+    }
+
+    /// Applies a function to the output of `self` to create a `ParseOutput`
+    /// with the same gender.
+    pub fn map_output<F: FnOnce(G, String) -> String>(self, f: F) -> Self {
+        Self::new(self.gender, f(self.gender, self.output))
+    }
+}
+
+/// Declares the necessary trait methods for parsing a terminal noun name. If
+/// you want to declare the trait methods for a non-terminal noun name, see
+/// [`impl_operator`].
+///
+/// # Example
+///
+/// ```
+/// impl_noun!(
+///     nullitope,
+///     polygon(n: u32),
+///     simplex(rank: Rank)
+/// );
+/// ```
+macro_rules! decl_noun {
+    ($($name:ident $(($($args:ident: $ty:ty),*))?),*) => {
+        $(
+            paste! {
+                doc_comment! {
+                    concat!("The string corresponding to the noun for \"", stringify!($name), "\"."),
+                    #[allow(unused_variables)]
+                    fn [<$name _noun_str>]($($($args: $ty),*)?) -> String;
+                }
+
+                doc_comment! {
+                    concat!("The grammatical gender corresponding to the noun \"", stringify!($name), "\"."),
+                    #[allow(unused_variables)]
+                    fn [<$name _gender>]($($($args: $ty),*)?) -> Self::Gender {
+                        Default::default()
+                    }
+                }
+
+                doc_comment! {
+                    concat!("Parses the name corresponding to the noun for \"", stringify!($name), "\"."),
+                    #[allow(unused_variables)]
+                    fn [<$name _noun>]($($($args: $ty),*)?) -> ParseOutput<Self::Gender> {
+                        ParseOutput::new(
+                            Self::[<$name _gender>]($($($args),*)?),
+                            Self::[<$name _noun_str>]($($($args),*)?)
+                        )
+                    }
+                }
+
+                doc_comment! {
+                    concat!("Parses the name corresponding to the adjective for \"", stringify!($name), "\"."),
+                    #[allow(unused_variables)]
+                    fn [<$name _adj>](gender: Self::Gender, $($($args: $ty),*)?) -> String;
+                }
+            }
+        )*
+    };
+}
+
+/// Declares the necessary trait methods for parsing a non-terminal noun name.
+/// This will automatically call [`impl_name`] to implement the base methods.
+/// If your name is also a multiproduct, use [`impl_multiproduct`] instead.
+///
+/// # Example
+///
+/// ```
+/// impl_operator!(
+///     antiprism,
+///     antitegum,
+///     ditope(rank: Rank)
+/// );
+/// ```
+macro_rules! decl_operator {
+    ($($name:ident $(($($args:ident: $ty:ty),*))?),*) => {
+        $(
+            decl_noun!($name $(($($args: $ty),*))?);
+
+            paste! {
+                doc_comment! {
+                    concat!("The position corresponding to the adjective for \"", stringify!($name), "\"."),
+                    #[allow(unused_variables)]
+                    fn [<$name _pos>]($($($args: $ty),*)?) -> Position {
+                        Self::default_pos()
+                    }
+                }
+
+                doc_comment! {
+                    concat!("Parses the ", stringify!($name), " of a name as a noun."),
+                    #[allow(unused_variables)]
+                    fn [<$name _of_noun>]<T: NameType>(base: &Name<T>, $($($args: $ty),*)?) -> ParseOutput<Self::Gender> {
+                        Self::[<$name _noun>]($($($args),*)?).map_output(|gender, output|
+                            Self::[<$name _pos>]($($($args),*)?).combine(
+                                &Self::parse_adj(base, gender),
+                                &output,
+                            )
+                        )
+                    }
+                }
+
+                doc_comment! {
+                    concat!("Parses the ", stringify!($name), " of a name as an adjective."),
+                    #[allow(unused_variables)]
+                    fn [<$name _of_adj>]<T: NameType>(gender: Self::Gender, base: &Name<T>, $($($args: $ty),*)?) -> String {
+                        Self::[<$name _pos>]($($($args),*)?).combine(
+                            &Self::parse_adj(base, gender),
+                            &Self::[<$name _adj>](gender, $($($args),*)?)
+                        )
+                    }
+                }
+            }
+        )*
+    };
+}
+
+/// Declares the necessary trait methods for parsing a multiprismatic name. This
+/// will automatically call [`impl_operator`] to implement the base methods.
+///
+/// # Example
+///
+/// ```
+/// impl_multiprism!(
+///     pyramid,
+///     prism,
+///     tegum
+/// );
+/// ```
+macro_rules! decl_multiproduct {
+    ($($name:ident),*) => {
+        $(
+            decl_operator!($name);
+
+            paste! {
+                doc_comment! {
+                    concat!("Makes the name for a general ", stringify!($name), " product as a noun."),
+                    fn [<$name _product_noun>]<T: NameType>(bases: &[Name<T>]) -> ParseOutput<Self::Gender> {
+                        // The kind of the product.
+                        let kind = Self::[<$name _noun>]();
+
+                        // Concatenates the bases as adjectives, adding hyphens between them.
+                        let mut str_bases = String::new();
+                        let (last, bases) = bases.split_last().unwrap();
+                        for base in bases {
+                            str_bases.push_str(&Self::parse_adj(base, kind.gender));
+                            str_bases.push('-');
+                        }
+                        str_bases.push_str(&Self::parse_adj(last, kind.gender));
+
+                        kind.map_output(|_, output|
+                            Self::[<$name _pos>]().combine(&str_bases, &(Self::multi_prefix(bases.len()) + &output))
+                        )
+                    }
+                }
+
+                doc_comment! {
+                    concat!("Makes the name for a general ", stringify!($name), " product as an adjective."),
+                    fn [<$name _product_adj>]<T: NameType>(gender: Self::Gender, bases: &[Name<T>]) -> String {
+                        // Concatenates the bases as adjectives, adding hyphens between them.
+                        let mut str_bases = String::new();
+                        let (last, bases) = bases.split_last().unwrap();
+                        for base in bases {
+                            str_bases.push_str(&Self::parse_adj(base, gender));
+                            str_bases.push('-');
+                        }
+                        str_bases.push_str(&Self::parse_adj(last, gender));
+
+                        Self::[<$name _pos>]().combine(
+                            &str_bases,
+                            &(Self::multi_prefix(bases.len()) + &Self::[<$name _adj>](gender))
+                        )
+                    }
+                }
+            }
+        )*
+    }
+}
+
+/// Declares the necessary trait methods for parsing an adjetive name.
+///
+/// # Example
+///
+/// ```
+/// impl_adj!(
+///     small,
+///     great,
+///     stellated
+/// );
+/// ```
+macro_rules! decl_adj {
+    ($($name:ident $(($($args:ident: $ty:ty),*))?),*) => {
+        $(
+            paste! {
+                doc_comment! {
+                    concat!("The position corresponding to the adjective \"", stringify!($name), "\"."),
+                    fn [<$name _pos>]($($($args: $ty),*)?) -> Position {
+                        Self::default_pos()
+                    }
+                }
+
+                doc_comment! {
+                    concat!("Parses the name corresponding to the adjective for \"", stringify!($name), "\"."),
+                    fn [<$name _adj>](gender: Self::Gender, $($($args: $ty),*)?) -> String;
+                }
+
+                doc_comment! {
+                    concat!("Parses a name with the modifier \"", stringify!($name), "\" as a noun."),
+                    fn [<$name _of_noun>]<T: NameType>(base: &Name<T>, $($($args: $ty),*)?) -> ParseOutput<Self::Gender> {
+                        Self::parse_noun(base).map_output(|gender, output|
+                            Self::[<$name _pos>]().combine(
+                                &Self::[<$name _adj>](gender, $($($args),*)?),
+                                &output,
+                            )
+                        )
+                    }
+                }
+
+                doc_comment! {
+                    concat!("Parses a name with the modifier \"", stringify!($name), "\" as an adjective."),
+                    fn [<$name _of_adj>]<T: NameType>(gender: Self::Gender, base: &Name<T>, $($($args: $ty),*)?) -> String {
+                        Self::[<$name _pos>]($($($args),*)?).combine(
+                            &Self::[<$name _adj>](gender, $($($args),*)?),
+                            &Self::parse_adj(base, gender)
+                        )
+                    }
+                }
+            }
+        )*
+    };
+}
+
+/// An macro that helps implement the [`Language::parse_noun`] and the
+/// [`Language::parse_adj`] methods.
+macro_rules! impl_parse {
+    ($type:ident $(,$gender:ident)? -> $ty:ty) => {
+        paste! {
+            /// Parses the [`Name`] in the specified language as a noun.
+            fn [<parse_ $type>]<T: NameType>(name: &Name<T>, $($gender: Self::Gender)?) -> $ty {
+                use Name::*;
+
+                debug_assert!(name.is_valid(), "Invalid name {:?}.", name);
+
+                match name {
+                    // Basic shapes
+                    Nullitope => Self::[<nullitope_ $type>]($($gender)?),
+                    Point => Self::[<point_ $type>]($($gender)?),
+                    Dyad => Self::[<dyad_ $type>]($($gender)?),
+
+                    // 2D shapes
+                    Triangle { .. } => Self::[<triangle_ $type>]($($gender)?),
+
+                    // TODO: merge these into one.
+                    Square => Self::[<square_ $type>]($($gender)?),
+                    Rectangle => Self::[<rectangle_ $type>]($($gender)?),
+                    Orthodiagonal => Self::[<generic_ $type>]($($gender,)? 4, Rank::new(2)),
+
+                    Polygon { n, .. } => Self::[<generic_ $type>]($($gender,)? *n, Rank::new(2)),
+
+                    // Regular families
+                    Simplex { rank, .. } => Self::[<simplex_ $type>]($($gender,)? *rank),
+                    Cuboid { regular } => Self::[<generic_cuboid_ $type>]::<T>($($gender,)? regular),
+                    Hyperblock { regular, rank } => Self::[<generic_hyperblock_ $type>]::<T>($($gender,)? regular, *rank),
+                    Orthoplex { rank, .. } => Self::[<orthoplex_ $type>]($($gender,)? *rank),
+
+                    // Modifiers
+                    Pyramid(base) => Self::[<pyramid_of_ $type>]($($gender,)? base),
+                    Prism(base) => Self::[<prism_of_ $type>]($($gender,)? base),
+                    Tegum(base) => Self::[<tegum_of_ $type>]($($gender,)? base),
+                    Antiprism { base, .. } => Self::[<antiprism_of_ $type>]($($gender,)? base),
+                    Antitegum { base, .. } => Self::[<antitegum_of_ $type>]($($gender,)? base),
+                    Ditope { base, rank } => Self::[<ditope_of_ $type>]($($gender,)? base, *rank),
+                    Hosotope { base, rank } => Self::[<hosotope_of_ $type>]($($gender,)? base, *rank),
+                    Petrial { base, .. } => Self::[<petrial_of_ $type>]($($gender,)? base),
+
+                    // Multimodifiers
+                    Multipyramid(bases) => Self::[<pyramid_product_ $type>]($($gender,)? bases),
+                    Multiprism(bases) => Self::[<prism_product_ $type>]($($gender,)? bases),
+                    Multitegum(bases) => Self::[<tegum_product_ $type>]($($gender,)? bases),
+                    Multicomb(bases) => Self::[<comb_product_ $type>]($($gender,)? bases),
+
+                    // Single adjectives
+                    Small(base) => Self::[<small_of_ $type>]($($gender,)? base),
+                    Great(base) => Self::[<great_of_ $type>]($($gender,)? base),
+                    Stellated(base) => Self::[<stellated_of_ $type>]($($gender,)? base),
+
+                    &Generic { facet_count, rank } => Self::[<generic_ $type>]($($gender,)? facet_count, rank),
+                    Dual { base, .. } => Self::[<dual_of_ $type>]($($gender,)? base),
+                }
+            }
+        }
+    };
+
+    () => {
+        impl_parse!(noun -> ParseOutput<Self::Gender>);
+        impl_parse!(adj, gender -> String);
+    };
+}
+
+/// The trait shared by all languages. Its one and only goal is to take a
+/// [`Name`] and parse it into a `String` in the given language.
 ///
 /// We strived to make this trait as general as possible while still making code
 /// reuse possible. However, there may be an implicit bias towards European
 /// languages due to the profile of the people who worked on this. Any
 /// suggestions towards making this more general are welcome.
+///
+/// In what follows, we describe how parsing works in general.
+///
+/// # Nouns & Adjectives
+///
+/// Every name acts as either a noun or an adjective. That is, it must either
+/// describe some standalone object, or it must modify such an object. Any noun
+/// must have a corresponding adjective, but the opposite is not required of
+/// adjectives.
+///
+/// Examples of nouns include nullitope, polygon, prism. Note the corresponding
+/// adjectives nullitopic, polygonal, prismatic. Examples of adjectives include
+/// great, stellated, truncated.
+///
+/// For translation to work, the target language will need to have categories of
+/// words serving these broad functions.
+///
+/// # Word agreement
+///
+/// Many languages require the various words that describe a single object to
+/// match up according to certain rules. This is known as **agreement**. To
+/// account for this, every parsed name takes in and returns some [`ParseInfo`],
+/// including grammatical count and gender.
+///
+/// A noun doesn't require any `ParseInfo`, but it must output it and propagate
+/// it into its argument and any surrounding adjective (if any). On the other
+/// hand, an adjective requires `ParseInfo`, but won't need to return any.
+/// Because of this, methods that generate the nouns and adjectives for a given
+/// name are separate.
+///
+/// # What needs to be implemented?
+///
+/// For convenience, many trait methods have default values. However, this
+/// doesn't mean that these methods should always be left unimplemented. What
+/// needs to be implemented will depend on the type of name and some
+/// characteristics of the language.
+///
+/// For terminal nouns, you should implement
+/// - `_str_noun`
+/// - `_adj`
+/// - `_gender`*
+///
+/// For non-terminal nouns, you should also implement
+/// - `_pos`**
+///
+/// For adjectives, you should implement
+/// - `_pos`**
+/// - `_adj`
+///
+/// \* in gendered languages \*\* if the language does not place adjectives in a
+/// unique position
+///
+/// If any other name does not behave as expected, the implementation may always
+/// be overridden.
 pub trait Language: Prefix {
-    /// Whichever grammatical number system the language uses.
-    type Count: Count;
-
     /// Whichever grammatical gender system the language uses.
     type Gender: Gender;
 
-    /// Parses the [`Name`] in the specified language.
-    fn parse<T: NameType>(name: &Name<T>) -> String {
-        Self::parse_with(name, Default::default())
+    /// The default position to place adjectives. This will be used for the
+    /// default implementations, but it can be overridden in any specific case.
+    fn default_pos() -> Position;
+
+    decl_noun!(
+        nullitope,
+        point,
+        dyad,
+        triangle,
+        square,
+        rectangle,
+        simplex(rank: Rank),
+        cuboid,
+        cube,
+        hyperblock(rank: Rank),
+        hypercube(rank: Rank),
+        orthoplex(rank: Rank),
+        suffix(rank: Rank)
+    );
+
+    decl_operator!(
+        antiprism,
+        antitegum,
+        ditope(rank: Rank),
+        hosotope(rank: Rank)
+    );
+
+    decl_multiproduct!(pyramid, prism, tegum, comb);
+
+    decl_adj!(dual, petrial, great, small, stellated);
+
+    // Defaults for generic names.
+
+    /// The string corresponding to the noun for a generic polytope.
+    fn generic_noun_str(facet_count: usize, rank: Rank) -> String {
+        Self::prefix(facet_count) + &Self::suffix_noun_str(rank)
     }
 
-    /// Parses the [`Name`] in the specified language, with the given [`Options`].
-    fn parse_with<T: NameType>(
-        name: &Name<T>,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
-        debug_assert!(name.is_valid(), "Invalid name {:?}.", name);
+    /// The grammatical gender corresponding to the noun for a generic polytope.
+    fn generic_gender(_: usize, rank: Rank) -> Self::Gender {
+        Self::suffix_gender(rank)
+    }
 
-        match name {
-            // Basic shapes
-            Name::Nullitope => Self::nullitope(options).to_owned(),
-            Name::Point => Self::point(options).to_owned(),
-            Name::Dyad => Self::dyad(options).to_owned(),
+    /// The generic name for a polytope with a given facet count and rank as a
+    /// noun.
+    fn generic_noun(facet_count: usize, rank: Rank) -> ParseOutput<Self::Gender> {
+        Self::suffix_noun(rank).map_output(|_, output| Self::prefix(facet_count) + &output)
+    }
 
-            // 2D shapes
-            Name::Triangle { .. } => Self::triangle(options).to_owned(),
-            Name::Square => Self::square(options).to_owned(),
-            Name::Rectangle => Self::rectangle(options).to_owned(),
-            Name::Orthodiagonal => Self::generic(4, Rank::new(2), options),
-            Name::Polygon { n, .. } => Self::generic(*n, Rank::new(2), options),
+    /// The generic name for a polytope with a given facet count and rank as an
+    /// adjective.
+    fn generic_adj(gender: Self::Gender, facet_count: usize, rank: Rank) -> String {
+        Self::prefix(facet_count) + &Self::suffix_adj(gender, rank)
+    }
 
-            // Regular families
-            Name::Simplex { rank, .. } => Self::simplex(*rank, options),
-            Name::Cuboid { regular } => {
-                if regular.satisfies(Regular::is_yes) {
-                    Self::cube(options).to_owned()
-                } else {
-                    Self::cuboid(options).to_owned()
-                }
-            }
-            Name::Hyperblock { regular, rank } => {
-                if regular.satisfies(Regular::is_yes) {
-                    Self::hypercube(*rank, options)
-                } else {
-                    Self::hyperblock(*rank, options)
-                }
-            }
-            Name::Orthoplex { rank, .. } => Self::orthoplex(*rank, options),
+    // Some auxiliary functions for parsing.
 
-            // Modifiers
-            Name::Pyramid(base) => Self::pyramid_of(base, options),
-            Name::Prism(base) => Self::prism_of(base, options),
-            Name::Tegum(base) => Self::tegum_of(base, options),
-            Name::Antiprism { base, .. } => Self::antiprism_of(base, options),
-            Name::Antitegum { base, .. } => Self::antitegum_of(base, options),
-            Name::Ditope { base, rank } => Self::ditope_of(base, *rank, options),
-            Name::Hosotope { base, rank } => Self::hosotope_of(base, *rank, options),
-            Name::Petrial { base, .. } => Self::petrial_of(base, options),
-
-            // Multimodifiers
-            Name::Multipyramid(_)
-            | Name::Multiprism(_)
-            | Name::Multitegum(_)
-            | Name::Multicomb(_) => Self::multiproduct(name, options),
-
-            // Single adjectives
-            Name::Small(base) => Self::small_of(base, options),
-            Name::Great(base) => Self::great_of(base, options),
-            Name::Stellated(base) => Self::stellated_of(base, options),
-
-            &Name::Generic { facet_count, rank } => Self::generic(facet_count, rank, options),
-            Name::Dual { base, .. } => Self::dual_of(base, options),
+    /// Parses a generic cuboid (regular or irregular) as a noun.
+    fn generic_cuboid_noun<T: NameType>(regular: &T::DataRegular) -> ParseOutput<Self::Gender> {
+        if regular.satisfies(Regular::is_yes) {
+            Self::cube_noun()
+        } else {
+            Self::cuboid_noun()
         }
+    }
+
+    /// Parses a generic cuboid (regular or irregular) as a noun.
+    fn generic_cuboid_adj<T: NameType>(gender: Self::Gender, regular: &T::DataRegular) -> String {
+        if regular.satisfies(Regular::is_yes) {
+            Self::cube_adj(gender)
+        } else {
+            Self::cuboid_adj(gender)
+        }
+    }
+
+    /// Parses a generic hyperblock (regular or irregular) as a noun.
+    fn generic_hyperblock_noun<T: NameType>(
+        regular: &T::DataRegular,
+        rank: Rank,
+    ) -> ParseOutput<Self::Gender> {
+        if regular.satisfies(Regular::is_yes) {
+            Self::hypercube_noun(rank)
+        } else {
+            Self::hyperblock_noun(rank)
+        }
+    }
+
+    /// Parses a generic hyperblock (regular or irregular) as an adjective.
+    fn generic_hyperblock_adj<T: NameType>(
+        gender: Self::Gender,
+        regular: &T::DataRegular,
+        rank: Rank,
+    ) -> String {
+        if regular.satisfies(Regular::is_yes) {
+            Self::hypercube_adj(gender, rank)
+        } else {
+            Self::hyperblock_adj(gender, rank)
+        }
+    }
+
+    impl_parse!();
+
+    /// Parses the [`Name`] in the specified language.
+    fn parse<T: NameType>(name: &Name<T>) -> String {
+        Self::parse_noun(name).output
     }
 
     /// Parses the [`Name`] in the specified language. If the first character is
@@ -342,455 +759,17 @@ pub trait Language: Prefix {
         lang::uppercase_mut(&mut result);
         result
     }
-
-    /// The default position to place adjectives. This will be used for the
-    /// default implementations, but it can be overridden in any specific case.
-    fn default_pos() -> Position;
-
-    /// Combines an adjective and a noun, placing the adjective in a given
-    /// [`Position`] with respect to the noun.
-    fn combine(adj: &str, noun: &str, pos: Position) -> String {
-        match pos {
-            Position::Before => format!("{} {}", adj, noun),
-            Position::After => format!("{} {}", noun, adj),
-        }
-    }
-
-    /// Converts a name into an adjective. The options passed are those for the
-    /// term this adjective is modifying, which might either be a noun or
-    /// another adjective.
-    ///
-    /// If the options don't specify an adjective, the specified gender is used.
-    /// Otherwise, the adjective inherits the gender from the options.
-    fn to_adj<T: NameType>(
-        base: &Name<T>,
-        mut options: Options<Self::Count, Self::Gender>,
-        gender: Self::Gender,
-    ) -> String {
-        let adj = options.adjective;
-        options.adjective = true;
-
-        // This is a noun, so we use the specified gender.
-        if !adj {
-            options.gender = gender;
-        }
-
-        Self::parse_with(base, options)
-    }
-
-    /// Returns the suffix for a d-polytope. Only needs to work up to d = 20, we
-    /// won't offer support any higher than that.
-    fn suffix(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String;
-
-    /// The generic name for a polytope with a given facet count and rank.
-    fn generic(
-        facet_count: usize,
-        rank: Rank,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
-        Self::prefix(facet_count) + &Self::suffix(rank, options)
-    }
-
-    /// The name of a nullitope.
-    fn nullitope(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The name of a point.
-    fn point(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The name of a dyad.
-    fn dyad(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The name of a triangle.
-    fn triangle(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The name of a square.
-    fn square(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The name of a rectangle.
-    fn rectangle(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The name of a pyramid.
-    fn pyramid(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The position at which the "pyramid" adjective goes. We assume this is
-    /// shared by "multipyramid".
-    fn pyramid_pos() -> Position {
-        Self::default_pos()
-    }
-
-    /// The gender of the "pyramid" noun. We assume this is shared by
-    /// "multipyramid".
-    fn pyramid_gender() -> Self::Gender {
-        Default::default()
-    }
-
-    /// The name for a pyramid with a given base.
-    fn pyramid_of<T: NameType>(
-        base: &Name<T>,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
-        Self::combine(
-            &Self::to_adj(base, options, Self::pyramid_gender()),
-            Self::pyramid(options),
-            Self::pyramid_pos(),
-        )
-    }
-
-    /// The name for a prism.
-    fn prism(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The position at which the "prism" adjective goes. We assume this is
-    /// shared by "multiprism".
-    fn prism_pos() -> Position {
-        Self::default_pos()
-    }
-
-    /// The gender of the "prism" noun. We assume this is shared by
-    /// "multiprism".
-    fn prism_gender() -> Self::Gender {
-        Default::default()
-    }
-
-    /// The name for a prism with a given base.
-    fn prism_of<T: NameType>(
-        base: &Name<T>,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
-        Self::combine(
-            &Self::to_adj(base, options, Self::prism_gender()),
-            &Self::prism(options),
-            Self::prism_pos(),
-        )
-    }
-
-    /// The name for a tegum.
-    fn tegum(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The position at which the "tegum" adjective goes. We assume this is
-    /// shared by "multitegum".
-    fn tegum_pos() -> Position {
-        Self::default_pos()
-    }
-
-    /// The gender of the "tegum" noun. We assume this is shared by
-    /// "multitegum".
-    fn tegum_gender() -> Self::Gender {
-        Default::default()
-    }
-
-    /// The name for a tegum with a given base.
-    fn tegum_of<T: NameType>(
-        base: &Name<T>,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
-        Self::combine(
-            &Self::to_adj(base, options, Self::tegum_gender()),
-            Self::tegum(options),
-            Self::tegum_pos(),
-        )
-    }
-
-    /// The name for a comb.
-    fn comb(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The position at which the "multicomb" adjective goes.
-    fn comb_pos() -> Position {
-        Self::default_pos()
-    }
-
-    /// The gender of the "multicomb" noun.
-    fn comb_gender() -> Self::Gender {
-        Default::default()
-    }
-
-    // A comb can't be used as a standalone. Instead, it must be used as part of
-    // the word "multicomb."
-
-    /// Makes the name for a general multiproduct
-    fn multiproduct<T: NameType>(
-        name: &Name<T>,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
-        // Gets the bases and the kind of multiproduct.
-        let (bases, kind, gender, pos) = match name {
-            Name::Multipyramid(bases) => (
-                bases,
-                Self::pyramid(options),
-                Self::pyramid_gender(),
-                Self::pyramid_pos(),
-            ),
-            Name::Multiprism(bases) => (
-                bases,
-                Self::prism(options),
-                Self::prism_gender(),
-                Self::prism_pos(),
-            ),
-            Name::Multitegum(bases) => (
-                bases,
-                Self::tegum(options),
-                Self::tegum_gender(),
-                Self::tegum_pos(),
-            ),
-            Name::Multicomb(bases) => (
-                bases,
-                Self::comb(options),
-                Self::comb_gender(),
-                Self::comb_pos(),
-            ),
-
-            // This method shouldn't be called in any other case.
-            _ => unreachable!(),
-        };
-
-        // Prepends a multi_prefix.
-        let kind = Self::multi_prefix(bases.len()) + kind;
-
-        // Concatenates the bases as adjectives, adding hyphens between them.
-        let mut str_bases = String::new();
-        let (last, bases) = bases.split_last().unwrap();
-        for base in bases {
-            str_bases.push_str(&Self::to_adj(base, options, gender));
-            str_bases.push('-');
-        }
-        str_bases.push_str(&Self::to_adj(last, options, gender));
-
-        Self::combine(&str_bases, &kind, pos)
-    }
-
-    /// The name for a simplex with a given rank.
-    fn simplex(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
-        Self::generic(rank.plus_one_usize(), rank, options)
-    }
-
-    /// The name for a cuboid.
-    fn cuboid(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The name for a cube.
-    fn cube(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The name for a hyperblock with a given rank.
-    fn hyperblock(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String;
-
-    /// The name for a hypercube with a given rank.
-    fn hypercube(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String;
-
-    /// The name for an orthoplex with a given rank.
-    fn orthoplex(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
-        Self::generic(1 << rank.into_usize(), rank, options)
-    }
-
-    /// The adjective for a "dual" polytope.
-    fn dual(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The position at which the "dual" adjective goes.
-    fn dual_pos() -> Position {
-        Self::default_pos()
-    }
-
-    /// The name for the dual of another polytope.
-    fn dual_of<T: NameType>(base: &Name<T>, options: Options<Self::Count, Self::Gender>) -> String {
-        Self::combine(
-            &Self::dual(options),
-            &Self::parse_with(base, options),
-            Self::dual_pos(),
-        )
-    }
-
-    /// The name for an antiprism.
-    fn antiprism(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The position at which the "antiprism" adjective goes.
-    fn antiprism_pos() -> Position {
-        Self::prism_pos()
-    }
-
-    /// The gender of the "antiprism" noun.
-    fn antiprism_gender() -> Self::Gender {
-        Self::prism_gender()
-    }
-
-    /// The name for an antiprism with a given base.
-    fn antiprism_of<T: NameType>(
-        base: &Name<T>,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
-        Self::combine(
-            &Self::to_adj(base, options, Self::antiprism_gender()),
-            &Self::antiprism(options),
-            Self::antiprism_pos(),
-        )
-    }
-
-    /// The name for an antitegum.
-    fn antitegum(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The position at which the "antitegum" adjective goes.
-    fn antitegum_pos() -> Position {
-        Self::tegum_pos()
-    }
-
-    /// The gender of the "antitegum" noun.
-    fn antitegum_gender() -> Self::Gender {
-        Self::tegum_gender()
-    }
-
-    /// The name for an antitegum with a given base.
-    fn antitegum_of<T: NameType>(
-        base: &Name<T>,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
-        Self::combine(
-            &Self::to_adj(base, options, Self::antitegum_gender()),
-            &Self::antitegum(options),
-            Self::antitegum_pos(),
-        )
-    }
-
-    /// The name for a ditope.
-    fn ditope(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
-        Self::generic(2, rank, options)
-    }
-
-    /// The position at which the "ditope" noun goes.
-    fn ditope_pos() -> Position {
-        !Self::default_pos()
-    }
-
-    /// The gender of the "ditope" noun.
-    fn ditope_gender(_rank: Rank) -> Self::Gender {
-        Default::default()
-    }
-
-    /// The name for a ditope with a given base.
-    fn ditope_of<T: NameType>(
-        base: &Name<T>,
-        rank: Rank,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
-        Self::combine(
-            &Self::to_adj(base, options, Self::ditope_gender(rank)),
-            &Self::ditope(rank, options),
-            !Self::ditope_pos(),
-        )
-    }
-
-    /// The name for a hosotope.
-    fn hosotope(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String;
-
-    /// The position at which the "hosotope" noun goes.
-    fn hosotope_pos() -> Position {
-        !Self::default_pos()
-    }
-
-    /// The gender of the "hosotope" noun.
-    fn hosotope_gender(_rank: Rank) -> Self::Gender {
-        Default::default()
-    }
-
-    /// The name for a hosotope with a given base.
-    fn hosotope_of<T: NameType>(
-        base: &Name<T>,
-        rank: Rank,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
-        Self::combine(
-            &Self::to_adj(base, options, Self::hosotope_gender(rank)),
-            &Self::hosotope(rank, options),
-            !Self::hosotope_pos(),
-        )
-    }
-
-    /// The adjective for a Petrial.
-    fn petrial(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The position at which the "Petrial" adjective goes.
-    fn petrial_pos() -> Position {
-        Self::default_pos()
-    }
-
-    /// The name for a Petrial with a given base.
-    fn petrial_of<T: NameType>(
-        base: &Name<T>,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
-        Self::combine(
-            Self::petrial(options),
-            &Self::parse_with(base, options),
-            Self::petrial_pos(),
-        )
-    }
-
-    /// The adjective for a "great" version of a polytope.
-    fn great(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The position of the "great" adjective.
-    fn great_pos() -> Position {
-        Self::default_pos()
-    }
-
-    /// The name for a great polytope with a given base.
-    fn great_of<T: NameType>(
-        base: &Name<T>,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
-        Self::combine(
-            Self::great(options),
-            &Self::parse_with(base, options),
-            Self::great_pos(),
-        )
-    }
-
-    /// The adjective for a "small" version of a polytope.
-    fn small(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The position of the "small" adjective.
-    fn small_pos() -> Position {
-        Self::default_pos()
-    }
-
-    /// The name for a small polytope with a given base.
-    fn small_of<T: NameType>(
-        base: &Name<T>,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
-        Self::combine(
-            Self::small(options),
-            &Self::parse_with(base, options),
-            Self::small_pos(),
-        )
-    }
-
-    /// The adjective for a "stellated" version of a polytope.
-    fn stellated(options: Options<Self::Count, Self::Gender>) -> &'static str;
-
-    /// The position of the "small" adjective.
-    fn stellated_pos() -> Position {
-        Self::default_pos()
-    }
-
-    /// The name for a stellated polytope from a given base.
-    fn stellated_of<T: NameType>(
-        base: &Name<T>,
-        options: Options<Self::Count, Self::Gender>,
-    ) -> String {
-        Self::combine(
-            &Self::stellated(options),
-            &Self::parse_with(base, options),
-            Self::stellated_pos(),
-        )
-    }
 }
 
 #[derive(Clone, Copy, Debug, EnumIter, Serialize, Deserialize)]
 pub enum SelectedLanguage {
     /// English
     En,
+    // Spanish
+    //  Es,
 
-    /// Spanish
-    Es,
-
-    /// German
-    De,
+    // German
+    //  De,
     // French
     // Fr,
 
@@ -802,11 +781,11 @@ pub enum SelectedLanguage {
 }
 
 impl std::fmt::Display for SelectedLanguage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.write_str(match self {
             Self::En => "English",
-            Self::Es => "Spanish",
-            Self::De => "German",
+            //        Self::Es => "Spanish",
+            //       Self::De => "German",
             // Self::Fr => "French",
             // Self::Ja => "Japanese",
             // Self::Pii => "Proto Indo-Iranian",
@@ -820,8 +799,8 @@ impl SelectedLanguage {
 
         match self {
             Self::En => En::parse_uppercase(name),
-            Self::Es => Es::parse_uppercase(name),
-            Self::De => De::parse_uppercase(name),
+            //      Self::Es => Es::parse_uppercase(name),
+            //       Self::De => De::parse_uppercase(name),
             // Self::Fr => Fr::parse_uppercase(name),
             // Self::Ja => Ja::parse(name),
             // Self::Pii => Pii::parse_uppercase(name),

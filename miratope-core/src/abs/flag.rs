@@ -528,7 +528,7 @@ impl<'a> OrientedFlagIter<'a> {
 
             // Applies the current flag change to the current flag.
             let flag_change = self.flag_changes[self.flag_idx];
-            let new_flag = current.change(&self.polytope, flag_change);
+            let new_flag = current.change(self.polytope, flag_change);
 
             // Increments the flag index.
             self.flag_idx = if self.flag_idx + 1 == self.flag_changes.len() {
@@ -667,7 +667,7 @@ impl PartialEq for FlagSet {
         }
 
         let flag = self.flags.iter().next().unwrap();
-        other.flags.contains(&flag)
+        other.flags.contains(flag)
     }
 }
 
@@ -716,7 +716,7 @@ impl FlagSet {
 
             for flag in &self.flags {
                 if flags.insert(flag.clone()) {
-                    let subset = Self::with_flags(&polytope, flag_changes.clone(), flag.clone());
+                    let subset = Self::with_flags(polytope, flag_changes.clone(), flag.clone());
 
                     for flag in &subset.flags {
                         flags.insert(flag.clone());

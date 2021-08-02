@@ -275,7 +275,7 @@ impl Polytope for Concrete {
     /// If you want more control over the arguments, you can use
     /// [`Self::try_antiprism_with`].
     fn try_antiprism(&self) -> DualResult<Self> {
-        Self::try_antiprism_with(&self, &Hypersphere::unit(self.dim().unwrap_or(1)), 1.0)
+        Self::try_antiprism_with(self, &Hypersphere::unit(self.dim().unwrap_or(1)), 1.0)
     }
 
     /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
@@ -489,7 +489,7 @@ pub trait ConcretePolytope: Polytope {
 
         for vertex in vertices {
             // If the new vertex does not lie on the hyperplane of the others:
-            if let Some(basis_vector) = subspace.add(&vertex) {
+            if let Some(basis_vector) = subspace.add(vertex) {
                 // Calculates the new circumcenter.
                 let distance = ((&center - vertex).norm_squared()
                     - (&center - &first_vertex).norm_squared())
@@ -759,7 +759,7 @@ pub trait ConcretePolytope: Polytope {
 
         // The flattened vertices (may possibly be the original vertices).
         let subspace = Subspace::from_points(self.vertices().iter());
-        let flat_vertices = subspace.flatten_vec(&self.vertices());
+        let flat_vertices = subspace.flatten_vec(self.vertices());
 
         match flat_vertices.get(0)?.len().cmp(&rank.into()) {
             // Degenerate polytopes have volume 0.

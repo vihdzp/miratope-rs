@@ -28,73 +28,30 @@ impl Default for Trigender {
 
 impl Gender for Trigender {}
 
-/// This implementation uses the fact, specific to German, that plurals for all
-/// genders are the same, and that female and plural declensions are the same
-/// (in the nominative case).
-impl Options<Plural, Trigender> {
-    /// Chooses a suffix for an adjective from three options:
-    ///
-    /// * A singular adjective (male).
-    /// * A singular adjective (female).
-    /// * A singular adjective (neuter).
-    ///
-    /// Assumes that the word will be used as an adjective, regardless of
-    /// `self.adjective`.
-    fn three_adj<'a>(&self, adj_m: &'a str, adj_f: &'a str, adj_n: &'a str) -> &'a str {
-        if self.count.is_one() {
-            match self.gender {
-                Trigender::Male => adj_m,
-                Trigender::Female => adj_f,
-                Trigender::Neuter => adj_n,
-            }
-        } else {
-            adj_f
+impl Trigender {
+    /// Chooses one of three arguments lazily depending on the gender of `self`.
+    fn choose_lazy<T, F1, F2, F3>(self, m: F1, f: F2, n: F3) -> T
+    where
+        F1: FnOnce() -> T,
+        F2: FnOnce() -> T,
+        F3: FnOnce() -> T,
+    {
+        match self {
+            Self::Male => m(),
+            Self::Female => f(),
+            Self::Neuter => n(),
         }
     }
 
-    /// Chooses a suffix from five options:
-    ///
-    /// * Base form.
-    /// * A plural.
-    /// * A singular adjective (male).
-    /// * A singular adjective (female).
-    /// * A singular adjective (neuter).
-    fn five<'a>(
-        &self,
-        base: &'a str,
-        plural: &'a str,
-        adj_m: &'a str,
-        adj_f: &'a str,
-        adj_n: &'a str,
-    ) -> &'a str {
-        if self.adjective {
-            self.three_adj(adj_m, adj_f, adj_n)
-        } else if self.count.is_one() {
-            base
-        } else {
-            plural
-        }
+    /// Chooses one of three arguments depending on the gender of `self`.
+    fn choose<T>(self, m: T, f: T, n: T) -> T {
+        self.choose_lazy(|| m, || f, || n)
     }
-}
 
-/// Calls `options.three`, autocompleting the declension rules of German.
-macro_rules! three {
-    ($options: ident, $adj: literal) => {
-        $options.three(concat!($adj, "er"), concat!($adj, "e"), concat!($adj, "es"))
-    };
-}
-
-/// Calls `options.five`, autocompleting the declension rules of German.
-macro_rules! five {
-    ($options: ident, $base: literal, $plural: literal, $adj: literal) => {
-        $options.five(
-            $base,
-            $plural,
-            concat!($adj, "er"),
-            concat!($adj, "e"),
-            concat!($adj, "es"),
-        )
-    };
+    /// Conjugates a string according to the usual German declension rules.
+    fn auto(self, str: String) -> String {
+        self.choose_lazy(|| str + "er", || str + "e", || str + "es")
+    }
 }
 
 /// The German language.
@@ -109,45 +66,78 @@ impl Prefix for De {
 }
 
 impl Language for De {
-    type Count = Plural;
     type Gender = Trigender;
 
-    /// The default position to place adjectives. This will be used for the
-    /// default implementations, but it can be overridden in any specific case.
     fn default_pos() -> Position {
         Position::Before
     }
 
-    /// Returns the suffix for a d-polytope. Only needs to work up to d = 20, we
-    /// won't offer support any higher than that.
-    fn suffix(d: Rank, options: Options<Self::Count, Self::Gender>) -> String {
-        const SUFFIXES: [&str; 21] = [
-            "mon", "tel", "gon", "edr", "cor", "ter", "pet", "ex", "zet", "yot", "xen", "dac",
-            "hendac", "doc", "tradac", "teradac", "petadac", "exdac", "zetadac", "yotadac",
-            "xendac",
-        ];
-
-        SUFFIXES[d.into_usize()].to_owned() + options.four("o", "os", "al", "ales")
-    }
-
-    fn nullitope(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        five!(options, "Nullitop", "Nullitope", "nullitopisch")
-    }
-
-    fn point(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        five!(options, "Punkt", "Punkte", "punktuell")
-    }
-
-    fn dyad(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        five!(options, "Dyade", "Dyaden", "dyadisch")
-    }
-
-    fn triangle(_options: Options<Self::Count, Self::Gender>) -> &'static str {
+    fn suffix_noun_str(d: Rank) -> String {
         todo!()
     }
 
-    fn square(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        five!(options, "Quadrat", "Quadrate", "quadratisch")
+    fn suffix_adj(d: Rank, _: Self::Gender) -> String {
+        todo!()
+    }
+
+    fn nullitope_noun_str() -> String {
+        "Nullitop".to_owned()
+    }
+
+    fn nullitope_gender() -> Self::Gender {
+        Trigender::Neuter
+    }
+
+    fn nullitope_adj(gender: Self::Gender) -> String {
+        gender.auto("nullitopisch".to_owned())
+    }
+
+    fn point_noun_str() -> String {
+        "Punkt".to_owned()
+    }
+
+    fn point_gender() -> Self::Gender {
+        Trigender::Male
+    }
+
+    fn point_adj(gender: Self::Gender) -> String {
+        gender.auto("punktuell".to_owned())
+    }
+
+    fn dyad_noun_str() -> String {
+        "Dyade".to_owned()
+    }
+
+    fn dyad_gender() -> Self::Gender {
+        Trigender::Female
+    }
+
+    fn dyad_adj(gender: Self::Gender) -> String {
+        gender.auto("dyadisch")
+    }
+
+    fn triangle_noun_str() ->String {
+        "Dreieck".to_owned()
+    }
+
+    fn triangle_gender() ->Self::Gender {
+        Trigender::Neuter
+    }
+
+    fn triangle_adj(gender:Self::Gender) ->String {
+        gender.auto("dreieckig")
+    }
+
+    fn square_noun_str() ->String {
+        "Quadrat".to_owned()
+    }
+
+    fn square_gender() ->Self::Gender {
+        Trigender::Neuter
+    }
+
+    fn square_adj(gender:Self::Gender) ->String {
+        gender.auto("quadratisch")
     }
 
     fn rectangle(options: Options<Self::Count, Self::Gender>) -> &'static str {

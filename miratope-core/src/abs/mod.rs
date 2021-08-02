@@ -1067,10 +1067,10 @@ impl Polytope for Abstract {
             while loop_continue {
                 loop_continue = face.insert(edge);
 
-                flag.change_mut(&self, 0);
-                traversed_flags.insert(flag.change(&self, 2));
-                flag.change_mut(&self, 1);
-                flag.change_mut(&self, 2);
+                flag.change_mut(self, 0);
+                traversed_flags.insert(flag.change(self, 2));
+                flag.change_mut(self, 1);
+                flag.change_mut(self, 2);
                 traversed_flags.insert(flag.clone());
 
                 edge = flag[1];
