@@ -80,7 +80,12 @@ impl Language for En {
     }
 
     fn suffix_adj(_: Self::Gender, rank: Rank) -> String {
-        SUFFIXES[rank.into_usize()].to_owned() + (if rank == Rank::new(2) { "" } else { "on" })
+        let suffix = SUFFIXES[rank.into_usize()].to_owned();
+
+        match rank.plus_one_usize() {
+            3 | 4 => suffix + "al",
+            _ => suffix + "ic",
+        }
     }
 
     fn nullitope_noun_str() -> String {

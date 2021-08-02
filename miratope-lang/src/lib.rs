@@ -424,8 +424,8 @@ macro_rules! decl_multiproduct {
 
                         // Concatenates the bases as adjectives, adding hyphens between them.
                         let mut str_bases = String::new();
-                        let (last, bases) = bases.split_last().unwrap();
-                        for base in bases {
+                        let (last, other_bases) = bases.split_last().unwrap();
+                        for base in other_bases {
                             str_bases.push_str(&Self::parse_adj(base, kind.gender));
                             str_bases.push('-');
                         }
@@ -442,8 +442,8 @@ macro_rules! decl_multiproduct {
                     fn [<$name _product_adj>]<T: NameType>(gender: Self::Gender, bases: &[Name<T>]) -> String {
                         // Concatenates the bases as adjectives, adding hyphens between them.
                         let mut str_bases = String::new();
-                        let (last, bases) = bases.split_last().unwrap();
-                        for base in bases {
+                        let (last, other_bases) = bases.split_last().unwrap();
+                        for base in other_bases {
                             str_bases.push_str(&Self::parse_adj(base, gender));
                             str_bases.push('-');
                         }
