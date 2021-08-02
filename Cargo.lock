@@ -312,19 +312,6 @@ dependencies = [
 
 [[package]]
 name = "bevy_egui"
-version = "0.4.2"
-source = "git+https://github.com/OfficialURL/bevy_egui?branch=bevy-main#4d79b26cc2be454c7a934fd1ce5b92accca3b2a7"
-dependencies = [
- "bevy",
- "clipboard",
- "egui",
- "thread_local",
- "webbrowser",
- "winit",
-]
-
-[[package]]
-name = "bevy_egui"
 version = "0.6.1"
 source = "git+https://github.com/jakobhellermann/bevy_egui?branch=bevy-main#125350d720181466603d545f9ba02b917dd47fd3"
 dependencies = [
@@ -2183,7 +2170,7 @@ version = "0.1.0"
 dependencies = [
  "approx",
  "bevy",
- "bevy_egui 0.6.1",
+ "bevy_egui",
  "directories",
  "egui",
  "lyon",
@@ -2203,7 +2190,7 @@ name = "miratope-core"
 version = "0.1.0"
 dependencies = [
  "approx",
- "bevy_egui 0.4.2",
+ "bevy_egui",
  "dyn-clone",
  "gcd",
  "itertools",
@@ -3553,7 +3540,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 [[package]]
 name = "winit"
 version = "0.25.0"
-source = "git+https://github.com/OfficialURL/winit?rev=06b285d5246210d6cf50e14283b912434d073cf2#06b285d5246210d6cf50e14283b912434d073cf2"
+source = "git+https://github.com/OfficialURL/winit?rev=91591c4e94fc31b5cd3b9e0438873a97abb35a17#91591c4e94fc31b5cd3b9e0438873a97abb35a17"
 dependencies = [
  "bitflags",
  "cocoa",

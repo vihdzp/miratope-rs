@@ -11,7 +11,7 @@ use miratope_lang::{poly::conc::NamedConcrete, SelectedLanguage};
 pub struct MainWindowPlugin;
 
 impl Plugin for MainWindowPlugin {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.add_system_to_stage(CoreStage::PreUpdate, update_visible.system())
             .add_system(update_scale_factor.system())
             .add_system_to_stage(CoreStage::PostUpdate, update_changed_polytopes.system());

@@ -79,7 +79,7 @@ const NEW_ISSUE: &str = "https://github.com/OfficialURL/miratope-rs/issues/new";
 
 /// Loads all of the necessary systems for the application to run.
 fn main() {
-    App::build()
+    App::new()
         // Adds resources.
         .insert_resource(Msaa { samples: 4 })
         // Adds plugins.

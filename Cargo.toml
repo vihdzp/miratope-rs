@@ -56,7 +56,7 @@ features = ["multi_threaded"]
 
 [patch.crates-io]
 # Fixes winit issue #1779.
-winit = { git = "https://github.com/OfficialURL/winit", rev = "06b285d5246210d6cf50e14283b912434d073cf2" }
+winit = { git = "https://github.com/OfficialURL/winit", rev = "91591c4e94fc31b5cd3b9e0438873a97abb35a17" }
 
 [profile.release]
 lto = "thin"

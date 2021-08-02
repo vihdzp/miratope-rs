@@ -38,7 +38,7 @@ pub enum ShowResult {
 pub struct OperationsPlugin;
 
 impl Plugin for OperationsPlugin {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.add_plugin(DualWindow::plugin())
             .add_plugin(PyramidWindow::plugin())
             .add_plugin(PrismWindow::plugin())
@@ -185,7 +185,7 @@ pub trait PlainWindow: Window {
 pub struct PlainWindowPlugin<T: PlainWindow>(PhantomData<T>);
 
 impl<T: PlainWindow + 'static> Plugin for PlainWindowPlugin<T> {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.insert_resource(T::default())
             .add_system(T::show_system.system().label("show_windows"));
     }
@@ -242,7 +242,7 @@ pub trait UpdateWindow: Window {
 pub struct UpdateWindowPlugin<T: UpdateWindow>(PhantomData<T>);
 
 impl<T: UpdateWindow + 'static> Plugin for UpdateWindowPlugin<T> {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.insert_resource(T::default())
             .add_system(T::show_system.system().label("show_windows"))
             .add_system(T::update_system.system().label("show_windows"));
@@ -448,7 +448,7 @@ pub trait DuoWindow: Window {
 pub struct DuoWindowPlugin<T: DuoWindow>(PhantomData<T>);
 
 impl<T: DuoWindow + 'static> Plugin for DuoWindowPlugin<T> {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.insert_resource(T::default())
             .add_system(T::show_system.system().label("show_windows"));
     }

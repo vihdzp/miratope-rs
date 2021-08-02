@@ -24,7 +24,7 @@ const CONF_FILE: &str = "miratope.conf";
 pub struct ConfigPlugin;
 
 impl Plugin for ConfigPlugin {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         // The configuration directory.
         let config_dir = Config::config_dir();
 

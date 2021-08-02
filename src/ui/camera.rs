@@ -12,7 +12,7 @@ use bevy_egui::{egui::CtxRef, EguiContext};
 pub struct InputPlugin;
 
 impl Plugin for InputPlugin {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.add_event::<CameraInputEvent>()
             .insert_resource(ProjectionType::Perspective)
             // We register inputs after the library has been shown, so that we

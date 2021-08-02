@@ -25,7 +25,7 @@ use strum::IntoEnumIterator;
 pub struct TopPanelPlugin;
 
 impl Plugin for TopPanelPlugin {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.insert_resource(FileDialogState::default())
             .insert_resource(Memory::default())
             .insert_resource(SectionDirection::default())
