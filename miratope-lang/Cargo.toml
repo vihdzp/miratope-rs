@@ -6,10 +6,7 @@ edition = "2018"
 [dependencies]
 miratope-core = { path = "../miratope-core" }
 vec-like = { path = "../vec-like" }
-# Has a few of my fixes.
-nalgebra = { git = "https://github.com/dimforge/nalgebra", branch = "dev", version = "0.27", features = [
-    "serde-serialize"
-] }
+nalgebra = { version = "0.28", features = ["serde-serialize"] }
 paste = "1"
 ron = "0.6"
 serde = { version = "1", features = ["derive"] }

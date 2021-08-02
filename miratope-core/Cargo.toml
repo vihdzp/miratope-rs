@@ -9,12 +9,9 @@ approx = "0.5"
 dyn-clone = "1.0"
 gcd = "2.0"
 itertools = "0.10"
-# Contains a few of my fixes.
-nalgebra = { git = "https://github.com/dimforge/nalgebra", branch = "dev", version = "0.27", features = [
-    "serde-serialize"
-] }
+nalgebra = { version = "0.28", features = ["serde-serialize"] }
 ordered-float = "2.4"
-petgraph = "0.5"
+petgraph = "0.6"
 rayon = "1.5"
 ron = "0.6"
 serde = { version = "1.0", features = ["derive"] }
