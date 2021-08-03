@@ -3,10 +3,10 @@
 
 //pub mod de;
 pub mod en;
-//pub mod es;
+pub mod es;
 //pub use de::De;
 pub use en::En;
-//pub use es::Es;
+pub use es::Es;
 
 pub(crate) fn uppercase_mut(str: &mut String) {
     let mut indices = str.char_indices();

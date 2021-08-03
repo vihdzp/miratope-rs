@@ -91,12 +91,6 @@ pub trait Prefix {
         format!("{}-", n)
     }
 
-    /// Returns the prefix that stands for n- in a polygon, whenever we aren't
-    /// writing an adjective.
-    fn polygon_prefix(n: usize) -> String {
-        Self::prefix(n)
-    }
-
     /// Returns the prefix that stands for n- in a multiproduct.
     fn multi_prefix(n: usize) -> String {
         Self::prefix(n)
@@ -694,7 +688,10 @@ pub trait Language: Prefix {
     /// The generic name for a polytope with a given facet count and rank as a
     /// noun.
     fn generic_noun(facet_count: usize, rank: Rank) -> ParseOutput<Self::Gender> {
-        Self::suffix_noun(rank).map_output(|_, output| Self::prefix(facet_count) + &output)
+        ParseOutput::new(
+            Self::generic_gender(facet_count, rank),
+            Self::generic_noun_str(facet_count, rank),
+        )
     }
 
     /// The generic name for a polytope with a given facet count and rank as an
@@ -789,9 +786,9 @@ pub trait Language: Prefix {
 pub enum SelectedLanguage {
     /// English
     En,
-    // Spanish
-    //  Es,
 
+    /// Spanish
+    Es,
     // German
     //  De,
     // French
@@ -808,7 +805,7 @@ impl std::fmt::Display for SelectedLanguage {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.write_str(match self {
             Self::En => "English",
-            //        Self::Es => "Spanish",
+            Self::Es => "Spanish",
             //       Self::De => "German",
             // Self::Fr => "French",
             // Self::Ja => "Japanese",
@@ -823,7 +820,7 @@ impl SelectedLanguage {
 
         match self {
             Self::En => En::parse_uppercase(name),
-            //      Self::Es => Es::parse_uppercase(name),
+            Self::Es => Es::parse_uppercase(name),
             //       Self::De => De::parse_uppercase(name),
             // Self::Fr => Fr::parse_uppercase(name),
             // Self::Ja => Ja::parse(name),

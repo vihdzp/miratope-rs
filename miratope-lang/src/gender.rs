@@ -29,7 +29,7 @@ pub enum Bigender {
 
 impl Default for Bigender {
     fn default() -> Self {
-        Self::Male
+        panic!("You forgot to override the gender of a method!");
     }
 }
 
@@ -69,7 +69,7 @@ pub enum Trigender {
 
 impl Default for Trigender {
     fn default() -> Self {
-        Self::Neuter
+        panic!("You forgot to override the gender of a method!");
     }
 }
 

@@ -1,11 +1,14 @@
 //! Implements the Spanish language.
-use crate::{
-    greek_prefixes,
-    options::{Bigender, Options},
-    GreekPrefix, Language, Position, Prefix,
-};
+use crate::{gender::Bigender, greek_prefixes, GreekPrefix, Language, Position, Prefix};
 
 use miratope_core::abs::rank::Rank;
+
+impl Bigender {
+    /// Adds either an 'o' or an 'a' to the end of a string depending on the gender.
+    fn choose_auto(self, str: String) -> String {
+        str + self.choose("o", "a")
+    }
+}
 
 /// The Spanish language.
 pub struct Es;
@@ -33,24 +36,6 @@ impl Prefix for Es {
     /// not in the ASCII range, we need to be **really careful** here.
     fn prefix(n: usize) -> String {
         Self::greek_prefix(n)
-    }
-
-    fn polygon_prefix(n: usize) -> String {
-        let mut chars = Self::prefix(n).chars().collect::<Vec<_>>();
-        for c in chars.iter_mut().rev() {
-            *c = match c {
-                'a' => 'á',
-                'e' => 'é',
-                'i' => 'í',
-                'o' => 'ó',
-                'u' => 'ú',
-                _ => continue,
-            };
-
-            break;
-        }
-
-        chars.into_iter().collect()
     }
 
     fn multi_prefix(n: usize) -> String {
@@ -112,8 +97,30 @@ impl Prefix for Es {
     }
 }
 
+fn polygon_prefix(n: usize) -> String {
+    let mut chars = Es::prefix(n).chars().collect::<Vec<_>>();
+    for c in chars.iter_mut().rev() {
+        *c = match c {
+            'a' => 'á',
+            'e' => 'é',
+            'i' => 'í',
+            'o' => 'ó',
+            'u' => 'ú',
+            _ => continue,
+        };
+
+        break;
+    }
+
+    chars.into_iter().collect()
+}
+
+const SUFFIXES: [&str; 21] = [
+    "mon", "tel", "gon", "edr", "cor", "ter", "pet", "ex", "zet", "yot", "xen", "dac", "hendac",
+    "doc", "tradac", "teradac", "petadac", "exdac", "zetadac", "yotadac", "xendac",
+];
+
 impl Language for Es {
-    type Count = crate::options::Plural;
     type Gender = Bigender;
 
     /// The default position to place adjectives. This will be used for the
@@ -122,206 +129,263 @@ impl Language for Es {
         Position::After
     }
 
-    /// Returns the suffix for a d-polytope. Only needs to work up to d = 20, we
-    /// won't offer support any higher than that.
-    fn suffix(d: Rank, options: Options<Self::Count, Self::Gender>) -> String {
-        const SUFFIXES: [&str; 21] = [
-            "mon", "tel", "gon", "edr", "cor", "ter", "pet", "ex", "zet", "yot", "xen", "dac",
-            "hendac", "doc", "tradac", "teradac", "petadac", "exdac", "zetadac", "yotadac",
-            "xendac",
-        ];
-
-        SUFFIXES[d.into_usize()].to_owned() + options.four("o", "os", "al", "ales")
+    fn suffix_noun_str(rank: Rank) -> String {
+        SUFFIXES[rank.into_usize()].to_owned() + "o"
     }
 
-    /// The name of a nullitope.
-    fn nullitope(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.six(
-            "nulitopo",
-            "nulitopos",
-            "nulitópico",
-            "nulitópicos",
-            "nulitópica",
-            "nulitópicas",
-        )
+    fn suffix_gender(_: Rank) -> Self::Gender {
+        Bigender::Male
     }
 
-    /// The name of a point.
-    fn point(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.four("punto", "puntos", "puntual", "puntuales")
+    fn suffix_adj(_: Self::Gender, rank: Rank) -> String {
+        SUFFIXES[rank.into_usize()].to_owned() + "al"
     }
 
-    /// The name of a dyad.
-    fn dyad(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.six(
-            "díada",
-            "díadas",
-            "diádico",
-            "diádicos",
-            "diádica",
-            "diádicas",
-        )
-    }
-
-    /// The name of a triangle.
-    fn triangle(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.four("triángulo", "triángulos", "triangular", "triangulares")
-    }
-
-    /// The name of a square.
-    fn square(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.six(
-            "cuadrado",
-            "cuadrados",
-            "cuadrado",
-            "cuadrados",
-            "cuadrada",
-            "cuadradas",
-        )
-    }
-
-    /// The name of a rectangle.
-    fn rectangle(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.four("rectángulo", "rectángulos", "rectangular", "rectangulares")
-    }
-
-    /// The generic name for a polytope with `n` facets in `d` dimensions.
-    fn generic(n: usize, d: Rank, options: Options<Self::Count, Self::Gender>) -> String {
-        (if d == Rank::new(2) && !options.adjective {
-            Self::polygon_prefix(n)
+    fn generic_noun_str(facet_count: usize, rank: Rank) -> String {
+        if rank == Rank::new(2) {
+            polygon_prefix(facet_count) + &Self::suffix_noun_str(rank)
         } else {
-            Self::prefix(n)
-        }) + &Self::suffix(d, options)
+            Self::prefix(facet_count) + &Self::suffix_noun_str(rank)
+        }
     }
 
-    /// The name for a pyramid.
-    fn pyramid(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.four("pirámide", "pirámides", "piramidal", "piramidales")
+    fn nullitope_noun_str() -> String {
+        "nulítopo".to_owned()
     }
 
-    /// The gender of the "pyramid" noun. We assume this is shared by
-    /// "multipyramid".
-    fn pyramid_gender() -> Self::Gender {
+    fn nullitope_gender() -> Self::Gender {
+        Bigender::Male
+    }
+
+    fn nullitope_adj(gender: Self::Gender) -> String {
+        gender.choose_auto("nulitópic".to_owned())
+    }
+
+    fn point_noun_str() -> String {
+        "punto".to_owned()
+    }
+
+    fn point_gender() -> Self::Gender {
+        Bigender::Male
+    }
+
+    fn point_adj(_: Self::Gender) -> String {
+        "puntual".to_owned()
+    }
+
+    fn dyad_noun_str() -> String {
+        "díada".to_owned()
+    }
+
+    fn dyad_gender() -> Self::Gender {
         Bigender::Female
     }
 
-    /// The name for a prism.
-    fn prism(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.six(
-            "prisma",
-            "prismas",
-            "prismático",
-            "prismáticos",
-            "prismática",
-            "prismáticas",
-        )
+    fn dyad_adj(gender: Self::Gender) -> String {
+        gender.choose_auto("diádic".to_owned())
     }
 
-    /// The name for a tegum.
-    fn tegum(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.six(
-            "tego",
-            "tegos",
-            "tegmático",
-            "tegmáticos",
-            "tegmática",
-            "tegmáticas",
-        )
+    fn triangle_noun_str() -> String {
+        "triángulo".to_owned()
     }
 
-    /// The name for a comb.
-    fn comb(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.two("panal", "panales")
+    fn triangle_gender() -> Self::Gender {
+        Bigender::Male
     }
 
-    /// The name for a cuboid.
-    fn cuboid(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.four("cuboide", "cuboides", "cuboidal", "cuboidales")
+    fn triangle_adj(_: Self::Gender) -> String {
+        "triangular".to_owned()
     }
 
-    /// The name for a cube.
-    fn cube(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.six("cubo", "cubos", "cúbico", "cúbicos", "cúbica", "cúbicas")
+    fn square_noun_str() -> String {
+        "cuadrado".to_owned()
     }
 
-    /// The name for a hyperblock with a given rank.
-    fn hyperblock(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
-        Self::prefix(rank.into()) + options.two("bloque", "bloques")
+    fn square_gender() -> Self::Gender {
+        Bigender::Male
     }
 
-    /// The name for a hypercube with a given rank.
-    fn hypercube(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
-        Self::hypercube_prefix(rank.into())
-            + options.six(
-                "racto",
-                "ractos",
-                "ráctico",
-                "rácticos",
-                "ráctica",
-                "rácticas",
-            )
+    fn square_adj(gender: Self::Gender) -> String {
+        gender.choose_auto("cuadrad".to_owned())
     }
 
-    /// The adjective for a "dual" polytope.
-    fn dual(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.two("dual", "duales")
+    fn rectangle_noun_str() -> String {
+        "rectángulo".to_owned()
     }
 
-    /// The name for an antiprism.
-    fn antiprism(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.six(
-            "antiprisma",
-            "antiprismas",
-            "antiprismático",
-            "antiprismáticos",
-            "antiprismática",
-            "antiprismáticas",
-        )
+    fn rectangle_gender() -> Self::Gender {
+        Bigender::Male
     }
 
-    /// The name for an antitegum.
-    fn antitegum(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.six(
-            "antitego",
-            "antitegos",
-            "antitegmático",
-            "antitegmáticos",
-            "antitegmática",
-            "antitegmáticas",
-        )
+    fn rectangle_adj(_: Self::Gender) -> String {
+        "rectangular".to_owned()
     }
 
-    fn hosotope(rank: Rank, options: Options<Self::Count, Self::Gender>) -> String {
-        "hoso".to_owned() + &Self::suffix(rank, options)
+    fn pyramid_noun_str() -> String {
+        "pirámide".to_owned()
     }
 
-    /// The adjective for a Petrial.
-    fn petrial(_options: Options<Self::Count, Self::Gender>) -> &'static str {
-        "Petrial"
+    fn pyramid_gender() -> Self::Gender {
+        Bigender::Male
     }
 
-    /// The adjective for a "great" version of a polytope.
-    fn great(_options: Options<Self::Count, Self::Gender>) -> &'static str {
-        "gran"
+    fn pyramid_adj(_: Self::Gender) -> String {
+        "piramidal".to_owned()
     }
 
-    /// The position of the "great" adjective.
+    fn prism_noun_str() -> String {
+        "prisma".to_owned()
+    }
+
+    fn prism_gender() -> Self::Gender {
+        Bigender::Male
+    }
+
+    fn prism_adj(gender: Self::Gender) -> String {
+        gender.choose_auto("prismátic".to_owned())
+    }
+
+    fn tegum_noun_str() -> String {
+        "tego".to_owned()
+    }
+
+    fn tegum_gender() -> Self::Gender {
+        Bigender::Male
+    }
+
+    fn tegum_adj(gender: Self::Gender) -> String {
+        gender.choose_auto("tegmátic".to_owned())
+    }
+
+    fn comb_noun_str() -> String {
+        "panal".to_owned()
+    }
+
+    fn comb_gender() -> Self::Gender {
+        Bigender::Male
+    }
+
+    fn comb_adj(_: Self::Gender) -> String {
+        "panal".to_owned()
+    }
+
+    fn antiprism_noun_str() -> String {
+        "antiprisma".to_owned()
+    }
+
+    fn antiprism_gender() -> Self::Gender {
+        Bigender::Male
+    }
+
+    fn antiprism_adj(gender: Self::Gender) -> String {
+        gender.choose_auto("antiprismátic".to_owned())
+    }
+
+    fn antitegum_noun_str() -> String {
+        "antitego".to_owned()
+    }
+
+    fn antitegum_gender() -> Self::Gender {
+        Bigender::Male
+    }
+
+    fn antitegum_adj(gender: Self::Gender) -> String {
+        gender.choose_auto("antitegmátic".to_owned())
+    }
+
+    fn hosotope_noun_str(rank: Rank) -> String {
+        "hoso".to_owned() + &Self::suffix_noun_str(rank)
+    }
+
+    fn hosotope_gender(_: Rank) -> Self::Gender {
+        Bigender::Male
+    }
+
+    fn hosotope_adj(gender: Self::Gender, rank: Rank) -> String {
+        "hoso".to_owned() + &Self::suffix_adj(gender, rank)
+    }
+
+    fn ditope_noun_str(rank: Rank) -> String {
+        "hoso".to_owned() + &Self::suffix_noun_str(rank)
+    }
+
+    fn ditope_gender(_: Rank) -> Self::Gender {
+        Bigender::Male
+    }
+
+    fn ditope_adj(gender: Self::Gender, rank: Rank) -> String {
+        "di".to_owned() + &Self::suffix_adj(gender, rank)
+    }
+
+    fn petrial_adj(_: Self::Gender) -> String {
+        "Petrial".to_owned()
+    }
+
+    fn simplex_noun_str(rank: Rank) -> String {
+        Self::generic_noun_str(rank.plus_one_usize(), rank)
+    }
+
+    fn simplex_adj(gender: Self::Gender, rank: Rank) -> String {
+        Self::generic_adj(gender, rank.plus_one_usize(), rank)
+    }
+
+    fn cuboid_noun_str() -> String {
+        "cuboide".to_owned()
+    }
+
+    fn cuboid_adj(_: Self::Gender) -> String {
+        "cuboidal".to_owned()
+    }
+
+    fn cube_noun_str() -> String {
+        "cubo".to_owned()
+    }
+
+    fn cube_adj(gender: Self::Gender) -> String {
+        gender.choose_auto("cúbic".to_owned())
+    }
+
+    fn hyperblock_noun_str(rank: Rank) -> String {
+        Self::greek_prefix(rank.into_usize()) + "bloque"
+    }
+
+    fn hyperblock_adj(_: Self::Gender, rank: Rank) -> String {
+        Self::greek_prefix(rank.into_usize()) + "bloque"
+    }
+
+    fn hypercube_noun_str(rank: Rank) -> String {
+        Self::greek_prefix(rank.into_usize()) + "racto"
+    }
+
+    fn hypercube_adj(gender: Self::Gender, rank: Rank) -> String {
+        gender.choose_auto(Self::greek_prefix(rank.into_usize()) + "ráctic")
+    }
+
+    fn orthoplex_noun_str(rank: Rank) -> String {
+        Self::generic_noun_str(1 << rank.into_usize(), rank)
+    }
+
+    fn orthoplex_adj(gender: Self::Gender, rank: Rank) -> String {
+        Self::generic_adj(gender, 1 << rank.into_usize(), rank)
+    }
+
+    fn great_adj(_: Self::Gender) -> String {
+        "gran".to_owned()
+    }
+
     fn great_pos() -> Position {
         Position::Before
     }
 
-    /// The adjective for a "small" version of a polytope.
-    fn small(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.four_adj("pequeño", "pequeños", "pequeña", "pequeñas")
+    fn small_adj(gender: Self::Gender) -> String {
+        gender.choose_auto("pequeñ".to_owned())
     }
 
-    /// The position of the "small" adjective.
-    fn small_pos() -> Position {
-        Position::Before
+    fn stellated_adj(gender: Self::Gender) -> String {
+        gender.choose_auto("estrellad".to_owned())
     }
 
-    /// The adjective for a "stellated" version of a polytope.
-    fn stellated(options: Options<Self::Count, Self::Gender>) -> &'static str {
-        options.four_adj("estrellado", "estrellados", "estrellada", "estrelladas")
+    fn dual_adj(_: Self::Gender) -> String {
+        "dual".to_owned()
     }
 }
