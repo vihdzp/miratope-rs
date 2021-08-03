@@ -60,7 +60,7 @@ pub mod lang;
 pub mod name;
 pub mod poly;
 
-use name::{Name, NameData, NameType, Regular};
+use name::{Name, NameData, NameType, Quadrilateral, Regular};
 
 use gender::Gender;
 use miratope_core::abs::rank::Rank;
@@ -261,10 +261,18 @@ impl std::ops::Not for Position {
 impl Position {
     /// Combines an adjective and a noun, placing the adjective in a given
     /// position with respect to the noun.
-    fn combine(self, adj: &str, noun: &str) -> String {
+    fn combine(self, mut adj: String, mut noun: String) -> String {
         match self {
-            Self::Before => format!("{} {}", adj, noun),
-            Self::After => format!("{} {}", noun, adj),
+            Self::Before => {
+                adj.push(' ');
+                adj += &noun;
+                adj
+            }
+            Self::After => {
+                noun.push(' ');
+                noun += &adj;
+                noun
+            }
         }
     }
 }
@@ -376,8 +384,8 @@ macro_rules! decl_operator {
                     fn [<$name _of_noun>]<T: NameType>(base: &Name<T>, $($($args: $ty),*)?) -> ParseOutput<Self::Gender> {
                         Self::[<$name _noun>]($($($args),*)?).map_output(|gender, output|
                             Self::[<$name _pos>]($($($args),*)?).combine(
-                                &Self::parse_adj(base, gender),
-                                &output,
+                                Self::parse_adj(base, gender),
+                                output,
                             )
                         )
                     }
@@ -388,8 +396,8 @@ macro_rules! decl_operator {
                     #[allow(unused_variables)]
                     fn [<$name _of_adj>]<T: NameType>(gender: Self::Gender, base: &Name<T>, $($($args: $ty),*)?) -> String {
                         Self::[<$name _pos>]($($($args),*)?).combine(
-                            &Self::parse_adj(base, gender),
-                            &Self::[<$name _adj>](gender, $($($args),*)?)
+                            Self::parse_adj(base, gender),
+                            Self::[<$name _adj>](gender, $($($args),*)?)
                         )
                     }
                 }
@@ -422,17 +430,11 @@ macro_rules! decl_multiproduct {
                         // The kind of the product.
                         let kind = Self::[<$name _noun>]();
 
-                        // Concatenates the bases as adjectives, adding hyphens between them.
-                        let mut str_bases = String::new();
-                        let (last, other_bases) = bases.split_last().unwrap();
-                        for base in other_bases {
-                            str_bases.push_str(&Self::parse_adj(base, kind.gender));
-                            str_bases.push('-');
-                        }
-                        str_bases.push_str(&Self::parse_adj(last, kind.gender));
-
-                        kind.map_output(|_, output|
-                            Self::[<$name _pos>]().combine(&str_bases, &(Self::multi_prefix(bases.len()) + &output))
+                        kind.map_output(|gender, output|
+                            Self::[<$name _pos>]().combine(
+                                Self::hyphenate(bases.iter().map(|base| Self::parse_adj(base, gender))),
+                                (Self::multi_prefix(bases.len()) + &output)
+                            )
                         )
                     }
                 }
@@ -440,18 +442,9 @@ macro_rules! decl_multiproduct {
                 doc_comment! {
                     concat!("Makes the name for a general ", stringify!($name), " product as an adjective."),
                     fn [<$name _product_adj>]<T: NameType>(gender: Self::Gender, bases: &[Name<T>]) -> String {
-                        // Concatenates the bases as adjectives, adding hyphens between them.
-                        let mut str_bases = String::new();
-                        let (last, other_bases) = bases.split_last().unwrap();
-                        for base in other_bases {
-                            str_bases.push_str(&Self::parse_adj(base, gender));
-                            str_bases.push('-');
-                        }
-                        str_bases.push_str(&Self::parse_adj(last, gender));
-
                         Self::[<$name _pos>]().combine(
-                            &str_bases,
-                            &(Self::multi_prefix(bases.len()) + &Self::[<$name _adj>](gender))
+                            Self::hyphenate(bases.iter().map(|base| Self::parse_adj(base, gender))),
+                            (Self::multi_prefix(bases.len()) + &Self::[<$name _adj>](gender))
                         )
                     }
                 }
@@ -492,8 +485,8 @@ macro_rules! decl_adj {
                     fn [<$name _of_noun>]<T: NameType>(base: &Name<T>, $($($args: $ty),*)?) -> ParseOutput<Self::Gender> {
                         Self::parse_noun(base).map_output(|gender, output|
                             Self::[<$name _pos>]().combine(
-                                &Self::[<$name _adj>](gender, $($($args),*)?),
-                                &output,
+                                Self::[<$name _adj>](gender, $($($args),*)?),
+                                output,
                             )
                         )
                     }
@@ -503,8 +496,8 @@ macro_rules! decl_adj {
                     concat!("Parses a name with the modifier \"", stringify!($name), "\" as an adjective."),
                     fn [<$name _of_adj>]<T: NameType>(gender: Self::Gender, base: &Name<T>, $($($args: $ty),*)?) -> String {
                         Self::[<$name _pos>]($($($args),*)?).combine(
-                            &Self::[<$name _adj>](gender, $($($args),*)?),
-                            &Self::parse_adj(base, gender)
+                            Self::[<$name _adj>](gender, $($($args),*)?),
+                            Self::parse_adj(base, gender)
                         )
                     }
                 }
@@ -534,9 +527,7 @@ macro_rules! impl_parse {
                     Triangle { .. } => Self::[<triangle_ $type>]($($gender)?),
 
                     // TODO: merge these into one.
-                    Square => Self::[<square_ $type>]($($gender)?),
-                    Rectangle => Self::[<rectangle_ $type>]($($gender)?),
-                    Orthodiagonal => Self::[<generic_ $type>]($($gender,)? 4, Rank::new(2)),
+                    Quadrilateral { quad } => Self::[<generic_quadrilateral_ $type>]::<T>($($gender,)? *quad),
 
                     Polygon { n, .. } => Self::[<generic_ $type>]($($gender,)? *n, Rank::new(2)),
 
@@ -676,6 +667,18 @@ pub trait Language: Prefix {
 
     decl_adj!(dual, petrial, great, small, stellated);
 
+    /// Hyphenates various adjectives together.
+    fn hyphenate<T: AsRef<str>, U: Iterator<Item = T>>(mut bases: U) -> String {
+        let mut res = bases.next().unwrap().as_ref().to_owned();
+
+        for name in bases {
+            res.push('-');
+            res += name.as_ref();
+        }
+
+        res
+    }
+
     // Defaults for generic names.
 
     /// The string corresponding to the noun for a generic polytope.
@@ -701,6 +704,27 @@ pub trait Language: Prefix {
     }
 
     // Some auxiliary functions for parsing.
+
+    fn generic_quadrilateral_noun<T: NameType>(
+        quad: T::DataQuadrilateral,
+    ) -> ParseOutput<Self::Gender> {
+        match quad.unwrap_or_default() {
+            Quadrilateral::Square => Self::square_noun(),
+            Quadrilateral::Rectangle => Self::rectangle_noun(),
+            Quadrilateral::Orthodiagonal => Self::generic_noun(4, Rank::new(2)),
+        }
+    }
+
+    fn generic_quadrilateral_adj<T: NameType>(
+        gender: Self::Gender,
+        quad: T::DataQuadrilateral,
+    ) -> String {
+        match quad.unwrap_or_default() {
+            Quadrilateral::Square => Self::square_adj(gender),
+            Quadrilateral::Rectangle => Self::rectangle_adj(gender),
+            Quadrilateral::Orthodiagonal => Self::generic_adj(gender, 4, Rank::new(2)),
+        }
+    }
 
     /// Parses a generic cuboid (regular or irregular) as a noun.
     fn generic_cuboid_noun<T: NameType>(regular: &T::DataRegular) -> ParseOutput<Self::Gender> {

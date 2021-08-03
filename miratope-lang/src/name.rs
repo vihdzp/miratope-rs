@@ -19,6 +19,10 @@ pub trait NameType: Debug + Clone + PartialEq + Serialize {
     /// associated types are stable.
     type DataRegular: NameData<Regular> + Default + DeserializeOwned;
 
+    /// Either `AbsData<Quadrilateral>` or `ConData<Quadrilateral>`. Workaround until generic
+    /// associated types are stable.
+    type DataQuadrilateral: NameData<Quadrilateral> + Default + DeserializeOwned + Copy;
+
     /// Whether the name marker is for an abstract polytope.
     fn is_abstract() -> bool;
 }
@@ -34,10 +38,22 @@ pub trait NameData<T>: PartialEq + Debug + Clone + Serialize {
     fn new(value: T) -> Self;
 
     /// Determines whether `self` contains a given value.
-    fn contains(&self, value: &T) -> bool;
+    fn is(&self, value: &T) -> bool;
 
     /// Determines whether `self` satisfies a given predicate.
     fn satisfies<F: Fn(&T) -> bool>(&self, f: F) -> bool;
+
+    /// Retrieves the wrapped value, or a specified value if none.
+    fn unwrap_or(self, value: T) -> T;
+
+    /// Retrieves the wrapped value, or the default value if none.
+    fn unwrap_or_default(self) -> T
+    where
+        T: Default,
+    {
+        #[allow(clippy::or_fun_call)]
+        self.unwrap_or(Default::default())
+    }
 }
 
 /// Phantom data associated with an abstract polytope.
@@ -55,7 +71,7 @@ impl<T> Default for AbsData<T> {
 
 /// Any two `AbsData` compare as equal to one another.
 impl<T> PartialEq for AbsData<T> {
-    fn eq(&self, _other: &Self) -> bool {
+    fn eq(&self, _: &Self) -> bool {
         true
     }
 }
@@ -74,13 +90,18 @@ impl<T: Debug> NameData<T> for AbsData<T> {
     }
 
     /// Returns `true` no matter what, as if `self` actually held the given value.
-    fn contains(&self, _: &T) -> bool {
+    fn is(&self, _: &T) -> bool {
         true
     }
 
     /// Returns `true` no matter what, as if `self` actually satisfied the given predicate.
     fn satisfies<F: Fn(&T) -> bool>(&self, _: F) -> bool {
         true
+    }
+
+    /// Returns the specified value verbatim.
+    fn unwrap_or(self, value: T) -> T {
+        value
     }
 }
 
@@ -91,6 +112,7 @@ pub struct Abs;
 impl NameType for Abs {
     type DataPoint = AbsData<Point>;
     type DataRegular = AbsData<Regular>;
+    type DataQuadrilateral = AbsData<Quadrilateral>;
 
     fn is_abstract() -> bool {
         true
@@ -108,13 +130,18 @@ impl<T: PartialEq + Debug + Clone + Serialize + DeserializeOwned> NameData<T> fo
     }
 
     /// Determines whether `self` contains a given value.
-    fn contains(&self, value: &T) -> bool {
+    fn is(&self, value: &T) -> bool {
         &self.0 == value
     }
 
     /// Determines whether `self` satisfies the given predicate.
     fn satisfies<F: Fn(&T) -> bool>(&self, f: F) -> bool {
         f(&self.0)
+    }
+
+    /// Retrieves the wrapped value, ignores the argument.
+    fn unwrap_or(self, _: T) -> T {
+        self.0
     }
 }
 
@@ -125,6 +152,7 @@ pub struct Con;
 impl NameType for Con {
     type DataPoint = ConData<Point>;
     type DataRegular = ConData<Regular>;
+    type DataQuadrilateral = ConData<Quadrilateral>;
 
     fn is_abstract() -> bool {
         false
@@ -160,6 +188,30 @@ impl Regular {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Quadrilateral {
+    /// A square.
+    Square,
+
+    /// A rectangle.
+    Rectangle,
+
+    /// An orthodiagonal quadrilateral (a dyadic duotegum).
+    Orthodiagonal,
+}
+
+impl Default for Quadrilateral {
+    fn default() -> Self {
+        Self::Square
+    }
+}
+
+impl Quadrilateral {
+    pub fn is_square(self) -> bool {
+        matches!(self, Self::Square)
+    }
+}
+
 /// A language-independent representation of a polytope name, in a syntax
 /// tree-like structure.
 ///
@@ -188,16 +240,8 @@ pub enum Name<T: NameType> {
         regular: T::DataRegular,
     },
 
-    /// A square.
-    // Maybe we should store its center?
-    Square,
-
-    /// A rectangle (a 2-cuboid).
-    // Maybe we should store its center?
-    Rectangle,
-
-    /// An orthodiagonal quadrilateral (a dyadic duotegum).
-    Orthodiagonal,
+    /// A quadrilateral.
+    Quadrilateral { quad: T::DataQuadrilateral },
 
     /// A polygon with **at least 4** sides if irregular, or **at least 5**
     /// sides if regular.
@@ -462,7 +506,7 @@ impl<T: NameType> Name<T> {
             // We make irregular triangles into irregular simplices, and regular
             // triangles into triangular pyramids.
             Self::Triangle { regular } => {
-                if regular.contains(&Regular::No) {
+                if regular.is(&Regular::No) {
                     Self::Simplex {
                         regular,
                         rank: Rank::new(3),
@@ -475,7 +519,7 @@ impl<T: NameType> Name<T> {
             // We make irregular simplices into irregular simplices, and regular
             // simplices into simplicial pyramids.
             Self::Simplex { regular, rank } => {
-                if regular.contains(&Regular::No) {
+                if regular.is(&Regular::No) {
                     Self::Simplex {
                         regular,
                         rank: rank.plus_one(),
@@ -506,27 +550,33 @@ impl<T: NameType> Name<T> {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
             Self::Dyad => Self::rectangle(),
-            Self::Rectangle => Self::Cuboid {
-                regular: Default::default(),
-            },
+            Self::Quadrilateral { quad } => {
+                if quad.is(&Quadrilateral::Orthodiagonal) {
+                    Self::Prism(Box::new(self))
+                } else {
+                    Self::Cuboid {
+                        regular: Default::default(),
+                    }
+                }
+            }
 
             // We make an irregular cuboid into an irregular cuboid, and
             // a regular one into a cubic prism.
-            Self::Cuboid { regular } => {
-                if regular.contains(&Regular::No) {
+            Self::Cuboid { ref regular } => {
+                if regular.is(&Regular::No) {
                     Self::Hyperblock {
                         regular: Default::default(),
                         rank: Rank::new(4),
                     }
                 } else {
-                    Self::Prism(Box::new(Self::Cuboid { regular }))
+                    Self::Prism(Box::new(self))
                 }
             }
 
             // We make an irregular hyperblock into an irregular hyperblock, and
             // a regular one into a hypercube prism.
             Self::Hyperblock { regular, rank } => {
-                if regular.contains(&Regular::No) {
+                if regular.is(&Regular::No) {
                     Self::Hyperblock {
                         regular,
                         rank: rank.plus_one(),
@@ -557,15 +607,21 @@ impl<T: NameType> Name<T> {
             Self::Nullitope => Self::Nullitope,
             Self::Point => Self::Dyad,
             Self::Dyad => Self::orthodiagonal(),
-            Self::Orthodiagonal => Self::Orthoplex {
-                regular: Default::default(),
-                rank: Rank::new(3),
-            },
+            Self::Quadrilateral { quad } => {
+                if quad.is(&Quadrilateral::Rectangle) {
+                    Self::Tegum(Box::new(self))
+                } else {
+                    Self::Orthoplex {
+                        regular: Default::default(),
+                        rank: Rank::new(3),
+                    }
+                }
+            }
 
             // We make an irregular orthoplex into an irregular orthoplex, and
             // a regular one into an orthoplex prism.
             Self::Orthoplex { regular, rank } => {
-                if regular.contains(&Regular::No) {
+                if regular.is(&Regular::No) {
                     Self::Orthoplex {
                         regular,
                         rank: rank.plus_one(),
@@ -595,7 +651,7 @@ impl<T: NameType> Name<T> {
             // Hardcoded cases.
             Self::Nullitope => Self::Point,
             Self::Point => Self::Dyad,
-            Self::Dyad => Self::Orthodiagonal,
+            Self::Dyad => Self::orthodiagonal(),
 
             // Simplices become irregular orthoplices.
             Self::Simplex { rank, .. } => Self::Orthoplex {
@@ -675,8 +731,13 @@ impl<T: NameType> Name<T> {
 
             // Other hardcoded cases.
             Self::Triangle { regular } => regular_dual!(regular, Triangle),
-            Self::Square | Self::Rectangle => Self::orthodiagonal(),
-            Self::Orthodiagonal => Self::polygon(Default::default(), 4),
+            Self::Quadrilateral { quad } => {
+                if quad.is(&Quadrilateral::Orthodiagonal) {
+                    Self::polygon(Default::default(), 4)
+                } else {
+                    Self::orthodiagonal()
+                }
+            }
 
             // Duals of duals become the original polytopes if possible, and
             // default to generic names otherwise.
@@ -782,23 +843,26 @@ impl<T: NameType> Name<T> {
         }
     }
 
+    /// Returns the name for a square.
+    pub fn square() -> Self {
+        Self::Quadrilateral {
+            quad: Default::default(),
+        }
+    }
+
     /// Returns the name for a rectangle, depending on whether it's abstract or
     /// not.
     pub fn rectangle() -> Self {
-        if T::is_abstract() {
-            Self::Square
-        } else {
-            Self::Rectangle
+        Self::Quadrilateral {
+            quad: T::DataQuadrilateral::new(Quadrilateral::Rectangle),
         }
     }
 
     /// Returns the name for an orthodiagonal quadrilateral, depending on
     /// whether it's abstract or not.
     pub fn orthodiagonal() -> Self {
-        if T::is_abstract() {
-            Self::Square
-        } else {
-            Self::Orthodiagonal
+        Self::Quadrilateral {
+            quad: T::DataQuadrilateral::new(Quadrilateral::Orthodiagonal),
         }
     }
 
@@ -821,7 +885,7 @@ impl<T: NameType> Name<T> {
             1 => Self::Dyad,
             2 => {
                 if regular.satisfies(Regular::is_yes) {
-                    Self::Square
+                    Self::square()
                 } else {
                     Self::rectangle()
                 }
@@ -848,7 +912,7 @@ impl<T: NameType> Name<T> {
             3 => Self::Triangle { regular },
             4 => {
                 if regular.satisfies(Regular::is_yes) {
-                    Self::Square
+                    Self::square()
                 } else {
                     Self::Polygon { regular, n }
                 }
@@ -911,18 +975,24 @@ impl<T: NameType> Name<T> {
 
         // Figures out which bases of the multiprism are multiprisms themselves,
         // and accounts for them accordingly.
-        for name in bases {
-            match name {
+        for base in bases {
+            match base {
                 Self::Nullitope => {
                     return Self::Nullitope;
                 }
                 Self::Point => {}
                 Self::Dyad => prism_count += 1,
-                Self::Square | Self::Rectangle => prism_count += 2,
+                Self::Quadrilateral { quad } => {
+                    if quad.is(&Quadrilateral::Orthodiagonal) {
+                        new_bases.push(base);
+                    } else {
+                        prism_count += 2;
+                    }
+                }
                 Self::Cuboid { .. } => prism_count += 3,
                 Self::Hyperblock { rank, .. } => prism_count += rank.into_usize(),
                 Self::Multiprism(mut extra_bases) => new_bases.append(&mut extra_bases),
-                _ => new_bases.push(name),
+                _ => new_bases.push(base),
             }
         }
 
@@ -967,7 +1037,13 @@ impl<T: NameType> Name<T> {
                 }
                 Self::Point => {}
                 Self::Dyad => tegum_count += 1,
-                Self::Square | Self::Orthodiagonal => tegum_count += 2,
+                Self::Quadrilateral { quad } => {
+                    if quad.is(&Quadrilateral::Rectangle) {
+                        new_bases.push(base);
+                    } else {
+                        tegum_count += 2;
+                    }
+                }
                 Self::Orthoplex { rank, .. } => tegum_count += rank.into_usize(),
                 Self::Multitegum(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
