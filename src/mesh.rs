@@ -10,7 +10,7 @@ use bevy::{
 };
 use lyon::{math::point, path::Path, tessellation::*};
 use miratope_core::{
-    abs::{elements::ElementList, rank::Rank},
+    abs::elements::ElementList,
     conc::{
         cycle::{Cycle, CycleBuilder},
         Concrete, ConcretePolytope,
@@ -113,8 +113,8 @@ impl Triangulation {
         // returns a reference to an empty element list.
         let elements_or = |r| polytope.abs.ranks.get(r).unwrap_or(&empty_els);
 
-        let edges = elements_or(Rank::new(1));
-        let faces = elements_or(Rank::new(2));
+        let edges = elements_or(2);
+        let faces = elements_or(3);
 
         let concrete_vertex_len = polytope.vertices.len() as u16;
 
@@ -320,8 +320,8 @@ pub fn wireframe(poly: &Concrete, projection_type: ProjectionType) -> Mesh {
         return empty_mesh();
     }
 
-    let edges = poly.abs.ranks.get(Rank::new(1));
-    let edge_count = poly.el_count(Rank::new(1));
+    let edges = poly.abs.ranks.get(2);
+    let edge_count = poly.el_count(3);
 
     // We add a single vertex so that Miratope doesn't crash.
     let vertices = vertex_coords(poly, poly.vertices.iter(), projection_type);

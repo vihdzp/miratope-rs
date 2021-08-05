@@ -63,7 +63,6 @@ pub mod poly;
 use name::{Name, NameData, NameType, Quadrilateral, Regular};
 
 use gender::Gender;
-use miratope_core::abs::rank::Rank;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
@@ -519,11 +518,8 @@ macro_rules! impl_parse {
 
                     // 2D shapes
                     Triangle { .. } => Self::[<triangle_ $type>]($($gender)?),
-
-                    // TODO: merge these into one.
                     Quadrilateral { quad } => Self::[<generic_quadrilateral_ $type>]::<T>($($gender,)? *quad),
-
-                    Polygon { n, .. } => Self::[<generic_ $type>]($($gender,)? *n, Rank::new(2)),
+                    Polygon { n, .. } => Self::[<generic_ $type>]($($gender,)? *n, 3),
 
                     // Regular families
                     Simplex { rank, .. } => Self::[<simplex_ $type>]($($gender,)? *rank),
@@ -641,20 +637,20 @@ pub trait Language: Prefix {
         triangle,
         square,
         rectangle,
-        simplex(rank: Rank),
+        simplex(rank: usize),
         cuboid,
         cube,
-        hyperblock(rank: Rank),
-        hypercube(rank: Rank),
-        orthoplex(rank: Rank),
-        suffix(rank: Rank)
+        hyperblock(rank: usize),
+        hypercube(rank: usize),
+        orthoplex(rank: usize),
+        suffix(rank: usize)
     );
 
     decl_operator!(
         antiprism,
         antitegum,
-        ditope(rank: Rank),
-        hosotope(rank: Rank)
+        ditope(rank: usize),
+        hosotope(rank: usize)
     );
 
     decl_multiproduct!(pyramid, prism, tegum, comb);
@@ -676,18 +672,18 @@ pub trait Language: Prefix {
     // Defaults for generic names.
 
     /// The string corresponding to the noun for a generic polytope.
-    fn generic_noun_str(facet_count: usize, rank: Rank) -> String {
+    fn generic_noun_str(facet_count: usize, rank: usize) -> String {
         Self::prefix(facet_count) + &Self::suffix_noun_str(rank)
     }
 
     /// The grammatical gender corresponding to the noun for a generic polytope.
-    fn generic_gender(_: usize, rank: Rank) -> Self::Gender {
+    fn generic_gender(_: usize, rank: usize) -> Self::Gender {
         Self::suffix_gender(rank)
     }
 
     /// The generic name for a polytope with a given facet count and rank as a
     /// noun.
-    fn generic_noun(facet_count: usize, rank: Rank) -> ParseOutput<Self::Gender> {
+    fn generic_noun(facet_count: usize, rank: usize) -> ParseOutput<Self::Gender> {
         ParseOutput::new(
             Self::generic_gender(facet_count, rank),
             Self::generic_noun_str(facet_count, rank),
@@ -696,7 +692,7 @@ pub trait Language: Prefix {
 
     /// The generic name for a polytope with a given facet count and rank as an
     /// adjective.
-    fn generic_adj(gender: Self::Gender, facet_count: usize, rank: Rank) -> String {
+    fn generic_adj(gender: Self::Gender, facet_count: usize, rank: usize) -> String {
         Self::prefix(facet_count) + &Self::suffix_adj(gender, rank)
     }
 
@@ -708,7 +704,7 @@ pub trait Language: Prefix {
         match quad.unwrap_or_default() {
             Quadrilateral::Square => Self::square_noun(),
             Quadrilateral::Rectangle => Self::rectangle_noun(),
-            Quadrilateral::Orthodiagonal => Self::generic_noun(4, Rank::new(2)),
+            Quadrilateral::Orthodiagonal => Self::generic_noun(4, 3),
         }
     }
 
@@ -719,7 +715,7 @@ pub trait Language: Prefix {
         match quad.unwrap_or_default() {
             Quadrilateral::Square => Self::square_adj(gender),
             Quadrilateral::Rectangle => Self::rectangle_adj(gender),
-            Quadrilateral::Orthodiagonal => Self::generic_adj(gender, 4, Rank::new(2)),
+            Quadrilateral::Orthodiagonal => Self::generic_adj(gender, 4, 3),
         }
     }
 
@@ -744,7 +740,7 @@ pub trait Language: Prefix {
     /// Parses a generic hyperblock (regular or irregular) as a noun.
     fn generic_hyperblock_noun<T: NameType>(
         regular: &T::DataRegular,
-        rank: Rank,
+        rank: usize,
     ) -> ParseOutput<Self::Gender> {
         if regular.satisfies(Regular::is_yes) {
             Self::hypercube_noun(rank)
@@ -757,7 +753,7 @@ pub trait Language: Prefix {
     fn generic_hyperblock_adj<T: NameType>(
         gender: Self::Gender,
         regular: &T::DataRegular,
-        rank: Rank,
+        rank: usize,
     ) -> String {
         if regular.satisfies(Regular::is_yes) {
             Self::hypercube_adj(gender, rank)

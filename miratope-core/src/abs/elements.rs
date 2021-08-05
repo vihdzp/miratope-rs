@@ -3,35 +3,32 @@
 
 use std::{collections::HashMap, iter::IntoIterator};
 
-use super::{
-    rank::{Rank, RankVec},
-    Abstract,
-};
+use super::Abstract;
 use crate::Polytope;
 
 use vec_like::*;
 
 /// A bundled rank and index, which can be used as coordinates to refer to an
 /// element in an abstract polytope.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ElementRef {
+
+pub trait ElementRef: Copy + Eq {
     /// The rank of the element.
-    pub rank: Rank,
+    fn rank(self) -> usize {
+        self.rank_idx().0
+    }
 
     /// The index of the element in its corresponding element list.
-    pub idx: usize,
-}
-
-impl std::fmt::Display for ElementRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "element at rank {}, index {}", self.rank, self.idx)
+    fn idx(self) -> usize {
+        self.rank_idx().1
     }
+
+    /// Returns the bundled rank and index, in that order.
+    fn rank_idx(self) -> (usize, usize);
 }
 
-impl ElementRef {
-    /// Creates a new element reference with a given rank and index.
-    pub fn new(rank: Rank, idx: usize) -> Self {
-        Self { rank, idx }
+impl ElementRef for (usize, usize) {
+    fn rank_idx(self) -> (usize, usize) {
+        self
     }
 }
 
@@ -196,6 +193,20 @@ impl SubelementList {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Ranks(Vec<ElementList>);
+impl_veclike!(Ranks, Item = ElementList, Index = usize);
+
+impl Ranks {
+    pub fn with_rank_capacity(rank: usize) -> Self {
+        Self::with_capacity(rank + 1)
+    }
+
+    pub fn rank(&self) -> usize {
+        self.len() - 1
+    }
+}
+
 /// A structure used to build a polytope from the bottom up.
 ///
 /// To operate on polytopes, we often need both the [`Subelements`] and
@@ -215,7 +226,7 @@ impl AbstractBuilder {
 
     /// Initializes a new empty abstract builder with a capacity to store
     /// elements up and until a given [`Rank`].
-    pub fn with_capacity(rank: Rank) -> Self {
+    pub fn with_capacity(rank: usize) -> Self {
         Self(Abstract::with_rank_capacity(rank))
     }
 
@@ -251,7 +262,7 @@ impl AbstractBuilder {
     pub fn push_vertices(&mut self, vertex_count: usize) {
         // If you're using this method, the polytope should consist of a single
         // minimal element.
-        debug_assert_eq!(self.0.rank(), Rank::new(-1));
+        debug_assert_eq!(self.0.rank(), 0);
         self.push(SubelementList::vertices(vertex_count))
     }
 
@@ -271,31 +282,31 @@ impl AbstractBuilder {
 /// Maps each recursive subelement of an abstract polytope's element to a
 /// `usize`, representing its index in a new polytope. This is used to build the
 /// elements figures of polytopes, or to find their vertices.
-pub struct ElementHash(RankVec<HashMap<usize, usize>>);
+pub struct ElementHash(Vec<HashMap<usize, usize>>);
 
 impl ElementHash {
     /// Returns a map from elements on a polytope to elements on a new polytope
     /// representing a particular element (as a polytope). If the element
     /// doesn't exist, we return `None`.
-    pub fn new(poly: &Abstract, el: ElementRef) -> Option<Self> {
-        poly.get_element(el)?;
+    pub fn new(poly: &Abstract, rank: usize, idx: usize) -> Option<Self> {
+        poly.get_element(rank, idx)?;
 
         // A vector of HashMaps. The k-th entry is a map from k-elements of the
         // original polytope into k-elements in a new polytope.
-        let mut hashes = RankVec::with_rank_capacity(el.rank);
-        for _ in Rank::range_inclusive_iter(-1, el.rank) {
+        let mut hashes = Vec::with_capacity(rank + 1);
+        for _ in 0..=rank {
             hashes.push(HashMap::new());
         }
-        hashes[el.rank].insert(el.idx, 0);
+        hashes[rank].insert(idx, 0);
 
         // Gets subindices of subindices, until reaching the vertices.
-        for r in Rank::range_inclusive_iter(0, el.rank).rev() {
+        for r in (1..=rank).rev() {
             let (left_slice, right_slice) = hashes.split_at_mut(r);
             let prev_hash = left_slice.last_mut().unwrap();
             let hash = right_slice.first().unwrap();
 
             for &idx in hash.keys() {
-                for &sub in &poly[r][idx].subs {
+                for &sub in &poly[(r, idx)].subs {
                     let len = prev_hash.len();
                     prev_hash.entry(sub).or_insert(len);
                 }
@@ -305,14 +316,18 @@ impl ElementHash {
         Some(Self(hashes))
     }
 
+    fn rank(&self) -> usize {
+        self.0.len() - 1
+    }
+
     /// Gets the `HashMap` corresponding to elements of a given rank.
-    fn get(&self, idx: Rank) -> Option<&HashMap<usize, usize>> {
+    fn get(&self, idx: usize) -> Option<&HashMap<usize, usize>> {
         self.0.get(idx)
     }
 
     /// Gets the indices of the elements of a given rank in the original
     /// polytope.
-    fn to_elements(&self, rank: Rank) -> Vec<usize> {
+    fn to_elements(&self, rank: usize) -> Vec<usize> {
         if let Some(elements) = self.get(rank) {
             let mut new_elements = Vec::new();
             new_elements.resize(elements.len(), 0);
@@ -329,16 +344,16 @@ impl ElementHash {
 
     /// Gets the indices of the vertices in the original polytope.
     pub fn to_vertices(&self) -> Vec<usize> {
-        self.to_elements(Rank::new(0))
+        self.to_elements(1)
     }
 
     /// Gets the indices of the vertices of a given element in a polytope.
     pub fn to_polytope(&self, poly: &Abstract) -> Abstract {
-        let rank = self.0.rank();
+        let rank = self.rank();
         let mut abs = Abstract::with_rank_capacity(rank);
 
         // For every rank stored in the element map.
-        for r in Rank::range_inclusive_iter(-1, rank) {
+        for r in 0..=rank {
             let mut elements = ElementList::new();
             let hash = &self.0[r];
 
@@ -351,12 +366,12 @@ impl ElementHash {
                 // We take the corresponding element in the original polytope
                 // and use the hash map to get its sub and superelements in the
                 // new polytope.
-                let el = poly.get_element(ElementRef::new(r, idx)).unwrap();
+                let el = poly.get_element(r, idx).unwrap();
                 let mut new_el = Element::new();
 
                 // Gets the subelements.
-                if let Some(r_minus_one) = r.try_minus_one() {
-                    if let Some(prev_hash) = self.get(r_minus_one) {
+                if r >= 1 {
+                    if let Some(prev_hash) = self.get(r - 1) {
                         for sub in &el.subs {
                             if let Some(&new_sub) = prev_hash.get(sub) {
                                 new_el.subs.push(new_sub);
@@ -366,7 +381,7 @@ impl ElementHash {
                 }
 
                 // Gets the superelements.
-                if let Some(next_hash) = self.get(r.plus_one()) {
+                if let Some(next_hash) = self.get(r + 1) {
                     for sup in &el.sups {
                         if let Some(&new_sup) = next_hash.get(sup) {
                             new_el.sups.push(new_sup);
@@ -388,23 +403,49 @@ impl ElementHash {
 /// polytope. Not to be confused with a cross-section.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SectionRef {
-    /// The lowest element in the section.
-    pub lo: ElementRef,
+    /// The rank of the lowest element in the section.
+    pub lo_rank: usize,
+
+    pub lo_idx: usize,
 
     /// The highest element in the section.
-    pub hi: ElementRef,
+    pub hi_rank: usize,
+
+    pub hi_idx: usize,
 }
 
 impl std::fmt::Display for SectionRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "section between ({}) and ({})", self.lo, self.hi)
+        write!(f, "section between ({:?}) and ({:?})", self.lo(), self.hi())
     }
 }
 
 impl SectionRef {
     /// Initializes a new section between two elements.
-    pub fn new(lo: ElementRef, hi: ElementRef) -> Self {
-        Self { lo, hi }
+    pub fn new(lo_rank: usize, lo_idx: usize, hi_rank: usize, hi_idx: usize) -> Self {
+        Self {
+            lo_rank,
+            lo_idx,
+            hi_rank,
+            hi_idx,
+        }
+    }
+
+    pub fn from_els(lo: (usize, usize), hi: (usize, usize)) -> Self {
+        Self::new(lo.rank(), lo.idx(), hi.rank(), hi.idx())
+    }
+
+    pub fn singleton(rank: usize, idx: usize) -> Self {
+        let el = (rank, idx);
+        Self::from_els(el, el)
+    }
+
+    pub fn lo(self) -> (usize, usize) {
+        (self.lo_rank, self.lo_idx)
+    }
+
+    pub fn hi(self) -> (usize, usize) {
+        (self.hi_rank, self.hi_idx)
     }
 }
 
@@ -445,12 +486,11 @@ impl SectionHash {
     pub fn singletons(poly: &Abstract) -> Self {
         let mut section_hash = Self::new();
 
-        for (rank, elements) in poly.ranks.rank_iter().rank_enumerate() {
+        for (rank, elements) in poly.ranks.iter().enumerate() {
             for idx in 0..elements.len() {
-                let el = ElementRef::new(rank, idx);
                 section_hash
                     .0
-                    .insert(SectionRef::new(el, el), section_hash.len());
+                    .insert(SectionRef::singleton(rank, idx), section_hash.len());
             }
         }
 

@@ -2,23 +2,28 @@
 
 pub mod elements;
 pub mod flag;
-pub mod rank;
+pub mod product;
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::{
+    collections::{BTreeSet, HashMap, HashSet},
+    convert::Infallible,
+    ops::{Index, IndexMut},
+};
 
 use self::{
     elements::{
-        AbstractBuilder, Element, ElementHash, ElementList, ElementRef, SectionHash, SectionRef,
-        SubelementList, Subelements, Superelements,
+        AbstractBuilder, Element, ElementHash, ElementList, ElementRef, Ranks, SectionHash,
+        SectionRef, SubelementList, Subelements, Superelements,
     },
     flag::{Flag, FlagSet},
-    rank::{Rank, RankVec},
 };
-use super::{DualResult, Polytope};
+use super::Polytope;
 
 use rayon::prelude::*;
 use strum_macros::Display;
 use vec_like::VecLike;
+
+pub use product::*;
 
 /// Represents the way in which two elements with one rank of difference are
 /// incident to one another. Used as a field in some [`AbstractError`] variants.
@@ -51,7 +56,7 @@ pub enum AbstractError {
     /// non-existent element.
     Index {
         /// The coordinates of the element at fault.
-        el: ElementRef,
+        el: (usize, usize),
 
         /// Whether the invalid index is a subelement or a superelement.
         incidence_type: IncidenceType,
@@ -64,7 +69,7 @@ pub enum AbstractError {
     /// another but not viceversa.
     Consistency {
         /// The coordinates of the element at fault.
-        el: ElementRef,
+        el: (usize, usize),
 
         /// Whether the invalid incidence is a subelement or a superelement.
         incidence_type: IncidenceType,
@@ -77,7 +82,7 @@ pub enum AbstractError {
     /// maximal lacks a subelement or superelement, respectively.
     Ranked {
         /// The coordinates of the element at fault.
-        el: ElementRef,
+        el: (usize, usize),
 
         /// Whether the missing incidences are at subelements or superelements.
         incidence_type: IncidenceType,
@@ -118,7 +123,7 @@ impl std::fmt::Display for AbstractError {
                 index,
             } => write!(
                 f,
-                "Polytope has an invalid index: {} has a {} with index {}, but it doesn't exist",
+                "Polytope has an invalid index: {:?} has a {} with index {}, but it doesn't exist",
                 el, incidence_type, index
             ),
 
@@ -128,14 +133,14 @@ impl std::fmt::Display for AbstractError {
                 index,
             } => write!(
                 f,
-                "Polytope has an invalid index: {} has a {} with index {}, but not viceversa",
+                "Polytope has an invalid index: {:?} has a {} with index {}, but not viceversa",
                 el, incidence_type, index
             ),
 
             // The polytope is not ranked.
             AbstractError::Ranked { el, incidence_type } => write!(
                 f,
-                "Polytope is not ranked: {} has no {}s",
+                "Polytope is not ranked: {:?} has no {}s",
                 el, incidence_type
             ),
 
@@ -186,21 +191,20 @@ pub type AbstractResult<T> = Result<T, AbstractError>;
 ///    must be exactly two elements *b* such that *a* ≤ *b* ≤ *c*.
 ///
 /// Each element in the poset represents an element in the polytope (that is, a
-/// vertex, edge, etc.) By convention, we choose the rank function so that the
+/// vertex, edge, etc.) The minimal and maximal element in the poset represent
+/// an "empty" element and the entire polytope, and are there mostly for
+/// convenience. The usual convention is to choose the rank function so that the
 /// minimal element has rank &minus;1, which makes the rank of an element match
-/// its expected dimension (vertices are rank 0, edges are rank 1, etc.) The
-/// minimal and maximal element in the poset represent an "empty" element and
-/// the entire polytope, and are there mostly for convenience.
+/// its expected dimension (vertices are rank 0, edges are rank 1, etc.)
+/// However, since indexing is most naturally expressed with an `usize`, we'll
+/// internally start indexing by 0.
 ///
 /// For more info, see [Wikipedia](https://en.wikipedia.org/wiki/Abstract_polytope)
 /// or the [Polytope Wiki](https://polytope.miraheze.org/wiki/Abstract_polytope)
 ///
 /// # How are these represented?
 /// The core attribute of the `Abstract` type is the `ranks` attribute, which
-/// contains a `RankVec<ElementList>`.
-///
-/// A [`RankVec`] is a wrapper around a `Vec` that allows us to index by a
-/// [`Rank`]. That is, indexing starts at `-1`.
+/// contains a `Vec<ElementList>`.
 ///
 /// An [`ElementList`] is nothing but a list of [`Elements`](Element). Every
 /// element stores the indices of the incident [`Subelements`] of the previous
@@ -220,10 +224,10 @@ pub type AbstractResult<T> = Result<T, AbstractError>;
 /// [`Abstract::push_subs`] method, which will push a list of subelements and
 /// automatically set the superelements of the previous rank, under the
 /// assumption that they're empty.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Abstract {
-    /// The list of element lists in the polytope, ordered by [`Rank`].
-    pub ranks: RankVec<ElementList>,
+    /// The list of element lists in the polytope.
+    pub ranks: Ranks,
 
     /// Whether every single element's subelements and superelements are sorted.
     pub sorted: bool,
@@ -241,8 +245,22 @@ impl AsMut<Vec<ElementList>> for Abstract {
     }
 }
 
-impl From<RankVec<ElementList>> for Abstract {
-    fn from(ranks: RankVec<ElementList>) -> Self {
+impl Index<usize> for Abstract {
+    type Output = ElementList;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.ranks[index]
+    }
+}
+
+impl IndexMut<usize> for Abstract {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.ranks[index]
+    }
+}
+
+impl From<Ranks> for Abstract {
+    fn from(ranks: Ranks) -> Self {
         Self {
             ranks,
             sorted: false,
@@ -251,26 +269,36 @@ impl From<RankVec<ElementList>> for Abstract {
 }
 
 impl From<Vec<ElementList>> for Abstract {
-    fn from(vec: Vec<ElementList>) -> Self {
-        RankVec::from(vec).into()
+    fn from(ranks: Vec<ElementList>) -> Self {
+        let ranks: Ranks = ranks.into();
+        ranks.into()
+    }
+}
+
+impl IntoIterator for Abstract {
+    type Item = ElementList;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.ranks.into_iter()
     }
 }
 
 impl VecLike for Abstract {
     type VecItem = ElementList;
-    type VecIndex = Rank;
+    type VecIndex = usize;
 }
 
 impl Abstract {
     /// Initializes a polytope with an empty element list.
     pub fn new() -> Self {
-        RankVec::new().into()
+        Ranks::new().into()
     }
 
     /// Initializes a new polytope with the capacity needed to store elements up
     /// to a given rank.
-    pub fn with_rank_capacity(rank: Rank) -> Self {
-        RankVec::with_rank_capacity(rank).into()
+    pub fn with_rank_capacity(rank: usize) -> Self {
+        Ranks::with_rank_capacity(rank).into()
     }
 
     /// Returns `true` if we haven't added any elements to the polytope. Note
@@ -290,7 +318,7 @@ impl Abstract {
     /// # Panics
     /// Panics if the polytope has not been initialized.
     pub fn min(&self) -> &Element {
-        self.get_element(ElementRef::new(Rank::new(-1), 0)).unwrap()
+        self.get_element(0, 0).unwrap()
     }
 
     /// Returns a mutable reference to the minimal element of the polytope.
@@ -298,8 +326,7 @@ impl Abstract {
     /// # Panics
     /// Panics if the polytope has not been initialized.
     pub fn min_mut(&mut self) -> &mut Element {
-        self.get_element_mut(ElementRef::new(Rank::new(-1), 0))
-            .unwrap()
+        self.get_element_mut(0, 0).unwrap()
     }
 
     /// Returns a reference to the maximal element of the polytope.
@@ -307,7 +334,11 @@ impl Abstract {
     /// # Panics
     /// Panics if the polytope has not been initialized.
     pub fn max(&self) -> &Element {
-        self.get_element(ElementRef::new(self.rank(), 0)).unwrap()
+        self.get_element(self.rank(), 0).unwrap()
+    }
+
+    pub fn edges_mut(&mut self) -> &mut ElementList {
+        &mut self[2]
     }
 
     /// Returns a mutable reference to the maximal element of the polytope.
@@ -315,8 +346,7 @@ impl Abstract {
     /// # Panics
     /// Panics if the polytope has not been initialized.
     pub fn max_mut(&mut self) -> &mut Element {
-        self.get_element_mut(ElementRef::new(self.rank(), 0))
-            .unwrap()
+        self.get_element_mut(self.rank(), 0).unwrap()
     }
 
     /// Pushes a new element list, assuming that the superelements of the
@@ -327,17 +357,17 @@ impl Abstract {
     }
 
     /// Pushes a given element into the vector of elements of a given rank.
-    pub fn push_at(&mut self, rank: Rank, el: Element) {
+    pub fn push_at(&mut self, rank: usize, el: Element) {
         self[rank].push(el);
     }
 
     /// Pushes a given element into the vector of elements of a given rank.
     /// Updates the superelements of its subelements automatically.
-    pub fn push_subs_at(&mut self, rank: Rank, sub_el: Subelements) {
+    pub fn push_subs_at(&mut self, rank: usize, sub_el: Subelements) {
         let i = self[rank].len();
 
-        if rank != Rank::new(-1) {
-            if let Some(lower_rank) = self.ranks.get_mut(rank.minus_one()) {
+        if rank != 0 {
+            if let Some(lower_rank) = self.ranks.get_mut(rank - 1) {
                 // Updates superelements of the lower rank.
                 for &sub in &sub_el {
                     lower_rank[sub].sups.push(i);
@@ -374,33 +404,33 @@ impl Abstract {
 
     /// Returns a reference to an element of the polytope. To actually get the
     /// entire polytope it defines, use [`element`](Self::element).
-    pub fn get_element(&self, el: ElementRef) -> Option<&Element> {
-        self.ranks.get(el.rank)?.get(el.idx)
+    pub fn get_element(&self, rank: usize, idx: usize) -> Option<&Element> {
+        self.ranks.get(rank)?.get(idx)
     }
 
     /// Returns a mutable reference to an element of the polytope. To actually get the
     /// entire polytope it defines, use [`element`](Self::element).
-    pub fn get_element_mut(&mut self, el: ElementRef) -> Option<&mut Element> {
-        self.ranks.get_mut(el.rank)?.get_mut(el.idx)
+    pub fn get_element_mut(&mut self, rank: usize, idx: usize) -> Option<&mut Element> {
+        self.ranks.get_mut(rank)?.get_mut(idx)
     }
 
     /// Gets the indices of the vertices of an element in the polytope, if it
     /// exists.
-    pub fn element_vertices(&self, el: ElementRef) -> Option<Vec<usize>> {
-        Some(ElementHash::new(self, el)?.to_vertices())
+    pub fn element_vertices(&self, rank: usize, idx: usize) -> Option<Vec<usize>> {
+        Some(ElementHash::new(self, rank, idx)?.to_vertices())
     }
 
     /// Gets both elements with a given rank and index as a polytope and the
     /// indices of its vertices on the original polytope, if it exists.
-    pub fn element_and_vertices(&self, el: ElementRef) -> Option<(Vec<usize>, Self)> {
-        let element_hash = ElementHash::new(self, el)?;
+    pub fn element_and_vertices(&self, rank: usize, idx: usize) -> Option<(Vec<usize>, Self)> {
+        let element_hash = ElementHash::new(self, rank, idx)?;
         Some((element_hash.to_vertices(), element_hash.to_polytope(self)))
     }
 
     /// Returns the indices of a Petrial polygon in cyclic order, or `None` if
     /// it self-intersects.
     pub fn petrie_polygon_vertices(&mut self, flag: Flag) -> Option<Vec<usize>> {
-        let rank = self.rank().try_usize()?;
+        let rank = self.rank();
         let mut new_flag = flag.clone();
         let first_vertex = flag[0];
 
@@ -450,7 +480,7 @@ impl Abstract {
 
         // We actually build the elements backwards, which is as awkward as it
         // seems. Maybe we should fix that in the future?
-        let mut backwards_abs = RankVec::with_rank_capacity(rank.plus_one());
+        let mut backwards_abs = Vec::with_capacity(rank + 1);
         backwards_abs.push(SubelementList::max(section_hash.len()));
 
         // Indices of base.
@@ -462,8 +492,7 @@ impl Abstract {
         let mut dual_vertices = Vec::with_capacity(facet_count);
 
         // Adds all elements corresponding to sections of a given height.
-        for height in 0..=rank.into_isize() + 1 {
-            let height = Rank::new(height);
+        for height in 1..=rank + 1 {
             let mut new_section_hash = SectionHash::new();
             let mut elements = SubelementList::with_capacity(section_hash.len());
 
@@ -478,12 +507,16 @@ impl Abstract {
             for (section, idx) in section_hash.into_iter() {
                 // Finds all of the subelements of our old section's
                 // lowest element.
-                for &idx_lo in &self.get_element(section.lo).unwrap().subs {
+                for &idx_lo in &self
+                    .get_element(section.lo_rank, section.lo_idx)
+                    .unwrap()
+                    .subs
+                {
                     // Adds the new sections of the current height, gets
                     // their index, uses that to build the ElementList.
-                    let sub = new_section_hash.get(SectionRef::new(
-                        ElementRef::new(section.lo.rank.minus_one(), idx_lo),
-                        section.hi,
+                    let sub = new_section_hash.get(SectionRef::from_els(
+                        (section.lo_rank - 1, idx_lo),
+                        section.hi(),
                     ));
 
                     elements[idx].push(sub);
@@ -491,12 +524,16 @@ impl Abstract {
 
                 // Finds all of the superelements of our old section's
                 // highest element.
-                for &idx_hi in &self.get_element(section.hi).unwrap().sups {
+                for &idx_hi in &self
+                    .get_element(section.hi_rank, section.hi_idx)
+                    .unwrap()
+                    .sups
+                {
                     // Adds the new sections of the current height, gets
                     // their index, uses that to build the ElementList.
-                    let sub = new_section_hash.get(SectionRef::new(
-                        section.lo,
-                        ElementRef::new(section.hi.rank.plus_one(), idx_hi),
+                    let sub = new_section_hash.get(SectionRef::from_els(
+                        section.lo(),
+                        (section.hi_rank + 1, idx_hi),
                     ));
 
                     elements[idx].push(sub);
@@ -505,21 +542,15 @@ impl Abstract {
 
             // We figure out where the vertices of the base and the dual base
             // were sent.
-            if height == rank.minus_one() {
+            if height == rank - 1 {
                 // We create a map from the base's vertices to the new vertices.
                 for v in 0..vertex_count {
-                    vertices.push(new_section_hash.get(SectionRef::new(
-                        ElementRef::new(Rank::new(0), v),
-                        ElementRef::new(rank, 0),
-                    )));
+                    vertices.push(new_section_hash.get(SectionRef::new(1, v, rank, 0)));
                 }
 
                 // We create a map from the dual base's vertices to the new vertices.
                 for f in 0..facet_count {
-                    dual_vertices.push(new_section_hash.get(SectionRef::new(
-                        ElementRef::new(Rank::new(-1), 0),
-                        ElementRef::new(rank.minus_one(), f),
-                    )));
+                    dual_vertices.push(new_section_hash.get(SectionRef::new(0, 0, rank - 1, f)));
                 }
             }
 
@@ -528,7 +559,7 @@ impl Abstract {
         }
 
         // We built this backwards, so let's fix it.
-        let mut abs = AbstractBuilder::with_capacity(backwards_abs.rank());
+        let mut abs = AbstractBuilder::with_capacity(backwards_abs.len() - 1);
 
         for subelements in backwards_abs.into_iter().rev() {
             abs.push(subelements);
@@ -548,10 +579,10 @@ impl Abstract {
         let rank = self.rank();
 
         // The elements of each rank... backwards.
-        let mut ranks = Vec::with_capacity(rank.plus_one_usize());
+        let mut ranks = Vec::with_capacity(rank + 1);
 
         // Adds elements of each rank.
-        for _ in 0..rank.into() {
+        for _ in 0..rank {
             let mut subelements = SubelementList::new();
 
             // Gets the subelements of each element.
@@ -623,7 +654,7 @@ impl Abstract {
     /// minimal element and a single maximal element. A valid polytope should
     /// always return `true`.
     pub fn bounded(&self) -> AbstractResult<()> {
-        let min_count = self.el_count(Rank::new(-1));
+        let min_count = self.el_count(0);
         let max_count = self.el_count(self.rank());
 
         if min_count == 1 && max_count == 1 {
@@ -642,13 +673,13 @@ impl Abstract {
     /// seriously wrong.
     pub fn check_incidences(&self) -> AbstractResult<()> {
         // Iterates over elements of every rank.
-        for (r, elements) in self.ranks.rank_iter().rank_enumerate() {
+        for (r, elements) in self.ranks.iter().enumerate() {
             // Iterates over all such elements.
             for (idx, el) in elements.iter().enumerate() {
                 // Only the minimal element can have no subelements.
-                if r != Rank::new(-1) && el.subs.len() == 0 {
+                if r != 0 && el.subs.len() == 0 {
                     return Err(AbstractError::Ranked {
-                        el: ElementRef::new(r, idx),
+                        el: (r, idx),
                         incidence_type: IncidenceType::Subelement,
                     });
                 }
@@ -656,14 +687,14 @@ impl Abstract {
                 // Iterates over the element's subelements.
                 for &sub in &el.subs {
                     // Attempts to get the subelement's superelements.
-                    if let Some(r_minus_one) = r.try_sub(Rank::new(1)) {
-                        if let Some(sub_el) = self.get_element(ElementRef::new(r_minus_one, sub)) {
+                    if r >= 1 {
+                        if let Some(sub_el) = self.get_element(r - 1, sub) {
                             if sub_el.sups.contains(&idx) {
                                 continue;
                             } else {
                                 // The element contains a subelement, but not viceversa.
                                 return Err(AbstractError::Consistency {
-                                    el: ElementRef::new(r, idx),
+                                    el: (r, idx),
                                     index: sub,
                                     incidence_type: IncidenceType::Subelement,
                                 });
@@ -673,7 +704,7 @@ impl Abstract {
 
                     // We got ourselves an invalid index.
                     return Err(AbstractError::Index {
-                        el: ElementRef::new(r, idx),
+                        el: (r, idx),
                         index: sub,
                         incidence_type: IncidenceType::Subelement,
                     });
@@ -682,7 +713,7 @@ impl Abstract {
                 // Only the maximal element can have no superelements.
                 if r != self.rank() && el.sups.len() == 0 {
                     return Err(AbstractError::Ranked {
-                        el: ElementRef::new(r, idx),
+                        el: (r, idx),
                         incidence_type: IncidenceType::Superelement,
                     });
                 }
@@ -690,13 +721,13 @@ impl Abstract {
                 // Iterates over the element's superelements.
                 for &sup in &el.sups {
                     // Attempts to get the subelement's superelements.
-                    if let Some(sub_el) = self.get_element(ElementRef::new(r.plus_one(), sup)) {
+                    if let Some(sub_el) = self.get_element(r + 1, sup) {
                         if sub_el.subs.contains(&idx) {
                             continue;
                         } else {
                             // The element contains a superelement, but not viceversa.
                             return Err(AbstractError::Consistency {
-                                el: ElementRef::new(r, idx),
+                                el: (r, idx),
                                 index: sup,
                                 incidence_type: IncidenceType::Superelement,
                             });
@@ -705,7 +736,7 @@ impl Abstract {
 
                     // We got ourselves an invalid index.
                     return Err(AbstractError::Index {
-                        el: ElementRef::new(r, idx),
+                        el: (r, idx),
                         index: sup,
                         incidence_type: IncidenceType::Superelement,
                     });
@@ -731,14 +762,12 @@ impl Abstract {
 
         // For every element, by looking through the subelements of its
         // subelements, we need to find each exactly twice.
-        for r in 1..self.rank().into_isize() {
-            let r = Rank::new(r);
-
+        for r in 2..self.rank() {
             for (idx, el) in self[r].iter().enumerate() {
                 let mut hash_sub_subs = HashMap::new();
 
                 for &sub in &el.subs {
-                    let sub_el = &self[r.minus_one()][sub];
+                    let sub_el = &self[(r - 1, sub)];
 
                     for &sub_sub in &sub_el.subs {
                         match hash_sub_subs.get(&sub_sub) {
@@ -751,10 +780,7 @@ impl Abstract {
                             // Found for the third time?! Abort!
                             Some(Count::Twice) => {
                                 return Err(AbstractError::Dyadic {
-                                    section: SectionRef::new(
-                                        ElementRef::new(r - Rank::new(2), sub_sub),
-                                        ElementRef::new(r, idx),
-                                    ),
+                                    section: SectionRef::new(r - 2, sub_sub, r, idx),
                                     more: true,
                                 });
                             }
@@ -767,10 +793,7 @@ impl Abstract {
                 for (sub_sub, count) in hash_sub_subs.into_iter() {
                     if count == Count::Once {
                         return Err(AbstractError::Dyadic {
-                            section: SectionRef::new(
-                                ElementRef::new(r - Rank::new(2), sub_sub),
-                                ElementRef::new(r, idx),
-                            ),
+                            section: SectionRef::new(r - 2, sub_sub, r, idx),
                             more: false,
                         });
                     }
@@ -795,156 +818,11 @@ impl Abstract {
     pub fn is_strongly_connected(&self) -> bool {
         todo!()
     }
-
-    /// Takes the [direct product](https://en.wikipedia.org/wiki/Direct_product#Direct_product_of_binary_relations)
-    /// of two polytopes. If the `min` flag is turned off, it ignores the
-    /// minimal elements of both of the factors and adds one at the end. The
-    /// `max` flag works analogously.
-    ///
-    /// The elements of this product are in one to one correspondence to pairs
-    /// of elements in the set of polytopes. The elements of a specific rank are
-    /// sorted first by lexicographic order of the ranks, then by lexicographic
-    /// order of the elements.
-    pub fn product(p: &Self, q: &Self, min: bool, max: bool) -> Self {
-        // The ranks of p and q.
-        let p_rank = p.rank();
-        let q_rank = q.rank();
-
-        // The lowest and highest ranks we'll use to take products in p and q.
-        let p_low = Rank::new(-(min as isize));
-        let p_hi = p_rank - Rank::new(!max as isize);
-        let q_low = Rank::new(-(min as isize));
-        let q_hi = q_rank - Rank::new(!max as isize);
-
-        // The rank of the product.
-        let rank = p_rank + q_rank.plus_one() - Rank::new(!min as isize) - Rank::new(!max as isize);
-
-        // Initializes the element lists. These will only contain the
-        // subelements as they're generated. When they're complete, we'll call
-        // push_subs for each of them into a new Abstract.
-        let mut element_lists = RankVec::with_rank_capacity(rank);
-        for _ in Rank::range_inclusive_iter(-1, rank) {
-            element_lists.push(SubelementList::new());
-        }
-
-        // We add the elements of a given rank in lexicographic order of the
-        // ranks. This vector memoizes how many elements of the same rank are
-        // added by the time we add those of the form (p_rank, q_rank). It
-        // stores this value in offset_memo[p_rank - p_low][q_rank - q_hi].
-        let mut offset_memo: Vec<Vec<_>> = Vec::new();
-        for p_rank in Rank::range_inclusive_iter(p_low, p_hi) {
-            let mut offset_memo_row = Vec::new();
-
-            for q_rank in Rank::range_inclusive_iter(q_low, q_hi) {
-                offset_memo_row.push(
-                    if p_rank == p_low || q_rank == q_hi {
-                        0
-                    } else {
-                        offset_memo[(p_rank.minus_one() - p_low).into_usize()]
-                            [(q_rank.plus_one() - q_low).into_usize()]
-                    } + p.el_count(p_rank) * q.el_count(q_rank),
-                );
-            }
-
-            offset_memo.push(offset_memo_row);
-        }
-
-        // Gets the value stored in offset_memo[p_rank - p_low][q_rank - q_hi],
-        // or returns 0 if the indices are out of range.
-        let offset = |p_rank: Rank, q_rank: Rank| -> _ {
-            // The usize casts may overflow, but we really don't care about it.
-            if let Some(offset_memo_row) =
-                offset_memo.get((p_rank - p_low).try_usize().unwrap_or(usize::MAX))
-            {
-                offset_memo_row
-                    .get((q_rank - q_low).try_usize().unwrap_or(usize::MAX))
-                    .copied()
-                    .unwrap_or(0)
-            } else {
-                0
-            }
-        };
-
-        // Every element of the product is in one to one correspondence with
-        // a pair of an element from p and an element from q. This function
-        // finds the position we placed it in.
-        let get_element_index = |p_rank: Rank, p_idx, q_rank: Rank, q_idx| -> _ {
-            if let Some(p_rank_minus_one) = p_rank.try_sub(1) {
-                offset(p_rank_minus_one, q_rank.plus_one()) + p_idx * q.el_count(q_rank) + q_idx
-            } else {
-                q_idx
-            }
-        };
-
-        // Adds elements in order of rank.
-        for prod_rank in Rank::range_inclusive_iter(-1, rank) {
-            // Adds elements by lexicographic order of the ranks.
-            for p_els_rank in Rank::range_inclusive_iter(p_low, p_hi) {
-                if let Some(q_els_rank) = prod_rank.try_sub(p_els_rank + Rank::new(min as isize)) {
-                    if q_els_rank < q_low || q_els_rank > q_hi {
-                        continue;
-                    }
-
-                    // Takes the product of every element in p with rank p_els_rank,
-                    // with every element in q with rank q_els_rank.
-                    for (p_idx, p_el) in p[p_els_rank].iter().enumerate() {
-                        for (q_idx, q_el) in q[q_els_rank].iter().enumerate() {
-                            let mut subs = Subelements::new();
-
-                            // Products of p's subelements with q.
-                            if min || p_els_rank != Rank::new(0) {
-                                for &s in &p_el.subs {
-                                    subs.push(get_element_index(
-                                        p_els_rank.minus_one(),
-                                        s,
-                                        q_els_rank,
-                                        q_idx,
-                                    ))
-                                }
-                            }
-
-                            // Products of q's subelements with p.
-                            if min || q_els_rank != Rank::new(0) {
-                                for &s in &q_el.subs {
-                                    subs.push(get_element_index(
-                                        p_els_rank,
-                                        p_idx,
-                                        q_els_rank.minus_one(),
-                                        s,
-                                    ))
-                                }
-                            }
-
-                            element_lists[prod_rank].push(subs)
-                        }
-                    }
-                }
-            }
-        }
-
-        // If !min, we have to set a minimal element manually.
-        if !min {
-            let vertex_count = p.vertex_count() * q.vertex_count();
-            element_lists[Rank::new(-1)] = SubelementList::min();
-            element_lists[Rank::new(0)] = SubelementList::vertices(vertex_count);
-        }
-
-        // If !max, we have to set a maximal element manually.
-        if !max {
-            element_lists[rank] = SubelementList::max(element_lists[rank.minus_one()].len());
-        }
-
-        // Uses push_subs to add all of the element lists into a new polytope.
-        let mut product = AbstractBuilder::with_capacity(element_lists.rank());
-        for elements in element_lists.into_iter() {
-            product.push(elements);
-        }
-
-        product.build()
-    }
 }
 
 impl Polytope for Abstract {
+    type DualError = Infallible;
+
     fn abs(&self) -> &Abstract {
         self
     }
@@ -977,7 +855,7 @@ impl Polytope for Abstract {
     /// [dyad](https://polytope.miraheze.org/wiki/Dyad), the unique polytope of
     /// rank 1.
     fn dyad() -> Self {
-        let mut abs = AbstractBuilder::with_capacity(Rank::new(1));
+        let mut abs = AbstractBuilder::with_capacity(2);
 
         abs.push_min();
         abs.push_vertices(2);
@@ -1001,7 +879,7 @@ impl Polytope for Abstract {
         }
         edges.push(Subelements(vec![0, n - 1]));
 
-        let mut poly = AbstractBuilder::with_capacity(Rank::new(2));
+        let mut poly = AbstractBuilder::with_capacity(3);
 
         poly.push_min();
         poly.push_vertices(n);
@@ -1015,7 +893,7 @@ impl Polytope for Abstract {
 
     /// Converts a polytope into its dual. Use [`Self::dual`] instead, as this method
     /// can never fail.
-    fn try_dual(&self) -> DualResult<Self> {
+    fn try_dual(&self) -> Result<Self, Self::DualError> {
         let mut clone = self.clone();
         clone.dual_mut();
         Ok(clone)
@@ -1023,7 +901,7 @@ impl Polytope for Abstract {
 
     /// Converts a polytope into its dual in place. Use [`Self::dual_mut`] instead, as
     /// this method can never fail.
-    fn try_dual_mut(&mut self) -> DualResult<()> {
+    fn try_dual_mut(&mut self) -> Result<(), Self::DualError> {
         for elements in self.ranks.iter_mut() {
             elements.par_iter_mut().for_each(Element::swap_mut);
         }
@@ -1036,7 +914,7 @@ impl Polytope for Abstract {
     /// polyhedron in place.
     fn petrial_mut(&mut self) -> bool {
         // Petrials only really make sense for polyhedra.
-        if self.rank() != Rank::new(3) {
+        if self.rank() != 4 {
             return false;
         }
 
@@ -1091,7 +969,7 @@ impl Polytope for Abstract {
         self.pop();
 
         // Clears the current edges' superelements.
-        for edge in self[Rank::new(1)].iter_mut() {
+        for edge in self.edges_mut().iter_mut() {
             edge.sups = Superelements::new();
         }
 
@@ -1110,7 +988,7 @@ impl Polytope for Abstract {
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope. Use [`Self::antiprism`] instead, as this
     /// method can never fail.
-    fn try_antiprism(&self) -> DualResult<Self> {
+    fn try_antiprism(&self) -> Result<Self, Self::DualError> {
         Ok(self.antiprism())
     }
 
@@ -1131,24 +1009,18 @@ impl Polytope for Abstract {
 
         let el_counts = self.el_counts();
 
-        for (r, elements) in p
-            .ranks
-            .rank_into_iter()
-            .rank_enumerate()
-            .skip(1)
-            .take(rank.into())
-        {
-            let sub_offset = el_counts[r.minus_one()];
-            let sup_offset = el_counts[r.plus_one()];
+        for (r, elements) in p.ranks.into_iter().enumerate().skip(1).take(rank - 1) {
+            let sub_offset = el_counts[r - 1];
+            let sup_offset = el_counts[r + 1];
 
             for mut el in elements.into_iter() {
-                if r != Rank::new(0) {
+                if r != 1 {
                     for sub in el.subs.iter_mut() {
                         *sub += sub_offset;
                     }
                 }
 
-                if r != rank.minus_one() {
+                if r != rank - 1 {
                     for sup in el.sups.iter_mut() {
                         *sup += sup_offset;
                     }
@@ -1164,39 +1036,39 @@ impl Polytope for Abstract {
     }
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
-    fn element(&self, el: ElementRef) -> Option<Self> {
-        Some(ElementHash::new(self, el)?.to_polytope(self))
+    fn element(&self, rank: usize, idx: usize) -> Option<Self> {
+        Some(ElementHash::new(self, rank, idx)?.to_polytope(self))
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.
     fn duopyramid(p: &Self, q: &Self) -> Self {
-        Self::product(p, q, true, true)
+        Self::product::<true, true>(p, q)
     }
 
     /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
     /// from two polytopes.
     fn duoprism(p: &Self, q: &Self) -> Self {
-        Self::product(p, q, false, true)
+        Self::product::<false, true>(p, q)
     }
 
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
     /// from two polytopes.
     fn duotegum(p: &Self, q: &Self) -> Self {
-        Self::product(p, q, true, false)
+        Self::product::<true, false>(p, q)
     }
 
     /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
     /// from two polytopes.
     fn duocomb(p: &Self, q: &Self) -> Self {
-        Self::product(p, q, false, false)
+        Self::product::<false, false>(p, q)
     }
 
     /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
     /// polytope in place. Does nothing in the case of the nullitope.
     fn ditope_mut(&mut self) {
         let rank = self.rank();
-        if rank != Rank::new(-1) {
+        if rank != 0 {
             self.push_subs_at(rank, self.max().subs.clone());
             self.push_max();
         }
@@ -1205,49 +1077,31 @@ impl Polytope for Abstract {
     /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
     /// given polytope in place. Does nothing in case of the nullitope.
     fn hosotope_mut(&mut self) {
-        if self.rank() != Rank::new(-1) {
+        if self.rank() != 0 {
             self.min_mut().subs.push(0);
             let min = self.min().clone();
-            self[Rank::new(-1)].push(min);
+            self[0].push(min);
 
-            for v in &mut self[Rank::new(0)] {
+            for v in &mut self[1] {
                 v.subs.push(1);
             }
 
-            self.ranks.insert(Rank::new(-1), ElementList::min(2));
+            self.insert(0, ElementList::min(2));
         }
     }
 }
 
-/// Permits indexing an abstract polytope by rank.
-impl std::ops::Index<Rank> for Abstract {
-    type Output = ElementList;
+impl Index<(usize, usize)> for Abstract {
+    type Output = Element;
 
-    fn index(&self, index: Rank) -> &Self::Output {
-        &self.ranks[index]
-    }
-}
-
-/// Permits mutably indexing an abstract polytope by rank.
-impl std::ops::IndexMut<Rank> for Abstract {
-    fn index_mut(&mut self, index: Rank) -> &mut Self::Output {
-        &mut self.ranks[index]
-    }
-}
-
-impl IntoIterator for Abstract {
-    type Item = ElementList;
-
-    type IntoIter = crate::abs::rank::IntoIter<ElementList>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.ranks.rank_into_iter()
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        &self[index.rank()][index.idx()]
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{super::Polytope, rank::Rank, Abstract};
+    use super::{super::Polytope, Abstract};
 
     /// Returns a bunch of varied polytopes to run general tests on. Use only
     /// for tests that should work on **everything** you give it!
@@ -1261,15 +1115,15 @@ mod tests {
             Abstract::polygon(4),
             Abstract::polygon(5),
             Abstract::polygon(10),
-            Abstract::hypercube(Rank::new(3)),
-            Abstract::hypercube(Rank::new(4)),
-            Abstract::hypercube(Rank::new(5)),
-            Abstract::simplex(Rank::new(3)),
-            Abstract::simplex(Rank::new(4)),
-            Abstract::simplex(Rank::new(5)),
-            Abstract::orthoplex(Rank::new(3)),
-            Abstract::orthoplex(Rank::new(4)),
-            Abstract::orthoplex(Rank::new(5)),
+            Abstract::hypercube(4),
+            Abstract::hypercube(5),
+            Abstract::hypercube(6),
+            Abstract::simplex(4),
+            Abstract::simplex(5),
+            Abstract::simplex(6),
+            Abstract::orthoplex(4),
+            Abstract::orthoplex(5),
+            Abstract::orthoplex(6),
             Abstract::duoprism(&Abstract::polygon(6), &Abstract::polygon(7)),
             Abstract::dyad().ditope().ditope().ditope().ditope(),
         ]
@@ -1277,10 +1131,10 @@ mod tests {
 
     /// Tests whether a polytope's element counts match the expected element
     /// counts, and whether a polytope is valid.
-    fn test(poly: &Abstract, element_counts: Vec<usize>) {
+    fn test(poly: &Abstract, element_counts: &[usize]) {
         assert_eq!(
-            poly.el_counts(),
-            element_counts.into(),
+            &poly.el_counts(),
+            &element_counts,
             "{} element counts don't match expected value.",
             "TBA: name"
         );
@@ -1295,26 +1149,26 @@ mod tests {
     #[test]
     /// Checks that a nullitope is generated correctly.
     fn nullitope() {
-        test(&Abstract::nullitope(), vec![1]);
+        test(&Abstract::nullitope(), &[1]);
     }
 
     #[test]
     /// Checks that a point is generated correctly.
     fn point() {
-        test(&Abstract::point(), vec![1, 1]);
+        test(&Abstract::point(), &[1, 1]);
     }
 
     #[test]
     /// Checks that a dyad is generated correctly.
     fn dyad() {
-        test(&Abstract::dyad(), vec![1, 2, 1]);
+        test(&Abstract::dyad(), &[1, 2, 1]);
     }
 
     #[test]
     /// Checks that polygons are generated correctly.
     fn polygon() {
         for n in 2..=10 {
-            test(&Abstract::polygon(n), vec![1, n, n, 1]);
+            test(&Abstract::polygon(n), &[1, n, n, 1]);
         }
     }
 
@@ -1330,7 +1184,7 @@ mod tests {
             for n in m..=5 {
                 test(
                     &Abstract::duopyramid(&polygons[m - 2], &polygons[n - 2]),
-                    vec![
+                    &[
                         1,
                         m + n,
                         m + n + m * n,
@@ -1356,7 +1210,7 @@ mod tests {
             for n in m..=5 {
                 test(
                     &Abstract::duoprism(&polygons[m - 2], &polygons[n - 2]),
-                    vec![1, m * n, 2 * m * n, m + n + m * n, m + n, 1],
+                    &[1, m * n, 2 * m * n, m + n + m * n, m + n, 1],
                 );
             }
         }
@@ -1374,7 +1228,7 @@ mod tests {
             for n in m..=5 {
                 test(
                     &Abstract::duotegum(&polygons[m - 2], &polygons[n - 2]),
-                    vec![1, m + n, m + n + m * n, 2 * m * n, m * n, 1],
+                    &[1, m + n, m + n + m * n, 2 * m * n, m * n, 1],
                 );
             }
         }
@@ -1392,7 +1246,7 @@ mod tests {
             for n in m..=5 {
                 test(
                     &Abstract::duocomb(&polygons[m - 2], &polygons[n - 2]),
-                    vec![1, m * n, 2 * m * n, m * n, 1],
+                    &[1, m * n, 2 * m * n, m * n, 1],
                 );
             }
         }
@@ -1413,47 +1267,47 @@ mod tests {
     #[test]
     /// Checks that simplices are generated correctly.
     fn simplex() {
-        for n in Rank::range_inclusive_iter(-1, 5) {
+        for n in 0..=7 {
             let simplex = Abstract::simplex(n);
-            let mut element_counts = Vec::with_capacity(n.plus_one_usize());
+            let mut element_counts = Vec::with_capacity(n + 1);
 
-            for k in Rank::range_inclusive_iter(-1, n) {
-                element_counts.push(choose(n.plus_one_usize(), k.plus_one_usize()));
+            for k in 0..=n {
+                element_counts.push(choose(n, k));
             }
 
-            test(&simplex, element_counts);
+            test(&simplex, &element_counts);
         }
     }
 
     #[test]
     /// Checks that hypercubes are generated correctly.
     fn hypercube() {
-        for n in Rank::range_inclusive_iter(-1, 5) {
+        for n in 0..=6 {
             let hypercube = Abstract::hypercube(n);
-            let mut element_counts = Vec::with_capacity(n.plus_one_usize());
+            let mut element_counts = Vec::with_capacity(n + 1);
 
             element_counts.push(1);
-            for k in Rank::range_inclusive_iter(Rank::new(0), n) {
-                element_counts.push(choose(n.into(), k.into()) * (1 << (n - k).into_usize()));
+            for k in 1..=n {
+                element_counts.push(choose(n - 1, k - 1) * (1 << (n - k)));
             }
 
-            test(&hypercube, element_counts);
+            test(&hypercube, &element_counts);
         }
     }
 
     #[test]
     /// Checks that orthoplices are generated correctly.
     fn orthoplex() {
-        for n in Rank::range_inclusive_iter(-1, 5) {
+        for n in 0..=6 {
             let orthoplex = Abstract::orthoplex(n);
-            let mut element_counts = Vec::with_capacity(n.plus_one_usize());
+            let mut element_counts = Vec::with_capacity(n + 1);
 
-            for k in Rank::range_inclusive_iter(0, n) {
-                element_counts.push(choose(n.into(), (n - k).into()) * (1 << k.into_usize()));
+            for k in 0..n {
+                element_counts.push(choose(n - 1, k) * (1 << k));
             }
             element_counts.push(1);
 
-            test(&orthoplex, element_counts);
+            test(&orthoplex, &element_counts);
         }
     }
 
@@ -1468,8 +1322,6 @@ mod tests {
     #[test]
     /// Checks that duals are generated correctly.
     fn dual_check() {
-        use vec_like::VecLike;
-
         for poly in test_polytopes().iter_mut() {
             let el_counts = poly.el_counts();
             poly.dual_mut();

@@ -12,29 +12,18 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use super::{elements::ElementRef, rank::Rank, Abstract};
+use super::Abstract;
 use crate::{Float, Polytope};
 
 use vec_like::*;
 
 /// Represents a [flag](https://polytope.miraheze.org/wiki/Flag) in a polytope.
-/// Stores the indices of the elements of each rank, excluding the minimal and
-/// maximal elements.
-#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+/// Stores the indices of the elements of each rank.
+#[derive(Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Flag(Vec<usize>);
 impl_veclike!(Flag, Item = usize, Index = usize);
 
 impl Flag {
-    /// Gets the index of the element with a given rank, or returns `0` if it
-    /// doesn't exist. This allows us to pretend that the flag stores a minimal
-    /// and maximal element.
-    pub fn get_or_zero(&self, rank: Rank) -> usize {
-        match rank.try_usize() {
-            Some(rank) => self.get(rank).cloned().unwrap_or(0),
-            None => 0,
-        }
-    }
-
     /// Applies a specified flag change to the flag in place.
     ///
     /// # Panics
@@ -42,32 +31,19 @@ impl Flag {
     /// argument.
     pub fn change_mut(&mut self, polytope: &Abstract, r: usize) {
         let rank = polytope.rank();
-        debug_assert_ne!(
-            rank,
-            Rank::new(-1),
-            "Can't iterate over flags of the nullitope."
-        );
 
-        // A flag change is a no-op in a point.
-        if rank == Rank::new(0) {
+        // A flag change is a no-op in a nullitope or point.
+        if rank <= 1 {
             return;
         }
 
-        let r_rank = Rank::from(r);
-        let r_minus_one = r_rank.minus_one();
-        let r_plus_one = r_rank.plus_one();
-
         // Determines the common elements between the subelements of the element
         // above and the superelements of the element below.
-        let below_idx = self.get_or_zero(r_minus_one);
-        let below = polytope
-            .get_element(ElementRef::new(r_minus_one, below_idx))
-            .unwrap();
+        let below_idx = self[r - 1];
+        let below = polytope.get_element(r - 1, below_idx).unwrap();
 
-        let above_idx = self.get_or_zero(r_plus_one);
-        let above = polytope
-            .get_element(ElementRef::new(r_plus_one, above_idx))
-            .unwrap();
+        let above_idx = self[r + 1];
+        let above = polytope.get_element(r + 1, above_idx).unwrap();
 
         let common = common(&below.sups.0, &above.subs.0);
 
@@ -75,10 +51,10 @@ impl Flag {
             common.len(),
             2,
             "Diamond property fails between rank {}, index {}, and rank {}, index {}.",
-            r_minus_one,
-            self.get_or_zero(r_minus_one),
-            r_plus_one,
-            self.get_or_zero(r_plus_one),
+            r - 1,
+            below_idx,
+            r + 1,
+            above_idx,
         );
 
         // Changes the element at idx to the other element in the section
@@ -166,11 +142,10 @@ impl<'a> FlagIter<'a> {
             "You must make sure that the polytope is sorted before iterating over its flags."
         );
 
-        let r = polytope.rank().try_usize().unwrap_or(0);
         Self {
             polytope,
-            flag: polytope.first_flag(),
-            indices: vec![0; r],
+            flag: Some(polytope.first_flag()),
+            indices: vec![0; polytope.rank()],
         }
     }
 }
@@ -181,21 +156,20 @@ impl<'a> Iterator for FlagIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let flag = self.flag.as_mut()?;
         let prev_flag = flag.clone();
-        let rank = self.polytope.rank().into_usize();
+        let rank = self.polytope.rank();
 
         // The largest rank of the elements we'll update.
-        let mut r = 0;
+        let mut r = 1;
         loop {
-            if r == rank {
+            if r >= rank {
                 self.flag = None;
                 return Some(prev_flag);
             }
 
-            let r_plus_one = Rank::from(r + 1);
-            let ranks = &self.polytope[r_plus_one];
-            let idx = flag.get_or_zero(r_plus_one);
+            let element_list = &self.polytope[r + 1];
+            let idx = flag[r + 1];
 
-            if ranks[idx].subs.len() == self.indices[r] + 1 {
+            if element_list[idx].subs.len() == self.indices[r] + 1 {
                 self.indices[r] = 0;
                 r += 1;
             } else {
@@ -205,26 +179,25 @@ impl<'a> Iterator for FlagIter<'a> {
         }
 
         // Updates all elements in the flag with ranks r down to 0.
-        let r_plus_one = Rank::from(r + 1);
-        let idx = flag.get(r + 1).copied().unwrap_or(0);
-        let mut element = &self.polytope[r_plus_one][idx];
+        let idx = flag[r + 1];
+        let mut element = &self.polytope[(r + 1, idx)];
         loop {
             let idx = self.indices[r];
             flag[r] = element.subs[idx];
 
-            if r == 0 {
+            if r == 1 {
                 break;
             }
 
-            element = &self.polytope[r.into()][flag[r]];
+            element = &self.polytope[(r, flag[r])];
             r -= 1;
         }
 
-        Some(prev_flag)
+        Some(dbg!(prev_flag))
     }
 }
 
-#[derive(Clone, Default, Eq)]
+#[derive(Clone, Default, Debug, Eq)]
 /// A flag together with an orientation. Any flag change flips the orientation.
 /// If the polytope associated to the flag is non-orientable, the orientation
 /// will be garbage data.
@@ -368,8 +341,8 @@ impl_veclike!(FlagChanges, Item = usize, Index = usize);
 
 impl FlagChanges {
     /// Returns the set of all flag changes for a polytope of a given rank.
-    pub fn all(rank: Rank) -> Self {
-        Self((0..rank.into()).collect())
+    pub fn all(rank: usize) -> Self {
+        Self((1..rank).collect())
     }
 
     /// Returns an iterator over all subsets of flag changes created by taking
@@ -406,6 +379,7 @@ impl FlagChanges {
 /// You should use this iterator instead of a [`FlagIter`] when
 /// * you want to apply a specific set of flag changes,
 /// * you care about the orientation of the flags.
+// TODO: specialize this for non-oriented flags?
 pub struct OrientedFlagIter<'a> {
     /// The polytope whose flags we iterate over. For the algorithm that applies
     /// a flag change to work, **this polytope's subelement and superelement
@@ -436,6 +410,7 @@ pub struct OrientedFlagIter<'a> {
 }
 
 /// The result of trying to get the next flag.
+#[derive(Debug)]
 pub enum FlagNext {
     /// We found a new flag event (either a flag or the non-orientable event).
     New(FlagEvent),
@@ -448,19 +423,6 @@ pub enum FlagNext {
 }
 
 impl<'a> OrientedFlagIter<'a> {
-    /// Returns a dummy iterator that returns `None` every single time.
-    pub fn empty(polytope: &'a Abstract) -> Self {
-        Self {
-            polytope,
-            queue: VecDeque::new(), // This is the important bit.
-            flag_changes: FlagChanges::new(),
-            flag_idx: 0,
-            first: true, // And also this.
-            found: HashMap::new(),
-            orientable: true,
-        }
-    }
-
     /// Initializes a new iterator over the flag events of a polytope, starting
     /// from an arbitrary flag and applying all flag changes.
     ///
@@ -468,14 +430,11 @@ impl<'a> OrientedFlagIter<'a> {
     /// method.
     pub fn new(polytope: &'a Abstract) -> Self {
         // Initializes with any flag from the polytope and all flag changes.
-        if let Some(first_flag) = polytope.first_oriented_flag() {
-            let rank = polytope.rank();
-            Self::with_flags(polytope, FlagChanges::all(rank), first_flag)
-        }
-        // A nullitope has no flags.
-        else {
-            Self::empty(polytope)
-        }
+        Self::with_flags(
+            polytope,
+            FlagChanges::all(polytope.rank()),
+            polytope.first_oriented_flag(),
+        )
     }
 
     /// Initializes a new iterator over the flag events of a polytope, starting
@@ -488,25 +447,20 @@ impl<'a> OrientedFlagIter<'a> {
         flag_changes: FlagChanges,
         first_flag: OrientedFlag,
     ) -> Self {
-        let first = polytope.rank() == Rank::new(-1);
-
         // Initializes found flags.
         let mut found = HashMap::new();
+        found.insert(first_flag.clone(), 0);
+
+        // Initializes queue.
         let mut queue = VecDeque::new();
-
-        if !first {
-            found.insert(first_flag.clone(), 0);
-
-            // Initializes queue.
-            queue.push_back(first_flag);
-        }
+        queue.push_back(first_flag);
 
         Self {
             polytope,
             queue,
             flag_changes,
             flag_idx: 0,
-            first,
+            first: false,
             found,
             orientable: true,
         }
@@ -524,7 +478,7 @@ impl<'a> OrientedFlagIter<'a> {
     pub fn try_next(&mut self) -> FlagNext {
         // We get the current flag from the queue.
         if let Some(current) = self.queue.front() {
-            let rank = self.polytope.rank().into_usize();
+            let rank = self.polytope.rank();
 
             // Applies the current flag change to the current flag.
             let flag_change = self.flag_changes[self.flag_idx];
@@ -586,6 +540,7 @@ impl<'a> OrientedFlagIter<'a> {
 
 /// Represents either a new found flag, or the event in which the iterator
 /// realizes that the polytope is non-orientable.
+#[derive(Debug)]
 pub enum FlagEvent {
     /// We found a new flag.
     Flag(OrientedFlag),
@@ -624,7 +579,7 @@ impl<'a> Iterator for OrientedFlagIter<'a> {
 
             // If we're dealing with a point, or if we're performing no flag
             // changes, this is the only flag.
-            if rank == Rank::new(0) || self.flag_changes.is_empty() {
+            if rank <= 1 || self.flag_changes.is_empty() {
                 self.queue = VecDeque::new();
             }
 
@@ -679,7 +634,7 @@ impl FlagSet {
         Self::with_flags(
             polytope,
             FlagChanges::all(polytope.rank()),
-            polytope.first_flag().unwrap(),
+            polytope.first_flag(),
         )
     }
 
@@ -757,7 +712,7 @@ mod tests {
 
     #[test]
     fn nullitope() {
-        test(&mut Abstract::nullitope(), 0)
+        test(&mut Abstract::nullitope(), 1)
     }
 
     #[test]
@@ -779,30 +734,30 @@ mod tests {
 
     #[test]
     fn simplex() {
-        for n in 0..=7 {
+        for n in 1..=8 {
             test(
-                &mut Abstract::simplex(Rank::from(n)),
-                crate::factorial(n + 1) as usize,
+                &mut dbg!(Abstract::simplex(n)),
+                crate::factorial(n) as usize,
             );
         }
     }
 
     #[test]
     fn hypercube() {
-        for n in 0..=7 {
+        for n in 1..=7 {
             test(
-                &mut Abstract::hypercube(Rank::new(n as isize)),
-                (1 << n) * crate::factorial(n) as usize,
+                &mut dbg!(Abstract::hypercube(n)),
+                (1 << (n - 1)) * crate::factorial(n - 1) as usize,
             );
         }
     }
 
     #[test]
     fn orthoplex() {
-        for n in 0..=7 {
+        for n in 1..=7 {
             test(
-                &mut Abstract::orthoplex(Rank::new(n as isize)),
-                (1 << n) * crate::factorial(n) as usize,
+                &mut Abstract::orthoplex(n),
+                (1 << (n - 1)) * crate::factorial(n - 1) as usize,
             );
         }
     }

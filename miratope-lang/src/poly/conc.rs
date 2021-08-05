@@ -7,6 +7,7 @@ use crate::name::{Con, ConData, Name, NameData, Regular};
 use miratope_core::conc::file::off::{OffError, OffResult};
 use miratope_core::conc::file::FromFile;
 use miratope_core::conc::ConcretePolytope;
+use miratope_core::DualError;
 use miratope_core::{abs::Abstract, conc::Concrete, geometry::Point, Polytope};
 
 /// A [`Concrete`] polytope bundled together with a [`Name`] of [`Con`] type.
@@ -69,6 +70,8 @@ impl BorrowMut<Name<Con>> for NamedConcrete {
 impl NamedPolytope<Con> for NamedConcrete {}
 
 impl Polytope for NamedConcrete {
+    type DualError = DualError;
+
     fn abs(&self) -> &Abstract {
         &self.con.abs
     }
@@ -93,7 +96,7 @@ impl Polytope for NamedConcrete {
         Self::new(Concrete::polygon(n), Name::polygon(Default::default(), n))
     }
 
-    fn try_dual(&self) -> miratope_core::DualResult<Self> {
+    fn try_dual(&self) -> Result<Self, Self::DualError> {
         let con = self.con.try_dual()?;
         let name = Name::dual(
             self.name.clone(),
@@ -101,10 +104,11 @@ impl Polytope for NamedConcrete {
             con.facet_count(),
             con.rank(),
         );
+
         Ok(Self::new(con, name))
     }
 
-    fn try_dual_mut(&mut self) -> miratope_core::DualResult<()> {
+    fn try_dual_mut(&mut self) -> Result<(), Self::DualError> {
         self.con.try_dual_mut()?;
         self.name = Name::dual(
             mem::take(&mut self.name),
@@ -112,6 +116,7 @@ impl Polytope for NamedConcrete {
             self.con.facet_count(),
             self.con.rank(),
         );
+
         Ok(())
     }
 
@@ -119,8 +124,8 @@ impl Polytope for NamedConcrete {
         todo!()
     }
 
-    fn element(&self, el: miratope_core::abs::elements::ElementRef) -> Option<Self> {
-        Some(Self::new_generic(self.con.element(el)?))
+    fn element(&self, rank: usize, idx: usize) -> Option<Self> {
+        Some(Self::new_generic(self.con.element(rank, idx)?))
     }
 
     fn petrial_mut(&mut self) -> bool {
@@ -189,44 +194,44 @@ impl Polytope for NamedConcrete {
         self.name = Name::hosotope(mem::take(&mut self.name), self.rank());
     }
 
-    fn try_antiprism(&self) -> miratope_core::DualResult<Self> {
+    fn try_antiprism(&self) -> Result<Self, Self::DualError> {
         Ok(Self::new(
             self.con().try_antiprism()?,
             Name::antiprism(self.name.clone()),
         ))
     }
 
-    fn simplex(rank: miratope_core::abs::rank::Rank) -> Self {
+    fn simplex(rank: usize) -> Self {
         Self::new(
             Concrete::simplex(rank),
             Name::simplex(
                 ConData::new(Regular::Yes {
-                    center: Point::zeros(rank.try_usize().unwrap_or_default()),
+                    center: Point::zeros(rank - 1),
                 }),
                 rank,
             ),
         )
     }
 
-    fn hypercube(rank: miratope_core::abs::rank::Rank) -> Self {
+    fn hypercube(rank: usize) -> Self {
         println!("yes");
         Self::new(
             Concrete::hypercube(rank),
             Name::hyperblock(
                 ConData::new(Regular::Yes {
-                    center: Point::zeros(rank.try_usize().unwrap_or_default()),
+                    center: Point::zeros(rank - 1),
                 }),
                 rank,
             ),
         )
     }
 
-    fn orthoplex(rank: miratope_core::abs::rank::Rank) -> Self {
+    fn orthoplex(rank: usize) -> Self {
         Self::new(
             Concrete::orthoplex(rank),
             Name::orthoplex(
                 ConData::new(Regular::Yes {
-                    center: Point::zeros(rank.try_usize().unwrap_or_default()),
+                    center: Point::zeros(rank - 1),
                 }),
                 rank,
             ),
@@ -262,7 +267,7 @@ impl ConcretePolytope for NamedConcrete {
     fn try_dual_mut_with(
         &mut self,
         sphere: &miratope_core::geometry::Hypersphere,
-    ) -> miratope_core::DualResult<()> {
+    ) -> Result<(), Self::DualError> {
         let res = self.con.try_dual_mut_with(sphere);
         if res.is_ok() {
             self.name = Name::dual(

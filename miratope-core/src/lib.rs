@@ -16,20 +16,20 @@ pub mod conc;
 pub mod geometry;
 pub mod group;
 
-use std::iter;
+use std::{error::Error, iter};
 
 use abs::{
-    elements::{ElementList, ElementRef, SectionRef},
+    elements::{ElementList, Ranks, SectionRef},
     flag::{Flag, FlagIter, OrientedFlag, OrientedFlagIter},
-    rank::{Rank, RankVec},
     Abstract,
 };
 
 use vec_like::VecLike;
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
-const ELEMENT_NAMES: [&str; 11] = [
-    "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta", "Xenna", "Daka",
+const ELEMENT_NAMES: [&str; 12] = [
+    "", "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta", "Xenna",
+    "Daka",
 ];
 
 /// The word "Components".
@@ -85,22 +85,18 @@ pub type Float = f64;
 /// A wrapper around [`Float`] to allow for ordering and equality.
 pub type FloatOrd = ordered_float::OrderedFloat<Float>;
 
-/// The result of taking a dual: can either be a success value of `T`, or the
-/// index of a facet through the inversion center.
-pub type DualResult<T> = Result<T, DualError>;
-
 /// Represents an error in a concrete dual, in which a facet with a given index
 /// passes through the inversion center.
 #[derive(Debug)]
 pub struct DualError(usize);
 
 impl std::fmt::Display for DualError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "facet {} passes through inversion center", self.0)
     }
 }
 
-impl std::error::Error for DualError {}
+impl Error for DualError {}
 
 /// Gets the precalculated value for n!.
 fn factorial(n: usize) -> u32 {
@@ -114,15 +110,22 @@ fn factorial(n: usize) -> u32 {
 
 /// The trait for methods common to all polytopes.
 pub trait Polytope: Sized + Clone {
+    /// The error type of taking a dual.
+    type DualError: Error;
+
+    /// Returns a reference to the underlying abstract polytope.
     fn abs(&self) -> &Abstract;
 
+    /// Returns a mutable reference to the underlying abstract polytope.
     fn abs_mut(&mut self) -> &mut Abstract;
 
-    fn ranks(&self) -> &RankVec<ElementList> {
+    /// Returns a reference to the underlying ranks.
+    fn ranks(&self) -> &Ranks {
         &self.abs().ranks
     }
 
-    fn ranks_mut(&mut self) -> &mut RankVec<ElementList> {
+    /// Returns a mutable reference to the underlying ranks.
+    fn ranks_mut(&mut self) -> &mut Ranks {
         &mut self.abs_mut().ranks
     }
 
@@ -143,12 +146,12 @@ pub trait Polytope: Sized + Clone {
     }
 
     /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
-    fn rank(&self) -> Rank {
+    fn rank(&self) -> usize {
         self.ranks().rank()
     }
 
     /// Returns the number of elements of a given rank.
-    fn el_count(&self, rank: Rank) -> usize {
+    fn el_count(&self, rank: usize) -> usize {
         self.abs()
             .ranks
             .get(rank)
@@ -157,11 +160,11 @@ pub trait Polytope: Sized + Clone {
     }
 
     /// Returns the element counts of the polytope.
-    fn el_counts(&self) -> RankVec<usize> {
+    fn el_counts(&self) -> Vec<usize> {
         let abs = self.abs();
-        let mut counts = RankVec::with_rank_capacity(abs.rank());
+        let mut counts = Vec::with_capacity(abs.rank() + 1);
 
-        for r in Rank::range_inclusive_iter(Rank::new(-1), abs.rank()) {
+        for r in 0..=abs.rank() {
             counts.push(abs[r].len())
         }
 
@@ -170,15 +173,18 @@ pub trait Polytope: Sized + Clone {
 
     /// The number of vertices on the polytope.
     fn vertex_count(&self) -> usize {
-        self.el_count(Rank::new(0))
+        self.el_count(1)
     }
 
     /// The number of facets on the polytope.
     fn facet_count(&self) -> usize {
-        self.rank()
-            .try_sub(Rank::new(1))
-            .map(|r| self.el_count(r))
-            .unwrap_or(0)
+        let r = self.rank();
+
+        if r == 0 {
+            0
+        } else {
+            self.el_count(r - 1)
+        }
     }
 
     /// Returns an instance of the
@@ -203,7 +209,7 @@ pub trait Polytope: Sized + Clone {
     /// Returns the dual of a polytope. Never fails for an abstract polytope. In
     /// case of failing on a concrete polytope, returns the index of a facet
     /// through the inversion center.
-    fn try_dual(&self) -> DualResult<Self>;
+    fn try_dual(&self) -> Result<Self, Self::DualError>;
 
     /// Calls [`Self::try_dual`] and unwraps the result.
     fn dual(&self) -> Self {
@@ -213,7 +219,7 @@ pub trait Polytope: Sized + Clone {
     /// Builds the dual of a polytope in place. Never fails for an abstract
     /// polytope. In case of failing on a concrete polytope, returns the index
     /// of a facet through the inversion center and does nothing.
-    fn try_dual_mut(&mut self) -> DualResult<()>;
+    fn try_dual_mut(&mut self) -> Result<(), Self::DualError>;
 
     /// Calls [`Self::try_dual_mut`] and unwraps the result.
     fn dual_mut(&mut self) {
@@ -225,12 +231,12 @@ pub trait Polytope: Sized + Clone {
     fn comp_append(&mut self, p: Self);
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
-    fn element(&self, el: ElementRef) -> Option<Self>;
+    fn element(&self, rank: usize, idx: usize) -> Option<Self>;
 
     /// Gets the element figure with a given rank and index as a polytope.
-    fn element_fig(&self, el: ElementRef) -> DualResult<Option<Self>> {
-        if let Some(rank) = (self.rank() - el.rank).try_minus_one() {
-            if let Some(mut element_fig) = self.try_dual()?.element(ElementRef::new(rank, el.idx)) {
+    fn element_fig(&self, rank: usize, idx: usize) -> Result<Option<Self>, Self::DualError> {
+        if self.rank() >= (rank - 1) {
+            if let Some(mut element_fig) = self.try_dual()?.element(self.rank() - (rank - 1), idx) {
                 element_fig.try_dual_mut()?;
                 return Ok(Some(element_fig));
             }
@@ -242,22 +248,25 @@ pub trait Polytope: Sized + Clone {
     /// Gets the section defined by two elements with given ranks and indices as
     /// a polytope, or returns `None` in case no section is defined by these
     /// elements.
-    fn section(&self, section: SectionRef) -> DualResult<Option<Self>> {
-        Ok(if let Some(el) = self.element(section.hi) {
-            el.element_fig(section.lo)?
-        } else {
-            None
-        })
+    fn section(&self, section: SectionRef) -> Result<Option<Self>, Self::DualError> {
+        Ok(
+            if let Some(el) = self.element(section.hi_rank, section.hi_idx) {
+                el.element_fig(section.lo_rank, section.lo_idx)?
+            } else {
+                None
+            },
+        )
     }
 
     /// Gets the facet associated to the element of a given index as a polytope.
     fn facet(&self, idx: usize) -> Option<Self> {
-        self.element(ElementRef::new(self.rank().try_minus_one()?, idx))
+        let r = self.rank();
+        (r != 0).then(|| self.element(r - 1, idx)).flatten()
     }
 
     /// Gets the verf associated to the element of a given index as a polytope.
-    fn verf(&self, idx: usize) -> DualResult<Option<Self>> {
-        self.element_fig(ElementRef::new(Rank::new(0), idx))
+    fn verf(&self, idx: usize) -> Result<Option<Self>, Self::DualError> {
+        self.element_fig(1, idx)
     }
 
     /// Builds a compound polytope from a set of components.
@@ -292,7 +301,7 @@ pub trait Polytope: Sized + Clone {
     /// Builds a Petrie polygon from the first flag of the polytope. Returns
     /// `None` if this Petrie polygon is invalid.
     fn petrie_polygon(&mut self) -> Option<Self> {
-        self.petrie_polygon_with(self.first_flag()?)
+        self.petrie_polygon_with(self.first_flag())
     }
 
     /// Builds a Petrie polygon from a given flag of the polytope. Returns
@@ -301,31 +310,25 @@ pub trait Polytope: Sized + Clone {
 
     /// Returns the first [`Flag`] of a polytope. This is the flag built when we
     /// start at the maximal element and repeatedly take the first subelement.
-    fn first_flag(&self) -> Option<Flag> {
+    fn first_flag(&self) -> Flag {
         let rank = self.rank();
-        let rank_usize = rank.try_usize()?;
-
-        let mut flag = Flag::with_capacity(rank_usize);
+        let mut flag = Flag::with_capacity(rank + 1);
         let mut idx = 0;
         flag.push(0);
 
-        let abs = self.abs();
-        for r in Rank::range_iter(1, rank) {
-            idx = abs
-                .get_element(ElementRef::new(r.minus_one(), idx))
-                .unwrap()
-                .sups[0];
+        for r in 0..rank {
+            idx = self.abs().get_element(r, idx).unwrap().sups[0];
             flag.push(idx);
         }
 
-        Some(flag)
+        flag
     }
 
     /// Returns the first [`OrientedFlag`] of a polytope. This is the flag built
     /// when we start at the maximal element and repeatedly take the first
     /// subelement.
-    fn first_oriented_flag(&self) -> Option<OrientedFlag> {
-        Some(self.first_flag()?.into())
+    fn first_oriented_flag(&self) -> OrientedFlag {
+        self.first_flag().into()
     }
 
     /// Returns an iterator over all [`Flag`]s of a polytope.
@@ -384,7 +387,7 @@ pub trait Polytope: Sized + Clone {
     /// Attempts to build an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope. If it fails, it returns the index of a facet
     /// through the inversion center.
-    fn try_antiprism(&self) -> DualResult<Self>;
+    fn try_antiprism(&self) -> Result<Self, Self::DualError>;
 
     /// Calls [`Self::try_antiprism`] and unwraps the result.
     fn antiprism(&self) -> Self {
@@ -481,31 +484,27 @@ pub trait Polytope: Sized + Clone {
 
     /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
     /// given rank.
-    fn simplex(rank: Rank) -> Self {
-        if rank == Rank::new(-1) {
-            Self::nullitope()
-        } else {
-            Self::multipyramid(iter::repeat(&Self::point()).take(rank.plus_one_usize()))
-        }
+    fn simplex(rank: usize) -> Self {
+        Self::multipyramid(iter::repeat(&Self::point()).take(rank))
     }
 
     /// Builds a [hypercube](https://polytope.miraheze.org/wiki/Hypercube) with
     /// a given rank.
-    fn hypercube(rank: Rank) -> Self {
-        if rank == Rank::new(-1) {
+    fn hypercube(rank: usize) -> Self {
+        if rank == 0 {
             Self::nullitope()
         } else {
-            Self::multiprism(iter::repeat(&Self::dyad()).take(rank.into()))
+            Self::multiprism(iter::repeat(&Self::dyad()).take(rank - 1))
         }
     }
 
     /// Builds an [orthoplex](https://polytope.miraheze.org/wiki/Orthoplex) with
     /// a given rank.
-    fn orthoplex(rank: Rank) -> Self {
-        if rank == Rank::new(-1) {
+    fn orthoplex(rank: usize) -> Self {
+        if rank == 0 {
             Self::nullitope()
         } else {
-            Self::multitegum(iter::repeat(&Self::dyad()).take(rank.into()))
+            Self::multitegum(iter::repeat(&Self::dyad()).take(rank - 1))
         }
     }
 }

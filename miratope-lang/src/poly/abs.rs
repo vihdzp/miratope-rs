@@ -1,4 +1,5 @@
 use std::borrow::{Borrow, BorrowMut};
+use std::convert::Infallible;
 use std::mem;
 
 use super::NamedPolytope;
@@ -52,6 +53,8 @@ impl NamedAbstract {
 }
 
 impl Polytope for NamedAbstract {
+    type DualError = Infallible;
+
     fn abs(&self) -> &Abstract {
         &self.abs
     }
@@ -76,25 +79,27 @@ impl Polytope for NamedAbstract {
         Self::new(Abstract::polygon(n), Name::polygon(Default::default(), n))
     }
 
-    fn try_dual(&self) -> miratope_core::DualResult<Self> {
-        let abs = self.abs.try_dual()?;
+    fn try_dual(&self) -> Result<Self, Self::DualError> {
+        let abs = self.abs.dual();
         let name = Name::dual(
             self.name.clone(),
             Default::default(),
             abs.facet_count(),
             abs.rank(),
         );
+
         Ok(Self::new(abs, name))
     }
 
-    fn try_dual_mut(&mut self) -> miratope_core::DualResult<()> {
-        self.abs.try_dual_mut()?;
+    fn try_dual_mut(&mut self) -> Result<(), Self::DualError> {
+        self.abs.dual_mut();
         self.name = Name::dual(
             mem::take(&mut self.name),
             Default::default(),
             self.abs.facet_count(),
             self.abs.rank(),
         );
+
         Ok(())
     }
 
@@ -103,8 +108,8 @@ impl Polytope for NamedAbstract {
         todo!()
     }
 
-    fn element(&self, el: miratope_core::abs::elements::ElementRef) -> Option<Self> {
-        Some(Self::new_generic(self.abs.element(el)?))
+    fn element(&self, rank: usize, idx: usize) -> Option<Self> {
+        Some(Self::new_generic(self.abs.element(rank, idx)?))
     }
 
     fn petrial_mut(&mut self) -> bool {
@@ -179,28 +184,28 @@ impl Polytope for NamedAbstract {
         todo!()
     }
 
-    fn try_antiprism(&self) -> miratope_core::DualResult<Self> {
+    fn try_antiprism(&self) -> Result<Self, Self::DualError> {
         Ok(Self::new(
             self.abs().try_antiprism()?,
             Name::antiprism(self.name.clone()),
         ))
     }
 
-    fn simplex(rank: miratope_core::abs::rank::Rank) -> Self {
+    fn simplex(rank: usize) -> Self {
         Self::new(
             Abstract::simplex(rank),
             Name::simplex(Default::default(), rank),
         )
     }
 
-    fn hypercube(rank: miratope_core::abs::rank::Rank) -> Self {
+    fn hypercube(rank: usize) -> Self {
         Self::new(
             Abstract::hypercube(rank),
             Name::hyperblock(Default::default(), rank),
         )
     }
 
-    fn orthoplex(rank: miratope_core::abs::rank::Rank) -> Self {
+    fn orthoplex(rank: usize) -> Self {
         Self::new(
             Abstract::orthoplex(rank),
             Name::orthoplex(Default::default(), rank),

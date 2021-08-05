@@ -1,8 +1,6 @@
 //! Implements the English language.
 use crate::{GreekPrefix, Language, Position, Prefix};
 
-use miratope_core::abs::rank::Rank;
-
 /// The English language.
 pub struct En;
 
@@ -70,19 +68,19 @@ impl Language for En {
         Position::Before
     }
 
-    fn suffix_noun_str(rank: Rank) -> String {
-        let suffix = SUFFIXES[rank.into_usize()].to_owned();
+    fn suffix_noun_str(rank: usize) -> String {
+        let suffix = SUFFIXES[rank].to_owned();
 
-        match rank.plus_one_usize() {
+        match rank {
             3 => suffix,
             _ => suffix + "on",
         }
     }
 
-    fn suffix_adj(_: Self::Gender, rank: Rank) -> String {
-        let suffix = SUFFIXES[rank.into_usize()].to_owned();
+    fn suffix_adj(_: Self::Gender, rank: usize) -> String {
+        let suffix = SUFFIXES[rank].to_owned();
 
-        match rank.plus_one_usize() {
+        match rank {
             3 | 4 => suffix + "al",
             _ => suffix + "ic",
         }
@@ -184,19 +182,19 @@ impl Language for En {
         "antitegmatic".to_owned()
     }
 
-    fn hosotope_noun_str(rank: Rank) -> String {
+    fn hosotope_noun_str(rank: usize) -> String {
         "hoso".to_owned() + &Self::suffix_noun_str(rank)
     }
 
-    fn hosotope_adj(gender: Self::Gender, rank: Rank) -> String {
+    fn hosotope_adj(gender: Self::Gender, rank: usize) -> String {
         "hoso".to_owned() + &Self::suffix_adj(gender, rank)
     }
 
-    fn ditope_noun_str(rank: Rank) -> String {
+    fn ditope_noun_str(rank: usize) -> String {
         "hoso".to_owned() + &Self::suffix_noun_str(rank)
     }
 
-    fn ditope_adj(gender: Self::Gender, rank: Rank) -> String {
+    fn ditope_adj(gender: Self::Gender, rank: usize) -> String {
         "di".to_owned() + &Self::suffix_adj(gender, rank)
     }
 
@@ -204,12 +202,12 @@ impl Language for En {
         "Petrial".to_owned()
     }
 
-    fn simplex_noun_str(rank: Rank) -> String {
-        Self::generic_noun_str(rank.plus_one_usize(), rank)
+    fn simplex_noun_str(rank: usize) -> String {
+        Self::generic_noun_str(rank, rank)
     }
 
-    fn simplex_adj(gender: Self::Gender, rank: Rank) -> String {
-        Self::generic_adj(gender, rank.plus_one_usize(), rank)
+    fn simplex_adj(gender: Self::Gender, rank: usize) -> String {
+        Self::generic_adj(gender, rank, rank)
     }
 
     fn cuboid_noun_str() -> String {
@@ -228,28 +226,28 @@ impl Language for En {
         "cubic".to_owned()
     }
 
-    fn hyperblock_noun_str(rank: Rank) -> String {
-        Self::greek_prefix(rank.into_usize()) + "block"
+    fn hyperblock_noun_str(rank: usize) -> String {
+        Self::greek_prefix(rank) + "block"
     }
 
-    fn hyperblock_adj(_: Self::Gender, rank: Rank) -> String {
-        Self::greek_prefix(rank.into_usize()) + "block"
+    fn hyperblock_adj(_: Self::Gender, rank: usize) -> String {
+        Self::greek_prefix(rank) + "block"
     }
 
-    fn hypercube_noun_str(rank: Rank) -> String {
-        Self::greek_prefix(rank.into_usize()) + "ract"
+    fn hypercube_noun_str(rank: usize) -> String {
+        Self::greek_prefix(rank) + "ract"
     }
 
-    fn hypercube_adj(_: Self::Gender, rank: Rank) -> String {
-        Self::greek_prefix(rank.into_usize()) + "ractic"
+    fn hypercube_adj(_: Self::Gender, rank: usize) -> String {
+        Self::greek_prefix(rank) + "ractic"
     }
 
-    fn orthoplex_noun_str(rank: Rank) -> String {
-        Self::generic_noun_str(1 << rank.into_usize(), rank)
+    fn orthoplex_noun_str(rank: usize) -> String {
+        Self::generic_noun_str(1 << rank, rank)
     }
 
-    fn orthoplex_adj(gender: Self::Gender, rank: Rank) -> String {
-        Self::generic_adj(gender, 1 << rank.into_usize(), rank)
+    fn orthoplex_adj(gender: Self::Gender, rank: usize) -> String {
+        Self::generic_adj(gender, 1 << rank, rank)
     }
 
     fn great_adj(_: Self::Gender) -> String {
@@ -284,7 +282,7 @@ mod tests {
         );
 
         assert_eq!(
-            En::parse(&Name::<Abs>::simplex(Default::default(), Rank::new(5)).prism()),
+            En::parse(&Name::<Abs>::simplex(Default::default(), 6).prism()),
             "hexateric prism"
         );
     }

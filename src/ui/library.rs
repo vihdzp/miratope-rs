@@ -8,7 +8,6 @@ use std::{
 
 use super::config::LibPath;
 use miratope_core::{
-    abs::rank::Rank,
     conc::{file::FromFile, ConcretePolytope},
     Polytope,
 };
@@ -70,13 +69,13 @@ pub enum SpecialLibrary {
     AntiprismPrisms(usize, usize),
 
     /// A simplex.
-    Simplex(Rank),
+    Simplex(usize),
 
     /// A hypercube.
-    Hypercube(Rank),
+    Hypercube(usize),
 
     /// An orthoplex.
-    Orthoplex(Rank),
+    Orthoplex(usize),
 }
 
 /// The result of showing the Miratope library every frame.

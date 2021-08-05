@@ -2,14 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::{
-    abs::{
-        elements::ElementRef,
-        rank::{Rank, RankVec},
-    },
-    conc::Concrete,
-    Polytope,
-};
+use crate::{conc::Concrete, Polytope};
 
 use vec_like::*;
 
@@ -63,12 +56,12 @@ impl Concrete {
     - iterate over ranks backwards, use superelements instead of subelements
     - get number of types in total, if it's the same as previous loop, stop
     */
-    fn element_types(&self) -> RankVec<Vec<ElementType>> {
+    fn element_types(&self) -> Vec<Vec<ElementType>> {
         // Stores the different types, the counts of each, and the indices of
         // the types associated to each element.
-        let mut types = RankVec::new();
-        let mut type_counts = RankVec::new();
-        let mut type_of_element = RankVec::new();
+        let mut types = Vec::new();
+        let mut type_counts = Vec::new();
+        let mut type_of_element = Vec::new();
 
         // Initializes every element with the zeroth type.
         for el_count in self.el_counts() {
@@ -77,21 +70,21 @@ impl Concrete {
             type_counts.push(1);
         }
 
-        let mut type_count = self.rank().plus_one_usize();
+        let mut type_count = self.rank();
 
         // To limit the number of passes, we can turn this into a `for` loop.
         loop {
             // We build element types from the bottom up.
-            for r in Rank::range_iter(1, self.rank()) {
+            for r in 2..self.rank() {
                 // All element types of this rank.
                 let mut types_rank: Vec<ElementType> = Vec::new();
                 let mut dict = HashMap::new();
 
                 for (i, el) in self[r].iter().enumerate() {
-                    let mut sub_type_counts = vec![0; type_counts[r.minus_one()]];
+                    let mut sub_type_counts = vec![0; type_counts[r - 1]];
 
                     for &sub in el.subs.iter() {
-                        let sub_type = type_of_element[r.minus_one()][sub];
+                        let sub_type = type_of_element[r - 1][sub];
                         sub_type_counts[sub_type] += 1;
                     }
 
@@ -124,16 +117,16 @@ impl Concrete {
             }
 
             // We do basically the same thing, from the top down.
-            for r in Rank::range_iter(0, self.rank().minus_one()).rev() {
+            for r in (1..self.rank() - 1).rev() {
                 // All element types of this rank.
                 let mut types_rank: Vec<ElementType> = Vec::new();
                 let mut dict = HashMap::new();
 
                 for (i, el) in self[r].iter().enumerate() {
-                    let mut sup_type_counts = vec![0; type_counts[r.plus_one()]];
+                    let mut sup_type_counts = vec![0; type_counts[r + 1]];
 
                     for &sup in el.sups.iter() {
-                        let sup_type = type_of_element[r.plus_one()][sup];
+                        let sup_type = type_of_element[r + 1][sup];
                         sup_type_counts[sup_type] += 1;
                     }
 
@@ -182,34 +175,21 @@ impl Concrete {
         let type_iter = self.element_types().into_iter().skip(1).enumerate();
 
         for (r, types) in type_iter {
-            if r == self.rank().into_usize() {
+            if r == self.rank() {
                 println!();
                 break;
             }
+
             println!("{}", EL_NAMES[r]);
             for t in types {
                 let i = t.example;
                 println!(
-                    "{} × {}-{} , {}-{}",
+                    "{} × {}-{}, {}-{}",
                     t.count,
-                    self.abs
-                        .get_element(ElementRef {
-                            rank: r.into(),
-                            idx: i
-                        })
-                        .unwrap()
-                        .subs
-                        .len(),
+                    self.abs.get_element(r, i).unwrap().subs.len(),
                     EL_SUFFIXES[r],
-                    self.abs
-                        .get_element(ElementRef {
-                            rank: r.into(),
-                            idx: i
-                        })
-                        .unwrap()
-                        .sups
-                        .len(),
-                    EL_SUFFIXES[self.rank().into_usize() - r - 1],
+                    self.abs.get_element(r, i).unwrap().sups.len(),
+                    EL_SUFFIXES[self.rank() - r - 1],
                 );
             }
             println!();

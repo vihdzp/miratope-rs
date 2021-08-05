@@ -41,14 +41,12 @@ pub enum FileError<'a> {
 impl<'a> std::fmt::Display for FileError<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FileError::OffError(err) => write!(f, "OFF error: {}", err),
-            FileError::GgbError(err) => write!(f, "GGB error: {}", err),
-            FileError::IoError(err) => write!(f, "IO error: {}", err),
-            FileError::ZipError(err) => {
-                write!(f, "ZIP error encountered while opening GGB: {}", err)
-            }
-            FileError::InvalidFile(err) => write!(f, "invalid file: {}", err),
-            FileError::InvalidExtension(ext) => write!(f, "invalid file extension \"{}\"", ext),
+            Self::OffError(err) => write!(f, "OFF error: {}", err),
+            Self::GgbError(err) => write!(f, "GGB error: {}", err),
+            Self::IoError(err) => write!(f, "IO error: {}", err),
+            Self::ZipError(err) => write!(f, "ZIP error while opening GGB: {}", err),
+            Self::InvalidFile(err) => write!(f, "invalid file: {}", err),
+            Self::InvalidExtension(ext) => write!(f, "invalid file extension \"{}\"", ext),
         }
     }
 }

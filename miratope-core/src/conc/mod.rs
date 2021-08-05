@@ -8,14 +8,11 @@ use std::collections::{HashMap, HashSet};
 
 use super::{
     abs::{
-        elements::{
-            AbstractBuilder, ElementList, ElementRef, SubelementList, Subelements, Superelements,
-        },
+        elements::{AbstractBuilder, ElementList, SubelementList, Subelements, Superelements},
         flag::{Flag, FlagChanges, FlagEvent, OrientedFlagIter},
-        rank::{Rank, RankVec},
         Abstract,
     },
-    DualError, DualResult, Polytope,
+    DualError, Polytope,
 };
 use crate::{
     geometry::{Hyperplane, Hypersphere, Matrix, Point, PointOrd, Segment, Subspace, Vector},
@@ -37,18 +34,18 @@ pub struct Concrete {
     pub abs: Abstract,
 }
 
-impl std::ops::Index<Rank> for Concrete {
+impl std::ops::Index<usize> for Concrete {
     type Output = ElementList;
 
     /// Gets the list of elements with a given rank.
-    fn index(&self, rank: Rank) -> &Self::Output {
+    fn index(&self, rank: usize) -> &Self::Output {
         &self.abs[rank]
     }
 }
 
-impl std::ops::IndexMut<Rank> for Concrete {
+impl std::ops::IndexMut<usize> for Concrete {
     /// Gets the list of elements with a given rank.
-    fn index_mut(&mut self, rank: Rank) -> &mut Self::Output {
+    fn index_mut(&mut self, rank: usize) -> &mut Self::Output {
         &mut self.abs[rank]
     }
 }
@@ -79,6 +76,8 @@ impl Concrete {
 }
 
 impl Polytope for Concrete {
+    type DualError = DualError;
+
     /// Returns a reference to the underlying [`Abstract`].
     fn abs(&self) -> &Abstract {
         &self.abs
@@ -113,7 +112,7 @@ impl Polytope for Concrete {
     /// Returns the [dual](https://polytope.miraheze.org/wiki/Dual_polytope) of
     /// a polytope using the unit hypersphere, or the index of a facet through
     /// the origin if unsuccessful.
-    fn try_dual(&self) -> DualResult<Self> {
+    fn try_dual(&self) -> Result<Self, Self::DualError> {
         let mut clone = self.clone();
         clone.try_dual_mut().map(|_| clone)
     }
@@ -122,7 +121,7 @@ impl Polytope for Concrete {
     /// polytope in place using the unit hypersphere. If unsuccessful, leaves
     /// the polytope unchanged and returns the index of a facet through the
     /// origin.
-    fn try_dual_mut(&mut self) -> DualResult<()> {
+    fn try_dual_mut(&mut self) -> Result<(), Self::DualError> {
         self.try_dual_mut_with(&Hypersphere::unit(self.dim().unwrap_or(1)))
     }
 
@@ -159,8 +158,8 @@ impl Polytope for Concrete {
 
     /// Gets the element with a given rank and index as a polytope, or returns
     /// `None` if such an element doesn't exist.
-    fn element(&self, el: ElementRef) -> Option<Self> {
-        let (vertices, abs) = self.abs.element_and_vertices(el)?;
+    fn element(&self, rank: usize, idx: usize) -> Option<Self> {
+        let (vertices, abs) = self.abs.element_and_vertices(rank, idx)?;
 
         Some(Self::new(
             vertices
@@ -179,7 +178,7 @@ impl Polytope for Concrete {
 
         // Maps each element to the polytope to some vertex.
         let mut element_vertices = vec![self.vertices.clone()];
-        for r in Rank::range_inclusive_iter(Rank::new(1), self.rank()) {
+        for r in 2..=self.rank() {
             let mut rank_vertices = Vec::new();
 
             for el in &self[r] {
@@ -187,7 +186,7 @@ impl Polytope for Concrete {
                 let subs = &el.subs;
 
                 for &sub in subs {
-                    p += &element_vertices[r.into_usize() - 1][sub];
+                    p += &element_vertices[r - 1][sub];
                 }
 
                 rank_vertices.push(p / subs.len() as Float);
@@ -274,18 +273,18 @@ impl Polytope for Concrete {
     ///
     /// If you want more control over the arguments, you can use
     /// [`Self::try_antiprism_with`].
-    fn try_antiprism(&self) -> DualResult<Self> {
+    fn try_antiprism(&self) -> Result<Self, Self::DualError> {
         Self::try_antiprism_with(self, &Hypersphere::unit(self.dim().unwrap_or(1)), 1.0)
     }
 
     /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
     /// given rank.
-    fn simplex(rank: Rank) -> Self {
-        if rank == Rank::new(-1) {
+    fn simplex(rank: usize) -> Self {
+        if rank == 0 {
             Self::nullitope()
         } else {
-            let dim = rank.into_usize();
-            let mut vertices = Vec::with_capacity(dim + 1);
+            let dim = rank - 1;
+            let mut vertices = Vec::with_capacity(rank);
 
             // Adds all points with a single entry equal to √2/2, and all others
             // equal to 0.
@@ -557,7 +556,7 @@ pub trait ConcretePolytope: Polytope {
 
     /// Returns the length of a given edge.
     fn edge_len(&self, idx: usize) -> Option<Float> {
-        let edge = self.abs().get_element(ElementRef::new(Rank::new(1), idx))?;
+        let edge = self.abs().get_element(2, idx)?;
         let vertices = self.vertices();
         Some((&vertices[edge.subs[0]] - &vertices[edge.subs[1]]).norm())
     }
@@ -567,7 +566,7 @@ pub trait ConcretePolytope: Polytope {
         let mut edge_lengths = Vec::new();
 
         // If there are no edges, we just return the empty vector.
-        if let Some(edges) = self.ranks().get(Rank::new(1)) {
+        if let Some(edges) = self.ranks().get(2) {
             edge_lengths.reserve(edges.len());
 
             let vertices = self.vertices();
@@ -600,10 +599,7 @@ pub trait ConcretePolytope: Polytope {
     /// Checks whether a polytope is equilateral to a fixed precision.
     fn is_equilateral(&self) -> bool {
         // Checks whether self is equilateral with the edge length of any edge.
-        if let Some(vertices) = self
-            .con()
-            .element_vertices_ref(ElementRef::new(Rank::new(1), 0))
-        {
+        if let Some(vertices) = self.con().element_vertices_ref(2, 0) {
             self.is_equilateral_with_len((vertices[0] - vertices[1]).norm())
         }
         // If there are no edges, we return true.
@@ -618,7 +614,7 @@ pub trait ConcretePolytope: Polytope {
     /// Maybe make this work in the general case?
     fn midradius(&self) -> Float {
         let vertices = &self.vertices();
-        let edges = &self.ranks()[Rank::new(1)];
+        let edges = &self.ranks()[2];
         let edge = &edges[0];
 
         let sub0 = edge.subs[0];
@@ -634,11 +630,11 @@ pub trait ConcretePolytope: Polytope {
     ///
     /// # Panics
     /// This method shouldn't panic. If it does, please file a bug.
-    fn try_dual_mut_with(&mut self, sphere: &Hypersphere) -> DualResult<()>;
+    fn try_dual_mut_with(&mut self, sphere: &Hypersphere) -> Result<(), Self::DualError>;
 
     /// Returns the dual of a polytope with a given reciprocation sphere, or
     /// `None` if any facets pass through the reciprocation center.
-    fn try_dual_with(&self, sphere: &Hypersphere) -> DualResult<Self> {
+    fn try_dual_with(&self, sphere: &Hypersphere) -> Result<Self, Self::DualError> {
         let mut clone = self.clone();
         clone.try_dual_mut_with(sphere).map(|_| clone)
     }
@@ -672,7 +668,11 @@ pub trait ConcretePolytope: Polytope {
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope. Uses the specified [`Hypersphere`] to build
     /// the dual base, and separates the bases by the given height.
-    fn try_antiprism_with(&self, sphere: &Hypersphere, height: Float) -> DualResult<Self> {
+    fn try_antiprism_with(
+        &self,
+        sphere: &Hypersphere,
+        height: Float,
+    ) -> Result<Self, Self::DualError> {
         let half_height = height / 2.0;
         let vertices = self.vertices().iter().map(|v| v.push(-half_height));
         let dual = self.try_dual_with(sphere)?;
@@ -721,10 +721,10 @@ pub trait ConcretePolytope: Polytope {
 
     /// Gets the references to the (geometric) vertices of an element on the
     /// polytope.
-    fn element_vertices_ref(&self, el: ElementRef) -> Option<Vec<&Point>> {
+    fn element_vertices_ref(&self, rank: usize, idx: usize) -> Option<Vec<&Point>> {
         Some(
             self.abs()
-                .element_vertices(el)?
+                .element_vertices(rank, idx)?
                 .iter()
                 .map(|&v| &self.vertices()[v])
                 .collect(),
@@ -753,7 +753,7 @@ pub trait ConcretePolytope: Polytope {
         let rank = self.rank();
 
         // We leave the nullitope's volume undefined.
-        if rank == Rank::new(-1) {
+        if rank == 0 {
             return None;
         }
 
@@ -761,7 +761,7 @@ pub trait ConcretePolytope: Polytope {
         let subspace = Subspace::from_points(self.vertices().iter());
         let flat_vertices = subspace.flatten_vec(self.vertices());
 
-        match flat_vertices.get(0)?.len().cmp(&rank.into()) {
+        match flat_vertices.get(0)?.len().cmp(&(rank - 1)) {
             // Degenerate polytopes have volume 0.
             std::cmp::Ordering::Less => {
                 return Some(0.0);
@@ -785,18 +785,17 @@ pub trait ConcretePolytope: Polytope {
         vertex_map.push(vertex_list);
 
         // Every other element maps to the vertex of any subelement.
-        for r in Rank::range_inclusive_iter(Rank::new(1), self.rank()) {
+        for r in 2..=self.rank() {
             let mut element_list = Vec::new();
 
             for el in &self.ranks()[r] {
-                element_list.push(vertex_map[r.into_usize() - 1][el.subs[0]]);
+                element_list.push(vertex_map[r - 2][el.subs[0]]);
             }
 
             vertex_map.push(element_list);
         }
 
         let mut volume = 0.0;
-        let rank_usize = rank.into_usize();
 
         // All of the flags we've found so far.
         let mut all_flags = HashSet::new();
@@ -820,10 +819,12 @@ pub trait ConcretePolytope: Polytope {
                         // simplices times the sign of the flag that generated them.
                         component_volume += oriented_flag.orientation.sign()
                             * Matrix::from_iterator(
-                                rank_usize,
-                                rank_usize,
+                                rank - 1,
+                                rank - 1,
                                 oriented_flag
                                     .into_iter()
+                                    .skip(1)
+                                    .take(rank - 1)
                                     .enumerate()
                                     .map(|(rank, idx)| &flat_vertices[vertex_map[rank][idx]])
                                     .flatten()
@@ -842,7 +843,7 @@ pub trait ConcretePolytope: Polytope {
             }
         }
 
-        Some(volume / crate::factorial(rank_usize) as Float)
+        Some(volume / crate::factorial(rank - 1) as Float)
     }
 
     /// Projects the vertices of the polytope into the lowest dimension possible.
@@ -901,14 +902,14 @@ impl ConcretePolytope for Concrete {
     ///
     /// # Panics
     /// This method shouldn't panic. If it does, please file a bug.
-    fn try_dual_mut_with(&mut self, sphere: &Hypersphere) -> DualResult<()> {
+    fn try_dual_mut_with(&mut self, sphere: &Hypersphere) -> Result<(), Self::DualError> {
         // If we're dealing with a nullitope, the dual is itself.
         let rank = self.rank();
-        if rank == Rank::new(-1) {
+        if rank == 0 {
             return Ok(());
         }
         // In the case of points, we reciprocate them.
-        else if rank == Rank::new(0) {
+        else if rank == 1 {
             for (idx, v) in self.vertices.iter_mut().enumerate() {
                 if !sphere.reciprocate_mut(v) {
                     return Err(DualError(idx));
@@ -922,10 +923,10 @@ impl ConcretePolytope for Concrete {
         let o = h.project(&sphere.center);
 
         let mut projections;
-        let rank_minus_one = rank.minus_one();
+        let rank_minus_one = rank - 1;
 
         // We project our inversion center onto each of the facets.
-        if rank >= Rank::new(2) {
+        if rank >= 3 {
             let facet_count = self.el_count(rank_minus_one);
             let indices: Vec<_> = (0..facet_count).collect();
 
@@ -933,7 +934,7 @@ impl ConcretePolytope for Concrete {
                 .into_par_iter()
                 .map(|idx| {
                     Subspace::from_points(
-                        self.element_vertices_ref(ElementRef::new(rank_minus_one, idx))
+                        self.element_vertices_ref(rank_minus_one, idx)
                             .unwrap()
                             .into_iter(),
                     )
@@ -1057,7 +1058,7 @@ impl ConcretePolytope for Concrete {
     /// We should make this function take a general [`Subspace`] instead.
     fn cross_section(&self, slice: &Hyperplane) -> Self {
         let mut vertices = Vec::new();
-        let mut ranks = RankVec::with_rank_capacity(self.rank().minus_one());
+        let mut ranks = Vec::with_capacity(self.rank());
 
         // We map all indices of k-elements in the original polytope to the
         // indices of the new (k-1)-elements resulting from taking their
@@ -1065,7 +1066,7 @@ impl ConcretePolytope for Concrete {
         let mut hash_element = HashMap::new();
 
         // Determines the vertices of the cross-section.
-        for (idx, edge) in self[Rank::new(1)].iter().enumerate() {
+        for (idx, edge) in self[2].iter().enumerate() {
             let segment = Segment(&self.vertices[edge.subs[0]], &self.vertices[edge.subs[1]]);
 
             // If we got ourselves a new vertex:
@@ -1086,7 +1087,7 @@ impl ConcretePolytope for Concrete {
         ranks.push(SubelementList::vertices(vertex_count));
 
         // Takes care of building everything else.
-        for r in Rank::range_iter(2, self.rank()) {
+        for r in 2..self.rank() {
             let mut new_hash_element = HashMap::new();
             let mut new_els = SubelementList::new();
 
@@ -1113,7 +1114,7 @@ impl ConcretePolytope for Concrete {
         ranks.push(SubelementList::max(ranks.last().unwrap().len()));
 
         // Splits compounds of dyads.
-        let (first, last) = ranks.split_at_mut(Rank::new(2));
+        let (first, last) = ranks.split_at_mut(3);
 
         if let (Some(edges), Some(faces)) = (first.last_mut(), last.first_mut()) {
             // Keeps track of the indices of our new edges.
@@ -1177,7 +1178,7 @@ impl ConcretePolytope for Concrete {
 #[cfg(test)]
 mod tests {
     use super::{Concrete, ConcretePolytope};
-    use crate::{abs::rank::Rank, Consts, Float, Polytope};
+    use crate::{Consts, Float, Polytope};
 
     use approx::abs_diff_eq;
 
@@ -1321,12 +1322,12 @@ mod tests {
 
     #[test]
     fn simplex() {
-        for n in 0..=5 {
+        for n in 1..=6 {
             test_volume(
-                &mut Concrete::simplex(Rank::from(n)),
+                &mut Concrete::simplex(n),
                 Some(
-                    ((n + 1) as Float / (1 << n) as Float).sqrt()
-                        / crate::factorial(n as usize) as Float,
+                    (n as Float / (1 << (n - 1)) as Float).sqrt()
+                        / crate::factorial(n - 1) as Float,
                 ),
             );
         }
@@ -1334,17 +1335,17 @@ mod tests {
 
     #[test]
     fn hypercube() {
-        for n in 0..=5 {
-            test_volume(&mut Concrete::hypercube(Rank::new(n)), Some(1.0));
+        for n in 1..=6 {
+            test_volume(&mut Concrete::hypercube(n), Some(1.0));
         }
     }
 
     #[test]
     fn orthoplex() {
-        for n in 0..=5 {
+        for n in 1..=6 {
             test_volume(
-                &mut Concrete::orthoplex(Rank::from(n)),
-                Some(1.0 / crate::factorial(n) as Float),
+                &mut Concrete::orthoplex(n),
+                Some(1.0 / crate::factorial(n - 1) as Float),
             );
         }
     }

@@ -2,7 +2,7 @@
 
 use std::{fmt::Debug, fs, marker::PhantomData, mem};
 
-use miratope_core::{abs::rank::Rank, geometry::Point, Consts, Float};
+use miratope_core::{geometry::Point, Consts, Float};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// The trait for a type marker that determines whether a name describes an
@@ -167,6 +167,7 @@ pub enum Regular {
     /// The polytope is indeed regular.
     Yes {
         /// The center of the polytope.
+        // TODO: make into an Option to take the nullitope into account?
         center: Point,
     },
 
@@ -318,7 +319,7 @@ pub enum Name<T: NameType> {
         base: Box<Name<T>>,
 
         /// The rank of the ditope.
-        rank: Rank,
+        rank: usize,
     },
 
     /// A hosotope based on a specified polytope.
@@ -327,7 +328,7 @@ pub enum Name<T: NameType> {
         base: Box<Name<T>>,
 
         /// The rank of the hosotope.
-        rank: Rank,
+        rank: usize,
     },
 
     /// A simplex of a given dimension, **at least 3.**
@@ -336,7 +337,7 @@ pub enum Name<T: NameType> {
         regular: T::DataRegular,
 
         /// The rank of the simplex.
-        rank: Rank,
+        rank: usize,
     },
 
     /// A cuboid.
@@ -351,7 +352,7 @@ pub enum Name<T: NameType> {
         regular: T::DataRegular,
 
         /// The rank of the hyperblock.
-        rank: Rank,
+        rank: usize,
     },
 
     /// An orthoplex (polytope whose opposite vertices form an orthogonal basis)
@@ -361,7 +362,7 @@ pub enum Name<T: NameType> {
         regular: T::DataRegular,
 
         /// The rank of the orthoplex.
-        rank: Rank,
+        rank: usize,
     },
 
     /// A polytope with a given facet count and rank, in that order. The facet
@@ -372,7 +373,7 @@ pub enum Name<T: NameType> {
         facet_count: usize,
 
         /// The rank of the polytope.
-        rank: Rank,
+        rank: usize,
     },
 
     /// A smaller variant of a polytope.
@@ -437,10 +438,10 @@ impl<T: NameType> Name<T> {
 
             // Simplices and orthoplices must be at least 3D, otherwise they
             // have other names.
-            Self::Simplex { rank, .. } | Self::Orthoplex { rank, .. } => *rank >= Rank::new(3),
+            Self::Simplex { rank, .. } | Self::Orthoplex { rank, .. } => *rank >= 4,
 
             // Hyperblocks can't be 3D, since Cuboids are a separate thing.
-            Self::Hyperblock { rank, .. } => *rank >= Rank::new(4),
+            Self::Hyperblock { rank, .. } => *rank >= 5,
 
             // Multioperations must contain at least two bases and nothing nested.
             Self::Multipyramid(bases)
@@ -464,9 +465,7 @@ impl<T: NameType> Name<T> {
 
             // Generic polytopes must have at least 2 facets, and rank between
             // 3 and 20.
-            &Self::Generic { facet_count, rank } => {
-                facet_count >= 2 && rank >= Rank::new(3) && rank <= Rank::new(20)
-            }
+            &Self::Generic { facet_count, rank } => facet_count >= 2 && rank >= 4 && rank <= 21,
 
             // For lack of info, we return true otherwise.
             _ => true,
@@ -475,15 +474,15 @@ impl<T: NameType> Name<T> {
 
     /// The name for a generic polytope with a given number of facets, and a
     /// given rank.
-    pub fn generic(n: usize, rank: Rank) -> Self {
-        match rank.into_isize() {
+    pub fn generic(n: usize, rank: usize) -> Self {
+        match rank {
             // Hardcoded names.
-            -1 => Self::Nullitope,
-            0 => Self::Point,
-            1 => Self::Dyad,
+            0 => Self::Nullitope,
+            1 => Self::Point,
+            2 => Self::Dyad,
 
             // We use the same scheme as for irregular polygons in the 2D case.
-            2 => Self::polygon(Default::default(), n),
+            3 => Self::polygon(Default::default(), n),
 
             // Otherwise, we use a generic name.
             _ => Self::Generic {
@@ -507,10 +506,7 @@ impl<T: NameType> Name<T> {
             // triangles into triangular pyramids.
             Self::Triangle { regular } => {
                 if regular.is(&Regular::No) {
-                    Self::Simplex {
-                        regular,
-                        rank: Rank::new(3),
-                    }
+                    Self::Simplex { regular, rank: 4 }
                 } else {
                     Self::Pyramid(Box::new(Self::Triangle { regular }))
                 }
@@ -522,7 +518,7 @@ impl<T: NameType> Name<T> {
                 if regular.is(&Regular::No) {
                     Self::Simplex {
                         regular,
-                        rank: rank.plus_one(),
+                        rank: rank + 1,
                     }
                 } else {
                     Self::Pyramid(Box::new(Self::Simplex { regular, rank }))
@@ -566,7 +562,7 @@ impl<T: NameType> Name<T> {
                 if regular.is(&Regular::No) {
                     Self::Hyperblock {
                         regular: Default::default(),
-                        rank: Rank::new(4),
+                        rank: 5,
                     }
                 } else {
                     Self::Prism(Box::new(self))
@@ -579,7 +575,7 @@ impl<T: NameType> Name<T> {
                 if regular.is(&Regular::No) {
                     Self::Hyperblock {
                         regular,
-                        rank: rank.plus_one(),
+                        rank: rank + 1,
                     }
                 } else {
                     Self::Prism(Box::new(Self::Hyperblock { regular, rank }))
@@ -613,7 +609,7 @@ impl<T: NameType> Name<T> {
                 } else {
                     Self::Orthoplex {
                         regular: Default::default(),
-                        rank: Rank::new(3),
+                        rank: 4,
                     }
                 }
             }
@@ -624,7 +620,7 @@ impl<T: NameType> Name<T> {
                 if regular.is(&Regular::No) {
                     Self::Orthoplex {
                         regular,
-                        rank: rank.plus_one(),
+                        rank: rank + 1,
                     }
                 } else {
                     Self::Tegum(Box::new(Self::Orthoplex { regular, rank }))
@@ -655,7 +651,7 @@ impl<T: NameType> Name<T> {
 
             // Simplices become irregular orthoplices.
             Self::Simplex { rank, .. } => Self::Orthoplex {
-                rank: rank.plus_one(),
+                rank: rank + 1,
                 regular: Default::default(),
             },
 
@@ -668,7 +664,7 @@ impl<T: NameType> Name<T> {
 
     /// Builds a dual name from a given name. You must specify the facet count
     /// of the polytope this dual refers to.
-    pub fn dual(self, center: T::DataPoint, facet_count: usize, rank: Rank) -> Self {
+    pub fn dual(self, center: T::DataPoint, facet_count: usize, rank: usize) -> Self {
         /// Constructs a regular dual from a regular polytope.
         macro_rules! regular_dual {
             ($regular: ident, $dual: ident $(, $other_fields: ident)*) => {
@@ -795,7 +791,7 @@ impl<T: NameType> Name<T> {
     }
 
     /// Makes a ditope out of the name.
-    pub fn ditope(self, rank: Rank) -> Self {
+    pub fn ditope(self, rank: usize) -> Self {
         match self {
             // We do nothing in the case of the nullitope.
             Self::Nullitope => Self::Nullitope,
@@ -813,7 +809,7 @@ impl<T: NameType> Name<T> {
     }
 
     /// Makes a ditope out of the name.
-    pub fn hosotope(self, rank: Rank) -> Self {
+    pub fn hosotope(self, rank: usize) -> Self {
         match self {
             // We do nothing in the case of the nullitope.
             Self::Nullitope => Self::Nullitope,
@@ -867,41 +863,41 @@ impl<T: NameType> Name<T> {
     }
 
     /// The name for an *n*-simplex, regular or not.
-    pub fn simplex(regular: T::DataRegular, rank: Rank) -> Self {
-        match rank.into_isize() {
-            -1 => Self::Nullitope,
-            0 => Self::Point,
-            1 => Self::Dyad,
-            2 => Self::Triangle { regular },
+    pub fn simplex(regular: T::DataRegular, rank: usize) -> Self {
+        match rank {
+            0 => Self::Nullitope,
+            1 => Self::Point,
+            2 => Self::Dyad,
+            3 => Self::Triangle { regular },
             _ => Self::Simplex { regular, rank },
         }
     }
 
     /// The name for an *n*-block, regular or not.
-    pub fn hyperblock(regular: T::DataRegular, rank: Rank) -> Self {
-        match rank.into_isize() {
-            -1 => Self::Nullitope,
-            0 => Self::Point,
-            1 => Self::Dyad,
-            2 => {
+    pub fn hyperblock(regular: T::DataRegular, rank: usize) -> Self {
+        match rank {
+            0 => Self::Nullitope,
+            1 => Self::Point,
+            2 => Self::Dyad,
+            3 => {
                 if regular.satisfies(Regular::is_yes) {
                     Self::square()
                 } else {
                     Self::rectangle()
                 }
             }
-            3 => Self::Cuboid { regular },
+            4 => Self::Cuboid { regular },
             _ => Self::Hyperblock { regular, rank },
         }
     }
 
     /// The name for an *n*-orthoplex.
-    pub fn orthoplex(regular: T::DataRegular, rank: Rank) -> Self {
-        match rank.into_isize() {
-            -1 => Self::Nullitope,
-            0 => Self::Point,
-            1 => Self::Dyad,
-            2 => Self::orthodiagonal(),
+    pub fn orthoplex(regular: T::DataRegular, rank: usize) -> Self {
+        match rank {
+            0 => Self::Nullitope,
+            1 => Self::Point,
+            2 => Self::Dyad,
+            3 => Self::orthodiagonal(),
             _ => Self::Orthoplex { regular, rank },
         }
     }
@@ -935,7 +931,7 @@ impl<T: NameType> Name<T> {
                 Self::Point => pyramid_count += 1,
                 Self::Dyad => pyramid_count += 2,
                 Self::Triangle { .. } => pyramid_count += 3,
-                Self::Simplex { rank, .. } => pyramid_count += rank.plus_one_usize(),
+                Self::Simplex { rank, .. } => pyramid_count += rank,
                 Self::Multipyramid(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
             }
@@ -946,7 +942,7 @@ impl<T: NameType> Name<T> {
         if pyramid_count >= 2 {
             new_bases.push(Self::simplex(
                 Default::default(),
-                Rank::from(pyramid_count - 1),
+                usize::from(pyramid_count - 1),
             ));
         }
 
@@ -990,7 +986,7 @@ impl<T: NameType> Name<T> {
                     }
                 }
                 Self::Cuboid { .. } => prism_count += 3,
-                Self::Hyperblock { rank, .. } => prism_count += rank.into_usize(),
+                Self::Hyperblock { rank, .. } => prism_count += rank,
                 Self::Multiprism(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
             }
@@ -1001,7 +997,7 @@ impl<T: NameType> Name<T> {
         if prism_count >= 2 {
             new_bases.push(Self::hyperblock(
                 Default::default(),
-                Rank::from(prism_count),
+                usize::from(prism_count),
             ));
         }
 
@@ -1044,7 +1040,7 @@ impl<T: NameType> Name<T> {
                         tegum_count += 2;
                     }
                 }
-                Self::Orthoplex { rank, .. } => tegum_count += rank.into_usize(),
+                Self::Orthoplex { rank, .. } => tegum_count += rank,
                 Self::Multitegum(mut extra_bases) => new_bases.append(&mut extra_bases),
                 _ => new_bases.push(base),
             }
@@ -1053,7 +1049,10 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one tegum, we combine all of them into a
         // single orthoplex.
         if tegum_count >= 2 {
-            new_bases.push(Self::orthoplex(Default::default(), Rank::from(tegum_count)));
+            new_bases.push(Self::orthoplex(
+                Default::default(),
+                usize::from(tegum_count),
+            ));
         }
 
         // Either the final name, or the single base.

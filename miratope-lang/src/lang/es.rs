@@ -1,8 +1,6 @@
 //! Implements the Spanish language.
 use crate::{gender::Bigender, greek_prefixes, GreekPrefix, Language, Position, Prefix};
 
-use miratope_core::abs::rank::Rank;
-
 impl Bigender {
     /// Adds either an 'o' or an 'a' to the end of a string depending on the gender.
     fn choose_auto(self, str: String) -> String {
@@ -129,20 +127,20 @@ impl Language for Es {
         Position::After
     }
 
-    fn suffix_noun_str(rank: Rank) -> String {
-        SUFFIXES[rank.into_usize()].to_owned() + "o"
+    fn suffix_noun_str(rank: usize) -> String {
+        SUFFIXES[rank].to_owned() + "o"
     }
 
-    fn suffix_gender(_: Rank) -> Self::Gender {
+    fn suffix_gender(_: usize) -> Self::Gender {
         Bigender::Male
     }
 
-    fn suffix_adj(_: Self::Gender, rank: Rank) -> String {
-        SUFFIXES[rank.into_usize()].to_owned() + "al"
+    fn suffix_adj(_: Self::Gender, rank: usize) -> String {
+        SUFFIXES[rank].to_owned() + "al"
     }
 
-    fn generic_noun_str(facet_count: usize, rank: Rank) -> String {
-        if rank == Rank::new(2) {
+    fn generic_noun_str(facet_count: usize, rank: usize) -> String {
+        if rank == 3 {
             polygon_prefix(facet_count) + &Self::suffix_noun_str(rank)
         } else {
             Self::prefix(facet_count) + &Self::suffix_noun_str(rank)
@@ -293,27 +291,27 @@ impl Language for Es {
         gender.choose_auto("antitegmátic".to_owned())
     }
 
-    fn hosotope_noun_str(rank: Rank) -> String {
+    fn hosotope_noun_str(rank: usize) -> String {
         "hoso".to_owned() + &Self::suffix_noun_str(rank)
     }
 
-    fn hosotope_gender(_: Rank) -> Self::Gender {
+    fn hosotope_gender(_: usize) -> Self::Gender {
         Bigender::Male
     }
 
-    fn hosotope_adj(gender: Self::Gender, rank: Rank) -> String {
+    fn hosotope_adj(gender: Self::Gender, rank: usize) -> String {
         "hoso".to_owned() + &Self::suffix_adj(gender, rank)
     }
 
-    fn ditope_noun_str(rank: Rank) -> String {
+    fn ditope_noun_str(rank: usize) -> String {
         "hoso".to_owned() + &Self::suffix_noun_str(rank)
     }
 
-    fn ditope_gender(_: Rank) -> Self::Gender {
+    fn ditope_gender(_: usize) -> Self::Gender {
         Bigender::Male
     }
 
-    fn ditope_adj(gender: Self::Gender, rank: Rank) -> String {
+    fn ditope_adj(gender: Self::Gender, rank: usize) -> String {
         "di".to_owned() + &Self::suffix_adj(gender, rank)
     }
 
@@ -321,12 +319,12 @@ impl Language for Es {
         "Petrial".to_owned()
     }
 
-    fn simplex_noun_str(rank: Rank) -> String {
-        Self::generic_noun_str(rank.plus_one_usize(), rank)
+    fn simplex_noun_str(rank: usize) -> String {
+        Self::generic_noun_str(rank, rank)
     }
 
-    fn simplex_adj(gender: Self::Gender, rank: Rank) -> String {
-        Self::generic_adj(gender, rank.plus_one_usize(), rank)
+    fn simplex_adj(gender: Self::Gender, rank: usize) -> String {
+        Self::generic_adj(gender, rank, rank)
     }
 
     fn cuboid_noun_str() -> String {
@@ -345,28 +343,28 @@ impl Language for Es {
         gender.choose_auto("cúbic".to_owned())
     }
 
-    fn hyperblock_noun_str(rank: Rank) -> String {
-        Self::greek_prefix(rank.into_usize()) + "bloque"
+    fn hyperblock_noun_str(rank: usize) -> String {
+        Self::greek_prefix(rank) + "bloque"
     }
 
-    fn hyperblock_adj(_: Self::Gender, rank: Rank) -> String {
-        Self::greek_prefix(rank.into_usize()) + "bloque"
+    fn hyperblock_adj(_: Self::Gender, rank: usize) -> String {
+        Self::greek_prefix(rank) + "bloque"
     }
 
-    fn hypercube_noun_str(rank: Rank) -> String {
-        Self::greek_prefix(rank.into_usize()) + "racto"
+    fn hypercube_noun_str(rank: usize) -> String {
+        Self::greek_prefix(rank) + "racto"
     }
 
-    fn hypercube_adj(gender: Self::Gender, rank: Rank) -> String {
-        gender.choose_auto(Self::greek_prefix(rank.into_usize()) + "ráctic")
+    fn hypercube_adj(gender: Self::Gender, rank: usize) -> String {
+        gender.choose_auto(Self::greek_prefix(rank) + "ráctic")
     }
 
-    fn orthoplex_noun_str(rank: Rank) -> String {
-        Self::generic_noun_str(1 << rank.into_usize(), rank)
+    fn orthoplex_noun_str(rank: usize) -> String {
+        Self::generic_noun_str(1 << rank, rank)
     }
 
-    fn orthoplex_adj(gender: Self::Gender, rank: Rank) -> String {
-        Self::generic_adj(gender, 1 << rank.into_usize(), rank)
+    fn orthoplex_adj(gender: Self::Gender, rank: usize) -> String {
+        Self::generic_adj(gender, 1 << rank, rank)
     }
 
     fn great_adj(_: Self::Gender) -> String {
