@@ -18,11 +18,10 @@
 //! name like this:
 //!
 //! ```
-//! # use miratope_core::abs::rank::Rank;
 //! # use miratope_lang::{lang::En, Language, name::{Abs, Name}};
 //! let pecube: Name<Abs> = Name::multiprism(vec![
 //!     Name::polygon(Default::default(), 5), // 5-gon
-//!     Name::hyperblock(Default::default(), Rank::new(3)) // 3-hypercube
+//!     Name::hyperblock(Default::default(), 4) // 3-hypercube
 //! ]);
 //! # assert_eq!(En::parse(&pecube), "pentagonal-cubic duoprism");
 //! ```
@@ -33,11 +32,10 @@
 //! corresponding methods to parse and combine each of its parts:
 //!
 //! ```
-//! # use miratope_core::abs::rank::Rank;
 //! # use miratope_lang::{lang::En, Language, name::{Abs, Name}};
 //! # let pecube: Name<Abs> = Name::multiprism(vec![
 //! #     Name::polygon(Default::default(), 5), // abstract 5-gon
-//! #     Name::hyperblock(Default::default(), Rank::new(3)) // abstract 3-hypercube
+//! #     Name::hyperblock(Default::default(), 4) // abstract 3-hypercube
 //! # ]);
 //! assert_eq!(En::parse(&pecube), "pentagonal-cubic duoprism");
 //! ```

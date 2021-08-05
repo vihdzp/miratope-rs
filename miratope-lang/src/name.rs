@@ -940,10 +940,7 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one pyramid, we combine all of them into a
         // single simplex.
         if pyramid_count >= 2 {
-            new_bases.push(Self::simplex(
-                Default::default(),
-                usize::from(pyramid_count - 1),
-            ));
+            new_bases.push(Self::simplex(Default::default(), pyramid_count - 1));
         }
 
         // Either the final name, or the single base.
@@ -995,10 +992,7 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one prism, we combine all of them into a
         // single hyperblock.
         if prism_count >= 2 {
-            new_bases.push(Self::hyperblock(
-                Default::default(),
-                usize::from(prism_count),
-            ));
+            new_bases.push(Self::hyperblock(Default::default(), prism_count));
         }
 
         // Either the final name, or the single base.
@@ -1049,10 +1043,7 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one tegum, we combine all of them into a
         // single orthoplex.
         if tegum_count >= 2 {
-            new_bases.push(Self::orthoplex(
-                Default::default(),
-                usize::from(tegum_count),
-            ));
+            new_bases.push(Self::orthoplex(Default::default(), tegum_count));
         }
 
         // Either the final name, or the single base.

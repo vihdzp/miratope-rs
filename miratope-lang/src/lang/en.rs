@@ -53,10 +53,10 @@ impl Prefix for En {
     }
 }
 
-const SUFFIXES: [&str; 25] = [
-    "mon", "tel", "gon", "hedr", "chor", "ter", "pet", "ex", "zett", "yott", "xenn", "dak", "hend",
-    "dok", "tradak", "tedak", "pedak", "exdak", "zedak", "yodak", "nedak", "ik", "iken", "ikod",
-    "iktr",
+const SUFFIXES: [&str; 26] = [
+    "", "mon", "tel", "gon", "hedr", "chor", "ter", "pet", "ex", "zett", "yott", "xenn", "dak",
+    "hend", "dok", "tradak", "tedak", "pedak", "exdak", "zedak", "yodak", "nedak", "ik", "iken",
+    "ikod", "iktr",
 ];
 
 impl Language for En {
@@ -227,19 +227,19 @@ impl Language for En {
     }
 
     fn hyperblock_noun_str(rank: usize) -> String {
-        Self::greek_prefix(rank) + "block"
+        Self::greek_prefix(rank - 1) + "block"
     }
 
     fn hyperblock_adj(_: Self::Gender, rank: usize) -> String {
-        Self::greek_prefix(rank) + "block"
+        Self::greek_prefix(rank - 1) + "block"
     }
 
     fn hypercube_noun_str(rank: usize) -> String {
-        Self::greek_prefix(rank) + "ract"
+        Self::greek_prefix(rank - 1) + "ract"
     }
 
     fn hypercube_adj(_: Self::Gender, rank: usize) -> String {
-        Self::greek_prefix(rank) + "ractic"
+        Self::greek_prefix(rank - 1) + "ractic"
     }
 
     fn orthoplex_noun_str(rank: usize) -> String {

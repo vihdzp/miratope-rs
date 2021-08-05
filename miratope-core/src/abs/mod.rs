@@ -1043,25 +1043,25 @@ impl Polytope for Abstract {
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.
     fn duopyramid(p: &Self, q: &Self) -> Self {
-        Self::product::<true, true>(p, q)
+        Self::product::<false, false>(p, q)
     }
 
     /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
     /// from two polytopes.
     fn duoprism(p: &Self, q: &Self) -> Self {
-        Self::product::<false, true>(p, q)
+        Self::product::<true, false>(p, q)
     }
 
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
     /// from two polytopes.
     fn duotegum(p: &Self, q: &Self) -> Self {
-        Self::product::<true, false>(p, q)
+        Self::product::<false, true>(p, q)
     }
 
     /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
     /// from two polytopes.
     fn duocomb(p: &Self, q: &Self) -> Self {
-        Self::product::<false, false>(p, q)
+        Self::product::<true, true>(p, q)
     }
 
     /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given

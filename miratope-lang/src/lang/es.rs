@@ -113,9 +113,9 @@ fn polygon_prefix(n: usize) -> String {
     chars.into_iter().collect()
 }
 
-const SUFFIXES: [&str; 21] = [
-    "mon", "tel", "gon", "edr", "cor", "ter", "pet", "ex", "zet", "yot", "xen", "dac", "hendac",
-    "doc", "tradac", "teradac", "petadac", "exdac", "zetadac", "yotadac", "xendac",
+const SUFFIXES: [&str; 22] = [
+    "", "mon", "tel", "gon", "edr", "cor", "ter", "pet", "ex", "zet", "yot", "xen", "dac",
+    "hendac", "doc", "tradac", "teradac", "petadac", "exdac", "zetadac", "yotadac", "xendac",
 ];
 
 impl Language for Es {
