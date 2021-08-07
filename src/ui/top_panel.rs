@@ -310,7 +310,7 @@ pub fn show_top_panel(
                             if advanced(&keyboard) {
                                 pyramid_window.open();
                             } else if let Some(mut p) = query.iter_mut().next() {
-                                *p = p.pyramid();
+                                p.pyramid_mut();
                             }
                         }
 
@@ -319,7 +319,7 @@ pub fn show_top_panel(
                             if advanced(&keyboard) {
                                 prism_window.open();
                             } else if let Some(mut p) = query.iter_mut().next() {
-                                *p = p.prism();
+                                p.prism_mut();
                             }
                         }
 
@@ -328,7 +328,7 @@ pub fn show_top_panel(
                             if advanced(&keyboard) {
                                 tegum_window.open();
                             } else if let Some(mut p) = query.iter_mut().next() {
-                                *p = p.tegum();
+                                p.tegum_mut();
                             }
                         }
 

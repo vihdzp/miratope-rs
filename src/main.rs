@@ -133,14 +133,14 @@ fn setup(
         .spawn()
         // Mesh
         .insert_bundle(PbrNoBackfaceBundle {
-            mesh: meshes.add(mesh::mesh(&poly.poly, ProjectionType::Perspective)),
+            mesh: meshes.add(mesh::mesh(&poly.polytope, ProjectionType::Perspective)),
             material: mesh_material,
             ..Default::default()
         })
         // Wireframe
         .with_children(|cb| {
             cb.spawn().insert_bundle(PbrNoBackfaceBundle {
-                mesh: meshes.add(mesh::wireframe(&poly.poly, ProjectionType::Perspective)),
+                mesh: meshes.add(mesh::wireframe(&poly.polytope, ProjectionType::Perspective)),
                 material: wf_material,
                 ..Default::default()
             });

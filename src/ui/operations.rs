@@ -226,7 +226,7 @@ pub trait UpdateWindow: Window {
         Self: 'static,
     {
         if let Some((poly, _, _)) = query.iter().next() {
-            self_.update(poly.poly.dim_or());
+            self_.update(poly.polytope.dim_or());
         }
     }
 

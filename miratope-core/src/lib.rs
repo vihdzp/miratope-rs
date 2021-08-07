@@ -372,16 +372,28 @@ pub trait Polytope: Clone {
         Self::duopyramid(self, &Self::point())
     }
 
+    fn pyramid_mut(&mut self) {
+        *self = self.pyramid();
+    }
+
     /// Builds a [prism](https://polytope.miraheze.org/wiki/Prism) from a
     /// given base.
     fn prism(&self) -> Self {
         Self::duoprism(self, &Self::dyad())
     }
 
+    fn prism_mut(&mut self) {
+        *self = self.prism();
+    }
+
     /// Builds a [tegum](https://polytope.miraheze.org/wiki/Bipyramid) from a
     /// given base.
     fn tegum(&self) -> Self {
         Self::duotegum(self, &Self::dyad())
+    }
+
+    fn tegum_mut(&mut self) {
+        *self = self.tegum();
     }
 
     /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)

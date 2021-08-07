@@ -267,16 +267,16 @@ fn update_cameras_and_anchors(
 ) {
     // SAFETY: see the remark below.
     for (mut cam_tf, cam_gtf, parent, cam) in unsafe { q.iter_unsafe() } {
-        if cam.is_none() {
-            continue;
-        } else if let Some(parent) = parent {
-            // SAFETY: we assume that a camera isn't its own parent (this
-            // shouldn't ever happen on purpose)
-            if let Ok(mut anchor_tf) =
-                unsafe { q.get_component_unchecked_mut::<Transform>(parent.0) }
-            {
-                for event in events.iter() {
-                    event.update_camera_and_anchor(&mut anchor_tf, &mut cam_tf, cam_gtf);
+        if cam.is_some() {
+            if let Some(parent) = parent {
+                // SAFETY: we assume that a camera isn't its own parent (this
+                // shouldn't ever happen on purpose)
+                if let Ok(mut anchor_tf) =
+                    unsafe { q.get_component_unchecked_mut::<Transform>(parent.0) }
+                {
+                    for event in events.iter() {
+                        event.update_camera_and_anchor(&mut anchor_tf, &mut cam_tf, cam_gtf);
+                    }
                 }
             }
         }

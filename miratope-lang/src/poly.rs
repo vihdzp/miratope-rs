@@ -1,7 +1,5 @@
 //! Contains the named abstract and concrete polytope types.
 
-use std::mem;
-
 use miratope_core::{
     abs::{flag::Flag, Abstract, Ranked},
     conc::{
@@ -12,48 +10,58 @@ use miratope_core::{
         Concrete, ConcretePolytope,
     },
     geometry::Point,
-    Polytope,
+    Float, Polytope,
 };
 
 use crate::name::{Abs, Con, ConData, Name, NameData, NameType};
 
+/// Represents a named polytope, either [`Abstract`] or [`Concrete`].
 #[derive(Clone, Debug)]
 pub struct Named<T: NameType> {
-    pub poly: T::Polytope,
+    /// The inner polytope.
+    pub polytope: T::Polytope,
+
+    /// The stored name.
     pub name: Name<T>,
 }
 
 impl<T: NameType> Named<T> {
-    fn new(poly: T::Polytope, name: Name<T>) -> Self {
-        Self { poly, name }
+    /// Initializes a new named polytope.
+    fn new(polytope: T::Polytope, name: Name<T>) -> Self {
+        Self { polytope, name }
     }
 
-    fn new_generic(poly: T::Polytope) -> Self {
-        let name = Name::generic(poly.facet_count(), poly.rank());
-        Self::new(poly, name)
+    /// Initializes a new named polytope with a generic name.
+    fn new_generic(polytope: T::Polytope) -> Self {
+        let name = Name::generic(polytope.facet_count(), polytope.rank());
+        Self::new(polytope, name)
     }
 
+    /// Sets the polytope's name to the corresponding generic name.
     fn set_generic(&mut self) {
-        self.name = Name::generic(self.poly.facet_count(), self.poly.rank())
+        self.name = Name::generic(self.polytope.facet_count(), self.polytope.rank())
     }
 }
 
+/// An [`Abstract`] polytope with a [`Name`].
 pub type NamedAbstract = Named<Abs>;
+
+/// A [`Concrete`] polytope with a [`Name`].
 pub type NamedConcrete = Named<Con>;
 
 impl<T: NameType> Polytope for Named<T> {
     type DualError = <T::Polytope as Polytope>::DualError;
 
     fn abs(&self) -> &Abstract {
-        self.poly.abs()
+        self.polytope.abs()
     }
 
     fn abs_mut(&mut self) -> &mut Abstract {
-        self.poly.abs_mut()
+        self.polytope.abs_mut()
     }
 
     fn into_abs(self) -> Abstract {
-        self.poly.into_abs()
+        self.polytope.into_abs()
     }
 
     fn nullitope() -> Self {
@@ -76,7 +84,7 @@ impl<T: NameType> Polytope for Named<T> {
     }
 
     fn try_dual(&self) -> Result<Self, Self::DualError> {
-        let poly = self.poly.try_dual()?;
+        let poly = self.polytope.try_dual()?;
         let rank = poly.rank();
 
         let name = self.name.clone().dual(
@@ -89,14 +97,17 @@ impl<T: NameType> Polytope for Named<T> {
     }
 
     fn try_dual_mut(&mut self) -> Result<(), Self::DualError> {
-        self.poly.try_dual_mut()?;
-        let rank = self.poly.rank();
+        self.polytope.try_dual_mut()?;
+        let rank = self.polytope.rank();
+        let facet_count = self.polytope.facet_count();
 
-        self.name = mem::take(&mut self.name).dual(
-            T::DataPoint::new_lazy(|| Point::zeros(rank - 1)),
-            self.poly.facet_count(),
-            rank,
-        );
+        self.name.into_mut(|name| {
+            name.dual(
+                T::DataPoint::new_lazy(|| Point::zeros(rank - 1)),
+                facet_count,
+                rank,
+            )
+        });
 
         Ok(())
     }
@@ -107,61 +118,76 @@ impl<T: NameType> Polytope for Named<T> {
     }
 
     fn element(&self, rank: usize, idx: usize) -> Option<Self> {
-        Some(Self::new_generic(self.poly.element(rank, idx)?))
+        Some(Self::new_generic(self.polytope.element(rank, idx)?))
     }
 
     fn petrial_mut(&mut self) -> bool {
-        let res = self.poly.petrial_mut();
+        let res = self.polytope.petrial_mut();
         if res {
-            self.name = Name::petrial(mem::take(&mut self.name));
+            self.name.into_mut(Name::petrial);
         }
         res
     }
 
     fn petrie_polygon_with(&mut self, flag: Flag) -> Option<Self> {
-        Some(Self::new_generic(self.poly.petrie_polygon_with(flag)?))
+        Some(Self::new_generic(self.polytope.petrie_polygon_with(flag)?))
     }
 
     fn omnitruncate(&self) -> Self {
-        Self::new_generic(self.poly.omnitruncate())
+        Self::new_generic(self.polytope.omnitruncate())
     }
 
     fn prism(&self) -> Self {
-        Self::new(self.poly.prism(), self.name.clone().prism())
+        Self::new(self.polytope.prism(), self.name.clone().prism())
+    }
+
+    fn prism_mut(&mut self) {
+        self.polytope.prism_mut();
+        self.name.into_mut(Name::prism);
     }
 
     fn tegum(&self) -> Self {
-        Self::new(self.poly.tegum(), self.name.clone().tegum())
+        Self::new(self.polytope.tegum(), self.name.clone().tegum())
+    }
+
+    fn tegum_mut(&mut self) {
+        self.polytope.tegum_mut();
+        self.name.into_mut(Name::tegum);
     }
 
     fn pyramid(&self) -> Self {
-        Self::new(self.poly.pyramid(), self.name.clone().pyramid())
+        Self::new(self.polytope.pyramid(), self.name.clone().pyramid())
+    }
+
+    fn pyramid_mut(&mut self) {
+        self.polytope.pyramid_mut();
+        self.name.into_mut(Name::pyramid);
     }
 
     fn duopyramid(p: &Self, q: &Self) -> Self {
         Self::new(
-            T::Polytope::duopyramid(&p.poly, &q.poly),
+            T::Polytope::duopyramid(&p.polytope, &q.polytope),
             Name::multipyramid(vec![p.name.clone(), q.name.clone()]),
         )
     }
 
     fn duoprism(p: &Self, q: &Self) -> Self {
         Self::new(
-            T::Polytope::duoprism(&p.poly, &q.poly),
+            T::Polytope::duoprism(&p.polytope, &q.polytope),
             Name::multiprism(vec![p.name.clone(), q.name.clone()]),
         )
     }
 
     fn duotegum(p: &Self, q: &Self) -> Self {
         Self::new(
-            T::Polytope::duotegum(&p.poly, &q.poly),
+            T::Polytope::duotegum(&p.polytope, &q.polytope),
             Name::multitegum(vec![p.name.clone(), q.name.clone()]),
         )
     }
 
     fn duocomb(p: &Self, q: &Self) -> Self {
         Self::new(
-            T::Polytope::duocomb(&p.poly, &q.poly),
+            T::Polytope::duocomb(&p.polytope, &q.polytope),
             Name::multicomb(vec![p.name.clone(), q.name.clone()]),
         )
     }
@@ -186,7 +212,7 @@ impl<T: NameType> Polytope for Named<T> {
 
     fn try_antiprism(&self) -> Result<Self, Self::DualError> {
         Ok(Self::new(
-            self.poly.try_antiprism()?,
+            self.polytope.try_antiprism()?,
             Name::antiprism(self.name.clone()),
         ))
     }
@@ -215,21 +241,21 @@ impl<T: NameType> Polytope for Named<T> {
 
 impl ConcretePolytope for NamedConcrete {
     fn con(&self) -> &Concrete {
-        &self.poly
+        &self.polytope
     }
 
     fn con_mut(&mut self) -> &mut Concrete {
-        &mut self.poly
+        &mut self.polytope
     }
 
-    fn dyad_with(height: miratope_core::Float) -> Self {
+    fn dyad_with(height: Float) -> Self {
         Self::new(Concrete::dyad_with(height), Name::Dyad)
     }
 
-    fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: miratope_core::Float) -> Self {
+    fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: Float) -> Self {
         Self::new(
             Concrete::grunbaum_star_polygon_with_rot(n, d, rot),
-            Name::polygon(ConData::new(Point::zeros(2).into()), n),
+            Name::polygon(ConData::new_lazy(|| Point::zeros(2).into()), n),
         )
     }
 
@@ -237,14 +263,18 @@ impl ConcretePolytope for NamedConcrete {
         &mut self,
         sphere: &miratope_core::geometry::Hypersphere,
     ) -> Result<(), Self::DualError> {
-        let res = self.poly.try_dual_mut_with(sphere);
+        let res = self.polytope.try_dual_mut_with(sphere);
+        let facet_count = self.facet_count();
+        let rank = self.rank();
+
         if res.is_ok() {
-            self.name = Name::dual(
-                mem::take(&mut self.name),
-                ConData::new(sphere.center.clone()),
-                self.facet_count(),
-                self.rank(),
-            );
+            self.name.into_mut(|name| {
+                name.dual(
+                    ConData::new_lazy(|| sphere.center.clone()),
+                    facet_count,
+                    rank,
+                )
+            });
         }
         res
     }
@@ -256,7 +286,7 @@ impl ConcretePolytope for NamedConcrete {
         )
     }
 
-    fn prism_with(&self, height: miratope_core::Float) -> Self {
+    fn prism_with(&self, height: Float) -> Self {
         Self::new(
             self.con().prism_with(height),
             Name::prism(self.name.clone()),
@@ -286,7 +316,7 @@ impl ConcretePolytope for NamedConcrete {
         q: &Self,
         p_offset: &Point,
         q_offset: &Point,
-        height: miratope_core::Float,
+        height: Float,
     ) -> Self {
         Self::new(
             Concrete::duopyramid_with(p.con(), q.con(), p_offset, q_offset, height),

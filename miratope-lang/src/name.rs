@@ -421,6 +421,11 @@ impl<T: NameType> Default for Name<T> {
 }
 
 impl<T: NameType> Name<T> {
+    /// Applies a function taking `self` to `&mut self`.
+    pub fn into_mut<F: FnOnce(Self) -> Self>(&mut self, f: F) {
+        *self = f(mem::take(self));
+    }
+
     /// Gets the name from the first line of an OFF file.
     pub fn from_src(first_line: &str) -> Option<Self>
     where
