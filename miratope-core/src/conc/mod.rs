@@ -4,17 +4,20 @@ pub mod cycle;
 pub mod element_types;
 pub mod file;
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::{Index, IndexMut},
+};
 
 use super::{
     abs::{
-        elements::{AbstractBuilder, ElementList, SubelementList, Subelements, Superelements},
         flag::{Flag, FlagChanges, FlagEvent, OrientedFlagIter},
-        Abstract,
+        Abstract, ElementList, Ranked, SubelementList,
     },
     DualError, Polytope,
 };
 use crate::{
+    abs::{AbstractBuilder, Subelements, Superelements},
     geometry::{Hyperplane, Hypersphere, Matrix, Point, PointOrd, Segment, Subspace, Vector},
     Consts, Float,
 };
@@ -34,7 +37,19 @@ pub struct Concrete {
     pub abs: Abstract,
 }
 
-impl std::ops::Index<usize> for Concrete {
+impl AsRef<Abstract> for Concrete {
+    fn as_ref(&self) -> &Abstract {
+        &self.abs
+    }
+}
+
+impl AsMut<Abstract> for Concrete {
+    fn as_mut(&mut self) -> &mut Abstract {
+        &mut self.abs
+    }
+}
+
+impl Index<usize> for Concrete {
     type Output = ElementList;
 
     /// Gets the list of elements with a given rank.
@@ -43,7 +58,7 @@ impl std::ops::Index<usize> for Concrete {
     }
 }
 
-impl std::ops::IndexMut<usize> for Concrete {
+impl IndexMut<usize> for Concrete {
     /// Gets the list of elements with a given rank.
     fn index_mut(&mut self, rank: usize) -> &mut Self::Output {
         &mut self.abs[rank]
@@ -78,14 +93,16 @@ impl Concrete {
 impl Polytope for Concrete {
     type DualError = DualError;
 
-    /// Returns a reference to the underlying [`Abstract`].
     fn abs(&self) -> &Abstract {
         &self.abs
     }
 
-    /// Returns a mutable reference to the underlying [`Abstract`].
     fn abs_mut(&mut self) -> &mut Abstract {
         &mut self.abs
+    }
+
+    fn into_abs(self) -> Abstract {
+        self.abs
     }
 
     /// Builds the unique polytope of rank −1.
@@ -174,33 +191,16 @@ impl Polytope for Concrete {
     // to vertices? We got some math details to figure out.
     fn omnitruncate(&self) -> Self {
         let (abs, flags) = self.abs.omnitruncate_and_flags();
-        let dim = self.dim().unwrap();
 
-        // Maps each element to the polytope to some vertex.
-        let mut element_vertices = vec![self.vertices.clone()];
-        for r in 2..=self.rank() {
-            let mut rank_vertices = Vec::new();
-
-            for el in &self[r] {
-                let mut p = Point::zeros(dim);
-                let subs = &el.subs;
-
-                for &sub in subs {
-                    p += &element_vertices[r - 1][sub];
-                }
-
-                rank_vertices.push(p / subs.len() as Float);
-            }
-
-            element_vertices.push(rank_vertices);
-        }
+        // Maps each element to the polytope to the index of some vertex.
+        let element_vertices = self.abs.vertex_map();
 
         let vertices: Vec<_> = flags
             .into_iter()
             .map(|flag| {
                 flag.into_iter()
                     .enumerate()
-                    .map(|(r, idx)| &element_vertices[r][idx])
+                    .map(|(r, idx)| &self.vertices[element_vertices[(r, idx)]])
                     .sum()
             })
             .collect();
@@ -774,27 +774,7 @@ pub trait ConcretePolytope: Polytope {
         }
 
         // Maps every element of the polytope to one of its vertices.
-        let mut vertex_map = Vec::new();
-
-        // Vertices map to themselves.
-        let vertex_count = self.vertex_count();
-        let mut vertex_list = Vec::with_capacity(vertex_count);
-        for v in 0..vertex_count {
-            vertex_list.push(v);
-        }
-        vertex_map.push(vertex_list);
-
-        // Every other element maps to the vertex of any subelement.
-        for r in 2..=self.rank() {
-            let mut element_list = Vec::new();
-
-            for el in &self.ranks()[r] {
-                element_list.push(vertex_map[r - 2][el.subs[0]]);
-            }
-
-            vertex_map.push(element_list);
-        }
-
+        let vertex_map = self.abs().vertex_map();
         let mut volume = 0.0;
 
         // All of the flags we've found so far.
@@ -826,7 +806,7 @@ pub trait ConcretePolytope: Polytope {
                                     .skip(1)
                                     .take(rank - 1)
                                     .enumerate()
-                                    .map(|(rank, idx)| &flat_vertices[vertex_map[rank][idx]])
+                                    .map(|(rank, idx)| &flat_vertices[vertex_map[(rank, idx)]])
                                     .flatten()
                                     .copied(),
                             )
@@ -1183,8 +1163,8 @@ mod tests {
     use approx::abs_diff_eq;
 
     /// Tests that a polytope has an expected volume.
-    fn test_volume(poly: &mut Concrete, volume: Option<Float>) {
-        poly.abs_sort();
+    fn test_volume(mut poly: Concrete, volume: Option<Float>) {
+        poly.element_sort();
 
         if let Some(poly_volume) = poly.volume() {
             let volume = volume.expect(&format!(
@@ -1209,17 +1189,17 @@ mod tests {
 
     #[test]
     fn nullitope() {
-        test_volume(&mut Concrete::nullitope(), None)
+        test_volume(Concrete::nullitope(), None)
     }
 
     #[test]
     fn point() {
-        test_volume(&mut Concrete::point(), Some(1.0));
+        test_volume(Concrete::point(), Some(1.0));
     }
 
     #[test]
     fn dyad() {
-        test_volume(&mut Concrete::dyad(), Some(1.0));
+        test_volume(Concrete::dyad(), Some(1.0));
     }
 
     fn polygon_area(n: usize, d: usize) -> Float {
@@ -1232,14 +1212,12 @@ mod tests {
     fn polygon() {
         for n in 2..=10 {
             for d in 1..=n / 2 {
-                let mut poly = Concrete::star_polygon(n, d);
-                test_volume(&mut poly, Some(polygon_area(n, d)));
+                test_volume(dbg!(Concrete::star_polygon(n, d)), Some(polygon_area(n, d)));
             }
         }
     }
 
-    #[test]
-    fn duopyramid() {
+    fn polygons_areas() -> (Vec<Concrete>, Vec<f64>) {
         let mut polygons = Vec::new();
         let mut areas = Vec::new();
         for n in 2..=5 {
@@ -1249,10 +1227,17 @@ mod tests {
             }
         }
 
+        (polygons, areas)
+    }
+
+    #[test]
+    fn duopyramid() {
+        let (polygons, areas) = polygons_areas();
+
         for m in 0..polygons.len() {
             for n in 0..polygons.len() {
                 test_volume(
-                    &mut Concrete::duopyramid(&polygons[m], &polygons[n]),
+                    Concrete::duopyramid(&polygons[m], &polygons[n]),
                     Some(areas[m] * areas[n] / 30.0),
                 )
             }
@@ -1261,19 +1246,12 @@ mod tests {
 
     #[test]
     fn duoprism() {
-        let mut polygons = Vec::new();
-        let mut areas = Vec::new();
-        for n in 2..=5 {
-            for d in 1..=n / 2 {
-                polygons.push(Concrete::star_polygon(n, d));
-                areas.push(polygon_area(n, d));
-            }
-        }
+        let (polygons, areas) = polygons_areas();
 
         for m in 0..polygons.len() {
             for n in 0..polygons.len() {
                 test_volume(
-                    &mut Concrete::duoprism(&polygons[m], &polygons[n]),
+                    Concrete::duoprism(&polygons[m], &polygons[n]),
                     Some(areas[m] * areas[n]),
                 )
             }
@@ -1282,19 +1260,12 @@ mod tests {
 
     #[test]
     fn duotegum() {
-        let mut polygons = Vec::new();
-        let mut areas = Vec::new();
-        for n in 2..=5 {
-            for d in 1..=n / 2 {
-                polygons.push(Concrete::star_polygon(n, d));
-                areas.push(polygon_area(n, d));
-            }
-        }
+        let (polygons, areas) = polygons_areas();
 
         for m in 0..polygons.len() {
             for n in 0..polygons.len() {
                 test_volume(
-                    &mut Concrete::duotegum(&polygons[m], &polygons[n]),
+                    Concrete::duotegum(&polygons[m], &polygons[n]),
                     Some(areas[m] * areas[n] / 6.0),
                 )
             }
@@ -1303,19 +1274,14 @@ mod tests {
 
     #[test]
     fn duocomb() {
-        let mut polygons = Vec::new();
-        let mut areas = Vec::new();
-        for n in 2..=5 {
-            for d in 1..=n / 2 {
-                polygons.push(Concrete::star_polygon(n, d));
-                areas.push(polygon_area(n, d));
-            }
-        }
+        let (polygons, _) = polygons_areas();
 
         for m in 0..polygons.len() {
             for n in 0..polygons.len() {
-                let volume = (m == 0 || n == 0).then(|| 0.0);
-                test_volume(&mut Concrete::duocomb(&polygons[m], &polygons[n]), volume)
+                test_volume(
+                    Concrete::duocomb(&polygons[m], &polygons[n]),
+                    (m == 0 || n == 0).then(|| 0.0),
+                )
             }
         }
     }
@@ -1324,7 +1290,7 @@ mod tests {
     fn simplex() {
         for n in 1..=6 {
             test_volume(
-                &mut Concrete::simplex(n),
+                Concrete::simplex(n),
                 Some(
                     (n as Float / (1 << (n - 1)) as Float).sqrt()
                         / crate::factorial(n - 1) as Float,
@@ -1336,7 +1302,7 @@ mod tests {
     #[test]
     fn hypercube() {
         for n in 1..=6 {
-            test_volume(&mut Concrete::hypercube(n), Some(1.0));
+            test_volume(Concrete::hypercube(n), Some(1.0));
         }
     }
 
@@ -1344,7 +1310,7 @@ mod tests {
     fn orthoplex() {
         for n in 1..=6 {
             test_volume(
-                &mut Concrete::orthoplex(n),
+                Concrete::orthoplex(n),
                 Some(1.0 / crate::factorial(n - 1) as Float),
             );
         }

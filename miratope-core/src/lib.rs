@@ -19,9 +19,9 @@ pub mod group;
 use std::{error::Error, iter};
 
 use abs::{
-    elements::{ElementList, Ranks, SectionRef},
+    elements::{Ranks, SectionRef},
     flag::{Flag, FlagIter, OrientedFlag, OrientedFlagIter},
-    Abstract,
+    Abstract, Ranked,
 };
 
 use vec_like::VecLike;
@@ -108,8 +108,22 @@ fn factorial(n: usize) -> u32 {
     FACTORIALS[n]
 }
 
+impl<T: Polytope> Ranked for T {
+    fn ranks(&self) -> &Ranks {
+        &self.abs().ranks
+    }
+
+    fn ranks_mut(&mut self) -> &mut Ranks {
+        &mut self.abs_mut().ranks
+    }
+
+    fn into_ranks(self) -> Ranks {
+        self.into_abs().ranks
+    }
+}
+
 /// The trait for methods common to all polytopes.
-pub trait Polytope: Sized + Clone {
+pub trait Polytope: Clone {
     /// The error type of taking a dual.
     type DualError: Error;
 
@@ -119,72 +133,16 @@ pub trait Polytope: Sized + Clone {
     /// Returns a mutable reference to the underlying abstract polytope.
     fn abs_mut(&mut self) -> &mut Abstract;
 
-    /// Returns a reference to the underlying ranks.
-    fn ranks(&self) -> &Ranks {
-        &self.abs().ranks
-    }
-
-    /// Returns a mutable reference to the underlying ranks.
-    fn ranks_mut(&mut self) -> &mut Ranks {
-        &mut self.abs_mut().ranks
-    }
+    fn into_abs(self) -> Abstract;
 
     /// Sorts the subelements and superelements of the entire polytope. This is
     /// usually called before iterating over the flags of the polytope.
-    fn abs_sort(&mut self) {
-        if self.abs().sorted {
-            return;
-        }
-
-        for elements in self.ranks_mut().iter_mut() {
-            for el in elements.iter_mut() {
-                el.sort();
-            }
+    fn element_sort(&mut self) {
+        if !self.abs().sorted {
+            self.ranks_mut().element_sort()
         }
 
         self.abs_mut().sorted = true;
-    }
-
-    /// The [rank](https://polytope.miraheze.org/wiki/Rank) of the polytope.
-    fn rank(&self) -> usize {
-        self.ranks().rank()
-    }
-
-    /// Returns the number of elements of a given rank.
-    fn el_count(&self, rank: usize) -> usize {
-        self.abs()
-            .ranks
-            .get(rank)
-            .map(ElementList::len)
-            .unwrap_or(0)
-    }
-
-    /// Returns the element counts of the polytope.
-    fn el_counts(&self) -> Vec<usize> {
-        let abs = self.abs();
-        let mut counts = Vec::with_capacity(abs.rank() + 1);
-
-        for r in 0..=abs.rank() {
-            counts.push(abs[r].len())
-        }
-
-        counts
-    }
-
-    /// The number of vertices on the polytope.
-    fn vertex_count(&self) -> usize {
-        self.el_count(1)
-    }
-
-    /// The number of facets on the polytope.
-    fn facet_count(&self) -> usize {
-        let r = self.rank();
-
-        if r == 0 {
-            0
-        } else {
-            self.el_count(r - 1)
-        }
     }
 
     /// Returns an instance of the
@@ -280,7 +238,6 @@ pub trait Polytope: Sized + Clone {
             for q in components {
                 p.comp_append(q);
             }
-
             p
         } else {
             Self::nullitope()
@@ -398,7 +355,7 @@ pub trait Polytope: Sized + Clone {
     /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
     fn orientable(&mut self) -> bool {
         let abs = self.abs_mut();
-        abs.abs_sort();
+        abs.element_sort();
 
         for flag_event in abs.flag_events() {
             if flag_event.non_orientable() {

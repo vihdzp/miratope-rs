@@ -4,7 +4,8 @@ use super::{camera::ProjectionType, top_panel::SectionState};
 
 use bevy::prelude::*;
 use bevy_egui::EguiSettings;
-use miratope_lang::{poly::conc::NamedConcrete, SelectedLanguage};
+use miratope_core::Polytope;
+use miratope_lang::{poly::NamedConcrete, SelectedLanguage};
 
 /// The plugin in charge of the Miratope main window, and of drawing the
 /// polytope onto it.
@@ -48,10 +49,8 @@ pub fn update_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Res
 /// Updates polytopes after an operation.
 pub fn update_changed_polytopes(
     mut meshes: ResMut<Assets<Mesh>>,
-
     polies: Query<(&NamedConcrete, &Handle<Mesh>, &Children), Changed<NamedConcrete>>,
     wfs: Query<&Handle<Mesh>, Without<NamedConcrete>>,
-
     mut windows: ResMut<Windows>,
     mut section_state: ResMut<SectionState>,
     selected_language: Res<SelectedLanguage>,
@@ -60,10 +59,10 @@ pub fn update_changed_polytopes(
     for (poly, mesh_handle, children) in polies.iter() {
         if cfg!(debug_assertions) {
             println!("Polytope updated");
-            poly.con.abs.is_valid().unwrap();
+            poly.abs().is_valid().unwrap();
         }
 
-        *meshes.get_mut(mesh_handle).unwrap() = crate::mesh::mesh(&poly.con, *orthogonal);
+        *meshes.get_mut(mesh_handle).unwrap() = crate::mesh::mesh(&poly.poly, *orthogonal);
 
         // Sets the window's name to the polytope's name.
         windows
@@ -75,7 +74,7 @@ pub fn update_changed_polytopes(
         for child in children.iter() {
             if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {
                 *meshes.get_mut(wf_handle).unwrap() =
-                    crate::mesh::wireframe(&poly.con, *orthogonal);
+                    crate::mesh::wireframe(&poly.poly, *orthogonal);
             }
         }
 

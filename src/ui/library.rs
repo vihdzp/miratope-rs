@@ -13,7 +13,7 @@ use miratope_core::{
 };
 use miratope_lang::{
     name::{Con, Name},
-    poly::conc::NamedConcrete,
+    poly::NamedConcrete,
     SelectedLanguage,
 };
 

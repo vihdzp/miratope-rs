@@ -1,5 +1,7 @@
 //! Contains the methods to setup the camera.
 
+use std::ops::Mul;
+
 use bevy::{
     input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel},
     math::EulerRot,
@@ -42,10 +44,7 @@ impl ProjectionType {
 
     /// Returns whether the projection type is `Orthogonal`.
     pub fn is_orthogonal(&self) -> bool {
-        match self {
-            Self::Orthogonal => true,
-            Self::Perspective => false,
-        }
+        matches!(self, Self::Orthogonal)
     }
 }
 
@@ -74,15 +73,15 @@ pub enum CameraInputEvent {
     Reset,
 }
 
-impl std::ops::Mul<f32> for CameraInputEvent {
-    type Output = CameraInputEvent;
+impl Mul<f32> for CameraInputEvent {
+    type Output = Self;
 
     /// Scales the effect of a camera input event by a certain factor.
-    fn mul(mut self, rhs: f32) -> CameraInputEvent {
+    fn mul(mut self, rhs: f32) -> Self {
         match &mut self {
-            CameraInputEvent::RotateAnchor(r) => *r *= rhs,
-            CameraInputEvent::Translate(p) => *p *= rhs,
-            CameraInputEvent::Roll(r) | CameraInputEvent::Zoom(r) => *r *= rhs,
+            Self::RotateAnchor(r) => *r *= rhs,
+            Self::Translate(p) => *p *= rhs,
+            Self::Roll(r) | Self::Zoom(r) => *r *= rhs,
             _ => {}
         }
 
@@ -90,7 +89,7 @@ impl std::ops::Mul<f32> for CameraInputEvent {
     }
 }
 
-impl std::ops::Mul<CameraInputEvent> for f32 {
+impl Mul<CameraInputEvent> for f32 {
     type Output = CameraInputEvent;
 
     /// Scales the effect of a camera input event by a certain factor.
@@ -140,81 +139,81 @@ impl CameraInputEvent {
             Self::Reset => Self::reset(anchor_tf, cam_tf),
         }
     }
-}
 
-/// Processes camera events coming from the keyboard.
-fn cam_events_from_kb(
-    time: Res<Time>,
-    keyboard: Res<Input<KeyCode>>,
-    cam_inputs: &mut EventWriter<CameraInputEvent>,
-    ctx: &CtxRef,
-) -> (f32, f32) {
-    // TODO: make the spin rate modifiable in preferences.
-    const SPIN_RATE: f32 = std::f32::consts::TAU / 5.0;
-    const ROLL: CameraInputEvent = CameraInputEvent::Roll(SPIN_RATE);
+    /// Processes camera events coming from the keyboard.
+    fn cam_events_from_kb(
+        time: &Time,
+        keyboard: &Input<KeyCode>,
+        cam_inputs: &mut EventWriter<CameraInputEvent>,
+        ctx: &CtxRef,
+    ) -> (f32, f32) {
+        // TODO: make the spin rate modifiable in preferences.
+        const SPIN_RATE: f32 = std::f32::consts::TAU / 5.0;
+        const ROLL: CameraInputEvent = CameraInputEvent::Roll(SPIN_RATE);
 
-    let real_scale = time.delta_seconds();
-    let scale = if keyboard.pressed(KeyCode::LControl) | keyboard.pressed(KeyCode::RControl) {
-        real_scale * 3.0
-    } else {
-        real_scale
-    };
-
-    let fb = CameraInputEvent::Translate(Vec3::Z);
-    let lr = CameraInputEvent::Translate(Vec3::X);
-    let ud = CameraInputEvent::Translate(Vec3::Y);
-
-    if !ctx.wants_keyboard_input() {
-        for keycode in keyboard.get_pressed() {
-            cam_inputs.send(match keycode {
-                KeyCode::W | KeyCode::Up => -scale * fb,
-                KeyCode::S | KeyCode::Down => scale * fb,
-                KeyCode::D | KeyCode::Right => scale * lr,
-                KeyCode::A | KeyCode::Left => -scale * lr,
-                KeyCode::Space => scale * ud,
-                KeyCode::LShift | KeyCode::RShift => -scale * ud,
-                KeyCode::Q => real_scale * ROLL,
-                KeyCode::E => -real_scale * ROLL,
-                KeyCode::R => CameraInputEvent::Reset,
-                _ => continue,
-            })
-        }
-    }
-
-    (real_scale, scale)
-}
-
-/// Processes camera events coming from the mouse buttons.
-fn cam_events_from_mouse(
-    mouse_button: Res<Input<MouseButton>>,
-    mut mouse_move: EventReader<MouseMotion>,
-    width: f32,
-    height: f32,
-    real_scale: f32,
-    cam_inputs: &mut EventWriter<CameraInputEvent>,
-) {
-    if mouse_button.pressed(MouseButton::Right) {
-        for MouseMotion { mut delta } in mouse_move.iter() {
-            delta.x /= width;
-            delta.y /= height;
-            cam_inputs.send(CameraInputEvent::RotateAnchor(-100.0 * real_scale * delta))
-        }
-    }
-}
-
-/// Processes camera events coming from the mouse wheel.
-fn cam_events_from_wheel(
-    mut mouse_wheel: EventReader<MouseWheel>,
-    scale: f32,
-    cam_inputs: &mut EventWriter<CameraInputEvent>,
-) {
-    for MouseWheel { unit, y, .. } in mouse_wheel.iter() {
-        let unit_scale = match unit {
-            MouseScrollUnit::Line => 12.0,
-            MouseScrollUnit::Pixel => 1.0,
+        let real_scale = time.delta_seconds();
+        let scale = if keyboard.pressed(KeyCode::LControl) | keyboard.pressed(KeyCode::RControl) {
+            real_scale * 3.0
+        } else {
+            real_scale
         };
 
-        cam_inputs.send(CameraInputEvent::Zoom(unit_scale * -scale * y))
+        let fb = Self::Translate(Vec3::Z);
+        let lr = Self::Translate(Vec3::X);
+        let ud = Self::Translate(Vec3::Y);
+
+        if !ctx.wants_keyboard_input() {
+            for keycode in keyboard.get_pressed() {
+                cam_inputs.send(match keycode {
+                    KeyCode::W | KeyCode::Up => -scale * fb,
+                    KeyCode::S | KeyCode::Down => scale * fb,
+                    KeyCode::D | KeyCode::Right => scale * lr,
+                    KeyCode::A | KeyCode::Left => -scale * lr,
+                    KeyCode::Space => scale * ud,
+                    KeyCode::LShift | KeyCode::RShift => -scale * ud,
+                    KeyCode::Q => real_scale * ROLL,
+                    KeyCode::E => -real_scale * ROLL,
+                    KeyCode::R => Self::Reset,
+                    _ => continue,
+                })
+            }
+        }
+
+        (real_scale, scale)
+    }
+
+    /// Processes camera events coming from the mouse buttons.
+    fn cam_events_from_mouse(
+        mouse_button: &Input<MouseButton>,
+        mut mouse_move: EventReader<MouseMotion>,
+        width: f32,
+        height: f32,
+        real_scale: f32,
+        cam_inputs: &mut EventWriter<Self>,
+    ) {
+        if mouse_button.pressed(MouseButton::Right) {
+            for MouseMotion { mut delta } in mouse_move.iter() {
+                delta.x /= width;
+                delta.y /= height;
+                cam_inputs.send(Self::RotateAnchor(-100.0 * real_scale * delta))
+            }
+        }
+    }
+
+    /// Processes camera events coming from the mouse wheel.
+    fn cam_events_from_wheel(
+        mut mouse_wheel: EventReader<MouseWheel>,
+        scale: f32,
+        cam_inputs: &mut EventWriter<Self>,
+    ) {
+        for MouseWheel { unit, y, .. } in mouse_wheel.iter() {
+            let unit_scale = match unit {
+                MouseScrollUnit::Line => 12.0,
+                MouseScrollUnit::Pixel => 1.0,
+            };
+
+            cam_inputs.send(Self::Zoom(unit_scale * -scale * y))
+        }
     }
 }
 
@@ -240,19 +239,20 @@ fn add_cam_input_events(
 
     let ctx = egui_ctx.ctx();
     let cam_inputs = &mut cam_inputs;
-    let (real_scale, scale) = cam_events_from_kb(time, keyboard, cam_inputs, ctx);
+    let (real_scale, scale) =
+        CameraInputEvent::cam_events_from_kb(&time, &keyboard, cam_inputs, ctx);
 
     // Omit any events if the UI will process them instead.
     if !ctx.wants_pointer_input() {
-        cam_events_from_mouse(
-            mouse_button,
+        CameraInputEvent::cam_events_from_mouse(
+            &mouse_button,
             mouse_move,
             width,
             height,
             real_scale,
             cam_inputs,
         );
-        cam_events_from_wheel(mouse_wheel, scale, cam_inputs);
+        CameraInputEvent::cam_events_from_wheel(mouse_wheel, scale, cam_inputs);
     }
 }
 

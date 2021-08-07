@@ -14,10 +14,7 @@ use miratope_core::{
     geometry::{Hyperplane, Point, Vector},
     Float, Polytope,
 };
-use miratope_lang::{
-    poly::{conc::NamedConcrete, NamedPolytope},
-    SelectedLanguage,
-};
+use miratope_lang::{poly::NamedConcrete, SelectedLanguage};
 use rfd::FileDialog;
 use strum::IntoEnumIterator;
 
@@ -417,7 +414,7 @@ pub fn show_top_panel(
 
                     if ui.button("Omnitruncate").clicked() {
                         if let Some(mut p) = query.iter_mut().next() {
-                            p.abs_sort();
+                            p.element_sort();
                             *p = p.omnitruncate();
                         }
                     }
@@ -548,7 +545,7 @@ pub fn show_top_panel(
                     // Gets the volume of the polytope.
                     if ui.button("Volume").clicked() {
                         if let Some(mut p) = query.iter_mut().next() {
-                            p.abs_sort();
+                            p.element_sort();
 
                             if let Some(vol) = p.volume() {
                                 println!("The volume is {}.", vol);
@@ -581,7 +578,7 @@ pub fn show_top_panel(
                 // Searches the current polytope on the wiki.
                 if ui.button("Current").clicked() {
                     if let Some(p) = query.iter_mut().next() {
-                        if let Err(err) = webbrowser::open(&p.wiki_link()) {
+                        if let Err(err) = webbrowser::open(&p.name.wiki_link()) {
                             eprintln!("Website opening failed: {}", err)
                         }
                     }

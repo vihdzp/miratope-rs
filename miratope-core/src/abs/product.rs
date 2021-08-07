@@ -123,7 +123,6 @@ impl Abstract {
         // Initializes the element lists. These will only contain the
         // subelements as they're generated. When they're complete, we'll call
         // push_subs for each of them into a new Abstract.
-        // TODO: use a builder instead.
         let mut builder = AbstractBuilder::with_capacity(rank + 1);
         let offset_memo = OffsetMemo::<MIN, MAX>::new(p, q);
 

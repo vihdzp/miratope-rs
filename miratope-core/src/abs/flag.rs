@@ -12,8 +12,10 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use super::Abstract;
-use crate::{Float, Polytope};
+use crate::{
+    abs::{elements::Ranked, Abstract},
+    Float, Polytope,
+};
 
 use vec_like::*;
 
@@ -41,10 +43,8 @@ impl Flag {
         // above and the superelements of the element below.
         let below_idx = self[r - 1];
         let below = polytope.get_element(r - 1, below_idx).unwrap();
-
         let above_idx = self[r + 1];
         let above = polytope.get_element(r + 1, above_idx).unwrap();
-
         let common = common(&below.sups.0, &above.subs.0);
 
         debug_assert_eq!(
@@ -88,8 +88,8 @@ impl Orientation {
     /// Flips the parity of a flag.
     pub fn flip(&self) -> Self {
         match self {
-            Orientation::Even => Orientation::Odd,
-            Orientation::Odd => Orientation::Even,
+            Self::Even => Self::Odd,
+            Self::Odd => Self::Even,
         }
     }
 
@@ -97,8 +97,8 @@ impl Orientation {
     /// `-1.0`.
     pub fn sign(&self) -> Float {
         match self {
-            Orientation::Even => 1.0,
-            Orientation::Odd => -1.0,
+            Self::Even => 1.0,
+            Self::Odd => -1.0,
         }
     }
 }
@@ -193,7 +193,7 @@ impl<'a> Iterator for FlagIter<'a> {
             r -= 1;
         }
 
-        Some(dbg!(prev_flag))
+        Some(prev_flag)
     }
 }
 
@@ -221,24 +221,6 @@ impl From<Flag> for OrientedFlag {
     }
 }
 
-impl From<Vec<usize>> for OrientedFlag {
-    fn from(vec: Vec<usize>) -> Self {
-        Flag::from(vec).into()
-    }
-}
-
-impl AsRef<Vec<usize>> for OrientedFlag {
-    fn as_ref(&self) -> &Vec<usize> {
-        self.flag.as_ref()
-    }
-}
-
-impl AsMut<Vec<usize>> for OrientedFlag {
-    fn as_mut(&mut self) -> &mut Vec<usize> {
-        self.flag.as_mut()
-    }
-}
-
 /// Allows indexing an oriented flag by rank.
 impl Index<usize> for OrientedFlag {
     type Output = usize;
@@ -258,7 +240,6 @@ impl IndexMut<usize> for OrientedFlag {
 /// Iterates over the entries of an oriented flag.
 impl IntoIterator for OrientedFlag {
     type Item = usize;
-
     type IntoIter = std::vec::IntoIter<usize>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -268,8 +249,23 @@ impl IntoIterator for OrientedFlag {
 
 impl VecLike for OrientedFlag {
     type VecItem = usize;
-
     type VecIndex = usize;
+
+    fn as_inner(&self) -> &Vec<usize> {
+        self.flag.as_inner()
+    }
+
+    fn as_inner_mut(&mut self) -> &mut Vec<usize> {
+        self.flag.as_inner_mut()
+    }
+
+    fn into_inner(self) -> Vec<usize> {
+        self.flag.into_inner()
+    }
+
+    fn from_inner(vec: Vec<usize>) -> Self {
+        Flag::from_inner(vec).into()
+    }
 }
 
 impl Hash for OrientedFlag {
@@ -379,7 +375,6 @@ impl FlagChanges {
 /// You should use this iterator instead of a [`FlagIter`] when
 /// * you want to apply a specific set of flag changes,
 /// * you care about the orientation of the flags.
-// TODO: specialize this for non-oriented flags?
 pub struct OrientedFlagIter<'a> {
     /// The polytope whose flags we iterate over. For the algorithm that applies
     /// a flag change to work, **this polytope's subelement and superelement
@@ -468,9 +463,7 @@ impl<'a> OrientedFlagIter<'a> {
 
     /// Returns a new iterator over oriented flags, discarding the
     /// non-orientable event.
-    pub fn filter_flags(
-        self,
-    ) -> std::iter::FilterMap<Self, impl FnMut(FlagEvent) -> Option<OrientedFlag>> {
+    pub fn filter_flags(self) -> impl Iterator<Item = OrientedFlag> + 'a {
         self.filter_map(FlagEvent::flag)
     }
 
@@ -693,7 +686,7 @@ mod tests {
 
     /// Tests that a polytope has an expected number of flags, oriented or not.
     fn test(polytope: &mut Abstract, expected: usize) {
-        polytope.abs_sort();
+        polytope.element_sort();
 
         let flag_count = polytope.flags().count();
         assert_eq!(

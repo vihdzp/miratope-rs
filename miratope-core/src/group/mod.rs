@@ -294,7 +294,7 @@ impl Group {
 
     /// Generates a step prism group from a base group and a homomorphism into
     /// another group.
-    pub fn step(g: Self, f: impl Fn(Matrix) -> Matrix + Clone + 'static) -> Self {
+    pub fn step<F: 'static + Clone + Fn(Matrix) -> Matrix>(g: Self, f: F) -> Self {
         let dim = g.dim * 2;
 
         Self {

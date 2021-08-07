@@ -10,19 +10,14 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use self::{
-    elements::{
-        AbstractBuilder, Element, ElementHash, ElementList, ElementRef, Ranks, SectionHash,
-        SectionRef, SubelementList, Subelements, Superelements,
-    },
-    flag::{Flag, FlagSet},
-};
+use self::flag::{Flag, FlagSet};
 use super::Polytope;
 
 use rayon::prelude::*;
 use strum_macros::Display;
 use vec_like::VecLike;
 
+pub use elements::*;
 pub use product::*;
 
 /// Represents the way in which two elements with one rank of difference are
@@ -233,18 +228,6 @@ pub struct Abstract {
     pub sorted: bool,
 }
 
-impl AsRef<Vec<ElementList>> for Abstract {
-    fn as_ref(&self) -> &Vec<ElementList> {
-        self.ranks.as_ref()
-    }
-}
-
-impl AsMut<Vec<ElementList>> for Abstract {
-    fn as_mut(&mut self) -> &mut Vec<ElementList> {
-        self.ranks.as_mut()
-    }
-}
-
 impl Index<usize> for Abstract {
     type Output = ElementList;
 
@@ -259,19 +242,13 @@ impl IndexMut<usize> for Abstract {
     }
 }
 
+// todo: remove?
 impl From<Ranks> for Abstract {
     fn from(ranks: Ranks) -> Self {
         Self {
             ranks,
             sorted: false,
         }
-    }
-}
-
-impl From<Vec<ElementList>> for Abstract {
-    fn from(ranks: Vec<ElementList>) -> Self {
-        let ranks: Ranks = ranks.into();
-        ranks.into()
     }
 }
 
@@ -287,30 +264,29 @@ impl IntoIterator for Abstract {
 impl VecLike for Abstract {
     type VecItem = ElementList;
     type VecIndex = usize;
+
+    fn as_inner(&self) -> &Vec<ElementList> {
+        self.ranks.as_inner()
+    }
+
+    fn as_inner_mut(&mut self) -> &mut Vec<ElementList> {
+        self.ranks.as_inner_mut()
+    }
+
+    fn into_inner(self) -> Vec<ElementList> {
+        self.ranks.into_inner()
+    }
+
+    fn from_inner(vec: Vec<ElementList>) -> Self {
+        Ranks::from_inner(vec).into()
+    }
 }
 
 impl Abstract {
-    /// Initializes a polytope with an empty element list.
-    pub fn new() -> Self {
-        Ranks::new().into()
-    }
-
     /// Initializes a new polytope with the capacity needed to store elements up
     /// to a given rank.
     pub fn with_rank_capacity(rank: usize) -> Self {
         Ranks::with_rank_capacity(rank).into()
-    }
-
-    /// Returns `true` if we haven't added any elements to the polytope. Note
-    /// that such a polytope is considered invalid.
-    pub fn is_empty(&self) -> bool {
-        self.ranks.is_empty()
-    }
-
-    /// Reserves capacity for at least `additional` more element lists to be
-    /// inserted in `self`.
-    pub fn reserve(&mut self, additional: usize) {
-        self.ranks.reserve(additional)
     }
 
     /// Returns a reference to the minimal element of the polytope.
@@ -347,13 +323,6 @@ impl Abstract {
     /// Panics if the polytope has not been initialized.
     pub fn max_mut(&mut self) -> &mut Element {
         self.get_element_mut(self.rank(), 0).unwrap()
-    }
-
-    /// Pushes a new element list, assuming that the superelements of the
-    /// maximal rank **have** already been correctly set. If they haven't
-    /// already been set, use [`push_subs`](Self::push_subs) instead.
-    pub fn push(&mut self, elements: ElementList) {
-        self.ranks.push(elements);
     }
 
     /// Pushes a given element into the vector of elements of a given rank.
@@ -397,11 +366,6 @@ impl Abstract {
         self.push_subs(SubelementList::max(facet_count));
     }
 
-    /// Pops the element list of the largest rank.
-    pub fn pop(&mut self) -> Option<ElementList> {
-        self.ranks.pop()
-    }
-
     /// Returns a reference to an element of the polytope. To actually get the
     /// entire polytope it defines, use [`element`](Self::element).
     pub fn get_element(&self, rank: usize, idx: usize) -> Option<&Element> {
@@ -427,6 +391,34 @@ impl Abstract {
         Some((element_hash.to_vertices(), element_hash.to_polytope(self)))
     }
 
+    /// Returns a map from the elements in a polytope to the index of one of its
+    /// vertices. Does not map the minimal element anywhere.
+    pub fn vertex_map(&self) -> ElementMap<usize> {
+        // Maps every element of the polytope to one of its vertices.
+        let mut vertex_map = ElementMap::new();
+
+        // Vertices map to themselves.
+        let vertex_count = self.vertex_count();
+        let mut vertex_list = Vec::with_capacity(vertex_count);
+        for v in 0..vertex_count {
+            vertex_list.push(v);
+        }
+        vertex_map.push(vertex_list);
+
+        // Every other element maps to the vertex of any subelement.
+        for r in 2..=self.rank() {
+            let mut element_list = Vec::new();
+
+            for el in &self.ranks()[r] {
+                element_list.push(vertex_map[r - 2][el.subs[0]]);
+            }
+
+            vertex_map.push(element_list);
+        }
+
+        vertex_map
+    }
+
     /// Returns the indices of a Petrial polygon in cyclic order, or `None` if
     /// it self-intersects.
     pub fn petrie_polygon_vertices(&mut self, flag: Flag) -> Option<Vec<usize>> {
@@ -437,7 +429,7 @@ impl Abstract {
         let mut vertices = Vec::new();
         let mut vertex_hash = HashSet::new();
 
-        self.abs_sort();
+        self.element_sort();
 
         loop {
             // Applies 0-changes up to (rank-1)-changes in order.
@@ -831,12 +823,16 @@ impl Polytope for Abstract {
         self
     }
 
+    fn into_abs(self) -> Abstract {
+        self
+    }
+
     /// Returns an instance of the
     /// [nullitope](https://polytope.miraheze.org/wiki/Nullitope), the unique
     /// polytope of rank &minus;1.
     fn nullitope() -> Self {
         Self {
-            ranks: vec![ElementList::min(0)].into(),
+            ranks: Ranks::from_inner(vec![ElementList::min(0)]),
             sorted: true,
         }
     }
@@ -846,7 +842,7 @@ impl Polytope for Abstract {
     /// of rank 0.
     fn point() -> Self {
         Self {
-            ranks: vec![ElementList::min(1), ElementList::max(1)].into(),
+            ranks: Ranks::from_inner(vec![ElementList::min(1), ElementList::max(1)]),
             sorted: true,
         }
     }
@@ -928,7 +924,7 @@ impl Polytope for Abstract {
         let mut traversed_flags = BTreeSet::new();
         let mut faces = SubelementList::new();
 
-        self.abs_sort();
+        self.element_sort();
         for mut flag in self.flags() {
             // If we've found the face associated to this flag before, we skip.
             if !traversed_flags.insert(flag.clone()) {
@@ -1032,7 +1028,7 @@ impl Polytope for Abstract {
 
         // We don't need to do this every single time.
         *self.min_mut() = Element::min(self.vertex_count());
-        *self.max_mut() = Element::max(self.facet_count());
+        *self.max_mut() = Element::max(dbg!(self.facet_count()));
     }
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
@@ -1101,7 +1097,7 @@ impl Index<(usize, usize)> for Abstract {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::Polytope, Abstract};
+    use super::*;
 
     /// Returns a bunch of varied polytopes to run general tests on. Use only
     /// for tests that should work on **everything** you give it!

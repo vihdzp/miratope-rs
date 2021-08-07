@@ -3,8 +3,8 @@
 use std::{collections::HashMap, io::Result as IoResult, path::Path, str::FromStr};
 
 use crate::{
-    abs::elements::{AbstractBuilder, SubelementList},
-    conc::{Concrete, ElementList, Point, Polytope, Subelements},
+    abs::{AbstractBuilder, Ranked, SubelementList, Subelements},
+    conc::{Concrete, ElementList, Point, Polytope},
     COMPONENTS, ELEMENT_NAMES,
 };
 
@@ -729,17 +729,15 @@ mod tests {
 
     /// Used to test a particular polytope.
     // TODO: take a `&str` as an argument instead.
-    fn test_shape(p: Concrete, el_nums: Vec<usize>) {
+    fn test_shape(off: &str, el_nums: &[usize]) {
         // Checks that element counts match up.
+        let p = Concrete::from_off(off).expect("OFF file could not be loaded.");
         assert_eq!(p.el_counts(), el_nums);
 
         // Checks that the polytope can be reloaded correctly.
-        assert_eq!(
-            Concrete::from_off(&dbg!(p.to_off(Default::default())))
-                .unwrap()
-                .el_counts(),
-            el_nums
-        );
+        let p = Concrete::from_off(&dbg!(p.to_off(Default::default())))
+            .expect("OFF file could not be reloaded.");
+        assert_eq!(p.el_counts(), el_nums);
     }
 
     #[test]
@@ -781,18 +779,16 @@ mod tests {
     #[test]
     /// Checks that a tetrahedron has the correct amount of elements.
     fn tet_nums() {
-        let tet = Concrete::from_off(
+        test_shape(
             "OFF 4 4 6 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2",
+            &[1, 4, 6, 4, 1],
         )
-        .unwrap();
-        test_shape(tet, vec![1, 4, 6, 4, 1])
     }
 
     #[test]
     /// Checks that a 2-tetrahedron compund has the correct amount of elements.
     fn so_nums() {
-        let so = Concrete::from_off(include_str!("so.off")).unwrap();
-        test_shape(so, vec![1, 8, 12, 8, 1])
+        test_shape(include_str!("so.off"), &[1, 8, 12, 8, 1])
     }
 
     #[test]
@@ -805,22 +801,21 @@ mod tests {
     #[test]
     /// Checks that comments are correctly parsed.
     fn comments() {
-        let tet = Concrete::from_off(
+        test_shape(
             "# So
-            OFF # this
-            4 4 6 # is
-            # a # test # of
-            1 1 1 # the 1234 5678
-            1 -1 -1 # comment 987
-            -1 1 -1 # removal 654
-            -1 -1 1 # system 321
-            3 0 1 2 #let #us #see
-            3 3 0 2# if
-            3 0 1 3#it
-            3 3 1 2#works!#",
+        OFF # this
+        4 4 6 # is
+        # a # test # of
+        1 1 1 # the 1234 5678
+        1 -1 -1 # comment 987
+        -1 1 -1 # removal 654
+        -1 -1 1 # system 321
+        3 0 1 2 #let #us #see
+        3 3 0 2# if
+        3 0 1 3#it
+        3 3 1 2#works!#",
+            &[1, 4, 6, 4, 1],
         )
-        .unwrap();
-        test_shape(tet, vec![1, 4, 6, 4, 1])
     }
 
     #[test]

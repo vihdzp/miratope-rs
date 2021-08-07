@@ -7,7 +7,7 @@ use crate::{
     Consts, Float, FloatOrd,
 };
 
-use nalgebra::{dmatrix, Dynamic, VecStorage};
+use nalgebra::dmatrix;
 use petgraph::{
     graph::{Edge as GraphEdge, Graph, Node as GraphNode, NodeIndex},
     Undirected,
@@ -111,27 +111,19 @@ impl std::error::Error for CdError {}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CoxMatrix(MatrixOrd);
 
-impl AsRef<Matrix> for CoxMatrix {
-    fn as_ref(&self) -> &Matrix {
-        self.0.as_ref()
-    }
-}
-
-impl AsMut<Matrix> for CoxMatrix {
-    fn as_mut(&mut self) -> &mut Matrix {
-        self.0.as_mut()
-    }
-}
-
 impl CoxMatrix {
     /// Initializes a new CD matrix from a vector of nodes and a matrix.
     pub fn new(matrix: Matrix) -> Self {
         Self(MatrixOrd::new(matrix))
     }
 
+    pub fn matrix(&self) -> &Matrix {
+        self.0.matrix()
+    }
+
     /// Returns the dimensions of the matrix.
     pub fn dim(&self) -> usize {
-        self.as_ref().nrows()
+        self.matrix().nrows()
     }
 
     /// Parses a [`Cd`] and turns it into a Coxeter matrix.
@@ -162,10 +154,7 @@ impl CoxMatrix {
     }
 
     /// Returns a mutable reference to the elements of the matrix.
-    pub fn iter_mut(
-        &mut self,
-    ) -> nalgebra::iter::MatrixIterMut<Float, Dynamic, Dynamic, VecStorage<Float, Dynamic, Dynamic>>
-    {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Float> {
         self.0.iter_mut()
     }
 
@@ -833,10 +822,7 @@ impl Cd {
 
     /// Returns an iterator over the nodes in the Coxeter diagram, in the order
     /// in which they were found.
-    pub fn node_iter<'a>(
-        &'a self,
-    ) -> std::iter::Map<std::slice::Iter<GraphNode<Node>>, impl FnMut(&'a GraphNode<Node>) -> Node>
-    {
+    pub fn node_iter(&self) -> impl Iterator<Item = Node> + '_ {
         self.0.raw_nodes().iter().map(|node| node.weight)
     }
 

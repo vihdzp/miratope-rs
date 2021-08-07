@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::{conc::Concrete, Polytope};
+use crate::{abs::Ranked, conc::Concrete};
 
 use vec_like::*;
 

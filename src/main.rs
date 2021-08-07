@@ -62,7 +62,7 @@ use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::EguiPlugin;
 use miratope_core::conc::file::FromFile;
-use miratope_lang::poly::conc::NamedConcrete;
+use miratope_lang::poly::NamedConcrete;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
 use ui::{
@@ -133,14 +133,14 @@ fn setup(
         .spawn()
         // Mesh
         .insert_bundle(PbrNoBackfaceBundle {
-            mesh: meshes.add(mesh::mesh(&poly.con, ProjectionType::Perspective)),
+            mesh: meshes.add(mesh::mesh(&poly.poly, ProjectionType::Perspective)),
             material: mesh_material,
             ..Default::default()
         })
         // Wireframe
         .with_children(|cb| {
             cb.spawn().insert_bundle(PbrNoBackfaceBundle {
-                mesh: meshes.add(mesh::wireframe(&poly.con, ProjectionType::Perspective)),
+                mesh: meshes.add(mesh::wireframe(&poly.poly, ProjectionType::Perspective)),
                 material: wf_material,
                 ..Default::default()
             });

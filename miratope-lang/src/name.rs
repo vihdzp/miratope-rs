@@ -2,8 +2,10 @@
 
 use std::{fmt::Debug, fs, marker::PhantomData, mem};
 
-use miratope_core::{geometry::Point, Consts, Float};
+use miratope_core::{abs::Abstract, conc::Concrete, geometry::Point, Consts, Float, Polytope};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
+use crate::Language;
 
 /// The trait for a type marker that determines whether a name describes an
 /// abstract or concrete polytope.
@@ -11,6 +13,9 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 /// For some reason, adding `DeserializeOwned` causes the trait to jank out.
 /// This means we need to keep typing it everywhere.
 pub trait NameType: Debug + Clone + PartialEq + Serialize {
+    /// The polytope type that may be named by `Self`.
+    type Polytope: Polytope;
+
     /// Either `AbsData<Point>` or `ConData<Point>`. Workaround until generic
     /// associated types are stable.
     type DataPoint: NameData<Point> + DeserializeOwned;
@@ -34,25 +39,50 @@ pub trait NameType: Debug + Clone + PartialEq + Serialize {
 /// The idea is that `NameData` should be used to store whichever conditions on
 /// concrete polytopes always hold on abstract polytopes.
 pub trait NameData<T>: PartialEq + Debug + Clone + Serialize {
+    /// Initializes a new `NameData` with a given value, lazily evaluated.
+    fn new_lazy<F: FnOnce() -> T>(f: F) -> Self;
+
     /// Initializes a new `NameData` with a given value.
-    fn new(value: T) -> Self;
+    fn new(value: T) -> Self {
+        Self::new_lazy(|| value)
+    }
 
-    /// Determines whether `self` contains a given value.
-    fn is(&self, value: &T) -> bool;
+    /// Determines whether `self` contains a given value. An abstract name will
+    /// always return `true`.
+    fn is(&self, value: &T) -> bool
+    where
+        T: PartialEq,
+    {
+        self.satisfies(|inner| inner == value)
+    }
 
-    /// Determines whether `self` satisfies a given predicate.
-    fn satisfies<F: Fn(&T) -> bool>(&self, f: F) -> bool;
+    /// Determines whether `self` does not contain a given value. An abstract
+    /// name will always return `true`.
+    fn is_not(&self, value: &T) -> bool
+    where
+        T: PartialEq,
+    {
+        self.satisfies(|inner| inner != value)
+    }
 
-    /// Retrieves the wrapped value, or a specified value if none.
-    fn unwrap_or(self, value: T) -> T;
+    /// Determines whether `self` satisfies a given predicate. An abstract name
+    /// will always return `true`.
+    fn satisfies<F: FnOnce(&T) -> bool>(&self, f: F) -> bool;
+
+    /// Retrieves the wrapped value, or returns a lazily evaluated value if none.
+    fn unwrap_or_lazy<F: FnOnce() -> T>(self, f: F) -> T;
+
+    /// Retrieves the wrapped value, or returns a specified value if none.
+    fn unwrap_or(self, value: T) -> T {
+        self.unwrap_or_lazy(|| value)
+    }
 
     /// Retrieves the wrapped value, or the default value if none.
     fn unwrap_or_default(self) -> T
     where
         T: Default,
     {
-        #[allow(clippy::or_fun_call)]
-        self.unwrap_or(Default::default())
+        self.unwrap_or_lazy(Default::default)
     }
 }
 
@@ -85,23 +115,18 @@ impl<T> Clone for AbsData<T> {
 
 impl<T: Debug> NameData<T> for AbsData<T> {
     /// Initializes a new `AbsData` that pretends to hold a given value.
-    fn new(_: T) -> Self {
+    fn new_lazy<F: FnOnce() -> T>(_: F) -> Self {
         Default::default()
     }
 
-    /// Returns `true` no matter what, as if `self` actually held the given value.
-    fn is(&self, _: &T) -> bool {
-        true
-    }
-
     /// Returns `true` no matter what, as if `self` actually satisfied the given predicate.
-    fn satisfies<F: Fn(&T) -> bool>(&self, _: F) -> bool {
+    fn satisfies<F: FnOnce(&T) -> bool>(&self, _: F) -> bool {
         true
     }
 
     /// Returns the specified value verbatim.
-    fn unwrap_or(self, value: T) -> T {
-        value
+    fn unwrap_or_lazy<F: FnOnce() -> T>(self, value: F) -> T {
+        value()
     }
 }
 
@@ -110,6 +135,7 @@ impl<T: Debug> NameData<T> for AbsData<T> {
 pub struct Abs;
 
 impl NameType for Abs {
+    type Polytope = Abstract;
     type DataPoint = AbsData<Point>;
     type DataRegular = AbsData<Regular>;
     type DataQuadrilateral = AbsData<Quadrilateral>;
@@ -125,22 +151,17 @@ pub struct ConData<T>(T);
 
 impl<T: PartialEq + Debug + Clone + Serialize + DeserializeOwned> NameData<T> for ConData<T> {
     /// Initializes a new `ConData` that holds a given value.
-    fn new(value: T) -> Self {
-        Self(value)
-    }
-
-    /// Determines whether `self` contains a given value.
-    fn is(&self, value: &T) -> bool {
-        &self.0 == value
+    fn new_lazy<F: FnOnce() -> T>(value: F) -> Self {
+        Self(value())
     }
 
     /// Determines whether `self` satisfies the given predicate.
-    fn satisfies<F: Fn(&T) -> bool>(&self, f: F) -> bool {
+    fn satisfies<F: FnOnce(&T) -> bool>(&self, f: F) -> bool {
         f(&self.0)
     }
 
     /// Retrieves the wrapped value, ignores the argument.
-    fn unwrap_or(self, _: T) -> T {
+    fn unwrap_or_lazy<F: FnOnce() -> T>(self, _: F) -> T {
         self.0
     }
 }
@@ -150,6 +171,7 @@ impl<T: PartialEq + Debug + Clone + Serialize + DeserializeOwned> NameData<T> fo
 pub struct Con;
 
 impl NameType for Con {
+    type Polytope = Concrete;
     type DataPoint = ConData<Point>;
     type DataRegular = ConData<Regular>;
     type DataQuadrilateral = ConData<Quadrilateral>;
@@ -173,6 +195,12 @@ pub enum Regular {
 
     /// The polytope is not regular.
     No,
+}
+
+impl From<Point> for Regular {
+    fn from(center: Point) -> Self {
+        Self::Yes { center }
+    }
 }
 
 /// We don't treat something as regular by default.
@@ -940,7 +968,7 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one pyramid, we combine all of them into a
         // single simplex.
         if pyramid_count >= 2 {
-            new_bases.push(Self::simplex(Default::default(), pyramid_count - 1));
+            new_bases.push(Self::simplex(Default::default(), pyramid_count));
         }
 
         // Either the final name, or the single base.
@@ -976,10 +1004,10 @@ impl<T: NameType> Name<T> {
                 Self::Point => {}
                 Self::Dyad => prism_count += 1,
                 Self::Quadrilateral { quad } => {
-                    if quad.is(&Quadrilateral::Orthodiagonal) {
-                        new_bases.push(base);
-                    } else {
+                    if quad.is_not(&Quadrilateral::Orthodiagonal) {
                         prism_count += 2;
+                    } else {
+                        new_bases.push(base);
                     }
                 }
                 Self::Cuboid { .. } => prism_count += 3,
@@ -992,7 +1020,7 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one prism, we combine all of them into a
         // single hyperblock.
         if prism_count >= 2 {
-            new_bases.push(Self::hyperblock(Default::default(), prism_count));
+            new_bases.push(Self::hyperblock(Default::default(), prism_count + 1));
         }
 
         // Either the final name, or the single base.
@@ -1028,10 +1056,10 @@ impl<T: NameType> Name<T> {
                 Self::Point => {}
                 Self::Dyad => tegum_count += 1,
                 Self::Quadrilateral { quad } => {
-                    if quad.is(&Quadrilateral::Rectangle) {
-                        new_bases.push(base);
-                    } else {
+                    if quad.is_not(&Quadrilateral::Rectangle) {
                         tegum_count += 2;
+                    } else {
+                        new_bases.push(base);
                     }
                 }
                 Self::Orthoplex { rank, .. } => tegum_count += rank,
@@ -1043,7 +1071,7 @@ impl<T: NameType> Name<T> {
         // If we're taking more than one tegum, we combine all of them into a
         // single orthoplex.
         if tegum_count >= 2 {
-            new_bases.push(Self::orthoplex(Default::default(), tegum_count));
+            new_bases.push(Self::orthoplex(Default::default(), tegum_count + 1));
         }
 
         // Either the final name, or the single base.
@@ -1084,5 +1112,9 @@ impl<T: NameType> Name<T> {
             1 => new_bases.swap_remove(0),
             _ => Self::Multicomb(new_bases),
         }
+    }
+
+    pub fn wiki_link(&self) -> String {
+        crate::WIKI_LINK.to_owned() + &crate::lang::En::parse(self).replace(" ", "_")
     }
 }

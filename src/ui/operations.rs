@@ -17,7 +17,7 @@ use bevy_egui::{
     egui::{self, CtxRef, Layout, Ui, Widget},
     EguiContext,
 };
-use miratope_lang::poly::conc::NamedConcrete;
+use miratope_lang::poly::NamedConcrete;
 
 /// The result of showing a window, updated every frame.
 pub enum ShowResult {
@@ -86,7 +86,7 @@ fn resize(point: &mut Point, dim: usize) {
 
 /// The base trait for a window, containing the common code. You probably don't
 /// want to implement **only** this.
-pub trait Window: Send + Sync + Sized + Default {
+pub trait Window: Send + Sync + Default {
     const NAME: &'static str;
 
     /// Returns whether the window is open.
@@ -146,7 +146,6 @@ macro_rules! impl_show {
                     for mut polytope in query.iter_mut() {
                         self_.action(polytope.as_mut());
                     }
-
                     self_.close()
                 }
                 ShowResult::Close => self_.close(),
@@ -227,7 +226,7 @@ pub trait UpdateWindow: Window {
         Self: 'static,
     {
         if let Some((poly, _, _)) = query.iter().next() {
-            self_.update(poly.con.dim_or());
+            self_.update(poly.poly.dim_or());
         }
     }
 
@@ -268,6 +267,20 @@ impl Default for Slot {
     }
 }
 
+impl Slot {
+    pub fn to_poly<'a>(
+        self,
+        memory: &'a Memory,
+        loaded: &'a NamedConcrete,
+    ) -> Option<&'a NamedConcrete> {
+        match self {
+            Self::None => None,
+            Self::Memory(idx) => memory[idx].as_ref(),
+            Self::Loaded => Some(loaded),
+        }
+    }
+}
+
 /// A window for any duo-something. All of these depend on the [`Memory`] but
 /// don't need to be updated when the polytope changes.
 pub trait DuoWindow: Window {
@@ -283,27 +296,22 @@ pub trait DuoWindow: Window {
     /// Returns the references to the polytopes currently selected.
     fn polytopes<'a>(
         &'a self,
-        polytope: &'a NamedConcrete,
+        loaded: &'a NamedConcrete,
         memory: &'a Res<Memory>,
     ) -> [Option<&'a NamedConcrete>; 2] {
-        let slot_to_poly = |slot| match slot {
-            Slot::None => None,
-            Slot::Memory(idx) => memory[idx].as_ref(),
-            Slot::Loaded => Some(polytope),
-        };
-
         let [i, j] = self.slots();
-        [slot_to_poly(i), slot_to_poly(j)]
+        [i.to_poly(memory, loaded), j.to_poly(memory, loaded)]
     }
 
     /// Returns the dimensions of the polytopes currently selected, or 0 in case
     /// of the nullitope.
     fn dim_or(&self, polytope: &NamedConcrete, memory: &Res<Memory>) -> [usize; 2] {
         let [p, q] = self.polytopes(polytope, memory);
-        let dim_or =
-            |p: Option<&NamedConcrete>| p.map(|poly| poly.con.dim()).flatten().unwrap_or(0);
 
-        [dim_or(p), dim_or(q)]
+        [
+            p.map(|poly| poly.dim()).flatten().unwrap_or_default(),
+            q.map(|poly| poly.dim()).flatten().unwrap_or_default(),
+        ]
     }
 
     /// Applies the action of the window to the polytope.
@@ -492,7 +500,7 @@ impl UpdateWindow for DualWindow {
     fn action(&self, polytope: &mut NamedConcrete) {
         let sphere = Hypersphere::with_radius(self.center.clone(), self.radius);
 
-        if let Err(err) = polytope.con.try_dual_mut_with(&sphere) {
+        if let Err(err) = polytope.try_dual_mut_with(&sphere) {
             eprintln!("Dual failed: {}", err);
         }
     }

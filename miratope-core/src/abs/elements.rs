@@ -1,16 +1,19 @@
 //! A bunch of wrappers and helper structs that make dealing with abstract
 //! polytopes much less confusing.
 
-use std::{collections::HashMap, iter::IntoIterator};
+use std::{
+    collections::HashMap,
+    iter::IntoIterator,
+    ops::{Index, IndexMut},
+};
 
 use super::Abstract;
-use crate::Polytope;
 
+use rayon::iter::IntoParallelRefMutIterator;
 use vec_like::*;
 
 /// A bundled rank and index, which can be used as coordinates to refer to an
 /// element in an abstract polytope.
-
 pub trait ElementRef: Copy + Eq {
     /// The rank of the element.
     fn rank(self) -> usize {
@@ -32,8 +35,28 @@ impl ElementRef for (usize, usize) {
     }
 }
 
+/// Represents a map from ranks and indices into elements of a given type.
+/// Is internally stored as a jagged array.
+#[derive(Clone, Debug)]
+pub struct ElementMap<T>(Vec<Vec<T>>);
+impl_veclike!(@for [T] ElementMap<T>, Item = Vec<T>, Index = usize);
+
+impl<T> Index<(usize, usize)> for ElementMap<T> {
+    type Output = T;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        &self[index.rank()][index.idx()]
+    }
+}
+
+impl<T> IndexMut<(usize, usize)> for ElementMap<T> {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        &mut self[index.rank()][index.idx()]
+    }
+}
+
 /// Common boilerplate code for [`Subelements`] and [`Superelements`].
-pub trait Subsupelements: Sized + VecLike<VecItem = usize> {
+pub trait Subsupelements: VecLike<VecItem = usize> {
     /// Constructs a subelement or superelement list consisting of the indices
     /// from `0` to `n - 1`.
     fn count(n: usize) -> Self {
@@ -43,7 +66,7 @@ pub trait Subsupelements: Sized + VecLike<VecItem = usize> {
             vec.push(i);
         }
 
-        vec.into()
+        Self::from_inner(vec)
     }
 }
 
@@ -144,7 +167,7 @@ impl<'a> rayon::iter::IntoParallelIterator for &'a mut ElementList {
     type Item = &'a mut Element;
 
     fn into_par_iter(self) -> Self::Iter {
-        self.as_mut().into_par_iter()
+        self.0.par_iter_mut()
     }
 }
 
@@ -193,17 +216,94 @@ impl SubelementList {
     }
 }
 
+type IterFn = for<'r> fn(&'r ElementList) -> std::slice::Iter<'r, Element>;
+type IterMutFn = for<'r> fn(&'r mut ElementList) -> std::slice::IterMut<'r, Element>;
+type IntoIterFn = fn(ElementList) -> std::vec::IntoIter<Element>;
+
+pub type ElementIter<'a> =
+    std::iter::Flatten<std::iter::Map<std::slice::Iter<'a, ElementList>, IterFn>>;
+pub type ElementIterMut<'a> =
+    std::iter::Flatten<std::iter::Map<std::slice::IterMut<'a, ElementList>, IterMutFn>>;
+pub type ElementIntoIter =
+    std::iter::Flatten<std::iter::Map<std::vec::IntoIter<ElementList>, IntoIterFn>>;
+
 #[derive(Debug, Clone)]
 pub struct Ranks(Vec<ElementList>);
 impl_veclike!(Ranks, Item = ElementList, Index = usize);
+
+/// The trait for any structure with an underlying set of [`Ranks`].
+pub trait Ranked: Sized {
+    fn ranks(&self) -> &Ranks;
+
+    fn ranks_mut(&mut self) -> &mut Ranks;
+
+    fn into_ranks(self) -> Ranks;
+
+    fn rank(&self) -> usize {
+        self.ranks().len() - 1
+    }
+
+    fn el_count(&self, rank: usize) -> usize {
+        self.ranks().get(rank).map(ElementList::len).unwrap_or(0)
+    }
+
+    fn el_counts(&self) -> Vec<usize> {
+        self.ranks().iter().map(ElementList::len).collect()
+    }
+
+    fn vertex_count(&self) -> usize {
+        self.ranks().el_count(1)
+    }
+
+    fn facet_count(&self) -> usize {
+        self.ranks().el_count(self.rank().wrapping_sub(1))
+    }
+
+    fn element_into_iter(self) -> ElementIntoIter {
+        self.into_ranks()
+            .into_iter()
+            .map(ElementList::into_iter as IntoIterFn)
+            .flatten()
+    }
+
+    fn element_iter(&self) -> ElementIter {
+        self.ranks()
+            .iter()
+            .map(ElementList::iter as IterFn)
+            .flatten()
+    }
+
+    fn element_iter_mut(&mut self) -> ElementIterMut {
+        self.ranks_mut()
+            .iter_mut()
+            .map(ElementList::iter_mut as IterMutFn)
+            .flatten()
+    }
+}
+
+impl Ranked for Ranks {
+    fn ranks(&self) -> &Ranks {
+        self
+    }
+
+    fn ranks_mut(&mut self) -> &mut Ranks {
+        self
+    }
+
+    fn into_ranks(self) -> Ranks {
+        self
+    }
+}
 
 impl Ranks {
     pub fn with_rank_capacity(rank: usize) -> Self {
         Self::with_capacity(rank + 1)
     }
 
-    pub fn rank(&self) -> usize {
-        self.len() - 1
+    pub fn element_sort(&mut self) {
+        for el in self.element_iter_mut() {
+            el.sort();
+        }
     }
 }
 

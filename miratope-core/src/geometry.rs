@@ -352,21 +352,34 @@ pub struct MatrixOrdMxN<R: Dim, C: Dim>(pub MatrixMxN<R, C>)
 where
     VecStorage<Float, R, C>: Storage<Float, R, C>;
 
-impl<R: Dim, C: Dim> AsRef<MatrixMxN<R, C>> for MatrixOrdMxN<R, C>
+impl<R: Dim, C: Dim> MatrixOrdMxN<R, C>
 where
     VecStorage<Float, R, C>: Storage<Float, R, C>,
 {
-    fn as_ref(&self) -> &MatrixMxN<R, C> {
+    /// Initializes a new `MatrixOrd` from a `Matrix`.
+    pub fn new(mat: MatrixMxN<R, C>) -> Self {
+        Self(mat)
+    }
+
+    pub fn matrix(&self) -> &MatrixMxN<R, C> {
         &self.0
     }
-}
 
-impl<R: Dim, C: Dim> AsMut<MatrixMxN<R, C>> for MatrixOrdMxN<R, C>
-where
-    VecStorage<Float, R, C>: Storage<Float, R, C>,
-{
-    fn as_mut(&mut self) -> &mut MatrixMxN<R, C> {
-        &mut self.0
+    /// Iterates over the entries of the `MatrixOrd`.
+    pub fn iter(&self) -> impl Iterator<Item = &Float> {
+        self.0.iter()
+    }
+
+    /// Mutably iterates over the entries of the `MatrixOrd`.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Float>
+    where
+        VecStorage<Float, R, C>: StorageMut<Float, R, C>,
+    {
+        self.0.iter_mut()
+    }
+
+    pub fn shape(&self) -> (usize, usize) {
+        self.0.shape()
     }
 }
 
@@ -375,17 +388,10 @@ where
     VecStorage<Float, R, C>: Storage<Float, R, C>,
 {
     fn eq(&self, other: &Self) -> bool {
-        let mut other = other.iter();
-
-        for x in self.iter() {
-            let y = other.next().unwrap();
-
-            if abs_diff_ne!(x, y, epsilon = Float::EPS) {
-                return false;
-            }
-        }
-
-        true
+        debug_assert_eq!(self.shape(), other.shape(), "Matrix shape mismatch");
+        self.iter()
+            .zip(other.iter())
+            .all(|(x, y)| abs_diff_eq!(x, y, epsilon = Float::EPS))
     }
 }
 
@@ -413,7 +419,7 @@ where
     VecStorage<Float, R, C>: Storage<Float, R, C>,
 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
+        self.partial_cmp(other).expect("Matrix has NaN values")
     }
 }
 
@@ -425,31 +431,6 @@ where
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
         &self.0[index]
-    }
-}
-
-impl<R: Dim, C: Dim> MatrixOrdMxN<R, C>
-where
-    VecStorage<Float, R, C>: Storage<Float, R, C>,
-{
-    /// Initializes a new `MatrixOrd` from a `Matrix`.
-    pub fn new(mat: MatrixMxN<R, C>) -> Self {
-        Self(mat)
-    }
-
-    /// Iterates over the entries of the `MatrixOrd`.
-    pub fn iter(&self) -> nalgebra::iter::MatrixIter<Float, R, C, VecStorage<Float, R, C>> {
-        self.0.iter()
-    }
-
-    /// Mutably iterates over the entries of the `MatrixOrd`.
-    pub fn iter_mut(
-        &mut self,
-    ) -> nalgebra::iter::MatrixIterMut<Float, R, C, VecStorage<Float, R, C>>
-    where
-        VecStorage<Float, R, C>: StorageMut<Float, R, C>,
-    {
-        self.0.iter_mut()
     }
 }
 
