@@ -120,6 +120,7 @@ pub trait NameData<T>: Debug + Clone + Serialize + DeserializeOwned {
         self.unwrap_or_lazy(|| panic!("Called unwrap on AbsData"))
     }
 
+    /// Returns a reference to the inner value, or panics if none.
     fn unwrap_ref(&self) -> &T;
 }
 
@@ -144,7 +145,6 @@ impl<T> Clone for AbsData<T> {
 }
 
 impl<T: Debug> NameData<T> for AbsData<T> {
-    /// Initializes a new `AbsData` that pretends to hold a given value.
     fn new_lazy<F: FnOnce() -> T>(_: F) -> Self {
         Default::default()
     }
@@ -155,7 +155,6 @@ impl<T: Debug> NameData<T> for AbsData<T> {
 
     fn apply_mut<F: FnOnce(&mut T)>(&mut self, _: F) {}
 
-    /// Returns the specified value verbatim.
     fn unwrap_or_lazy<F: FnOnce() -> T>(self, value: F) -> T {
         value()
     }
@@ -185,7 +184,6 @@ impl NameType for Abs {
 pub struct ConData<T>(T);
 
 impl<T: PartialEq + Debug + Clone + Serialize + DeserializeOwned> NameData<T> for ConData<T> {
-    /// Initializes a new `ConData` that holds a given value.
     fn new_lazy<F: FnOnce() -> T>(value: F) -> Self {
         Self(value())
     }
@@ -198,7 +196,6 @@ impl<T: PartialEq + Debug + Clone + Serialize + DeserializeOwned> NameData<T> fo
         f(&mut self.0)
     }
 
-    /// Retrieves the wrapped value, ignores the argument.
     fn unwrap_or_lazy<F: FnOnce() -> T>(self, _: F) -> T {
         self.0
     }
@@ -736,12 +733,15 @@ impl<T: NameType> Name<T> {
         /// Constructs a regular dual from a regular polytope.
         macro_rules! regular_dual {
             ($regular: ident, $dual: ident $(, $other_fields: ident)*) => {
-                if $regular.apply_or(|r| match r {
-                    Regular::Yes {
-                        center: original_center,
-                    } => center.apply(|c| (c - original_center).norm() < Float::EPS),
-                    Regular::No => true,
-                }, true) {
+                if $regular.apply_or(
+                    |r| match r {
+                        Regular::Yes { center: original_center } => {
+                            center.apply(|c| (c - original_center).norm() < Float::EPS)
+                        }
+                        Regular::No => true,
+                    },
+                    true
+                ) {
                     Self::$dual {
                         $regular,
                         $($other_fields)*
