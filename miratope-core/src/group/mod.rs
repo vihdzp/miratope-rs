@@ -294,11 +294,9 @@ impl Group {
 
     /// Generates a step prism group from a base group and a homomorphism into
     /// another group.
-    pub fn step<F: 'static + Clone + Fn(Matrix) -> Matrix>(g: Self, f: F) -> Self {
-        let dim = g.dim * 2;
-
+    pub fn step<F: 'static + Clone + FnMut(Matrix) -> Matrix>(g: Self, mut f: F) -> Self {
         Self {
-            dim,
+            dim: g.dim * 2,
             iter: Box::new(g.map(move |mat| direct_sum(mat.clone(), f(mat)))),
         }
     }
@@ -316,7 +314,7 @@ impl Group {
         g: Self,
         h: Self,
         dim: usize,
-        product: (impl Fn(Matrix, Matrix) -> Matrix + Clone + 'static),
+        mut product: (impl FnMut(Matrix, Matrix) -> Matrix + Clone + 'static),
     ) -> Self {
         Self::new(
             dim,
