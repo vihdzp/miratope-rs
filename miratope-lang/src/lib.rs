@@ -719,19 +719,19 @@ pub trait Language: Prefix {
 
     /// Parses a generic cuboid (regular or irregular) as a noun.
     fn generic_cuboid_noun<T: NameType>(regular: &T::DataRegular) -> ParseOutput<Self::Gender> {
-        if regular.satisfies(Regular::is_yes) {
-            Self::cube_noun()
-        } else {
+        if regular.is_or(&Regular::No, false) {
             Self::cuboid_noun()
+        } else {
+            Self::cube_noun()
         }
     }
 
     /// Parses a generic cuboid (regular or irregular) as a noun.
     fn generic_cuboid_adj<T: NameType>(gender: Self::Gender, regular: &T::DataRegular) -> String {
-        if regular.satisfies(Regular::is_yes) {
-            Self::cube_adj(gender)
-        } else {
+        if regular.is_or(&Regular::No, false) {
             Self::cuboid_adj(gender)
+        } else {
+            Self::cube_adj(gender)
         }
     }
 
@@ -740,10 +740,10 @@ pub trait Language: Prefix {
         regular: &T::DataRegular,
         rank: usize,
     ) -> ParseOutput<Self::Gender> {
-        if regular.satisfies(Regular::is_yes) {
-            Self::hypercube_noun(rank)
-        } else {
+        if regular.is_or(&Regular::No, false) {
             Self::hyperblock_noun(rank)
+        } else {
+            Self::hypercube_noun(rank)
         }
     }
 
@@ -753,10 +753,10 @@ pub trait Language: Prefix {
         regular: &T::DataRegular,
         rank: usize,
     ) -> String {
-        if regular.satisfies(Regular::is_yes) {
-            Self::hypercube_adj(gender, rank)
-        } else {
+        if regular.is_or(&Regular::No, false) {
             Self::hyperblock_adj(gender, rank)
+        } else {
+            Self::hypercube_adj(gender, rank)
         }
     }
 

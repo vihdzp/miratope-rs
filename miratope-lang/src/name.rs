@@ -18,15 +18,15 @@ pub trait NameType: Debug + Clone + PartialEq + Serialize {
 
     /// Either `AbsData<Point>` or `ConData<Point>`. Workaround until generic
     /// associated types are stable.
-    type DataPoint: NameData<Point> + DeserializeOwned;
+    type DataPoint: NameData<Point>;
 
     /// Either `AbsData<Regular>` or `ConData<Regular>`. Workaround until generic
     /// associated types are stable.
-    type DataRegular: NameData<Regular> + Default + DeserializeOwned;
+    type DataRegular: NameData<Regular> + Default;
 
     /// Either `AbsData<Quadrilateral>` or `ConData<Quadrilateral>`. Workaround until generic
     /// associated types are stable.
-    type DataQuadrilateral: NameData<Quadrilateral> + Default + DeserializeOwned + Copy;
+    type DataQuadrilateral: NameData<Quadrilateral> + Default + Copy;
 
     /// Whether the name marker is for an abstract polytope.
     fn is_abstract() -> bool;
@@ -38,7 +38,7 @@ pub trait NameType: Debug + Clone + PartialEq + Serialize {
 ///
 /// The idea is that `NameData` should be used to store whichever conditions on
 /// concrete polytopes always hold on abstract polytopes.
-pub trait NameData<T>: PartialEq + Debug + Clone + Serialize {
+pub trait NameData<T>: Debug + Clone + Serialize + DeserializeOwned {
     /// Initializes a new `NameData` with a given value, lazily evaluated.
     fn new_lazy<F: FnOnce() -> T>(f: F) -> Self;
 
@@ -47,43 +47,80 @@ pub trait NameData<T>: PartialEq + Debug + Clone + Serialize {
         Self::new_lazy(|| value)
     }
 
-    /// Determines whether `self` contains a given value. An abstract name will
-    /// always return `true`.
-    fn is(&self, value: &T) -> bool
+    /// Applies a function to the inner value, or returns a lazily evaluated
+    /// value if none.
+    fn apply_or_lazy<U, F: FnOnce(&T) -> U, G: FnOnce() -> U>(&self, f: F, other: G) -> U;
+
+    /// Applies a function to the inner value, or returns a specified value if
+    /// none.
+    fn apply_or<U, F: FnOnce(&T) -> U>(&self, f: F, other: U) -> U {
+        self.apply_or_lazy(f, || other)
+    }
+
+    /// Applies a function to the inner value, or returns a default value if
+    /// none.
+    fn apply_or_default<U, F: FnOnce(&T) -> U>(&self, f: F) -> U
+    where
+        U: Default,
+    {
+        self.apply_or_lazy(f, Default::default)
+    }
+
+    /// Applies a function to the inner value, panics if none.
+    fn apply<U, F: FnOnce(&T) -> U>(&self, f: F) -> U {
+        self.apply_or_lazy(f, || panic!("Called apply on an AbsData"))
+    }
+
+    fn eq_or(&self, value: &Self, other: bool) -> bool
     where
         T: PartialEq,
     {
-        self.satisfies(|inner| inner == value)
+        self.apply_or(|inner| inner == value.unwrap_ref(), other)
     }
 
-    /// Determines whether `self` does not contain a given value. An abstract
-    /// name will always return `true`.
-    fn is_not(&self, value: &T) -> bool
+    /// Determines whether the inner value equals a lazily evaluated value, or
+    /// returns a given boolean otherwise.
+    fn is_or_lazy<F: FnOnce() -> T>(&self, value: F, other: bool) -> bool
     where
         T: PartialEq,
     {
-        self.satisfies(|inner| inner != value)
+        self.apply_or(|inner| inner == &value(), other)
     }
 
-    /// Determines whether `self` satisfies a given predicate. An abstract name
-    /// will always return `true`.
-    fn satisfies<F: FnOnce(&T) -> bool>(&self, f: F) -> bool;
+    /// Determines whether the inner value equals a specified value, or returns
+    /// a given boolean otherwise.
+    fn is_or(&self, value: &T, other: bool) -> bool
+    where
+        T: PartialEq,
+    {
+        self.apply_or(|inner| inner == value, other)
+    }
 
-    /// Retrieves the wrapped value, or returns a lazily evaluated value if none.
-    fn unwrap_or_lazy<F: FnOnce() -> T>(self, f: F) -> T;
+    /// Applies a mutable function to the inner value, or does nothing if none.
+    fn apply_mut<F: FnOnce(&mut T)>(&mut self, f: F);
 
-    /// Retrieves the wrapped value, or returns a specified value if none.
+    /// Gets the inner value, or returns a lazily evaluated value if none.
+    fn unwrap_or_lazy<F: FnOnce() -> T>(self, other: F) -> T;
+
+    /// Gets the inner value, or returns a specified value if none.
     fn unwrap_or(self, value: T) -> T {
         self.unwrap_or_lazy(|| value)
     }
 
-    /// Retrieves the wrapped value, or the default value if none.
+    /// Gets the inner value, or returns a default value if none.
     fn unwrap_or_default(self) -> T
     where
         T: Default,
     {
         self.unwrap_or_lazy(Default::default)
     }
+
+    /// Gets the inner value, or panics if none.
+    fn unwrap(self) -> T {
+        self.unwrap_or_lazy(|| panic!("Called unwrap on AbsData"))
+    }
+
+    fn unwrap_ref(&self) -> &T;
 }
 
 /// Phantom data associated with an abstract polytope.
@@ -96,13 +133,6 @@ pub struct AbsData<T>(PhantomData<T>);
 impl<T> Default for AbsData<T> {
     fn default() -> Self {
         Self(PhantomData)
-    }
-}
-
-/// Any two `AbsData` compare as equal to one another.
-impl<T> PartialEq for AbsData<T> {
-    fn eq(&self, _: &Self) -> bool {
-        true
     }
 }
 
@@ -119,14 +149,19 @@ impl<T: Debug> NameData<T> for AbsData<T> {
         Default::default()
     }
 
-    /// Returns `true` no matter what, as if `self` actually satisfied the given predicate.
-    fn satisfies<F: FnOnce(&T) -> bool>(&self, _: F) -> bool {
-        true
+    fn apply_or_lazy<U, F: FnOnce(&T) -> U, G: FnOnce() -> U>(&self, _: F, g: G) -> U {
+        g()
     }
+
+    fn apply_mut<F: FnOnce(&mut T)>(&mut self, _: F) {}
 
     /// Returns the specified value verbatim.
     fn unwrap_or_lazy<F: FnOnce() -> T>(self, value: F) -> T {
         value()
+    }
+
+    fn unwrap_ref(&self) -> &T {
+        panic!("Called unwrap_ref on AbsData")
     }
 }
 
@@ -155,14 +190,21 @@ impl<T: PartialEq + Debug + Clone + Serialize + DeserializeOwned> NameData<T> fo
         Self(value())
     }
 
-    /// Determines whether `self` satisfies the given predicate.
-    fn satisfies<F: FnOnce(&T) -> bool>(&self, f: F) -> bool {
+    fn apply_or_lazy<U, F: FnOnce(&T) -> U, G: FnOnce() -> U>(&self, f: F, _: G) -> U {
         f(&self.0)
+    }
+
+    fn apply_mut<F: FnOnce(&mut T)>(&mut self, f: F) {
+        f(&mut self.0)
     }
 
     /// Retrieves the wrapped value, ignores the argument.
     fn unwrap_or_lazy<F: FnOnce() -> T>(self, _: F) -> T {
         self.0
+    }
+
+    fn unwrap_ref(&self) -> &T {
+        &self.0
     }
 }
 
@@ -207,13 +249,6 @@ impl From<Point> for Regular {
 impl Default for Regular {
     fn default() -> Self {
         Self::No
-    }
-}
-
-impl Regular {
-    /// Returns whether `self` matches `Regular::Yes { .. }`.
-    pub fn is_yes(&self) -> bool {
-        matches!(self, Regular::Yes { .. })
     }
 }
 
@@ -463,7 +498,7 @@ impl<T: NameType> Name<T> {
             // Polygons must not be interpretable as triangles or squares.
             Self::Polygon { regular, n } => match *n {
                 2 | 5..=usize::MAX => true,
-                4 => !regular.satisfies(Regular::is_yes),
+                4 => regular.is_or(&Regular::No, false),
                 _ => false,
             },
 
@@ -537,24 +572,27 @@ impl<T: NameType> Name<T> {
 
             // We make irregular triangles into irregular simplices, and regular
             // triangles into triangular pyramids.
-            Self::Triangle { regular } => {
-                if regular.is(&Regular::No) {
-                    Self::Simplex { regular, rank: 4 }
+            Self::Triangle { ref regular } => {
+                if regular.is_or(&Regular::No, false) {
+                    Self::Simplex {
+                        regular: Default::default(),
+                        rank: 4,
+                    }
                 } else {
-                    Self::Pyramid(Box::new(Self::Triangle { regular }))
+                    Self::Pyramid(Box::new(self))
                 }
             }
 
             // We make irregular simplices into irregular simplices, and regular
             // simplices into simplicial pyramids.
-            Self::Simplex { regular, rank } => {
-                if regular.is(&Regular::No) {
+            Self::Simplex { ref regular, rank } => {
+                if regular.is_or(&Regular::No, false) {
                     Self::Simplex {
-                        regular,
+                        regular: Default::default(),
                         rank: rank + 1,
                     }
                 } else {
-                    Self::Pyramid(Box::new(Self::Simplex { regular, rank }))
+                    Self::Pyramid(Box::new(self))
                 }
             }
 
@@ -580,7 +618,7 @@ impl<T: NameType> Name<T> {
             Self::Point => Self::Dyad,
             Self::Dyad => Self::rectangle(),
             Self::Quadrilateral { quad } => {
-                if quad.is(&Quadrilateral::Orthodiagonal) {
+                if quad.is_or(&Quadrilateral::Orthodiagonal, false) {
                     Self::Prism(Box::new(self))
                 } else {
                     Self::Cuboid {
@@ -592,10 +630,10 @@ impl<T: NameType> Name<T> {
             // We make an irregular cuboid into an irregular cuboid, and
             // a regular one into a cubic prism.
             Self::Cuboid { ref regular } => {
-                if regular.is(&Regular::No) {
+                if regular.is_or(&Regular::No, false) {
                     Self::Hyperblock {
                         regular: Default::default(),
-                        rank: 5,
+                        rank: 4,
                     }
                 } else {
                     Self::Prism(Box::new(self))
@@ -605,11 +643,8 @@ impl<T: NameType> Name<T> {
             // We make an irregular hyperblock into an irregular hyperblock, and
             // a regular one into a hypercube prism.
             Self::Hyperblock { regular, rank } => {
-                if regular.is(&Regular::No) {
-                    Self::Hyperblock {
-                        regular,
-                        rank: rank + 1,
-                    }
+                if regular.is_or(&Regular::No, false) {
+                    Self::Hyperblock { regular, rank }
                 } else {
                     Self::Prism(Box::new(Self::Hyperblock { regular, rank }))
                 }
@@ -637,7 +672,7 @@ impl<T: NameType> Name<T> {
             Self::Point => Self::Dyad,
             Self::Dyad => Self::orthodiagonal(),
             Self::Quadrilateral { quad } => {
-                if quad.is(&Quadrilateral::Rectangle) {
+                if quad.is_or(&Quadrilateral::Rectangle, false) {
                     Self::Tegum(Box::new(self))
                 } else {
                     Self::Orthoplex {
@@ -649,14 +684,14 @@ impl<T: NameType> Name<T> {
 
             // We make an irregular orthoplex into an irregular orthoplex, and
             // a regular one into an orthoplex prism.
-            Self::Orthoplex { regular, rank } => {
-                if regular.is(&Regular::No) {
+            Self::Orthoplex { ref regular, rank } => {
+                if regular.is_or(&Regular::No, false) {
                     Self::Orthoplex {
-                        regular,
+                        regular: Default::default(),
                         rank: rank + 1,
                     }
                 } else {
-                    Self::Tegum(Box::new(Self::Orthoplex { regular, rank }))
+                    Self::Tegum(Box::new(self))
                 }
             }
 
@@ -701,12 +736,12 @@ impl<T: NameType> Name<T> {
         /// Constructs a regular dual from a regular polytope.
         macro_rules! regular_dual {
             ($regular: ident, $dual: ident $(, $other_fields: ident)*) => {
-                if $regular.satisfies(|r| match r {
+                if $regular.apply_or(|r| match r {
                     Regular::Yes {
                         center: original_center,
-                    } => center.satisfies(|c| (c - original_center).norm() < Float::EPS),
+                    } => center.apply(|c| (c - original_center).norm() < Float::EPS),
                     Regular::No => true,
-                }) {
+                }, true) {
                     Self::$dual {
                         $regular,
                         $($other_fields)*
@@ -761,7 +796,7 @@ impl<T: NameType> Name<T> {
             // Other hardcoded cases.
             Self::Triangle { regular } => regular_dual!(regular, Triangle),
             Self::Quadrilateral { quad } => {
-                if quad.is(&Quadrilateral::Orthodiagonal) {
+                if quad.is_or(&Quadrilateral::Orthodiagonal, true) {
                     Self::polygon(Default::default(), 4)
                 } else {
                     Self::orthodiagonal()
@@ -774,7 +809,7 @@ impl<T: NameType> Name<T> {
                 base,
                 center: original_center,
             } => {
-                if center == original_center {
+                if center.eq_or(&original_center, true) {
                     *base
                 } else {
                     Self::Generic { facet_count, rank }
@@ -796,7 +831,7 @@ impl<T: NameType> Name<T> {
                 base,
                 center: original_center,
             } => {
-                if center == original_center {
+                if center.eq_or(&original_center, true) {
                     Self::Antiprism { base }
                 } else {
                     Self::Dual {
@@ -913,10 +948,10 @@ impl<T: NameType> Name<T> {
             1 => Self::Point,
             2 => Self::Dyad,
             3 => {
-                if regular.satisfies(Regular::is_yes) {
-                    Self::square()
-                } else {
+                if regular.is_or(&Regular::No, false) {
                     Self::rectangle()
+                } else {
+                    Self::square()
                 }
             }
             4 => Self::Cuboid { regular },
@@ -930,7 +965,13 @@ impl<T: NameType> Name<T> {
             0 => Self::Nullitope,
             1 => Self::Point,
             2 => Self::Dyad,
-            3 => Self::orthodiagonal(),
+            3 => {
+                if regular.is_or(&Regular::No, false) {
+                    Self::orthodiagonal()
+                } else {
+                    Self::square()
+                }
+            }
             _ => Self::Orthoplex { regular, rank },
         }
     }
@@ -940,10 +981,10 @@ impl<T: NameType> Name<T> {
         match n {
             3 => Self::Triangle { regular },
             4 => {
-                if regular.satisfies(Regular::is_yes) {
-                    Self::square()
-                } else {
+                if regular.is_or(&Regular::No, false) {
                     Self::Polygon { regular, n }
+                } else {
+                    Self::square()
                 }
             }
             _ => Self::Polygon { regular, n },
@@ -1009,10 +1050,10 @@ impl<T: NameType> Name<T> {
                 Self::Point => {}
                 Self::Dyad => prism_count += 1,
                 Self::Quadrilateral { quad } => {
-                    if quad.is_not(&Quadrilateral::Orthodiagonal) {
-                        prism_count += 2;
-                    } else {
+                    if quad.is_or(&Quadrilateral::Orthodiagonal, false) {
                         new_bases.push(base);
+                    } else {
+                        prism_count += 2;
                     }
                 }
                 Self::Cuboid { .. } => prism_count += 3,
@@ -1061,10 +1102,10 @@ impl<T: NameType> Name<T> {
                 Self::Point => {}
                 Self::Dyad => tegum_count += 1,
                 Self::Quadrilateral { quad } => {
-                    if quad.is_not(&Quadrilateral::Rectangle) {
-                        tegum_count += 2;
-                    } else {
+                    if quad.is_or(&Quadrilateral::Rectangle, false) {
                         new_bases.push(base);
+                    } else {
+                        tegum_count += 2;
                     }
                 }
                 Self::Orthoplex { rank, .. } => tegum_count += rank,
