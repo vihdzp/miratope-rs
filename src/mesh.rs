@@ -111,7 +111,7 @@ impl Triangulation {
 
         // Either returns a reference to the element list of a given rank, or
         // returns a reference to an empty element list.
-        let elements_or = |r| polytope.abs.ranks.get(r).unwrap_or(&empty_els);
+        let elements_or = |r| polytope.get_element_list(r).unwrap_or(&empty_els);
 
         let edges = elements_or(2);
         let faces = elements_or(3);
@@ -320,7 +320,6 @@ pub fn wireframe(poly: &Concrete, projection_type: ProjectionType) -> Mesh {
         return empty_mesh();
     }
 
-    let edges = poly.abs.ranks.get(2);
     let edge_count = poly.el_count(3);
 
     // We add a single vertex so that Miratope doesn't crash.
@@ -328,7 +327,7 @@ pub fn wireframe(poly: &Concrete, projection_type: ProjectionType) -> Mesh {
     let mut indices = Vec::with_capacity(edge_count * 2);
 
     // Adds the edges to the wireframe.
-    if let Some(edges) = edges {
+    if let Some(edges) = poly.get_edges() {
         for edge in edges {
             debug_assert_eq!(
                 edge.subs.len(),

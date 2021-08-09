@@ -146,29 +146,31 @@ pub trait Polytope: Clone {
     /// Returns the underlying abstract polytope.
     fn into_abs(self) -> Abstract;
 
+    /// Returns whether this is a nullitope.
+    fn is_nullitope(&self) -> bool {
+        self.rank() == 0
+    }
+
     /// Returns a map from the elements in a polytope to the index of one of its
     /// vertices. Does not map the minimal element anywhere.
     fn vertex_map(&self) -> ElementMap<usize> {
         // Maps every element of the polytope to one of its vertices.
         let mut vertex_map = ElementMap::new();
+        vertex_map.push(Vec::new());
 
         // Vertices map to themselves.
-        let vertex_count = self.vertex_count();
-        let mut vertex_list = Vec::with_capacity(vertex_count);
-        for v in 0..vertex_count {
-            vertex_list.push(v);
+        if self.rank() != 0 {
+            vertex_map.push((0..self.vertex_count()).collect());
         }
-        vertex_map.push(vertex_list);
 
         // Every other element maps to the vertex of any subelement.
-        for r in 2..=self.rank() {
-            let mut element_list = Vec::new();
-
-            for el in &self.ranks()[r] {
-                element_list.push(vertex_map[r - 2][el.subs[0]]);
-            }
-
-            vertex_map.push(element_list);
+        for (r, elements) in self.ranks().iter().enumerate().skip(2) {
+            vertex_map.push(
+                elements
+                    .iter()
+                    .map(|el| vertex_map[r - 1][el.subs[0]])
+                    .collect(),
+            );
         }
 
         vertex_map

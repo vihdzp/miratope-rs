@@ -112,7 +112,7 @@ impl Polytope for Concrete {
 
     /// Builds the unique polytope of rank 0.
     fn point() -> Self {
-        Self::new(vec![vec![].into()], Abstract::point())
+        Self::new(vec![Vec::new().into()], Abstract::point())
     }
 
     /// Builds a dyad with unit edge length, centered at the origin.
@@ -191,21 +191,20 @@ impl Polytope for Concrete {
     // to vertices? We got some math details to figure out.
     fn omnitruncate(&self) -> Self {
         let (abs, flags) = self.abs.omnitruncate_and_flags();
-
-        // Maps each element to the polytope to the index of some vertex.
         let element_vertices = self.abs.vertex_map();
 
-        let vertices: Vec<_> = flags
-            .into_iter()
-            .map(|flag| {
-                flag.into_iter()
-                    .enumerate()
-                    .map(|(r, idx)| &self.vertices[element_vertices[(r, idx)]])
-                    .sum()
-            })
-            .collect();
-
-        Self::new(vertices, abs)
+        Self::new(
+            flags
+                .into_iter()
+                .map(|flag| {
+                    flag.into_iter()
+                        .enumerate()
+                        .map(|(r, idx)| &self.vertices[element_vertices[(r, idx)]])
+                        .sum()
+                })
+                .collect(),
+            abs,
+        )
     }
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
@@ -388,12 +387,12 @@ pub trait ConcretePolytope: Polytope {
     /// Returns a mutable reference to the underlying [`Concrete`] polytope.
     fn con_mut(&mut self) -> &mut Concrete;
 
-    /// Returns a reference to the vertices of the polytope.
+    /// Returns a reference to the concrete vertices of the polytope.
     fn vertices(&self) -> &Vec<Point> {
         &self.con().vertices
     }
 
-    /// Returns a mutable reference to the vertices of the polytope.
+    /// Returns a mutable reference to the concrete vertices of the polytope.
     fn vertices_mut(&mut self) -> &mut Vec<Point> {
         &mut self.con_mut().vertices
     }
@@ -401,7 +400,7 @@ pub trait ConcretePolytope: Polytope {
     /// Returns the number of dimensions of the space the polytope lives in,
     /// or `None` in the case of the nullitope.
     fn dim(&self) -> Option<usize> {
-        Some(self.con().vertices.get(0)?.len())
+        (!self.is_nullitope()).then(|| self.vertices()[0].len())
     }
 
     /// Returns the number of dimensions of the space the polytope lives in,
@@ -470,8 +469,7 @@ pub trait ConcretePolytope: Polytope {
     /// Applies a linear transformation to all vertices of a polytope.
     fn apply(mut self, m: &Matrix) -> Self {
         for v in self.vertices_mut() {
-            let new_v = m * v as &_;
-            *v = new_v;
+            *v = m * v as &_;
         }
 
         self
@@ -483,7 +481,7 @@ pub trait ConcretePolytope: Polytope {
         let mut vertices = self.vertices().iter();
 
         let first_vertex = vertices.next()?.clone();
-        let mut center: Point = first_vertex.clone();
+        let mut center = first_vertex.clone();
         let mut subspace = Subspace::new(first_vertex.clone());
 
         for vertex in vertices {
@@ -516,16 +514,8 @@ pub trait ConcretePolytope: Polytope {
     /// Calculates the gravicenter of a polytope, or returns `None` in the case
     /// of the nullitope.
     fn gravicenter(&self) -> Option<Point> {
-        let mut g = Point::zeros(self.dim()? as usize);
-        let vertices = self.vertices();
-
-        // Adds up all vertices.
-        for v in vertices {
-            g += v;
-        }
-
-        // Takes the average.
-        Some(g / (vertices.len() as Float))
+        (!self.is_nullitope())
+            .then(|| self.vertices().iter().sum::<Point>() / (self.vertex_count() as Float))
     }
 
     /// Gets the least and greatest distance of a vertex of the polytope,
@@ -576,7 +566,7 @@ pub trait ConcretePolytope: Polytope {
     /// # Todo
     /// Maybe make this work in the general case?
     fn midradius(&self) -> Float {
-        let edge_subs = &self.edges()[0].subs;
+        let edge_subs = &self.ranks()[(2, 0)].subs;
         (&self.vertices()[edge_subs[0]] + &self.vertices()[edge_subs[1]]).norm() / 2.0
     }
 
@@ -589,11 +579,23 @@ pub trait ConcretePolytope: Polytope {
     /// This method shouldn't panic. If it does, please file a bug.
     fn try_dual_mut_with(&mut self, sphere: &Hypersphere) -> Result<(), Self::DualError>;
 
+    /// Calls [`try_dual_mut_with`] and unwraps the result.
+    fn dual_mut_with(&mut self, sphere: &Hypersphere) {
+        self.try_dual_mut_with(sphere).unwrap();
+    }
+
     /// Returns the dual of a polytope with a given reciprocation sphere, or
     /// `None` if any facets pass through the reciprocation center.
     fn try_dual_with(&self, sphere: &Hypersphere) -> Result<Self, Self::DualError> {
         let mut clone = self.clone();
         clone.try_dual_mut_with(sphere).map(|_| clone)
+    }
+
+    /// Calls [`try_dual_with`] and unwraps the result.
+    fn dual_with(&self, sphere: &Hypersphere) -> Self {
+        let mut clone = self.clone();
+        clone.dual_mut_with(sphere);
+        clone
     }
 
     /// Builds a pyramid with a specified apex.
@@ -731,7 +733,7 @@ pub trait ConcretePolytope: Polytope {
         }
 
         // Maps every element of the polytope to one of its vertices.
-        let vertex_map = self.abs().vertex_map();
+        let vertex_map = self.vertex_map();
         let mut volume = 0.0;
 
         // All of the flags we've found so far.
@@ -760,9 +762,9 @@ pub trait ConcretePolytope: Polytope {
                                 rank - 1,
                                 oriented_flag
                                     .into_iter()
+                                    .enumerate()
                                     .skip(1)
                                     .take(rank - 1)
-                                    .enumerate()
                                     .map(|(rank, idx)| &flat_vertices[vertex_map[(rank, idx)]])
                                     .flatten()
                                     .copied(),
@@ -932,8 +934,10 @@ impl ConcretePolytope for Concrete {
     ) -> Self {
         let (abs, vertex_indices, dual_vertex_indices) = self.abs.antiprism_and_vertices();
         let vertex_count = abs.vertex_count();
+
+        // TODO: is it worth getting into the dark arts of uninitialized buffers?
         let mut new_vertices = Vec::with_capacity(vertex_count);
-        new_vertices.resize(vertex_count, vec![].into());
+        new_vertices.resize(vertex_count, Vec::new().into());
 
         for (idx, v) in vertices.enumerate() {
             new_vertices[vertex_indices[idx]] = v;
@@ -1169,7 +1173,7 @@ mod tests {
     fn polygon() {
         for n in 2..=10 {
             for d in 1..=n / 2 {
-                test_volume(dbg!(Concrete::star_polygon(n, d)), Some(polygon_area(n, d)));
+                test_volume(Concrete::star_polygon(n, d), Some(polygon_area(n, d)));
             }
         }
     }

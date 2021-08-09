@@ -113,8 +113,7 @@ impl<T: NameType> Polytope for Named<T> {
     }
 
     fn comp_append(&mut self, _p: Self) {
-        // Compound names are TBA
-        todo!()
+        todo!("Compound names are TBA!")
     }
 
     fn element(&self, rank: usize, idx: usize) -> Option<Self> {

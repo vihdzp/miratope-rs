@@ -3,8 +3,9 @@
 
 use std::{
     collections::HashMap,
-    iter::IntoIterator,
+    iter::{self, IntoIterator},
     ops::{Index, IndexMut},
+    slice,
 };
 
 use super::Abstract;
@@ -237,6 +238,9 @@ type IterMutFn = for<'r> fn(&'r mut ElementList) -> std::slice::IterMut<'r, Elem
 /// iterator.
 type IntoIterFn = fn(ElementList) -> std::vec::IntoIter<Element>;
 
+/// The signature of the function that returns the length of an `ElementList`.
+type LenFn = for<'r> fn(&'r ElementList) -> usize;
+
 /// The signature of an iterator over an `&'a ElementList`.
 pub type ElementIter<'a> =
     std::iter::Flatten<std::iter::Map<std::slice::Iter<'a, ElementList>, IterFn>>;
@@ -291,19 +295,9 @@ pub trait Ranked: Sized {
         self.ranks().get(rank).map(ElementList::len).unwrap_or(0)
     }
 
-    /// Returns the element counts of the structure.
-    fn el_counts(&self) -> Vec<usize> {
-        self.ranks().iter().map(ElementList::len).collect()
-    }
-
-    /// Returns the number of vertices.
-    fn vertex_count(&self) -> usize {
-        self.ranks().el_count(1)
-    }
-
-    /// Returns the number of facets.
-    fn facet_count(&self) -> usize {
-        self.ranks().el_count(self.rank().wrapping_sub(1))
+    /// Returns an iterator over the element counts of the structure.
+    fn el_count_iter(&self) -> iter::Map<slice::Iter<'_, ElementList>, LenFn> {
+        self.ranks().iter().map(ElementList::len as LenFn)
     }
 
     /// Returns a reference to an element of the polytope. To actually get the
@@ -318,13 +312,13 @@ pub trait Ranked: Sized {
         self.ranks_mut().get_mut(rank)?.get_mut(idx)
     }
 
-    /// Gets a reference to the list of elements of a given rank.
-    fn get_elements(&self, rank: usize) -> Option<&ElementList> {
+    /// Gets a reference to the element list of a given rank.
+    fn get_element_list(&self, rank: usize) -> Option<&ElementList> {
         self.ranks().get(rank)
     }
 
-    /// Gets a mutable reference to the list of elements of a given rank.
-    fn get_elements_mut(&mut self, rank: usize) -> Option<&mut ElementList> {
+    /// Gets a mutable reference to the element list of a given rank.
+    fn get_element_list_mut(&mut self, rank: usize) -> Option<&mut ElementList> {
         self.ranks_mut().get_mut(rank)
     }
 
@@ -361,35 +355,49 @@ pub trait Ranked: Sized {
         &mut self.ranks_mut()[(rank, 0)]
     }
 
-    /// Returns a reference to the vertices of the polytope.
-    fn vertices(&self) -> &ElementList {
-        &self.ranks()[1]
+    /// Returns a reference to the abstract vertices of the polytope.
+    fn get_vertices(&self) -> Option<&ElementList> {
+        self.get_element_list(1)
     }
 
-    /// Returns a mutable reference to the vertices of the polytope.
-    fn vertices_mut(&mut self) -> &mut ElementList {
-        &mut self.ranks_mut()[1]
+    /// Returns a mutable reference to the abstract vertices of the polytope.
+    fn get_vertices_mut(&mut self) -> Option<&mut ElementList> {
+        self.get_element_list_mut(1)
+    }
+
+    /// Returns the number of vertices.
+    fn vertex_count(&self) -> usize {
+        self.el_count(1)
     }
 
     /// Returns a reference to the edges of the polytope.
-    fn edges(&self) -> &ElementList {
-        &self.ranks()[2]
+    fn get_edges(&self) -> Option<&ElementList> {
+        self.get_element_list(2)
     }
 
     /// Returns a mutable reference to the edges of the polytope.
-    fn edges_mut(&mut self) -> &mut ElementList {
-        &mut self.ranks_mut()[2]
+    fn edges_mut(&mut self) -> Option<&mut ElementList> {
+        self.get_element_list_mut(2)
+    }
+
+    /// Returns the number of edges.
+    fn edge_count(&self) -> usize {
+        self.el_count(2)
     }
 
     /// Returns a reference to the facets of the polytope.
-    fn facets(&self) -> &ElementList {
-        &self.ranks()[self.rank() - 1]
+    fn get_facets(&self) -> Option<&ElementList> {
+        self.get_element_list(self.rank().wrapping_sub(1))
     }
 
     /// Returns a mutable reference to the facets of the polytope.
-    fn facets_mut(&mut self) -> &mut ElementList {
-        let rank = self.rank();
-        &mut self.ranks_mut()[rank - 1]
+    fn facets_mut(&mut self) -> Option<&mut ElementList> {
+        self.get_element_list_mut(self.rank().wrapping_sub(1))
+    }
+
+    /// Returns the number of facets.
+    fn facet_count(&self) -> usize {
+        self.el_count(self.rank().wrapping_sub(1))
     }
 
     /// Pushes a list of elements of a given rank.
@@ -405,14 +413,12 @@ pub trait Ranked: Sized {
     /// Pushes a given element into the vector of elements of a given rank.
     /// Updates the superelements of its subelements automatically.
     fn push_subs_at(&mut self, rank: usize, subs: Subelements) {
-        let i = self.ranks()[rank].len();
-
         if rank != 0 {
-            if let Some(lower_rank) = self.ranks_mut().get_mut(rank - 1) {
-                // Updates superelements of the lower rank.
-                for &sub in &subs {
-                    lower_rank[sub].sups.push(i);
-                }
+            let i = self.el_count(rank);
+
+            // Updates superelements of the lower rank.
+            for &sub in &subs {
+                self.ranks_mut()[(rank - 1, sub)].sups.push(i);
             }
         }
 
@@ -792,7 +798,7 @@ impl SectionHash {
     pub fn singletons(poly: &Abstract) -> Self {
         let mut section_hash = Self::new();
 
-        for (rank, elements) in poly.ranks.iter().enumerate() {
+        for (rank, elements) in poly.iter().enumerate() {
             for idx in 0..elements.len() {
                 section_hash
                     .0

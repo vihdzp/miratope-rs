@@ -182,7 +182,7 @@ impl Concrete {
         }
         output.push(edge_types);
 
-        for elements in self.abs.ranks.iter().take(self.rank()).skip(3) {
+        for elements in self.iter().take(self.rank()).skip(3) {
             // A map from element data to the indices of the elements with such data.
             let mut types = HashMap::new();
 

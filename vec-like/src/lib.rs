@@ -36,12 +36,16 @@ pub trait VecLike:
     /// The type used to index over the vector.
     type VecIndex: VecIndex;
 
+    /// Returns a reference to the inner vector.
     fn as_inner(&self) -> &Vec<Self::VecItem>;
 
+    /// Returns a mutable reference to the inner vector.
     fn as_inner_mut(&mut self) -> &mut Vec<Self::VecItem>;
 
+    /// Returns the owned inner vector.
     fn into_inner(self) -> Vec<Self::VecItem>;
 
+    /// Wraps around an owned vector.
     fn from_inner(vec: Vec<Self::VecItem>) -> Self;
 
     /// Initializes a new empty `Self` with no elements.

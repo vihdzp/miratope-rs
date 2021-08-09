@@ -496,9 +496,7 @@ impl Abstract {
     /// then either the polytope hasn't fully built up, or there's something
     /// seriously wrong.
     pub fn check_incidences(&self) -> AbstractResult<()> {
-        // Iterates over elements of every rank.
-        for (r, elements) in self.ranks.iter().enumerate() {
-            // Iterates over all such elements.
+        for (r, elements) in self.iter().enumerate() {
             for (idx, el) in elements.iter().enumerate() {
                 // Only the minimal element can have no subelements.
                 if r != 0 && el.subs.len() == 0 {
@@ -731,7 +729,7 @@ impl Polytope for Abstract {
     /// this method can never fail.
     fn try_dual_mut(&mut self) -> Result<(), Self::DualError> {
         self.for_each_element(Element::swap_mut);
-        self.ranks.reverse();
+        self.reverse();
         Ok(())
     }
 
@@ -794,7 +792,7 @@ impl Polytope for Abstract {
         self.pop();
 
         // Clears the current edges' superelements.
-        for edge in self.edges_mut().iter_mut() {
+        for edge in self.edges_mut().unwrap().iter_mut() {
             edge.sups = Superelements::new();
         }
 
@@ -832,11 +830,9 @@ impl Polytope for Abstract {
         // The polytopes must have the same ranks.
         assert_eq!(rank, p.rank());
 
-        let el_counts = self.el_counts();
-
-        for (r, elements) in p.ranks.into_iter().enumerate().skip(1).take(rank - 1) {
-            let sub_offset = el_counts[r - 1];
-            let sup_offset = el_counts[r + 1];
+        for (r, elements) in p.into_iter().enumerate().skip(1).take(rank - 1) {
+            let sub_offset = self.el_count(r - 1);
+            let sup_offset = self.el_count(r + 1);
 
             for mut el in elements.into_iter() {
                 if r != 1 {
@@ -857,7 +853,7 @@ impl Polytope for Abstract {
 
         // We don't need to do this every single time.
         *self.min_mut() = Element::min(self.vertex_count());
-        *self.max_mut() = Element::max(dbg!(self.facet_count()));
+        *self.max_mut() = Element::max(self.facet_count());
     }
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
@@ -907,7 +903,7 @@ impl Polytope for Abstract {
             let min = self.min().clone();
             self[0].push(min);
 
-            for v in self.vertices_mut() {
+            for v in self.get_vertices_mut().unwrap() {
                 v.subs.push(1);
             }
 
@@ -957,9 +953,10 @@ mod tests {
     /// Tests whether a polytope's element counts match the expected element
     /// counts, and whether a polytope is valid.
     fn test(poly: &Abstract, element_counts: &[usize]) {
+        let poly_counts: Vec<_> = poly.el_count_iter().collect();
+
         assert_eq!(
-            &poly.el_counts(),
-            &element_counts,
+            &poly_counts, &element_counts,
             "{} element counts don't match expected value.",
             "TBA: name"
         );
@@ -1148,15 +1145,13 @@ mod tests {
     /// Checks that duals are generated correctly.
     fn dual_check() {
         for poly in test_polytopes().iter_mut() {
-            let el_counts = poly.el_counts();
-            poly.dual_mut();
-
             // The element counts of the dual should be the same as the reversed
             // element counts of the original.
-            let mut du_el_counts_rev = poly.el_counts();
-            du_el_counts_rev.reverse();
+            let el_counts: Vec<_> = poly.el_count_iter().collect();
+            poly.dual_mut();
+            let new_el_counts: Vec<_> = poly.el_count_iter().rev().collect();
             assert_eq!(
-                el_counts, du_el_counts_rev,
+                el_counts, new_el_counts,
                 "Dual element counts of {} don't match expected value.",
                 "TBA: name"
             );

@@ -729,7 +729,7 @@ mod tests {
     fn simplex() {
         for n in 1..=8 {
             test(
-                &mut dbg!(Abstract::simplex(n)),
+                &mut Abstract::simplex(n),
                 crate::factorial(n) as usize,
             );
         }
@@ -739,7 +739,7 @@ mod tests {
     fn hypercube() {
         for n in 1..=7 {
             test(
-                &mut dbg!(Abstract::hypercube(n)),
+                &mut Abstract::hypercube(n),
                 (1 << (n - 1)) * crate::factorial(n - 1) as usize,
             );
         }

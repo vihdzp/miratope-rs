@@ -64,7 +64,7 @@ impl Concrete {
         let mut type_of_element = Vec::new();
 
         // Initializes every element with the zeroth type.
-        for el_count in self.el_counts() {
+        for el_count in self.el_count_iter() {
             type_of_element.push(vec![0; el_count]);
             types.push(Vec::new());
             type_counts.push(1);

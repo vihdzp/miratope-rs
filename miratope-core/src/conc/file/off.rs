@@ -688,7 +688,7 @@ impl<'a> OffWriter<'a> {
         }
 
         // Adds the element counts.
-        self.write_el_counts(self.polytope.el_counts());
+        self.write_el_counts(self.polytope.el_count_iter().collect());
 
         // Adds vertex coordinates.
         self.write_vertices(vertices);
@@ -732,12 +732,14 @@ mod tests {
     fn test_shape(off: &str, el_nums: &[usize]) {
         // Checks that element counts match up.
         let p = Concrete::from_off(off).expect("OFF file could not be loaded.");
-        assert_eq!(p.el_counts(), el_nums);
+        let p_counts: Vec<_> = p.el_count_iter().collect();
+        assert_eq!(p_counts, el_nums);
 
         // Checks that the polytope can be reloaded correctly.
-        let p = Concrete::from_off(&dbg!(p.to_off(Default::default())))
+        let p = Concrete::from_off(&p.to_off(Default::default()))
             .expect("OFF file could not be reloaded.");
-        assert_eq!(p.el_counts(), el_nums);
+        let p_counts: Vec<_> = p.el_count_iter().collect();
+        assert_eq!(p_counts, el_nums);
     }
 
     #[test]
