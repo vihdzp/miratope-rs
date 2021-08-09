@@ -110,7 +110,7 @@ impl LightMode {
 
 /// Updates the application appearance whenever the visuals are changed. This
 /// occurs at application startup and whenever the user toggles light/dark mode.
-fn update_visuals(egui_ctx: Res<EguiContext>, visuals: Res<egui::Visuals>) {
+fn update_visuals(egui_ctx: Res<'_, EguiContext>, visuals: Res<'_, egui::Visuals>) {
     if visuals.is_changed() {
         egui_ctx.ctx().set_visuals(visuals.clone());
     }
@@ -203,12 +203,12 @@ impl Config {
 
 /// Saves the configuration at application exit.
 fn save_config(
-    mut exit: EventReader<AppExit>,
-    config_path: Res<ConfigPath>,
-    lib_path: Res<LibPath>,
-    selected_language: Res<SelectedLanguage>,
-    background_color: Res<ClearColor>,
-    visuals: Res<egui::Visuals>,
+    mut exit: EventReader<'_, AppExit>,
+    config_path: Res<'_, ConfigPath>,
+    lib_path: Res<'_, LibPath>,
+    selected_language: Res<'_, SelectedLanguage>,
+    background_color: Res<'_, ClearColor>,
+    visuals: Res<'_, egui::Visuals>,
 ) {
     // If the application is being exited:
     if exit.iter().next().is_some() {

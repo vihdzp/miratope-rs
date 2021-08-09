@@ -146,7 +146,7 @@ impl Triangulation {
                         None,
                         &FillOptions::with_fill_rule(Default::default(), FillRule::EvenOdd)
                             .with_tolerance(f32::EPS),
-                        &mut BuffersBuilder::new(&mut geometry, |vertex: FillVertex| {
+                        &mut BuffersBuilder::new(&mut geometry, |vertex: FillVertex<'_>| {
                             vertex.sources().next().unwrap()
                         }),
                     )

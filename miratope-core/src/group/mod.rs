@@ -732,14 +732,14 @@ mod tests {
     /// regular dodecahedron and a regular hecatonicosachoron.
     #[test]
     fn h() {
-        test(Group::parse_unwrap("o5o3o"), 120, 60, &"H3");
-        test(Group::parse_unwrap("o5o3o3o"), 14400, 7200, &"H4");
+        test(Group::parse_unwrap("o5o3o"), 120, 60, "H3");
+        test(Group::parse_unwrap("o5o3o3o"), 14400, 7200, "H4");
     }
 
     /// Tests the E6 symmetry group.
     #[test]
     fn e6() {
-        test(Group::parse_unwrap("o3o3o3o3o *c3o"), 51840, 25920, &"E6");
+        test(Group::parse_unwrap("o3o3o3o3o *c3o"), 51840, 25920, "E6");
     }
 
     /// Tests the E7 symmetry group. This is very expensive, so we enable it
@@ -759,8 +759,8 @@ mod tests {
     /// Tests the direct product of A3 with itself.
     fn a3xa3() {
         let a3 = Group::parse_unwrap("o3o3o");
-        let g = Group::direct_product(a3.clone(), a3.clone());
-        test(g, 576, 288, &"A3×A3");
+        let g = Group::direct_product(a3.clone(), a3);
+        test(g, 576, 288, "A3×A3");
     }
 
     #[test]
@@ -770,7 +770,7 @@ mod tests {
             Group::wreath(Group::a(3), Group::a(1)),
             1152,
             576,
-            &"A3 ≀ A1",
+            "A3 ≀ A1",
         );
     }
 

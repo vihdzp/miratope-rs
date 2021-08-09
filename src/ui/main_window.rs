@@ -20,9 +20,9 @@ impl Plugin for MainWindowPlugin {
 }
 
 pub fn update_visible(
-    keyboard: Res<Input<KeyCode>>,
-    mut polies_vis: Query<&mut Visible, With<NamedConcrete>>,
-    mut wfs_vis: Query<&mut Visible, Without<NamedConcrete>>,
+    keyboard: Res<'_, Input<KeyCode>>,
+    mut polies_vis: Query<'_, &mut Visible, With<NamedConcrete>>,
+    mut wfs_vis: Query<'_, &mut Visible, Without<NamedConcrete>>,
 ) {
     if keyboard.just_pressed(KeyCode::V) {
         if let Some(mut visible) = polies_vis.iter_mut().next() {
@@ -40,7 +40,7 @@ pub fn update_visible(
 }
 
 /// Resizes the UI when the screen is resized.
-pub fn update_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Res<Windows>) {
+pub fn update_scale_factor(mut egui_settings: ResMut<'_, EguiSettings>, windows: Res<'_, Windows>) {
     if let Some(window) = windows.get_primary() {
         egui_settings.scale_factor = 1.0 / window.scale_factor();
     }
@@ -48,13 +48,13 @@ pub fn update_scale_factor(mut egui_settings: ResMut<EguiSettings>, windows: Res
 
 /// Updates polytopes after an operation.
 pub fn update_changed_polytopes(
-    mut meshes: ResMut<Assets<Mesh>>,
-    polies: Query<(&NamedConcrete, &Handle<Mesh>, &Children), Changed<NamedConcrete>>,
-    wfs: Query<&Handle<Mesh>, Without<NamedConcrete>>,
-    mut windows: ResMut<Windows>,
-    mut section_state: ResMut<SectionState>,
-    selected_language: Res<SelectedLanguage>,
-    orthogonal: Res<ProjectionType>,
+    mut meshes: ResMut<'_, Assets<Mesh>>,
+    polies: Query<'_, (&NamedConcrete, &Handle<Mesh>, &Children), Changed<NamedConcrete>>,
+    wfs: Query<'_, &Handle<Mesh>, Without<NamedConcrete>>,
+    mut windows: ResMut<'_, Windows>,
+    mut section_state: ResMut<'_, SectionState>,
+    selected_language: Res<'_, SelectedLanguage>,
+    orthogonal: Res<'_, ProjectionType>,
 ) {
     for (poly, mesh_handle, children) in polies.iter() {
         if cfg!(debug_assertions) {

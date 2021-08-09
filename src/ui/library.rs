@@ -491,11 +491,11 @@ impl Library {
 
 /// The system that shows the Miratope library.
 fn show_library(
-    egui_ctx: Res<EguiContext>,
-    mut query: Query<&mut NamedConcrete>,
-    mut library: ResMut<Option<Library>>,
-    lib_path: Res<LibPath>,
-    selected_language: Res<SelectedLanguage>,
+    egui_ctx: Res<'_, EguiContext>,
+    mut query: Query<'_, &mut NamedConcrete>,
+    mut library: ResMut<'_, Option<Library>>,
+    lib_path: Res<'_, LibPath>,
+    selected_language: Res<'_, SelectedLanguage>,
 ) {
     // Shows the polytope library.
     if let Some(library) = library.as_mut() {

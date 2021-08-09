@@ -157,9 +157,9 @@ impl FileDialogState {
 
 /// The system in charge of showing the file dialog.
 pub fn file_dialog(
-    mut query: Query<&mut NamedConcrete>,
-    file_dialog_state: Res<FileDialogState>,
-    file_dialog: NonSend<FileDialogToken>,
+    mut query: Query<'_, &mut NamedConcrete>,
+    file_dialog_state: Res<'_, FileDialogState>,
+    file_dialog: NonSend<'_, FileDialogToken>,
 ) {
     if file_dialog_state.is_changed() {
         match file_dialog_state.mode {
@@ -197,7 +197,7 @@ pub fn file_dialog(
 }
 
 /// Whether the hotkey to enable "advanced" options is enabled.
-pub fn advanced(keyboard: &Res<Input<KeyCode>>) -> bool {
+pub fn advanced(keyboard: &Res<'_, Input<KeyCode>>) -> bool {
     keyboard.pressed(KeyCode::LControl) || keyboard.pressed(KeyCode::RControl)
 }
 
@@ -218,20 +218,20 @@ pub type EguiWindows<'a> = (
 #[allow(clippy::too_many_arguments)]
 pub fn show_top_panel(
     // Info about the application state.
-    egui_ctx: Res<EguiContext>,
-    mut query: Query<&mut NamedConcrete>,
-    mut windows: ResMut<Windows>,
-    keyboard: Res<Input<KeyCode>>,
+    egui_ctx: Res<'_, EguiContext>,
+    mut query: Query<'_, &mut NamedConcrete>,
+    mut windows: ResMut<'_, Windows>,
+    keyboard: Res<'_, Input<KeyCode>>,
 
     // The Miratope resources controlled by the top panel.
-    mut section_state: ResMut<SectionState>,
-    mut section_direction: ResMut<SectionDirection>,
-    mut file_dialog_state: ResMut<FileDialogState>,
-    mut projection_type: ResMut<ProjectionType>,
-    mut memory: ResMut<Memory>,
-    mut background_color: ResMut<ClearColor>,
-    mut selected_language: ResMut<SelectedLanguage>,
-    mut visuals: ResMut<egui::Visuals>,
+    mut section_state: ResMut<'_, SectionState>,
+    mut section_direction: ResMut<'_, SectionDirection>,
+    mut file_dialog_state: ResMut<'_, FileDialogState>,
+    mut projection_type: ResMut<'_, ProjectionType>,
+    mut memory: ResMut<'_, Memory>,
+    mut background_color: ResMut<'_, ClearColor>,
+    mut selected_language: ResMut<'_, SelectedLanguage>,
+    mut visuals: ResMut<'_, egui::Visuals>,
 
     // The different windows that can be shown.
     (
@@ -244,7 +244,7 @@ pub fn show_top_panel(
         mut duoprism_window,
         mut duotegum_window,
         mut duocomb_window,
-    ): EguiWindows,
+    ): EguiWindows<'_>,
 ) {
     // The top bar.
     egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx(), |ui| {
@@ -657,9 +657,9 @@ pub fn show_top_panel(
 /// cross-section view.
 fn show_views(
     ui: &mut Ui,
-    mut query: Query<&mut NamedConcrete>,
-    mut section_state: ResMut<SectionState>,
-    mut section_direction: ResMut<SectionDirection>,
+    mut query: Query<'_, &mut NamedConcrete>,
+    mut section_state: ResMut<'_, SectionState>,
+    mut section_direction: ResMut<'_, SectionDirection>,
 ) {
     // The cross-section settings.
     if let SectionState::Active {

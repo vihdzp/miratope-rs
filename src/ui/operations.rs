@@ -135,9 +135,9 @@ macro_rules! impl_show {
 
         /// The system that shows the window.
         fn show_system(
-            mut self_: ResMut<Self>,
-            egui_ctx: Res<EguiContext>,
-            mut query: Query<&mut NamedConcrete>,
+            mut self_: ResMut<'_, Self>,
+            egui_ctx: Res<'_, EguiContext>,
+            mut query: Query<'_, &mut NamedConcrete>,
         ) where
             Self: 'static,
         {
@@ -220,8 +220,8 @@ pub trait UpdateWindow: Window {
     /// The system that updates the window when the rank of the polytope is
     /// updated.
     fn update_system(
-        mut self_: ResMut<Self>,
-        query: Query<(&NamedConcrete, &Handle<Mesh>, &Children), Changed<NamedConcrete>>,
+        mut self_: ResMut<'_, Self>,
+        query: Query<'_, (&NamedConcrete, &Handle<Mesh>, &Children), Changed<NamedConcrete>>,
     ) where
         Self: 'static,
     {
@@ -297,7 +297,7 @@ pub trait DuoWindow: Window {
     fn polytopes<'a>(
         &'a self,
         loaded: &'a NamedConcrete,
-        memory: &'a Res<Memory>,
+        memory: &'a Res<'_, Memory>,
     ) -> [Option<&'a NamedConcrete>; 2] {
         let [i, j] = self.slots();
         [i.to_poly(memory, loaded), j.to_poly(memory, loaded)]
@@ -305,7 +305,7 @@ pub trait DuoWindow: Window {
 
     /// Returns the dimensions of the polytopes currently selected, or 0 in case
     /// of the nullitope.
-    fn dim_or(&self, polytope: &NamedConcrete, memory: &Res<Memory>) -> [usize; 2] {
+    fn dim_or(&self, polytope: &NamedConcrete, memory: &Res<'_, Memory>) -> [usize; 2] {
         let [p, q] = self.polytopes(polytope, memory);
 
         [
@@ -315,16 +315,16 @@ pub trait DuoWindow: Window {
     }
 
     /// Applies the action of the window to the polytope.
-    fn action(&self, polytope: &mut NamedConcrete, memory: &Res<Memory>) {
+    fn action(&self, polytope: &mut NamedConcrete, memory: &Res<'_, Memory>) {
         if let [Some(p), Some(q)] = self.polytopes(polytope, memory) {
             *polytope = self.operation(p, q);
         }
     }
 
     /// Builds the window to be shown on screen.
-    fn build(&mut self, _: &mut Ui, _: &NamedConcrete, _: &Res<Memory>) {}
+    fn build(&mut self, _: &mut Ui, _: &NamedConcrete, _: &Res<'_, Memory>) {}
 
-    fn build_dropdowns(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Res<Memory>) {
+    fn build_dropdowns(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Res<'_, Memory>) {
         use miratope_lang::{lang::En, Language};
 
         const SELECT: &str = "Select";
@@ -402,7 +402,12 @@ pub trait DuoWindow: Window {
     }
 
     /// Shows the window on screen.
-    fn show(&mut self, ctx: &CtxRef, polytope: &NamedConcrete, memory: &Res<Memory>) -> ShowResult {
+    fn show(
+        &mut self,
+        ctx: &CtxRef,
+        polytope: &NamedConcrete,
+        memory: &Res<'_, Memory>,
+    ) -> ShowResult {
         let mut open = self.is_open();
         let mut result = ShowResult::None;
 
@@ -425,10 +430,10 @@ pub trait DuoWindow: Window {
 
     /// The system that shows the window.
     fn show_system(
-        mut self_: ResMut<Self>,
-        egui_ctx: Res<EguiContext>,
-        mut query: Query<&mut NamedConcrete>,
-        memory: Res<Memory>,
+        mut self_: ResMut<'_, Self>,
+        egui_ctx: Res<'_, EguiContext>,
+        mut query: Query<'_, &mut NamedConcrete>,
+        memory: Res<'_, Memory>,
     ) where
         Self: 'static,
     {
@@ -881,7 +886,7 @@ impl DuoWindow for DuopyramidWindow {
         &mut self.slots
     }
 
-    fn build(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Res<Memory>) {
+    fn build(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Res<'_, Memory>) {
         let [p_dim, q_dim] = self.dim_or(polytope, memory);
 
         resize(&mut self.offsets[0], p_dim);
@@ -983,7 +988,7 @@ impl DuoWindow for DuotegumWindow {
         &mut self.slots
     }
 
-    fn build(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Res<Memory>) {
+    fn build(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Res<'_, Memory>) {
         let [p_dim, q_dim] = self.dim_or(polytope, memory);
 
         resize(&mut self.offsets[0], p_dim);

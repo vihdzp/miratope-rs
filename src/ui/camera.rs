@@ -144,7 +144,7 @@ impl CameraInputEvent {
     fn cam_events_from_kb(
         time: &Time,
         keyboard: &Input<KeyCode>,
-        cam_inputs: &mut EventWriter<CameraInputEvent>,
+        cam_inputs: &mut EventWriter<'_, CameraInputEvent>,
         ctx: &CtxRef,
     ) -> (f32, f32) {
         // TODO: make the spin rate modifiable in preferences.
@@ -185,11 +185,11 @@ impl CameraInputEvent {
     /// Processes camera events coming from the mouse buttons.
     fn cam_events_from_mouse(
         mouse_button: &Input<MouseButton>,
-        mut mouse_move: EventReader<MouseMotion>,
+        mut mouse_move: EventReader<'_, MouseMotion>,
         width: f32,
         height: f32,
         real_scale: f32,
-        cam_inputs: &mut EventWriter<Self>,
+        cam_inputs: &mut EventWriter<'_, Self>,
     ) {
         if mouse_button.pressed(MouseButton::Right) {
             for MouseMotion { mut delta } in mouse_move.iter() {
@@ -202,9 +202,9 @@ impl CameraInputEvent {
 
     /// Processes camera events coming from the mouse wheel.
     fn cam_events_from_wheel(
-        mut mouse_wheel: EventReader<MouseWheel>,
+        mut mouse_wheel: EventReader<'_, MouseWheel>,
         scale: f32,
-        cam_inputs: &mut EventWriter<Self>,
+        cam_inputs: &mut EventWriter<'_, Self>,
     ) {
         for MouseWheel { unit, y, .. } in mouse_wheel.iter() {
             let unit_scale = match unit {
@@ -220,14 +220,14 @@ impl CameraInputEvent {
 /// The system that processes all input from the mouse and keyboard.
 #[allow(clippy::too_many_arguments)]
 fn add_cam_input_events(
-    time: Res<Time>,
-    keyboard: Res<Input<KeyCode>>,
-    mouse_button: Res<Input<MouseButton>>,
-    mouse_move: EventReader<MouseMotion>,
-    mouse_wheel: EventReader<MouseWheel>,
-    windows: Res<Windows>,
-    mut cam_inputs: EventWriter<CameraInputEvent>,
-    egui_ctx: Res<EguiContext>,
+    time: Res<'_, Time>,
+    keyboard: Res<'_, Input<KeyCode>>,
+    mouse_button: Res<'_, Input<MouseButton>>,
+    mouse_move: EventReader<'_, MouseMotion>,
+    mouse_wheel: EventReader<'_, MouseWheel>,
+    windows: Res<'_, Windows>,
+    mut cam_inputs: EventWriter<'_, CameraInputEvent>,
+    egui_ctx: Res<'_, EguiContext>,
 ) {
     let (width, height) = {
         let primary_win = windows.get_primary().expect("There is no primary window");
@@ -257,13 +257,16 @@ fn add_cam_input_events(
 }
 
 fn update_cameras_and_anchors(
-    mut events: EventReader<CameraInputEvent>,
-    q: Query<(
-        &mut Transform,
-        &GlobalTransform,
-        Option<&Parent>,
-        Option<&Camera>,
-    )>,
+    mut events: EventReader<'_, CameraInputEvent>,
+    q: Query<
+        '_,
+        (
+            &mut Transform,
+            &GlobalTransform,
+            Option<&Parent>,
+            Option<&Camera>,
+        ),
+    >,
 ) {
     // SAFETY: see the remark below.
     for (mut cam_tf, cam_gtf, parent, cam) in unsafe { q.iter_unsafe() } {

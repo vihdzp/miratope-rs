@@ -1,4 +1,14 @@
-#![allow(dead_code)]
+#![allow(dead_code)] // TODO: get rid of this!
+#![deny(
+    missing_docs,
+    nonstandard_style,
+    unused_parens,
+    unused_qualifications,
+    rust_2018_idioms,
+    rust_2018_compatibility,
+    future_incompatible,
+    missing_copy_implementations
+)]
 //! A tool for building and visualizing polytopes. Still in alpha development.
 //!
 //! ## What can Miratope do now?
@@ -25,7 +35,7 @@
 //! * Localization
 //!   * Automatic name generation in various languages for many shapes
 //!     * [x] English
-//!     * [ ] Spanish
+//!     * [x] Spanish
 //!     * [ ] French
 //!     * [ ] Japanese
 //!     * [ ] Proto Indo-Iranian
@@ -93,11 +103,11 @@ fn main() {
 
 /// Initializes the scene.
 fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut shaders: ResMut<Assets<Shader>>,
-    mut pipelines: ResMut<Assets<PipelineDescriptor>>,
+    mut commands: Commands<'_>,
+    mut meshes: ResMut<'_, Assets<Mesh>>,
+    mut materials: ResMut<'_, Assets<StandardMaterial>>,
+    mut shaders: ResMut<'_, Assets<Shader>>,
+    mut pipelines: ResMut<'_, Assets<PipelineDescriptor>>,
 ) {
     // Default polytope.
     let poly = NamedConcrete::from_off(include_str!("default.off")).unwrap();
