@@ -14,6 +14,7 @@ use crate::{
 use cd::{Cd, CdResult, CoxMatrix};
 
 use approx::relative_eq;
+use dyn_clone::DynClone;
 use nalgebra::{Dynamic, Quaternion, VecStorage};
 
 /// Converts a 3D rotation matrix into a quaternion. Uses the code from
@@ -119,8 +120,8 @@ fn direct_sum(mat1: Matrix, mat2: Matrix) -> Matrix {
 
 /// An iterator such that `dyn` objects using it can be cloned. Used to get
 /// around orphan rules.
-pub trait GroupIter: Iterator<Item = Matrix> + dyn_clone::DynClone {}
-impl<T: Iterator<Item = Matrix> + dyn_clone::DynClone> GroupIter for T {}
+pub trait GroupIter: Iterator<Item = Matrix> + DynClone {}
+impl<T: Iterator<Item = Matrix> + DynClone> GroupIter for T {}
 dyn_clone::clone_trait_object!(GroupIter);
 
 /// A [group](https://en.wikipedia.org/wiki/Group_(mathematics)) of matrices,
