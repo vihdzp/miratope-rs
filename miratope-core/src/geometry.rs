@@ -12,7 +12,10 @@ pub type VectorSlice<'a> = nalgebra::DVectorSlice<'a, Float>;
 /// An *n* by *n* matrix.
 pub type Matrix = nalgebra::DMatrix<Float>;
 
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    ops::{Index, IndexMut},
+};
 
 use crate::{Consts, Float};
 
@@ -425,7 +428,7 @@ where
     }
 }
 
-impl<R: Dim, C: Dim> std::ops::Index<(usize, usize)> for MatrixOrdMxN<R, C>
+impl<R: Dim, C: Dim> Index<(usize, usize)> for MatrixOrdMxN<R, C>
 where
     VecStorage<Float, R, C>: Storage<Float, R, C>,
 {
@@ -433,6 +436,15 @@ where
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
         &self.0[index]
+    }
+}
+
+impl<R: Dim, C: Dim> IndexMut<(usize, usize)> for MatrixOrdMxN<R, C>
+where
+    VecStorage<Float, R, C>: StorageMut<Float, R, C>,
+{
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        &mut self.0[index]
     }
 }
 

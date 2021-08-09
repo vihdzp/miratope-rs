@@ -478,8 +478,8 @@ impl Abstract {
     /// minimal element and a single maximal element. A valid polytope should
     /// always return `true`.
     pub fn bounded(&self) -> AbstractResult<()> {
-        let min_count = self.el_count(0);
-        let max_count = self.el_count(self.rank());
+        let min_count = self.min_count();
+        let max_count = self.max_count();
 
         if min_count == 1 && max_count == 1 {
             Ok(())
@@ -499,7 +499,7 @@ impl Abstract {
         for (r, elements) in self.iter().enumerate() {
             for (idx, el) in elements.iter().enumerate() {
                 // Only the minimal element can have no subelements.
-                if r != 0 && el.subs.len() == 0 {
+                if r != 0 && el.subs.is_empty() {
                     return Err(AbstractError::Ranked {
                         el: (r, idx),
                         incidence_type: IncidenceType::Subelement,
@@ -533,7 +533,7 @@ impl Abstract {
                 }
 
                 // Only the maximal element can have no superelements.
-                if r != self.rank() && el.sups.len() == 0 {
+                if r != self.rank() && el.sups.is_empty() {
                     return Err(AbstractError::Ranked {
                         el: (r, idx),
                         incidence_type: IncidenceType::Superelement,
@@ -826,25 +826,34 @@ impl Polytope for Abstract {
     /// This method will panic if the polytopes have different ranks.
     fn comp_append(&mut self, p: Self) {
         let rank = self.rank();
+        if rank <= 1 {
+            return;
+        }
 
         // The polytopes must have the same ranks.
-        assert_eq!(rank, p.rank());
+        assert_eq!(
+            rank,
+            p.rank(),
+            "polytopes in a compound must have the same rank"
+        );
+
+        // The element counts of the polytope, except we pretend there's no min
+        // or max elements.
+        let mut el_counts: Vec<_> = self.el_count_iter().collect();
+        el_counts[0] = 0;
+        el_counts[rank] = 0;
 
         for (r, elements) in p.into_iter().enumerate().skip(1).take(rank - 1) {
-            let sub_offset = self.el_count(r - 1);
-            let sup_offset = self.el_count(r + 1);
-
             for mut el in elements.into_iter() {
-                if r != 1 {
-                    for sub in el.subs.iter_mut() {
-                        *sub += sub_offset;
-                    }
+                let sub_offset = el_counts[r - 1];
+                let sup_offset = el_counts[r + 1];
+
+                for sub in el.subs.iter_mut() {
+                    *sub += sub_offset;
                 }
 
-                if r != rank - 1 {
-                    for sup in el.sups.iter_mut() {
-                        *sup += sup_offset;
-                    }
+                for sup in el.sups.iter_mut() {
+                    *sup += sup_offset;
                 }
 
                 self.push_at(r, el);
@@ -916,7 +925,13 @@ impl Index<(usize, usize)> for Abstract {
     type Output = Element;
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
-        &self[index.rank()][index.idx()]
+        &self[index.0][index.1]
+    }
+}
+
+impl IndexMut<(usize, usize)> for Abstract {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        &mut self[index.0][index.1]
     }
 }
 

@@ -5,7 +5,7 @@ use std::{
     collections::HashMap,
     iter::{self, IntoIterator},
     ops::{Index, IndexMut},
-    slice,
+    slice, vec,
 };
 
 use super::Abstract;
@@ -13,29 +13,6 @@ use super::Abstract;
 use rayon::iter::IntoParallelRefMutIterator;
 use rayon::iter::ParallelIterator;
 use vec_like::*;
-
-/// A bundled rank and index, which can be used as coordinates to refer to an
-/// element in an abstract polytope.
-pub trait ElementRef: Copy + Eq {
-    /// The rank of the element.
-    fn rank(self) -> usize {
-        self.rank_idx().0
-    }
-
-    /// The index of the element in its corresponding element list.
-    fn idx(self) -> usize {
-        self.rank_idx().1
-    }
-
-    /// Returns the bundled rank and index, in that order.
-    fn rank_idx(self) -> (usize, usize);
-}
-
-impl ElementRef for (usize, usize) {
-    fn rank_idx(self) -> (usize, usize) {
-        self
-    }
-}
 
 /// Represents a map from ranks and indices into elements of a given type.
 /// Is internally stored as a jagged array.
@@ -47,13 +24,13 @@ impl<T> Index<(usize, usize)> for ElementMap<T> {
     type Output = T;
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
-        &self[index.rank()][index.idx()]
+        &self[index.0][index.1]
     }
 }
 
 impl<T> IndexMut<(usize, usize)> for ElementMap<T> {
     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
-        &mut self[index.rank()][index.idx()]
+        &mut self[index.0][index.1]
     }
 }
 
@@ -228,11 +205,11 @@ impl SubelementList {
 }
 
 /// The signature of the function that turns an `&ElementList` into an iterator.
-type IterFn = for<'r> fn(&'r ElementList) -> std::slice::Iter<'r, Element>;
+type IterFn = for<'r> fn(&'r ElementList) -> slice::Iter<'r, Element>;
 
 /// The signature of the function that turns an `&mut ElementList` into a
 /// mutable iterator.
-type IterMutFn = for<'r> fn(&'r mut ElementList) -> std::slice::IterMut<'r, Element>;
+type IterMutFn = for<'r> fn(&'r mut ElementList) -> slice::IterMut<'r, Element>;
 
 /// The signature of the function that turns an `ElementList` into an owned
 /// iterator.
@@ -242,16 +219,13 @@ type IntoIterFn = fn(ElementList) -> std::vec::IntoIter<Element>;
 type LenFn = for<'r> fn(&'r ElementList) -> usize;
 
 /// The signature of an iterator over an `&'a ElementList`.
-pub type ElementIter<'a> =
-    std::iter::Flatten<std::iter::Map<std::slice::Iter<'a, ElementList>, IterFn>>;
+pub type ElementIter<'a> = iter::Flatten<iter::Map<slice::Iter<'a, ElementList>, IterFn>>;
 
 /// The signature of an iterator over an `&'a mut ElementList`.
-pub type ElementIterMut<'a> =
-    std::iter::Flatten<std::iter::Map<std::slice::IterMut<'a, ElementList>, IterMutFn>>;
+pub type ElementIterMut<'a> = iter::Flatten<iter::Map<slice::IterMut<'a, ElementList>, IterMutFn>>;
 
 /// The signature of an owned iterator over an `ElementList`.
-pub type ElementIntoIter =
-    std::iter::Flatten<std::iter::Map<std::vec::IntoIter<ElementList>, IntoIterFn>>;
+pub type ElementIntoIter = iter::Flatten<iter::Map<vec::IntoIter<ElementList>, IntoIterFn>>;
 
 /// Represents the [`ElementLists`](ElementList) of each rank that make up an
 /// abstract polytope.
@@ -338,6 +312,12 @@ pub trait Ranked: Sized {
         &mut self.ranks_mut()[(0, 0)]
     }
 
+    /// Returns the number of minimal elements. Unless you call this in the
+    /// middle of some other method, this should always be exactly 1.
+    fn min_count(&self) -> usize {
+        self.el_count(0)
+    }
+
     /// Returns a reference to the maximal element of the polytope.
     ///
     /// # Panics
@@ -353,6 +333,12 @@ pub trait Ranked: Sized {
     fn max_mut(&mut self) -> &mut Element {
         let rank = self.rank();
         &mut self.ranks_mut()[(rank, 0)]
+    }
+
+    /// Returns the number of maximal elements. Unless you call this in the
+    /// middle of some other method, this should always be exactly 1.
+    fn max_count(&self) -> usize {
+        self.el_count(self.rank())
     }
 
     /// Returns a reference to the abstract vertices of the polytope.
@@ -440,8 +426,8 @@ pub trait Ranked: Sized {
     /// subelements. To be used in circumstances where the elements are built up
     /// in layers.
     fn push_max(&mut self) {
-        let facet_count = self.el_count(self.rank());
-        self.push_subs(SubelementList::max(facet_count));
+        let max_count = self.max_count();
+        self.push_subs(SubelementList::max(max_count));
     }
 
     /// Returns an iterator over the elements.
@@ -470,8 +456,16 @@ pub trait Ranked: Sized {
 
     /// Applies a function to all elements in parallel.
     fn for_each_element<F: Fn(&mut Element) + Sync + Send + Clone>(&mut self, f: F) {
-        for elements in self.ranks_mut().iter_mut() {
-            elements.par_iter_mut().for_each(f.clone());
+        // No use parallelizing over all minimal or maximal elements.
+        let rank = self.rank();
+        f(self.min_mut());
+
+        if rank != 0 {
+            for elements in self.ranks_mut().iter_mut().skip(1).take(rank - 1) {
+                elements.par_iter_mut().for_each(f.clone());
+            }
+
+            f(self.max_mut());
         }
     }
 

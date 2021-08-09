@@ -552,13 +552,13 @@ pub trait ConcretePolytope: Polytope {
     /// Checks whether a polytope is equilateral to a fixed precision, and with
     /// a specified edge length.
     fn is_equilateral_with(&self, len: Float) -> bool {
-        (0..self.el_count(2))
+        (0..self.edge_count())
             .all(|idx| abs_diff_eq!(self.edge_len(idx).unwrap(), len, epsilon = Float::EPS))
     }
 
     /// Checks whether a polytope is equilateral to a fixed precision.
     fn is_equilateral(&self) -> bool {
-        self.el_count(2) == 0 || self.is_equilateral_with(self.edge_len(0).unwrap())
+        self.edge_count() == 0 || self.is_equilateral_with(self.edge_len(0).unwrap())
     }
 
     /// I haven't actually implemented this in the general case.
@@ -1167,6 +1167,19 @@ mod tests {
         let n = n as Float;
         let d = d as Float;
         n * (d * Float::TAU / n).sin() / 2.0
+    }
+
+    fn test_compound(mut p: Concrete, volume: Option<Float>) {
+        p.comp_append(p.clone());
+        test_volume(p, volume)
+    }
+
+    #[test]
+    fn compounds() {
+        test_compound(Concrete::nullitope(), None);
+        test_compound(Concrete::point(), Some(1.0));
+        test_compound(Concrete::polygon(3), Some(2.0 * polygon_area(3, 1)));
+        test_compound(Concrete::hypercube(4), Some(2.0));
     }
 
     #[test]

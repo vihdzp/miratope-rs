@@ -1,6 +1,6 @@
 //! Module that defines a language-independent representation of polytope names.
 
-use std::{fmt::Debug, fs, marker::PhantomData, mem};
+use std::{array, fmt::Debug, fs, iter, marker::PhantomData, mem};
 
 use miratope_core::{abs::Abstract, conc::Concrete, geometry::Point, Consts, Float, Polytope};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -595,12 +595,11 @@ impl<T: NameType> Name<T> {
             }
 
             // We integrate pyramids into a single multipyramid.
-            Self::Pyramid(base) => Self::multipyramid(vec![Self::Dyad, *base]),
+            Self::Pyramid(base) => Self::multipyramid(array::IntoIter::new([Self::Dyad, *base])),
 
             // We integrate multipyramids into a single multipyramid.
-            Self::Multipyramid(mut bases) => {
-                bases.push(Self::Point);
-                Self::multipyramid(bases)
+            Self::Multipyramid(bases) => {
+                Self::multipyramid(bases.into_iter().chain(iter::once(Self::Point)))
             }
 
             // We default to just making a pyramid out of the base.
@@ -649,12 +648,11 @@ impl<T: NameType> Name<T> {
             }
 
             // We integrate prisms into a single multiprism.
-            Self::Prism(base) => Self::multiprism(vec![Self::rectangle(), *base]),
+            Self::Prism(base) => Self::multiprism(array::IntoIter::new([Self::rectangle(), *base])),
 
             // We integrate multiprisms into a single multiprism.
-            Self::Multiprism(mut bases) => {
-                bases.push(Self::Dyad);
-                Self::multiprism(bases)
+            Self::Multiprism(bases) => {
+                Self::multiprism(bases.into_iter().chain(iter::once(Self::Dyad)))
             }
 
             // We default to just making a prism out of the base.
@@ -694,12 +692,13 @@ impl<T: NameType> Name<T> {
             }
 
             // We integrate tegums into a single multitegum.
-            Self::Tegum(base) => Self::multitegum(vec![Self::orthodiagonal(), *base]),
+            Self::Tegum(base) => {
+                Self::multitegum(array::IntoIter::new([Self::orthodiagonal(), *base]))
+            }
 
             // We integrate multitegums into a single multitegum.
-            Self::Multitegum(mut bases) => {
-                bases.push(Self::Dyad);
-                Self::multitegum(bases)
+            Self::Multitegum(bases) => {
+                Self::multitegum(bases.into_iter().chain(iter::once(Self::Dyad)))
             }
 
             // We default to just making a tegum out of the base.
@@ -994,7 +993,7 @@ impl<T: NameType> Name<T> {
 
     /// Makes a multipyramid out of a set of names. Uses the names in roughly
     /// the same order as were given.
-    pub fn multipyramid(bases: Vec<Name<T>>) -> Self {
+    pub fn multipyramid<U: Iterator<Item = Self>>(bases: U) -> Self {
         let mut new_bases = Vec::new();
         let mut pyramid_count = 0;
 
@@ -1021,7 +1020,7 @@ impl<T: NameType> Name<T> {
         // Either the final name, or the single base.
         let multipyramid = match new_bases.len() {
             0 => Self::Nullitope,
-            1 => new_bases.swap_remove(0),
+            1 => new_bases.drain(..1).next().unwrap(),
             _ => Self::Multipyramid(new_bases),
         };
 
@@ -1037,7 +1036,7 @@ impl<T: NameType> Name<T> {
 
     /// Makes a multiprism out of a set of names. Uses the names in roughly
     /// the same order as were given.
-    pub fn multiprism(bases: Vec<Name<T>>) -> Self {
+    pub fn multiprism<U: Iterator<Item = Self>>(bases: U) -> Self {
         let mut new_bases = Vec::new();
         let mut prism_count = 0;
 
@@ -1073,7 +1072,7 @@ impl<T: NameType> Name<T> {
         // Either the final name, or the single base.
         let multiprism = match new_bases.len() {
             0 => Self::Point,
-            1 => new_bases.swap_remove(0),
+            1 => new_bases.drain(..1).next().unwrap(),
             _ => Self::Multiprism(new_bases),
         };
 
@@ -1089,7 +1088,7 @@ impl<T: NameType> Name<T> {
 
     /// Makes a multitegum out of a set of names. Uses the names in roughly
     /// the same order as were given.
-    pub fn multitegum(bases: Vec<Name<T>>) -> Self {
+    pub fn multitegum<U: Iterator<Item = Self>>(bases: U) -> Self {
         let mut new_bases = Vec::new();
         let mut tegum_count = 0;
 
@@ -1124,7 +1123,7 @@ impl<T: NameType> Name<T> {
         // Either the final name, or the single base.
         let multitegum = match new_bases.len() {
             0 => Self::Point,
-            1 => new_bases.swap_remove(0),
+            1 => new_bases.drain(..1).next().unwrap(),
             _ => Self::Multitegum(new_bases),
         };
 
@@ -1140,7 +1139,7 @@ impl<T: NameType> Name<T> {
 
     /// Makes a multicomb out of a set of names. Uses the names in roughly
     /// the same order as were given.
-    pub fn multicomb(bases: Vec<Self>) -> Self {
+    pub fn multicomb<U: Iterator<Item = Name<T>>>(bases: U) -> Self {
         let mut new_bases = Vec::new();
 
         // Figures out which bases of the multicomb are multicombs themselves,

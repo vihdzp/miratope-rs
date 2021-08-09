@@ -1,5 +1,7 @@
 //! Contains the named abstract and concrete polytope types.
 
+use std::array;
+
 use miratope_core::{
     abs::{flag::Flag, Abstract, Ranked},
     conc::{
@@ -166,28 +168,28 @@ impl<T: NameType> Polytope for Named<T> {
     fn duopyramid(p: &Self, q: &Self) -> Self {
         Self::new(
             T::Polytope::duopyramid(&p.polytope, &q.polytope),
-            Name::multipyramid(vec![p.name.clone(), q.name.clone()]),
+            Name::multipyramid(array::IntoIter::new([p.name.clone(), q.name.clone()])),
         )
     }
 
     fn duoprism(p: &Self, q: &Self) -> Self {
         Self::new(
             T::Polytope::duoprism(&p.polytope, &q.polytope),
-            Name::multiprism(vec![p.name.clone(), q.name.clone()]),
+            Name::multiprism(array::IntoIter::new([p.name.clone(), q.name.clone()])),
         )
     }
 
     fn duotegum(p: &Self, q: &Self) -> Self {
         Self::new(
             T::Polytope::duotegum(&p.polytope, &q.polytope),
-            Name::multitegum(vec![p.name.clone(), q.name.clone()]),
+            Name::multitegum(array::IntoIter::new([p.name.clone(), q.name.clone()])),
         )
     }
 
     fn duocomb(p: &Self, q: &Self) -> Self {
         Self::new(
             T::Polytope::duocomb(&p.polytope, &q.polytope),
-            Name::multicomb(vec![p.name.clone(), q.name.clone()]),
+            Name::multicomb(array::IntoIter::new([p.name.clone(), q.name.clone()])),
         )
     }
 
@@ -319,14 +321,14 @@ impl ConcretePolytope for NamedConcrete {
     ) -> Self {
         Self::new(
             Concrete::duopyramid_with(p.con(), q.con(), p_offset, q_offset, height),
-            Name::multipyramid(vec![p.name.clone(), q.name.clone()]),
+            Name::multipyramid(array::IntoIter::new([p.name.clone(), q.name.clone()])),
         )
     }
 
     fn duotegum_with(p: &Self, q: &Self, p_offset: &Point, q_offset: &Point) -> Self {
         Self::new(
             Concrete::duotegum_with(p.con(), q.con(), p_offset, q_offset),
-            Name::multitegum(vec![p.name.clone(), q.name.clone()]),
+            Name::multitegum(array::IntoIter::new([p.name.clone(), q.name.clone()])),
         )
     }
 

@@ -171,7 +171,7 @@ enum Element {
 ///
 /// This method does a simple linear search over all attributes. This isn't
 /// really an issue, as long as we never call this method on some element that
-/// might have an arbitrarily large number of attributes.
+/// might have a large number of attributes.
 fn attribute<'a>(attributes: &'a [OwnedAttribute], idx: &str) -> Option<&'a str> {
     for att in attributes {
         if att.name.local_name == idx {

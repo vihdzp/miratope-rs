@@ -320,7 +320,7 @@ pub fn wireframe(poly: &Concrete, projection_type: ProjectionType) -> Mesh {
         return empty_mesh();
     }
 
-    let edge_count = poly.el_count(3);
+    let edge_count = poly.edge_count();
 
     // We add a single vertex so that Miratope doesn't crash.
     let vertices = vertex_coords(poly, poly.vertices.iter(), projection_type);

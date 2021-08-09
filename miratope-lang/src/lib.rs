@@ -28,11 +28,11 @@
 //! name like this:
 //!
 //! ```
-//! # use miratope_lang::{lang::En, Language, name::{Abs, Name}};
-//! let pecube: Name<Abs> = Name::multiprism(vec![
+//! # use miratope_lang::{lang::En, Language, name::{Abs, Name}}; use std::array;
+//! let pecube: Name<Abs> = Name::multiprism(array::IntoIter::new([
 //!     Name::polygon(Default::default(), 5), // 5-gon
 //!     Name::hyperblock(Default::default(), 4) // 3-hypercube
-//! ]);
+//! ]));
 //! # assert_eq!(En::parse(&pecube), "pentagonal-cubic duoprism");
 //! ```
 //!
@@ -42,11 +42,11 @@
 //! corresponding methods to parse and combine each of its parts:
 //!
 //! ```
-//! # use miratope_lang::{lang::En, Language, name::{Abs, Name}};
-//! # let pecube: Name<Abs> = Name::multiprism(vec![
+//! # use miratope_lang::{lang::En, Language, name::{Abs, Name}}; use std::array;
+//! # let pecube: Name<Abs> = Name::multiprism(array::IntoIter::new([
 //! #     Name::polygon(Default::default(), 5), // abstract 5-gon
 //! #     Name::hyperblock(Default::default(), 4) // abstract 3-hypercube
-//! # ]);
+//! # ]));
 //! assert_eq!(En::parse(&pecube), "pentagonal-cubic duoprism");
 //! ```
 //!

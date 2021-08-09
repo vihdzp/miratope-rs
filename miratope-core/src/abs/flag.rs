@@ -9,7 +9,8 @@ use std::{
     cmp::Ordering,
     collections::{hash_map::Entry, HashMap, HashSet, VecDeque},
     hash::{Hash, Hasher},
-    ops::{Index, IndexMut},
+    iter,
+    ops::{Index, IndexMut, Range},
 };
 
 use crate::{
@@ -343,9 +344,7 @@ impl FlagChanges {
 
     /// Returns an iterator over all subsets of flag changes created by taking
     /// out a single flag change.
-    pub fn subsets(
-        &self,
-    ) -> std::iter::Map<std::ops::Range<usize>, impl FnMut(usize) -> Self + '_> {
+    pub fn subsets(&self) -> iter::Map<Range<usize>, impl FnMut(usize) -> Self + '_> {
         (0..self.len()).map(move |i| {
             let mut subset = self.clone();
             subset.remove(i);
@@ -728,10 +727,7 @@ mod tests {
     #[test]
     fn simplex() {
         for n in 1..=8 {
-            test(
-                &mut Abstract::simplex(n),
-                crate::factorial(n) as usize,
-            );
+            test(&mut Abstract::simplex(n), crate::factorial(n) as usize);
         }
     }
 
