@@ -29,9 +29,9 @@
 //!
 //! ```
 //! # use miratope_lang::{lang::En, Language, name::{Abs, Name}}; use std::array;
-//! let pecube: Name<Abs> = Name::multiprism(array::IntoIter::new([
-//!     Name::polygon(Default::default(), 5), // 5-gon
-//!     Name::hyperblock(Default::default(), 4) // 3-hypercube
+//! let pecube = Name::<Abs>::multiprism(array::IntoIter::new([
+//!     Name::polygon(Default::default(), 5), // abstract 5-gon
+//!     Name::hyperblock(Default::default(), 4) // abstract 3-hyperblock
 //! ]));
 //! # assert_eq!(En::parse(&pecube), "pentagonal-cubic duoprism");
 //! ```
@@ -43,9 +43,9 @@
 //!
 //! ```
 //! # use miratope_lang::{lang::En, Language, name::{Abs, Name}}; use std::array;
-//! # let pecube: Name<Abs> = Name::multiprism(array::IntoIter::new([
+//! # let pecube = Name::<Abs>::multiprism(array::IntoIter::new([
 //! #     Name::polygon(Default::default(), 5), // abstract 5-gon
-//! #     Name::hyperblock(Default::default(), 4) // abstract 3-hypercube
+//! #     Name::hyperblock(Default::default(), 4) // abstract 3-hyperblock
 //! # ]));
 //! assert_eq!(En::parse(&pecube), "pentagonal-cubic duoprism");
 //! ```

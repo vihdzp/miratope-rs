@@ -114,8 +114,9 @@ impl<T: NameType> Polytope for Named<T> {
         Ok(())
     }
 
-    fn comp_append(&mut self, _p: Self) {
-        todo!("Compound names are TBA!")
+    fn comp_append(&mut self, p: Self) {
+        self.polytope.comp_append(p.polytope);
+        println!("Compound names are TBA!")
     }
 
     fn element(&self, rank: usize, idx: usize) -> Option<Self> {
