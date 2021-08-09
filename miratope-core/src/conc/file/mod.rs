@@ -104,7 +104,7 @@ pub trait FromFile: Sized {
     fn from_ggb(file: File) -> GgbResult<Self>;
 
     /// Loads a polytope from a file path.
-    fn from_path<U: AsRef<std::path::Path>>(fp: &U) -> FileResult<Self> {
+    fn from_path<U: AsRef<std::path::Path>>(fp: &U) -> FileResult<'_, Self> {
         use std::{ffi::OsStr, fs};
 
         let ext = fp

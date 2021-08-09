@@ -71,6 +71,8 @@ pub trait NameData<T>: Debug + Clone + Serialize + DeserializeOwned {
         self.apply_or_lazy(f, || panic!("Called apply on an AbsData"))
     }
 
+    /// Determines whether the inner values are equal, or returns a specified
+    /// value if none.
     fn eq_or(&self, value: &Self, other: bool) -> bool
     where
         T: PartialEq,
@@ -249,6 +251,8 @@ impl Default for Regular {
     }
 }
 
+/// Any quadrilateral that isn't irregular. These often result from tegums or
+/// prisms and can yield extra info about some names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Quadrilateral {
     /// A square.
@@ -264,12 +268,6 @@ pub enum Quadrilateral {
 impl Default for Quadrilateral {
     fn default() -> Self {
         Self::Square
-    }
-}
-
-impl Quadrilateral {
-    pub fn is_square(self) -> bool {
-        matches!(self, Self::Square)
     }
 }
 
@@ -301,8 +299,11 @@ pub enum Name<T: NameType> {
         regular: T::DataRegular,
     },
 
-    /// A quadrilateral.
-    Quadrilateral { quad: T::DataQuadrilateral },
+    /// A quadrilateral that isn't irregular.
+    Quadrilateral {
+        /// The type of quadrilateral.
+        quad: T::DataQuadrilateral,
+    },
 
     /// A polygon with **at least 4** sides if irregular, or **at least 5**
     /// sides if regular.
@@ -1160,6 +1161,8 @@ impl<T: NameType> Name<T> {
         }
     }
 
+    /// Gets the wiki link to a given polytope (the article isn't guaranteed to
+    /// exist).
     pub fn wiki_link(&self) -> String {
         crate::WIKI_LINK.to_owned() + &crate::lang::En::parse(self).replace(" ", "_")
     }

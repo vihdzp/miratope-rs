@@ -483,7 +483,7 @@ impl Iterator for GenIter {
 }
 
 /// Builds a reflection matrix from a given vector.
-pub fn refl_mat(n: VectorSlice) -> Matrix {
+pub fn refl_mat(n: VectorSlice<'_>) -> Matrix {
     let dim = n.nrows();
     let nn = n.norm_squared();
     let identity = Matrix::identity(dim, dim);

@@ -5,7 +5,7 @@ pub mod flag;
 pub mod product;
 
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeSet, HashMap},
     convert::Infallible,
     ops::{Index, IndexMut},
 };
@@ -13,7 +13,6 @@ use std::{
 use self::flag::{Flag, FlagSet};
 use super::Polytope;
 
-use rayon::prelude::*;
 use strum_macros::Display;
 use vec_like::VecLike;
 
@@ -23,7 +22,7 @@ pub use product::*;
 /// Represents the way in which two elements with one rank of difference are
 /// incident to one another. Used as a field in some [`AbstractError`] variants.
 
-#[derive(Debug, Display)]
+#[derive(Clone, Copy, Debug, Display)]
 pub enum IncidenceType {
     /// This element is a subelement of another.
     #[strum(serialize = "subelement")]
@@ -35,7 +34,7 @@ pub enum IncidenceType {
 }
 
 /// Represents an error in an abstract polytope.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum AbstractError {
     /// The polytope is not bounded, i.e. it doesn't have a single minimal and
     /// maximal element.
@@ -289,95 +288,6 @@ impl Abstract {
         Ranks::with_rank_capacity(rank).into()
     }
 
-    /// Returns a reference to the minimal element of the polytope.
-    ///
-    /// # Panics
-    /// Panics if the polytope has not been initialized.
-    pub fn min(&self) -> &Element {
-        self.get_element(0, 0).unwrap()
-    }
-
-    /// Returns a mutable reference to the minimal element of the polytope.
-    ///
-    /// # Panics
-    /// Panics if the polytope has not been initialized.
-    pub fn min_mut(&mut self) -> &mut Element {
-        self.get_element_mut(0, 0).unwrap()
-    }
-
-    /// Returns a reference to the maximal element of the polytope.
-    ///
-    /// # Panics
-    /// Panics if the polytope has not been initialized.
-    pub fn max(&self) -> &Element {
-        self.get_element(self.rank(), 0).unwrap()
-    }
-
-    pub fn edges_mut(&mut self) -> &mut ElementList {
-        &mut self[2]
-    }
-
-    /// Returns a mutable reference to the maximal element of the polytope.
-    ///
-    /// # Panics
-    /// Panics if the polytope has not been initialized.
-    pub fn max_mut(&mut self) -> &mut Element {
-        self.get_element_mut(self.rank(), 0).unwrap()
-    }
-
-    /// Pushes a given element into the vector of elements of a given rank.
-    pub fn push_at(&mut self, rank: usize, el: Element) {
-        self[rank].push(el);
-    }
-
-    /// Pushes a given element into the vector of elements of a given rank.
-    /// Updates the superelements of its subelements automatically.
-    pub fn push_subs_at(&mut self, rank: usize, sub_el: Subelements) {
-        let i = self[rank].len();
-
-        if rank != 0 {
-            if let Some(lower_rank) = self.ranks.get_mut(rank - 1) {
-                // Updates superelements of the lower rank.
-                for &sub in &sub_el {
-                    lower_rank[sub].sups.push(i);
-                }
-            }
-        }
-
-        self.push_at(rank, Element::from_subs(sub_el));
-    }
-
-    /// Pushes a new element list without superelements, assuming that the
-    /// superelements of the current maximal rank **haven't** already been set.
-    /// If they have already been set, use [`push`](Self::push) instead.
-    pub fn push_subs(&mut self, subelements: SubelementList) {
-        self.push(ElementList::with_capacity(subelements.len()));
-
-        for sub_el in subelements.into_iter() {
-            self.push_subs_at(self.rank(), sub_el);
-        }
-    }
-
-    /// Pushes a maximal element into the polytope, with the facets as
-    /// subelements. To be used in circumstances where the elements are built up
-    /// in layers.
-    pub fn push_max(&mut self) {
-        let facet_count = self.el_count(self.rank());
-        self.push_subs(SubelementList::max(facet_count));
-    }
-
-    /// Returns a reference to an element of the polytope. To actually get the
-    /// entire polytope it defines, use [`element`](Self::element).
-    pub fn get_element(&self, rank: usize, idx: usize) -> Option<&Element> {
-        self.ranks.get(rank)?.get(idx)
-    }
-
-    /// Returns a mutable reference to an element of the polytope. To actually get the
-    /// entire polytope it defines, use [`element`](Self::element).
-    pub fn get_element_mut(&mut self, rank: usize, idx: usize) -> Option<&mut Element> {
-        self.ranks.get_mut(rank)?.get_mut(idx)
-    }
-
     /// Gets the indices of the vertices of an element in the polytope, if it
     /// exists.
     pub fn element_vertices(&self, rank: usize, idx: usize) -> Option<Vec<usize>> {
@@ -389,78 +299,6 @@ impl Abstract {
     pub fn element_and_vertices(&self, rank: usize, idx: usize) -> Option<(Vec<usize>, Self)> {
         let element_hash = ElementHash::new(self, rank, idx)?;
         Some((element_hash.to_vertices(), element_hash.to_polytope(self)))
-    }
-
-    /// Returns a map from the elements in a polytope to the index of one of its
-    /// vertices. Does not map the minimal element anywhere.
-    pub fn vertex_map(&self) -> ElementMap<usize> {
-        // Maps every element of the polytope to one of its vertices.
-        let mut vertex_map = ElementMap::new();
-
-        // Vertices map to themselves.
-        let vertex_count = self.vertex_count();
-        let mut vertex_list = Vec::with_capacity(vertex_count);
-        for v in 0..vertex_count {
-            vertex_list.push(v);
-        }
-        vertex_map.push(vertex_list);
-
-        // Every other element maps to the vertex of any subelement.
-        for r in 2..=self.rank() {
-            let mut element_list = Vec::new();
-
-            for el in &self.ranks()[r] {
-                element_list.push(vertex_map[r - 2][el.subs[0]]);
-            }
-
-            vertex_map.push(element_list);
-        }
-
-        vertex_map
-    }
-
-    /// Returns the indices of a Petrial polygon in cyclic order, or `None` if
-    /// it self-intersects.
-    pub fn petrie_polygon_vertices(&mut self, flag: Flag) -> Option<Vec<usize>> {
-        let rank = self.rank();
-        let mut new_flag = flag.clone();
-        let first_vertex = flag[0];
-
-        let mut vertices = Vec::new();
-        let mut vertex_hash = HashSet::new();
-
-        self.element_sort();
-
-        loop {
-            // Applies 0-changes up to (rank-1)-changes in order.
-            for idx in 0..rank {
-                new_flag.change_mut(self, idx);
-            }
-
-            // If we just hit a previous vertex, we return.
-            let new_vertex = new_flag[0];
-            if vertex_hash.contains(&new_vertex) {
-                return None;
-            }
-
-            // Adds the new vertex.
-            vertices.push(new_vertex);
-            vertex_hash.insert(new_vertex);
-
-            // If we're back to the beginning, we break out of the loop.
-            if new_vertex == first_vertex {
-                break;
-            }
-        }
-
-        // We returned to precisely the initial flag.
-        if flag == new_flag {
-            Some(vertices)
-        }
-        // The Petrie polygon self-intersects.
-        else {
-            None
-        }
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
@@ -506,10 +344,7 @@ impl Abstract {
                 {
                     // Adds the new sections of the current height, gets
                     // their index, uses that to build the ElementList.
-                    let sub = new_section_hash.get(SectionRef::from_els(
-                        (section.lo_rank - 1, idx_lo),
-                        section.hi(),
-                    ));
+                    let sub = new_section_hash.get(section.with_lo(section.lo_rank - 1, idx_lo));
 
                     elements[idx].push(sub);
                 }
@@ -523,10 +358,7 @@ impl Abstract {
                 {
                     // Adds the new sections of the current height, gets
                     // their index, uses that to build the ElementList.
-                    let sub = new_section_hash.get(SectionRef::from_els(
-                        section.lo(),
-                        (section.hi_rank + 1, idx_hi),
-                    ));
+                    let sub = new_section_hash.get(section.with_hi(section.hi_rank + 1, idx_hi));
 
                     elements[idx].push(sub);
                 }
@@ -898,10 +730,7 @@ impl Polytope for Abstract {
     /// Converts a polytope into its dual in place. Use [`Self::dual_mut`] instead, as
     /// this method can never fail.
     fn try_dual_mut(&mut self) -> Result<(), Self::DualError> {
-        for elements in self.ranks.iter_mut() {
-            elements.par_iter_mut().for_each(Element::swap_mut);
-        }
-
+        self.for_each_element(Element::swap_mut);
         self.ranks.reverse();
         Ok(())
     }
@@ -1078,7 +907,7 @@ impl Polytope for Abstract {
             let min = self.min().clone();
             self[0].push(min);
 
-            for v in &mut self[1] {
+            for v in self.vertices_mut() {
                 v.subs.push(1);
             }
 

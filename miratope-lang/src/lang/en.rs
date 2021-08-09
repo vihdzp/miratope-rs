@@ -2,6 +2,7 @@
 use crate::{GreekPrefix, Language, Position, Prefix};
 
 /// The English language.
+#[derive(Clone, Copy)]
 pub struct En;
 
 impl GreekPrefix for En {}

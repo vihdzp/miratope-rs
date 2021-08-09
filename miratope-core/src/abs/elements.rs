@@ -10,6 +10,7 @@ use std::{
 use super::Abstract;
 
 use rayon::iter::IntoParallelRefMutIterator;
+use rayon::iter::ParallelIterator;
 use vec_like::*;
 
 /// A bundled rank and index, which can be used as coordinates to refer to an
@@ -106,6 +107,24 @@ pub struct Element {
     pub sups: Superelements,
 }
 
+impl From<Subelements> for Element {
+    fn from(subs: Subelements) -> Self {
+        Self {
+            subs,
+            sups: Superelements::new(),
+        }
+    }
+}
+
+impl From<Superelements> for Element {
+    fn from(sups: Superelements) -> Self {
+        Self {
+            subs: Subelements::new(),
+            sups,
+        }
+    }
+}
+
 impl Element {
     /// Initializes a new element with no subelements and no superelements.
     pub fn new() -> Self {
@@ -124,15 +143,6 @@ impl Element {
     pub fn max(facet_count: usize) -> Self {
         Self {
             subs: Subelements::count(facet_count),
-            sups: Superelements::new(),
-        }
-    }
-
-    /// Builds an element from a given set of subelements and an empty
-    /// superelement list.
-    pub fn from_subs(subs: Subelements) -> Self {
-        Self {
-            subs,
             sups: Superelements::new(),
         }
     }
@@ -216,49 +226,235 @@ impl SubelementList {
     }
 }
 
+/// The signature of the function that turns an `&ElementList` into an iterator.
 type IterFn = for<'r> fn(&'r ElementList) -> std::slice::Iter<'r, Element>;
+
+/// The signature of the function that turns an `&mut ElementList` into a
+/// mutable iterator.
 type IterMutFn = for<'r> fn(&'r mut ElementList) -> std::slice::IterMut<'r, Element>;
+
+/// The signature of the function that turns an `ElementList` into an owned
+/// iterator.
 type IntoIterFn = fn(ElementList) -> std::vec::IntoIter<Element>;
 
+/// The signature of an iterator over an `&'a ElementList`.
 pub type ElementIter<'a> =
     std::iter::Flatten<std::iter::Map<std::slice::Iter<'a, ElementList>, IterFn>>;
+
+/// The signature of an iterator over an `&'a mut ElementList`.
 pub type ElementIterMut<'a> =
     std::iter::Flatten<std::iter::Map<std::slice::IterMut<'a, ElementList>, IterMutFn>>;
+
+/// The signature of an owned iterator over an `ElementList`.
 pub type ElementIntoIter =
     std::iter::Flatten<std::iter::Map<std::vec::IntoIter<ElementList>, IntoIterFn>>;
 
+/// Represents the [`ElementLists`](ElementList) of each rank that make up an
+/// abstract polytope.
 #[derive(Debug, Clone)]
 pub struct Ranks(Vec<ElementList>);
 impl_veclike!(Ranks, Item = ElementList, Index = usize);
 
+impl Index<(usize, usize)> for Ranks {
+    type Output = Element;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        &self[index.0][index.1]
+    }
+}
+
+impl IndexMut<(usize, usize)> for Ranks {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        &mut self[index.0][index.1]
+    }
+}
+
 /// The trait for any structure with an underlying set of [`Ranks`].
 pub trait Ranked: Sized {
+    /// Returns a reference to the ranks.
     fn ranks(&self) -> &Ranks;
 
+    /// Returns a mutable reference to the ranks.
     fn ranks_mut(&mut self) -> &mut Ranks;
 
+    /// Returns the ranks.
     fn into_ranks(self) -> Ranks;
 
+    /// Returns the rank of the structure, i.e. the length of the `Ranks` minus
+    /// one.
     fn rank(&self) -> usize {
         self.ranks().len() - 1
     }
 
+    /// Returns the number of elements of a given rank.
     fn el_count(&self, rank: usize) -> usize {
         self.ranks().get(rank).map(ElementList::len).unwrap_or(0)
     }
 
+    /// Returns the element counts of the structure.
     fn el_counts(&self) -> Vec<usize> {
         self.ranks().iter().map(ElementList::len).collect()
     }
 
+    /// Returns the number of vertices.
     fn vertex_count(&self) -> usize {
         self.ranks().el_count(1)
     }
 
+    /// Returns the number of facets.
     fn facet_count(&self) -> usize {
         self.ranks().el_count(self.rank().wrapping_sub(1))
     }
 
+    /// Returns a reference to an element of the polytope. To actually get the
+    /// entire polytope it defines, use [`element`](Self::element).
+    fn get_element(&self, rank: usize, idx: usize) -> Option<&Element> {
+        self.ranks().get(rank)?.get(idx)
+    }
+
+    /// Returns a mutable reference to an element of the polytope. To actually get the
+    /// entire polytope it defines, use [`element`](Self::element).
+    fn get_element_mut(&mut self, rank: usize, idx: usize) -> Option<&mut Element> {
+        self.ranks_mut().get_mut(rank)?.get_mut(idx)
+    }
+
+    /// Gets a reference to the list of elements of a given rank.
+    fn get_elements(&self, rank: usize) -> Option<&ElementList> {
+        self.ranks().get(rank)
+    }
+
+    /// Gets a mutable reference to the list of elements of a given rank.
+    fn get_elements_mut(&mut self, rank: usize) -> Option<&mut ElementList> {
+        self.ranks_mut().get_mut(rank)
+    }
+
+    /// Returns a reference to the minimal element of the polytope.
+    ///
+    /// # Panics
+    /// Panics if the polytope has not been initialized.
+    fn min(&self) -> &Element {
+        &self.ranks()[(0, 0)]
+    }
+
+    /// Returns a mutable reference to the minimal element of the polytope.
+    ///
+    /// # Panics
+    /// Panics if the polytope has not been initialized.
+    fn min_mut(&mut self) -> &mut Element {
+        &mut self.ranks_mut()[(0, 0)]
+    }
+
+    /// Returns a reference to the maximal element of the polytope.
+    ///
+    /// # Panics
+    /// Panics if the polytope has not been initialized.
+    fn max(&self) -> &Element {
+        &self.ranks()[(self.rank(), 0)]
+    }
+
+    /// Returns a mutable reference to the maximal element of the polytope.
+    ///
+    /// # Panics
+    /// Panics if the polytope has not been initialized.
+    fn max_mut(&mut self) -> &mut Element {
+        let rank = self.rank();
+        &mut self.ranks_mut()[(rank, 0)]
+    }
+
+    /// Returns a reference to the vertices of the polytope.
+    fn vertices(&self) -> &ElementList {
+        &self.ranks()[1]
+    }
+
+    /// Returns a mutable reference to the vertices of the polytope.
+    fn vertices_mut(&mut self) -> &mut ElementList {
+        &mut self.ranks_mut()[1]
+    }
+
+    /// Returns a reference to the edges of the polytope.
+    fn edges(&self) -> &ElementList {
+        &self.ranks()[2]
+    }
+
+    /// Returns a mutable reference to the edges of the polytope.
+    fn edges_mut(&mut self) -> &mut ElementList {
+        &mut self.ranks_mut()[2]
+    }
+
+    /// Returns a reference to the facets of the polytope.
+    fn facets(&self) -> &ElementList {
+        &self.ranks()[self.rank() - 1]
+    }
+
+    /// Returns a mutable reference to the facets of the polytope.
+    fn facets_mut(&mut self) -> &mut ElementList {
+        let rank = self.rank();
+        &mut self.ranks_mut()[rank - 1]
+    }
+
+    /// Pushes a list of elements of a given rank.
+    fn push_elements(&mut self, elements: ElementList) {
+        self.ranks_mut().push(elements);
+    }
+
+    /// Pushes a given element into the vector of elements of a given rank.
+    fn push_at(&mut self, rank: usize, el: Element) {
+        self.ranks_mut()[rank].push(el);
+    }
+
+    /// Pushes a given element into the vector of elements of a given rank.
+    /// Updates the superelements of its subelements automatically.
+    fn push_subs_at(&mut self, rank: usize, subs: Subelements) {
+        let i = self.ranks()[rank].len();
+
+        if rank != 0 {
+            if let Some(lower_rank) = self.ranks_mut().get_mut(rank - 1) {
+                // Updates superelements of the lower rank.
+                for &sub in &subs {
+                    lower_rank[sub].sups.push(i);
+                }
+            }
+        }
+
+        self.push_at(rank, subs.into());
+    }
+
+    /// Pushes a new subelement list, assuming that the
+    /// superelements of the current maximal rank **haven't** already been set.
+    /// If they have already been set, use [`push`](Self::push) instead.
+    fn push_subs(&mut self, subelements: SubelementList) {
+        self.push_elements(ElementList::with_capacity(subelements.len()));
+
+        for sub_el in subelements {
+            self.push_subs_at(self.rank(), sub_el);
+        }
+    }
+
+    /// Pushes a maximal element into the polytope, with the facets as
+    /// subelements. To be used in circumstances where the elements are built up
+    /// in layers.
+    fn push_max(&mut self) {
+        let facet_count = self.el_count(self.rank());
+        self.push_subs(SubelementList::max(facet_count));
+    }
+
+    /// Returns an iterator over the elements.
+    fn element_iter(&self) -> ElementIter<'_> {
+        self.ranks()
+            .iter()
+            .map(ElementList::iter as IterFn)
+            .flatten()
+    }
+
+    /// Returns a mutable iterator over the elements.
+    fn element_iter_mut(&mut self) -> ElementIterMut<'_> {
+        self.ranks_mut()
+            .iter_mut()
+            .map(ElementList::iter_mut as IterMutFn)
+            .flatten()
+    }
+
+    /// Returns an owned iterator over the elements.
     fn element_into_iter(self) -> ElementIntoIter {
         self.into_ranks()
             .into_iter()
@@ -266,19 +462,14 @@ pub trait Ranked: Sized {
             .flatten()
     }
 
-    fn element_iter(&self) -> ElementIter {
-        self.ranks()
-            .iter()
-            .map(ElementList::iter as IterFn)
-            .flatten()
+    /// Applies a function to all elements in parallel.
+    fn for_each_element<F: Fn(&mut Element) + Sync + Send + Clone>(&mut self, f: F) {
+        for elements in self.ranks_mut().iter_mut() {
+            elements.par_iter_mut().for_each(f.clone());
+        }
     }
 
-    fn element_iter_mut(&mut self) -> ElementIterMut {
-        self.ranks_mut()
-            .iter_mut()
-            .map(ElementList::iter_mut as IterMutFn)
-            .flatten()
-    }
+    // TODO: sugar for the parallel iterator.
 }
 
 impl Ranked for Ranks {
@@ -296,14 +487,15 @@ impl Ranked for Ranks {
 }
 
 impl Ranks {
+    /// Initializes a new set of ranks capable of storing elements up to a given
+    /// rank.
     pub fn with_rank_capacity(rank: usize) -> Self {
         Self::with_capacity(rank + 1)
     }
 
+    /// Sorts all of the superelements and subelements by index.
     pub fn element_sort(&mut self) {
-        for el in self.element_iter_mut() {
-            el.sort();
-        }
+        self.for_each_element(Element::sort)
     }
 }
 
@@ -506,11 +698,13 @@ pub struct SectionRef {
     /// The rank of the lowest element in the section.
     pub lo_rank: usize,
 
+    /// The index of the lowest element in the section.
     pub lo_idx: usize,
 
-    /// The highest element in the section.
+    /// The rank of the highest element in the section.
     pub hi_rank: usize,
 
+    /// The index of the highest element in the section.
     pub hi_idx: usize,
 }
 
@@ -531,19 +725,31 @@ impl SectionRef {
         }
     }
 
-    pub fn from_els(lo: (usize, usize), hi: (usize, usize)) -> Self {
-        Self::new(lo.rank(), lo.idx(), hi.rank(), hi.idx())
-    }
-
+    /// Creates a new singleton section.
     pub fn singleton(rank: usize, idx: usize) -> Self {
-        let el = (rank, idx);
-        Self::from_els(el, el)
+        Self::new(rank, idx, rank, idx)
     }
 
+    /// Creates a new section by replacing the lowest element of another.
+    pub fn with_lo(mut self, lo_rank: usize, lo_idx: usize) -> Self {
+        self.lo_rank = lo_rank;
+        self.lo_idx = lo_idx;
+        self
+    }
+
+    /// Creates a new section by replacing the highest element of another.
+    pub fn with_hi(mut self, hi_rank: usize, hi_idx: usize) -> Self {
+        self.hi_rank = hi_rank;
+        self.hi_idx = hi_idx;
+        self
+    }
+
+    /// Returns the lowest element of a section.
     pub fn lo(self) -> (usize, usize) {
         (self.lo_rank, self.lo_idx)
     }
 
+    /// Returns the highest element of a section.
     pub fn hi(self) -> (usize, usize) {
         (self.hi_rank, self.hi_idx)
     }

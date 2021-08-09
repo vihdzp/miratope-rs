@@ -1,3 +1,5 @@
+//! Contains the code for the polytope products.
+
 use super::*;
 
 /// When we compute any polytope product, we add the elements of any given rank
@@ -5,7 +7,8 @@ use super::*;
 /// of the same rank are added by the time we add those of the form
 /// `(p_rank, q_rank)`. It stores this value in `offset_memo[(p_rank, q_rank)]`.
 struct OffsetMemo<'a, const MIN: bool, const MAX: bool> {
-    /// The memoized values.
+    /// The memoized values. We store them in a single `Vec` to avoid
+    /// allocations.
     memo: Vec<usize>,
 
     /// The first factor of the product.

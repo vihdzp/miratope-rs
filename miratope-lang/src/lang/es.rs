@@ -9,6 +9,7 @@ impl Bigender {
 }
 
 /// The Spanish language.
+#[derive(Clone, Copy)]
 pub struct Es;
 
 impl GreekPrefix for Es {

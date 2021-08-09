@@ -1,3 +1,13 @@
+#![deny(
+    missing_docs,
+    nonstandard_style,
+    unused_parens,
+    unused_qualifications,
+    rust_2018_idioms,
+    rust_2018_compatibility,
+    future_incompatible,
+    missing_copy_implementations
+)]
 // These are helpful to enable while we're building the docs.
 // #![warn(clippy::missing_docs_in_private_items)]
 // #![warn(clippy::missing_panics_doc)]
@@ -16,12 +26,12 @@ pub mod conc;
 pub mod geometry;
 pub mod group;
 
-use std::{error::Error, iter};
+use std::{collections::HashSet, error::Error, iter};
 
 use abs::{
     elements::{Ranks, SectionRef},
     flag::{Flag, FlagIter, OrientedFlag, OrientedFlagIter},
-    Abstract, Ranked,
+    Abstract, ElementMap, Ranked,
 };
 
 use vec_like::VecLike;
@@ -87,11 +97,11 @@ pub type FloatOrd = ordered_float::OrderedFloat<Float>;
 
 /// Represents an error in a concrete dual, in which a facet with a given index
 /// passes through the inversion center.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct DualError(usize);
 
 impl std::fmt::Display for DualError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "facet {} passes through inversion center", self.0)
     }
 }
@@ -133,7 +143,80 @@ pub trait Polytope: Clone {
     /// Returns a mutable reference to the underlying abstract polytope.
     fn abs_mut(&mut self) -> &mut Abstract;
 
+    /// Returns the underlying abstract polytope.
     fn into_abs(self) -> Abstract;
+
+    /// Returns a map from the elements in a polytope to the index of one of its
+    /// vertices. Does not map the minimal element anywhere.
+    fn vertex_map(&self) -> ElementMap<usize> {
+        // Maps every element of the polytope to one of its vertices.
+        let mut vertex_map = ElementMap::new();
+
+        // Vertices map to themselves.
+        let vertex_count = self.vertex_count();
+        let mut vertex_list = Vec::with_capacity(vertex_count);
+        for v in 0..vertex_count {
+            vertex_list.push(v);
+        }
+        vertex_map.push(vertex_list);
+
+        // Every other element maps to the vertex of any subelement.
+        for r in 2..=self.rank() {
+            let mut element_list = Vec::new();
+
+            for el in &self.ranks()[r] {
+                element_list.push(vertex_map[r - 2][el.subs[0]]);
+            }
+
+            vertex_map.push(element_list);
+        }
+
+        vertex_map
+    }
+
+    /// Returns the indices of a Petrial polygon in cyclic order, or `None` if
+    /// it self-intersects.
+    fn petrie_polygon_vertices(&mut self, flag: Flag) -> Option<Vec<usize>> {
+        let rank = self.rank();
+        let mut new_flag = flag.clone();
+        let first_vertex = flag[0];
+
+        let mut vertices = Vec::new();
+        let mut vertex_hash = HashSet::new();
+
+        self.element_sort();
+
+        loop {
+            // Applies 0-changes up to (rank-1)-changes in order.
+            for idx in 0..rank {
+                new_flag.change_mut(self.abs(), idx);
+            }
+
+            // If we just hit a previous vertex, we return.
+            let new_vertex = new_flag[0];
+            if vertex_hash.contains(&new_vertex) {
+                return None;
+            }
+
+            // Adds the new vertex.
+            vertices.push(new_vertex);
+            vertex_hash.insert(new_vertex);
+
+            // If we're back to the beginning, we break out of the loop.
+            if new_vertex == first_vertex {
+                break;
+            }
+        }
+
+        // We returned to precisely the initial flag.
+        if flag == new_flag {
+            Some(vertices)
+        }
+        // The Petrie polygon self-intersects.
+        else {
+            None
+        }
+    }
 
     /// Sorts the subelements and superelements of the entire polytope. This is
     /// usually called before iterating over the flags of the polytope.
@@ -274,7 +357,7 @@ pub trait Polytope: Clone {
         flag.push(0);
 
         for r in 0..rank {
-            idx = self.abs().get_element(r, idx).unwrap().sups[0];
+            idx = self.get_element(r, idx).unwrap().sups[0];
             flag.push(idx);
         }
 
@@ -289,12 +372,12 @@ pub trait Polytope: Clone {
     }
 
     /// Returns an iterator over all [`Flag`]s of a polytope.
-    fn flags(&self) -> FlagIter {
+    fn flags(&self) -> FlagIter<'_> {
         FlagIter::new(self.abs())
     }
 
     /// Returns an iterator over all [`OrientedFlag`]s of a polytope.
-    fn flag_events(&self) -> OrientedFlagIter {
+    fn flag_events(&self) -> OrientedFlagIter<'_> {
         OrientedFlagIter::new(self.abs())
     }
 
@@ -372,6 +455,10 @@ pub trait Polytope: Clone {
         Self::duopyramid(self, &Self::point())
     }
 
+    /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
+    /// given base.
+    ///
+    /// This is slightly more optimal in the case of named polytopes.
     fn pyramid_mut(&mut self) {
         *self = self.pyramid();
     }
@@ -382,6 +469,10 @@ pub trait Polytope: Clone {
         Self::duoprism(self, &Self::dyad())
     }
 
+    /// Builds a [prism](https://polytope.miraheze.org/wiki/Prism) from a
+    /// given base.
+    ///
+    /// This is slightly more optimal in the case of named polytopes.
     fn prism_mut(&mut self) {
         *self = self.prism();
     }
@@ -392,6 +483,10 @@ pub trait Polytope: Clone {
         Self::duotegum(self, &Self::dyad())
     }
 
+    /// Builds a [tegum](https://polytope.miraheze.org/wiki/Bipyramid) from a
+    /// given base.
+    ///
+    /// This is slightly more optimal in the case of named polytopes.
     fn tegum_mut(&mut self) {
         *self = self.tegum();
     }

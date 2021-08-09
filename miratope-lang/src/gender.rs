@@ -1,3 +1,6 @@
+//! Implements common grammatical gender systems and some convenience methods
+//! on them.
+
 /// Represents the grammatical genders in any given language. We assume that
 /// these propagate from nouns to adjectives, i.e. an adjective that describes
 /// a given noun is declensed with the gender of the noun.

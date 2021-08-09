@@ -313,7 +313,7 @@ impl Hyperplane {
 
     /// Returns the intersection of itself and a line segment, or `None` if it
     /// doesn't exist.
-    pub fn intersect(&self, line: Segment) -> Option<Point> {
+    pub fn intersect(&self, line: Segment<'_>) -> Option<Point> {
         let d0 = self.distance(line.0);
         let d1 = self.distance(line.1);
 
@@ -361,6 +361,7 @@ where
         Self(mat)
     }
 
+    /// Returns a reference to the inner matrix.
     pub fn matrix(&self) -> &MatrixMxN<R, C> {
         &self.0
     }
@@ -378,6 +379,7 @@ where
         self.0.iter_mut()
     }
 
+    /// Returns the shape of the matrix.
     pub fn shape(&self) -> (usize, usize) {
         self.0.shape()
     }

@@ -1,3 +1,13 @@
+#![deny(
+    missing_docs,
+    nonstandard_style,
+    unused_parens,
+    unused_qualifications,
+    rust_2018_idioms,
+    rust_2018_compatibility,
+    future_incompatible,
+    missing_copy_implementations
+)]
 //! A module dedicated to parsing the names of polytopes into different
 //! languages.
 //!
@@ -696,6 +706,7 @@ pub trait Language: Prefix {
 
     // Some auxiliary functions for parsing.
 
+    /// The generic name for a quadrilateral as a noun.
     fn generic_quadrilateral_noun<T: NameType>(
         quad: T::DataQuadrilateral,
     ) -> ParseOutput<Self::Gender> {
@@ -706,6 +717,7 @@ pub trait Language: Prefix {
         }
     }
 
+    /// The generic name for a quadrilateral as an adjective.
     fn generic_quadrilateral_adj<T: NameType>(
         gender: Self::Gender,
         quad: T::DataQuadrilateral,
@@ -776,6 +788,7 @@ pub trait Language: Prefix {
     }
 }
 
+/// The currently selected language in Miratope. (make language into a dyn?)
 #[derive(Clone, Copy, Debug, EnumIter, Serialize, Deserialize)]
 pub enum SelectedLanguage {
     /// English
@@ -796,7 +809,7 @@ pub enum SelectedLanguage {
 }
 
 impl std::fmt::Display for SelectedLanguage {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Self::En => "English",
             Self::Es => "Spanish",
@@ -809,7 +822,8 @@ impl std::fmt::Display for SelectedLanguage {
 }
 
 impl SelectedLanguage {
-    pub fn parse<T: NameType>(&self, name: &Name<T>) -> String {
+    /// Parses a name in the selected language.
+    pub fn parse<T: NameType>(self, name: &Name<T>) -> String {
         use crate::lang::*;
 
         match self {

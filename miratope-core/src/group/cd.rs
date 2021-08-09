@@ -3,7 +3,7 @@
 use std::{collections::VecDeque, fmt::Display, iter, mem, str::FromStr};
 
 use crate::{
-    geometry::{Matrix, MatrixOrd, Point, Vector},
+    geometry::{Matrix, Point, Vector},
     Consts, Float, FloatOrd,
 };
 
@@ -108,22 +108,18 @@ impl std::error::Error for CdError {}
 /// The Coxeter matrix for a Coxeter diagram is defined so that the (i, j) entry
 /// corresponds to the value of the edge between the ith and jth node, or 2 if
 /// there's no such edge.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CoxMatrix(MatrixOrd);
+#[derive(Clone, Debug, PartialEq)]
+pub struct CoxMatrix(Matrix);
 
 impl CoxMatrix {
     /// Initializes a new CD matrix from a vector of nodes and a matrix.
     pub fn new(matrix: Matrix) -> Self {
-        Self(MatrixOrd::new(matrix))
-    }
-
-    pub fn matrix(&self) -> &Matrix {
-        self.0.matrix()
+        Self(matrix)
     }
 
     /// Returns the dimensions of the matrix.
     pub fn dim(&self) -> usize {
-        self.matrix().nrows()
+        self.0.nrows()
     }
 
     /// Parses a [`Cd`] and turns it into a Coxeter matrix.
@@ -396,6 +392,7 @@ impl NodeRef {
 }
 
 /// Stores the [`NodeRef`]s of both ends of an edge, along with its value.
+#[derive(Clone, Copy)]
 pub struct EdgeRef {
     /// The reference to the first node in the edge.
     first: NodeRef,

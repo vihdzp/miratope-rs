@@ -517,7 +517,7 @@ pub trait ConcretePolytope: Polytope {
     /// of the nullitope.
     fn gravicenter(&self) -> Option<Point> {
         let mut g = Point::zeros(self.dim()? as usize);
-        let vertices = &self.con().vertices;
+        let vertices = self.vertices();
 
         // Adds up all vertices.
         for v in vertices {
@@ -537,8 +537,7 @@ pub trait ConcretePolytope: Polytope {
         let hyperplane = Hyperplane::new(direction.clone(), 0.0);
 
         match self
-            .con()
-            .vertices
+            .vertices()
             .iter()
             .map(|v| ordered_float::OrderedFloat(hyperplane.distance(v)))
             .minmax()
@@ -556,56 +555,20 @@ pub trait ConcretePolytope: Polytope {
 
     /// Returns the length of a given edge.
     fn edge_len(&self, idx: usize) -> Option<Float> {
-        let edge = self.abs().get_element(2, idx)?;
-        let vertices = self.vertices();
-        Some((&vertices[edge.subs[0]] - &vertices[edge.subs[1]]).norm())
-    }
-
-    /// Gets the edge lengths of all edges in the polytope, in order.
-    fn edge_lengths(&self) -> Vec<Float> {
-        let mut edge_lengths = Vec::new();
-
-        // If there are no edges, we just return the empty vector.
-        if let Some(edges) = self.ranks().get(2) {
-            edge_lengths.reserve(edges.len());
-
-            let vertices = self.vertices();
-            for edge in edges {
-                let sub0 = edge.subs[0];
-                let sub1 = edge.subs[1];
-
-                edge_lengths.push((&vertices[sub0] - &vertices[sub1]).norm());
-            }
-        }
-
-        edge_lengths
+        let edge = self.get_element(2, idx)?;
+        Some((&self.vertices()[edge.subs[0]] - &self.vertices()[edge.subs[1]]).norm())
     }
 
     /// Checks whether a polytope is equilateral to a fixed precision, and with
     /// a specified edge length.
-    fn is_equilateral_with_len(&self, len: Float) -> bool {
-        let edge_lengths = self.edge_lengths().into_iter();
-
-        // Checks that every other edge length is equal to the first.
-        for edge_len in edge_lengths {
-            if abs_diff_eq!(edge_len, len, epsilon = Float::EPS) {
-                return false;
-            }
-        }
-
-        true
+    fn is_equilateral_with(&self, len: Float) -> bool {
+        (0..self.el_count(2))
+            .all(|idx| abs_diff_eq!(self.edge_len(idx).unwrap(), len, epsilon = Float::EPS))
     }
 
     /// Checks whether a polytope is equilateral to a fixed precision.
     fn is_equilateral(&self) -> bool {
-        // Checks whether self is equilateral with the edge length of any edge.
-        if let Some(vertices) = self.con().element_vertices_ref(2, 0) {
-            self.is_equilateral_with_len((vertices[0] - vertices[1]).norm())
-        }
-        // If there are no edges, we return true.
-        else {
-            true
-        }
+        self.el_count(2) == 0 || self.is_equilateral_with(self.edge_len(0).unwrap())
     }
 
     /// I haven't actually implemented this in the general case.
@@ -613,14 +576,8 @@ pub trait ConcretePolytope: Polytope {
     /// # Todo
     /// Maybe make this work in the general case?
     fn midradius(&self) -> Float {
-        let vertices = &self.vertices();
-        let edges = &self.ranks()[2];
-        let edge = &edges[0];
-
-        let sub0 = edge.subs[0];
-        let sub1 = edge.subs[1];
-
-        (&vertices[sub0] + &vertices[sub1]).norm() / 2.0
+        let edge_subs = &self.edges()[0].subs;
+        (&self.vertices()[edge_subs[0]] + &self.vertices()[edge_subs[1]]).norm() / 2.0
     }
 
     /// Builds the dual of a polytope with a given reciprocation sphere in
@@ -833,6 +790,7 @@ pub trait ConcretePolytope: Polytope {
     /// Flattens the vertices of a polytope into a specified subspace.
     fn flatten_into(&mut self, subspace: &Subspace);
 
+    /// Slices the polytope through a given plane.
     fn cross_section(&self, slice: &Hyperplane) -> Self;
 }
 
@@ -903,24 +861,23 @@ impl ConcretePolytope for Concrete {
         let o = h.project(&sphere.center);
 
         let mut projections;
-        let rank_minus_one = rank - 1;
 
         // We project our inversion center onto each of the facets.
         if rank >= 3 {
-            let facet_count = self.el_count(rank_minus_one);
-            let indices: Vec<_> = (0..facet_count).collect();
+            let facet_count = self.facet_count();
+            projections = Vec::with_capacity(facet_count);
 
-            projections = indices
+            (0..facet_count)
                 .into_par_iter()
                 .map(|idx| {
                     Subspace::from_points(
-                        self.element_vertices_ref(rank_minus_one, idx)
+                        self.element_vertices_ref(rank - 1, idx)
                             .unwrap()
                             .into_iter(),
                     )
                     .project(&o)
                 })
-                .collect();
+                .collect_into_vec(&mut projections);
         }
         // If our polytope is 1D, the vertices themselves are the facets.
         else {
