@@ -2,7 +2,10 @@
 
 use std::collections::HashMap;
 
-use crate::{abs::Ranked, conc::Concrete};
+use crate::{
+    abs::{ElementMap, Ranked},
+    conc::Concrete,
+};
 
 use vec_like::*;
 
@@ -56,12 +59,14 @@ impl Concrete {
     - iterate over ranks backwards, use superelements instead of subelements
     - get number of types in total, if it's the same as previous loop, stop
     */
-    fn element_types(&self) -> Vec<Vec<ElementType>> {
+    fn element_types(&self) -> ElementMap<ElementType> {
+        let rank = self.rank();
+
         // Stores the different types, the counts of each, and the indices of
         // the types associated to each element.
-        let mut types = Vec::new();
+        let mut types = ElementMap::new();
         let mut type_counts = Vec::new();
-        let mut type_of_element = Vec::new();
+        let mut type_of_element = ElementMap::new();
 
         // Initializes every element with the zeroth type.
         for el_count in self.el_count_iter() {
@@ -70,12 +75,12 @@ impl Concrete {
             type_counts.push(1);
         }
 
-        let mut type_count = self.rank();
+        let mut type_count = rank;
 
         // To limit the number of passes, we can turn this into a `for` loop.
         loop {
             // We build element types from the bottom up.
-            for r in 2..self.rank() {
+            for r in 1..rank {
                 // All element types of this rank.
                 let mut types_rank: Vec<ElementType> = Vec::new();
                 let mut dict = HashMap::new();
@@ -117,7 +122,7 @@ impl Concrete {
             }
 
             // We do basically the same thing, from the top down.
-            for r in (1..self.rank() - 1).rev() {
+            for r in (1..rank).rev() {
                 // All element types of this rank.
                 let mut types_rank: Vec<ElementType> = Vec::new();
                 let mut dict = HashMap::new();
