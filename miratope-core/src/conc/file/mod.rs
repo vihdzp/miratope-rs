@@ -7,13 +7,14 @@ use self::{
     ggb::{GgbError, GgbResult},
     off::{OffReader, OffResult},
 };
+use crate::Float;
 
 use super::Concrete;
 use off::OffError;
 use zip::result::ZipError;
 
 pub use std::io::Error as IoError;
-use std::{fs::File, string::FromUtf8Error};
+use std::{fs::File, str::FromStr, string::FromUtf8Error};
 
 /// Any error encountered while trying to load a polytope.
 #[derive(Debug)]
@@ -129,7 +130,7 @@ pub trait FromFile: Sized {
     }
 }
 
-impl FromFile for Concrete {
+impl<T: Float + FromStr> FromFile for Concrete<T> {
     fn from_off(src: &str) -> OffResult<Self> {
         OffReader::new(src).build()
     }

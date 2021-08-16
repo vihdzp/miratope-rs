@@ -1,11 +1,13 @@
 //! The systems that update the main window.
 
 use super::{camera::ProjectionType, top_panel::SectionState};
+use crate::mesh::Renderable;
+use crate::NamedConcrete;
 
 use bevy::prelude::*;
 use bevy_egui::EguiSettings;
 use miratope_core::Polytope;
-use miratope_lang::{poly::NamedConcrete, SelectedLanguage};
+use miratope_lang::SelectedLanguage;
 
 /// The plugin in charge of the Miratope main window, and of drawing the
 /// polytope onto it.
@@ -62,7 +64,7 @@ pub fn update_changed_polytopes(
             poly.abs().is_valid().unwrap();
         }
 
-        *meshes.get_mut(mesh_handle).unwrap() = crate::mesh::mesh(&poly.polytope, *orthogonal);
+        *meshes.get_mut(mesh_handle).unwrap() = poly.mesh(*orthogonal);
 
         // Sets the window's name to the polytope's name.
         windows
@@ -73,8 +75,7 @@ pub fn update_changed_polytopes(
         // Updates all wireframes.
         for child in children.iter() {
             if let Ok(wf_handle) = wfs.get_component::<Handle<Mesh>>(*child) {
-                *meshes.get_mut(wf_handle).unwrap() =
-                    crate::mesh::wireframe(&poly.polytope, *orthogonal);
+                *meshes.get_mut(wf_handle).unwrap() = poly.wireframe(*orthogonal);
             }
         }
 

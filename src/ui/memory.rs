@@ -1,6 +1,8 @@
+use crate::NamedConcrete;
+
 use bevy::prelude::Query;
 use bevy_egui::egui;
-use miratope_lang::{lang::En, poly::NamedConcrete};
+use miratope_lang::lang::En;
 
 pub const MEMORY_SLOTS: usize = 8;
 

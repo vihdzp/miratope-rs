@@ -1,29 +1,26 @@
 //! Contains structs and methods to faciliate geometry in *n*-dimensional space.
 
 /// A point in *n*-dimensional space.
-pub type Point = nalgebra::DVector<Float>;
+pub type Point<T> = nalgebra::DVector<T>;
 
 /// A vector in *n*-dimensional space.
-pub type Vector = Point;
+pub type Vector<T> = Point<T>;
 
 /// A non-owned form of [`Vector`].
-pub type VectorSlice<'a> = nalgebra::DVectorSlice<'a, Float>;
+pub type VectorSlice<'a, T> = nalgebra::DVectorSlice<'a, T>;
 
 /// An *n* by *n* matrix.
-pub type Matrix = nalgebra::DMatrix<Float>;
+pub type Matrix<T> = nalgebra::DMatrix<T>;
 
 use std::{
     borrow::Cow,
     ops::{Index, IndexMut},
 };
 
-use crate::{Consts, Float};
+use crate::Float;
 
 use approx::{abs_diff_eq, abs_diff_ne};
-use nalgebra::{
-    storage::{Storage, StorageMut},
-    Dim, Dynamic, VecStorage, U1,
-};
+use nalgebra::{storage::StorageMut, Dim, Dynamic, VecStorage, U1};
 
 /// A hypersphere with a certain center and radius.
 ///
@@ -31,31 +28,31 @@ use nalgebra::{
 /// where the hypersphere is used to reciprocate polytopes. For convenience, we
 /// allow the hypersphere to have a negative squared radius, which results in
 /// the dualized polytope being reflected about its center.
-pub struct Hypersphere {
+pub struct Hypersphere<T: Float> {
     /// The center of the hypersphere.
-    pub center: Point,
+    pub center: Point<T>,
 
     /// The squared radius of the hypersphere. We allow negative numbers as a
     /// convenient way to dual + reflect a polytope.
-    pub squared_radius: Float,
+    pub squared_radius: T,
 }
 
-impl Hypersphere {
+impl<T: Float> Hypersphere<T> {
     /// Returns the radius of the hypersphere, or `NaN` if its squared radius is
     /// negative.
-    pub fn radius(&self) -> Float {
-        self.squared_radius.sqrt()
+    pub fn radius(&self) -> T {
+        self.squared_radius.fsqrt()
     }
 
     /// Constructs a hypersphere with a given dimension and radius,
     /// centered at the origin.
-    pub fn with_radius(center: Point, radius: Float) -> Hypersphere {
+    pub fn with_radius(center: Point<T>, radius: T) -> Self {
         Self::with_squared_radius(center, radius * radius)
     }
 
     /// Constructs a hypersphere with a given dimension and squared radius,
     /// centered at the origin.
-    pub fn with_squared_radius(center: Point, squared_radius: Float) -> Hypersphere {
+    pub fn with_squared_radius(center: Point<T>, squared_radius: T) -> Self {
         Self {
             center,
             squared_radius,
@@ -63,14 +60,14 @@ impl Hypersphere {
     }
 
     /// Represents the unit hypersphere in a certain number of dimensions.
-    pub fn unit(dim: usize) -> Hypersphere {
-        Hypersphere::with_squared_radius(Point::zeros(dim), 1.0)
+    pub fn unit(dim: usize) -> Self {
+        Hypersphere::with_squared_radius(Point::zeros(dim), T::ONE)
     }
 
     /// Attempts to reciprocate a point in place. If it's too close to the
     /// sphere's center, it returns `false` and leaves it unchanged.
-    pub fn reciprocate_mut(&self, p: &mut Point) -> bool {
-        let mut q = p as &Point - &self.center;
+    pub fn reciprocate_mut(&self, p: &mut Point<T>) -> bool {
+        let mut q = (p as &Point<T>) - &self.center;
         let s = q.norm_squared();
 
         // If any face passes through the dual center, the dual does
@@ -91,7 +88,7 @@ impl Hypersphere {
 
     /// Attempts to reciprocate a point. If it's too close to the sphere's
     /// center, it returns `None`.
-    pub fn reciprocate(&self, mut p: Point) -> Option<Point> {
+    pub fn reciprocate(&self, mut p: Point<T>) -> Option<Point<T>> {
         self.reciprocate_mut(&mut p).then(|| p)
     }
 }
@@ -101,17 +98,17 @@ impl Hypersphere {
 ///
 /// TODO: Use asserts to guarantee that the basis is an orthogonal basis of unit
 /// vectors.
-pub struct Subspace {
+pub struct Subspace<T: Float> {
     /// An orthogonal basis for the subspace, defined by unit vectors.
-    pub basis: Vec<Vector>,
+    pub basis: Vec<Vector<T>>,
 
     /// An "offset", which represents any point on the subspace.
-    pub offset: Point,
+    pub offset: Point<T>,
 }
 
-impl Subspace {
+impl<T: Float> Subspace<T> {
     /// Generates a trivial subspace passing through a given point.
-    pub fn new(p: Point) -> Self {
+    pub fn new(p: Point<T>) -> Self {
         Self {
             basis: Vec::new(),
             offset: p,
@@ -148,7 +145,7 @@ impl Subspace {
     ///
     /// # Todo:
     /// Implement the [Gram-Schmidt process](https://en.wikipedia.org/wiki/Gram%E2%80%93Schmidt_process#Numerical_stability).
-    pub fn add(&mut self, p: &Point) -> Option<&Point> {
+    pub fn add(&mut self, p: &Point<T>) -> Option<&Point<T>> {
         let mut v = p - self.project(p);
 
         if v.normalize_mut() > Float::EPS {
@@ -165,7 +162,7 @@ impl Subspace {
     ///
     /// Consider using [`Self::from_points_with`] if you expect your subspace to
     /// have an exact rank.
-    pub fn from_points<'a, T: Iterator<Item = &'a Point>>(mut iter: T) -> Self {
+    pub fn from_points<'a, U: Iterator<Item = &'a Point<T>>>(mut iter: U) -> Self {
         let mut subspace = Self::new(
             iter.next()
                 .expect("A hyperplane can't be created from an empty point array!")
@@ -192,8 +189,8 @@ impl Subspace {
     ///
     /// This method is only faster than the usual one when the specified rank
     /// isn't equal to the dimension of the points.
-    pub fn from_points_with<'a, T: Iterator<Item = &'a Point>>(
-        mut points: T,
+    pub fn from_points_with<'a, U: Iterator<Item = &'a Point<T>>>(
+        mut points: U,
         rank: usize,
     ) -> Option<Self> {
         let mut subspace = Self::new(
@@ -213,7 +210,7 @@ impl Subspace {
     }
 
     /// Projects a point onto the subspace.
-    pub fn project(&self, p: &Point) -> Point {
+    pub fn project(&self, p: &Point<T>) -> Point<T> {
         let p = p - &self.offset;
         let mut q = self.offset.clone();
 
@@ -226,7 +223,7 @@ impl Subspace {
 
     /// Projects a point onto the subspace, but returns lower-dimensional
     /// coordinates in the subspace's basis.
-    pub fn flatten(&self, p: &Point) -> Point {
+    pub fn flatten(&self, p: &Point<T>) -> Point<T> {
         let p = p - &self.offset;
         Point::from_iterator(self.rank(), self.basis.iter().map(|b| p.dot(b)))
     }
@@ -236,7 +233,7 @@ impl Subspace {
     ///
     /// This optimizes [`Self::flatten`] by just returning the original set in
     /// case that the subspace is of full rank.
-    pub fn flatten_vec<'a>(&self, vec: &'a [Point]) -> Cow<'a, [Point]> {
+    pub fn flatten_vec<'a>(&self, vec: &'a [Point<T>]) -> Cow<'a, [Point<T>]> {
         if self.is_full_rank() {
             Cow::Borrowed(vec)
         } else {
@@ -249,14 +246,14 @@ impl Subspace {
     }
 
     /// Calculates the distance from a point to the subspace.
-    pub fn distance(&self, p: &Point) -> Float {
+    pub fn distance(&self, p: &Point<T>) -> T {
         (p - self.project(p)).norm()
     }
 
     /// Computes a normal vector to the subspace, so that the specified point is
     /// left out of it. Returns `None` if the point given lies on the subspace.
-    pub fn normal(&self, p: &Point) -> Option<Vector> {
-        (p - self.project(p)).try_normalize(Float::EPS)
+    pub fn normal(&self, p: &Point<T>) -> Option<Vector<T>> {
+        (p - self.project(p)).try_normalize(T::EPS)
     }
 
     // Computes a set of independent vectors that span the orthogonal
@@ -267,82 +264,79 @@ impl Subspace {
 }
 
 /// Represents an (oriented) hyperplane together with a normal vector.
-pub struct Hyperplane {
+pub struct Hyperplane<T: Float> {
     /// The underlying subspace associated to the hyperplane.
-    pub subspace: Subspace,
+    pub subspace: Subspace<T>,
 
     /// The normal vector of the hyperplane.
-    normal: Vector,
+    normal: Vector<T>,
 }
 
-impl Hyperplane {
+impl<T: Float> Hyperplane<T> {
     /// Generates an oriented hyperplane from its normal vector.
-    pub fn new(normal: Vector, pos: Float) -> Self {
+    pub fn new(normal: Vector<T>, pos: T) -> Self {
         let rank = normal.len();
-        let mut subspace = Subspace::new(pos * &normal);
+        let mut subspace = Subspace::new(&normal * pos);
         let mut e = Vector::zeros(rank);
 
         for i in 0..rank {
-            e[i] = 1.0;
-            e += (pos - e.dot(&normal)) * &normal;
+            e[i] = T::ONE;
+            e += &normal * (pos - e.dot(&normal));
             subspace.add(&e);
-            e[i] = 0.0;
+            e[i] = T::ZERO;
         }
 
         Self { subspace, normal }
     }
 
     /// Projects a point onto the hyperplane.
-    pub fn project(&self, p: &Point) -> Point {
+    pub fn project(&self, p: &Point<T>) -> Point<T> {
         self.subspace.project(p)
     }
 
     /// Calculates the signed distance from a point to the hyperplane. Points on
     /// the side of the hyperplane containing the vector have positive distance.
-    pub fn distance(&self, p: &Point) -> Float {
+    pub fn distance(&self, p: &Point<T>) -> T {
         (p - self.project(p)).dot(&self.normal)
     }
 
     /// Applies a map from the hyperplane to a lower dimensional space to the
     /// point.
-    pub fn flatten(&self, p: &Point) -> Point {
+    pub fn flatten(&self, p: &Point<T>) -> Point<T> {
         self.subspace.flatten(p)
     }
 
     /// Returns whether a point is contained on the hyperplane.
-    pub fn is_outer(&self, p: &Point) -> bool {
-        abs_diff_eq!(self.distance(p), 0.0, epsilon = Float::EPS)
+    pub fn is_outer(&self, p: &Point<T>) -> bool {
+        abs_diff_eq!(self.distance(p), T::ZERO, epsilon = Float::EPS)
     }
 
     /// Returns the intersection of itself and a line segment, or `None` if it
     /// doesn't exist.
-    pub fn intersect(&self, line: Segment<'_>) -> Option<Point> {
+    pub fn intersect(&self, line: Segment<'_, T>) -> Option<Point<T>> {
         let d0 = self.distance(line.0);
         let d1 = self.distance(line.1);
 
         // This right here is some really sensitive code. If we screw up
         // handling the edge cases, cross-sections through elements will crash.
-        if abs_diff_eq!(d0, d1, epsilon = Float::EPS) || (d0 < -Float::EPS) == (d1 < -Float::EPS) {
-            None
-        } else {
-            Some(line.at(d1 / (d1 - d0)))
-        }
+        (abs_diff_ne!(d0, d1, epsilon = T::EPS) && (d0 < -T::EPS) != (d1 < -T::EPS))
+            .then(|| line.at(d1 / (d1 - d0)))
     }
 }
 
 /// Represents a line segment between two points.
-pub struct Segment<'a>(pub &'a Point, pub &'a Point);
+pub struct Segment<'a, T: Float>(pub &'a Point<T>, pub &'a Point<T>);
 
-impl<'a> Segment<'a> {
+impl<'a, T: Float> Segment<'a, T> {
     /// Returns the point at a certain position along the line. If `t` is
     /// between 0 and 1, the point will be contained on the line segment.
-    pub fn at(&self, t: Float) -> Point {
-        self.0 * t + self.1 * (1.0 - t)
+    pub fn at(&self, t: T) -> Point<T> {
+        self.0 * t + self.1 * (T::ONE - t)
     }
 }
 
 /// A matrix with a given number of rows and columns.
-type MatrixMxN<R, C> = nalgebra::Matrix<Float, R, C, VecStorage<Float, R, C>>;
+type MatrixMxN<T, R, C> = nalgebra::Matrix<T, R, C, VecStorage<T, R, C>>;
 
 /// A matrix ordered by fuzzy lexicographic ordering. That is, lexicographic
 /// ordering where two entries that differ by less than an epsilon are
@@ -351,34 +345,31 @@ type MatrixMxN<R, C> = nalgebra::Matrix<Float, R, C, VecStorage<Float, R, C>>;
 /// This struct can be used to build a `BTreeSet` of points or matrices in a way
 /// that's resistant to floating point errors.
 #[derive(Clone, Debug)]
-pub struct MatrixOrdMxN<R: Dim, C: Dim>(pub MatrixMxN<R, C>)
+pub struct MatrixOrdMxN<T: Float, R: Dim, C: Dim>(pub MatrixMxN<T, R, C>)
 where
-    VecStorage<Float, R, C>: Storage<Float, R, C>;
+    VecStorage<T, R, C>: StorageMut<T, R, C>;
 
-impl<R: Dim, C: Dim> MatrixOrdMxN<R, C>
+impl<T: Float, R: Dim, C: Dim> MatrixOrdMxN<T, R, C>
 where
-    VecStorage<Float, R, C>: Storage<Float, R, C>,
+    VecStorage<T, R, C>: StorageMut<T, R, C>,
 {
     /// Initializes a new `MatrixOrd` from a `Matrix`.
-    pub fn new(mat: MatrixMxN<R, C>) -> Self {
+    pub fn new(mat: MatrixMxN<T, R, C>) -> Self {
         Self(mat)
     }
 
     /// Returns a reference to the inner matrix.
-    pub fn matrix(&self) -> &MatrixMxN<R, C> {
+    pub fn matrix(&self) -> &MatrixMxN<T, R, C> {
         &self.0
     }
 
     /// Iterates over the entries of the `MatrixOrd`.
-    pub fn iter(&self) -> impl Iterator<Item = &Float> {
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.0.iter()
     }
 
     /// Mutably iterates over the entries of the `MatrixOrd`.
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Float>
-    where
-        VecStorage<Float, R, C>: StorageMut<Float, R, C>,
-    {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
         self.0.iter_mut()
     }
 
@@ -388,9 +379,9 @@ where
     }
 }
 
-impl<R: Dim, C: Dim> PartialEq for MatrixOrdMxN<R, C>
+impl<T: Float, R: Dim, C: Dim> PartialEq for MatrixOrdMxN<T, R, C>
 where
-    VecStorage<Float, R, C>: Storage<Float, R, C>,
+    VecStorage<T, R, C>: StorageMut<T, R, C>,
 {
     fn eq(&self, other: &Self) -> bool {
         debug_assert_eq!(self.shape(), other.shape(), "Matrix shape mismatch");
@@ -402,11 +393,14 @@ where
 
 /// Equality on `MatrixOrds` should be an equality relation, as long as the
 /// distance between the `MatrixOrds` you're comparing is "small".
-impl<R: Dim, C: Dim> Eq for MatrixOrdMxN<R, C> where VecStorage<Float, R, C>: Storage<Float, R, C> {}
+impl<T: Float, R: Dim, C: Dim> Eq for MatrixOrdMxN<T, R, C> where
+    VecStorage<T, R, C>: StorageMut<T, R, C>
+{
+}
 
-impl<R: Dim, C: Dim> PartialOrd for MatrixOrdMxN<R, C>
+impl<T: Float, R: Dim, C: Dim> PartialOrd for MatrixOrdMxN<T, R, C>
 where
-    VecStorage<Float, R, C>: Storage<Float, R, C>,
+    VecStorage<T, R, C>: StorageMut<T, R, C>,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         for (x, y) in self.iter().zip(other.iter()) {
@@ -419,29 +413,29 @@ where
     }
 }
 
-impl<R: Dim, C: Dim> Ord for MatrixOrdMxN<R, C>
+impl<T: Float, R: Dim, C: Dim> Ord for MatrixOrdMxN<T, R, C>
 where
-    VecStorage<Float, R, C>: Storage<Float, R, C>,
+    VecStorage<T, R, C>: StorageMut<T, R, C>,
 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other).expect("Matrix has NaN values")
     }
 }
 
-impl<R: Dim, C: Dim> Index<(usize, usize)> for MatrixOrdMxN<R, C>
+impl<T: Float, R: Dim, C: Dim> Index<(usize, usize)> for MatrixOrdMxN<T, R, C>
 where
-    VecStorage<Float, R, C>: Storage<Float, R, C>,
+    VecStorage<T, R, C>: StorageMut<T, R, C>,
 {
-    type Output = Float;
+    type Output = T;
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
         &self.0[index]
     }
 }
 
-impl<R: Dim, C: Dim> IndexMut<(usize, usize)> for MatrixOrdMxN<R, C>
+impl<T: Float, R: Dim, C: Dim> IndexMut<(usize, usize)> for MatrixOrdMxN<T, R, C>
 where
-    VecStorage<Float, R, C>: StorageMut<Float, R, C>,
+    VecStorage<T, R, C>: StorageMut<T, R, C>,
 {
     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
         &mut self.0[index]
@@ -450,11 +444,11 @@ where
 
 /// A matrix ordered by fuzzy lexicographic ordering. For more info, see
 /// [`MatrixOrdMxN`].
-pub type MatrixOrd = MatrixOrdMxN<Dynamic, Dynamic>;
+pub type MatrixOrd<T> = MatrixOrdMxN<T, Dynamic, Dynamic>;
 
 /// A point ordered by fuzzy lexicographic ordering. For more info, see
 /// [`MatrixOrdMxN`].
-pub type PointOrd = MatrixOrdMxN<Dynamic, U1>;
+pub type PointOrd<T> = MatrixOrdMxN<T, Dynamic, U1>;
 
 #[cfg(test)]
 mod tests {
@@ -463,7 +457,7 @@ mod tests {
     use approx::assert_abs_diff_eq;
     use nalgebra::dvector;
 
-    fn assert_eq(p: Point, q: Point) {
+    fn assert_eq(p: Point<f32>, q: Point<f32>) {
         assert_abs_diff_eq!((p - q).norm(), 0.0, epsilon = Float::EPS)
     }
 

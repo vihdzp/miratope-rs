@@ -7,6 +7,7 @@ use crate::{
     conc::Concrete,
 };
 
+use crate::Float;
 use vec_like::*;
 
 /// Every element in a polytope can be assigned a "type" depending on its
@@ -45,7 +46,7 @@ const EL_SUFFIXES: [&str; 24] = [
     "nedakon", "ikon", "ikenon", "ikodon",
 ];
 
-impl Concrete {
+impl<T: Float> Concrete<T> {
     /*  element type of an element is <index>
     - initialize all elements to <0>
     - repeat:

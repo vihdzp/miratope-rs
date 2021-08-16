@@ -72,7 +72,6 @@ use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::EguiPlugin;
 use miratope_core::conc::file::FromFile;
-use miratope_lang::poly::NamedConcrete;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
 use ui::{
@@ -80,9 +79,20 @@ use ui::{
     MiratopePlugins,
 };
 
+use crate::mesh::Renderable;
+
 mod mesh;
 mod no_cull_pipeline;
 mod ui;
+
+type Float = f32;
+type Concrete = miratope_core::conc::Concrete<Float>;
+type NamedConcrete = miratope_lang::poly::NamedConcrete<Float>;
+type Point = miratope_core::geometry::Point<Float>;
+type Vector = miratope_core::geometry::Vector<Float>;
+type Hypersphere = miratope_core::geometry::Hypersphere<Float>;
+type Hyperplane = miratope_core::geometry::Hyperplane<Float>;
+const EPS: Float = <Float as miratope_core::Float>::EPS;
 
 /// The link to the GitHub issues.
 const NEW_ISSUE: &str = "https://github.com/OfficialURL/miratope-rs/issues/new";
@@ -143,14 +153,14 @@ fn setup(
         .spawn()
         // Mesh
         .insert_bundle(PbrNoBackfaceBundle {
-            mesh: meshes.add(mesh::mesh(&poly.polytope, ProjectionType::Perspective)),
+            mesh: meshes.add(poly.mesh(ProjectionType::Perspective)),
             material: mesh_material,
             ..Default::default()
         })
         // Wireframe
         .with_children(|cb| {
             cb.spawn().insert_bundle(PbrNoBackfaceBundle {
-                mesh: meshes.add(mesh::wireframe(&poly.polytope, ProjectionType::Perspective)),
+                mesh: meshes.add(poly.wireframe(ProjectionType::Perspective)),
                 material: wf_material,
                 ..Default::default()
             });

@@ -5,7 +5,7 @@ use std::{collections::HashMap, io::Result as IoResult, path::Path, str::FromStr
 use crate::{
     abs::{AbstractBuilder, Ranked, SubelementList, Subelements},
     conc::{Concrete, ElementList, Point, Polytope},
-    COMPONENTS, ELEMENT_NAMES,
+    Float, COMPONENTS, ELEMENT_NAMES,
 };
 
 use petgraph::{graph::NodeIndex, visit::Dfs, Graph};
@@ -105,6 +105,12 @@ struct Token<'a> {
     pos: Position,
 }
 
+impl<'a> Token<'a> {
+    fn parse<T: FromStr>(&self) -> OffResult<T> {
+        self.slice.parse().map_err(|_| OffError::Parsing(self.pos))
+    }
+}
+
 /// An iterator over the tokens in an OFF file. It excludes whitespace and
 /// comments. It also keeps track of position.
 struct TokenIter<'a> {
@@ -187,15 +193,10 @@ impl<'a> TokenIter<'a> {
     }
 
     /// Reads and parses the next token from the OFF file.
-    pub fn parse_next<U: FromStr>(&mut self) -> OffResult<U>
-    where
-        <U as FromStr>::Err: std::fmt::Debug,
-    {
-        let Token { slice, pos } = self
-            .next()
-            .ok_or(OffError::UnexpectedEnding(self.position))?;
-
-        slice.parse().map_err(|_| OffError::Parsing(pos))
+    pub fn parse_next<U: FromStr>(&mut self) -> OffResult<U> {
+        self.next()
+            .ok_or(OffError::UnexpectedEnding(self.position))?
+            .parse()
     }
 }
 
@@ -288,7 +289,11 @@ impl<'a> OffReader<'a> {
     }
 
     /// Parses all vertex coordinates from the OFF file.
-    fn parse_vertices(&mut self, num: usize, dim: usize) -> OffResult<Vec<Point>> {
+    fn parse_vertices<T: Float + FromStr>(
+        &mut self,
+        num: usize,
+        dim: usize,
+    ) -> OffResult<Vec<Point<T>>> {
         // Reads all vertices.
         let mut vertices = Vec::with_capacity(num);
 
@@ -396,7 +401,7 @@ impl<'a> OffReader<'a> {
     }*/
 
     /// Builds a concrete polytope from the OFF reader.
-    pub fn build(mut self) -> OffResult<Concrete> {
+    pub fn build<T: Float + FromStr>(mut self) -> OffResult<Concrete<T>> {
         // Reads the rank of the polytope.
         let rank = self.rank()?;
 
@@ -482,22 +487,22 @@ impl Default for OffOptions {
 }
 
 /// An auxiliary struct to write a polytope to an OFF file.
-pub struct OffWriter<'a> {
+pub struct OffWriter<'a, T: Float + ToString> {
     /// The output OFF file, as a string. (Maybe we should use a file writer
     /// or something similar instead?)
     off: String,
 
     /// The polytope that we're converting into an OFF file.
-    polytope: &'a Concrete,
+    polytope: &'a Concrete<T>,
 
     /// Options for the text output.
     options: OffOptions,
 }
 
-impl<'a> OffWriter<'a> {
+impl<'a, T: Float + ToString> OffWriter<'a, T> {
     /// Initializes a new OFF writer from a polytope, with a given set of
     /// options.
-    pub fn new(polytope: &'a Concrete, options: OffOptions) -> Self {
+    pub fn new(polytope: &'a Concrete<T>, options: OffOptions) -> Self {
         Self {
             off: String::new(),
             polytope,
@@ -543,7 +548,7 @@ impl<'a> OffWriter<'a> {
     }
 
     /// Writes the vertices of a polytope into an OFF file.
-    fn write_vertices(&mut self, vertices: &[Point]) {
+    fn write_vertices(&mut self, vertices: &[Point<T>]) {
         // # Vertices
         if self.options.comments {
             self.off.push_str("\n# ");
@@ -707,7 +712,7 @@ impl<'a> OffWriter<'a> {
     }
 }
 
-impl Concrete {
+impl<T: Float + ToString> Concrete<T> {
     /// Converts a polytope into an OFF file.
     pub fn to_off(&self, options: OffOptions) -> String {
         OffWriter::new(self, options).build()
@@ -731,12 +736,12 @@ mod tests {
     // TODO: take a `&str` as an argument instead.
     fn test_shape(off: &str, el_nums: &[usize]) {
         // Checks that element counts match up.
-        let p = Concrete::from_off(off).expect("OFF file could not be loaded.");
+        let p = Concrete::<f32>::from_off(off).expect("OFF file could not be loaded.");
         let p_counts: Vec<_> = p.el_count_iter().collect();
         assert_eq!(p_counts, el_nums);
 
         // Checks that the polytope can be reloaded correctly.
-        let p = Concrete::from_off(&p.to_off(Default::default()))
+        let p = Concrete::<f32>::from_off(&p.to_off(Default::default()))
             .expect("OFF file could not be reloaded.");
         let p_counts: Vec<_> = p.el_count_iter().collect();
         assert_eq!(p_counts, el_nums);
@@ -823,24 +828,24 @@ mod tests {
     #[test]
     #[should_panic(expected = "Empty")]
     fn empty() {
-        Concrete::from_off("").unwrap();
+        Concrete::<f32>::from_off("").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "Rank(Position { row: 0, column: 3 })")]
     fn rank() {
-        Concrete::from_off("   fooOFF").unwrap();
+        Concrete::<f32>::from_off("   fooOFF").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "MagicWord(Position { row: 1, column: 3 })")]
     fn magic_num() {
-        Concrete::from_off("# comment\n   foo bar").unwrap();
+        Concrete::<f32>::from_off("# comment\n   foo bar").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "Parsing(Position { row: 1, column: 3 })")]
     fn parse() {
-        Concrete::from_off("OFF\n10 foo bar").unwrap();
+        Concrete::<f32>::from_off("OFF\n10 foo bar").unwrap();
     }
 }

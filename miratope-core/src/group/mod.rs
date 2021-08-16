@@ -9,7 +9,7 @@ use std::{
 
 use crate::{
     geometry::{Matrix, MatrixOrd, Point, PointOrd, VectorSlice},
-    Consts, Float,
+    Float,
 };
 use cd::{Cd, CdResult, CoxMatrix};
 
@@ -19,18 +19,18 @@ use nalgebra::{Dynamic, Quaternion, VecStorage};
 
 /// Converts a 3D rotation matrix into a quaternion. Uses the code from
 /// [Day (2015)](https://d3cw3dd2w32x2b.cloudfront.net/wp-content/uploads/2015/01/matrix-to-quat.pdf).
-fn mat_to_quat(mat: Matrix) -> Quaternion<Float> {
+fn mat_to_quat<T: Float>(mat: Matrix<T>) -> Quaternion<T> {
     debug_assert!(
-        relative_eq!(mat.determinant(), 1.0, epsilon = Float::EPS),
+        relative_eq!(mat.determinant(), T::ONE, epsilon = T::EPS),
         "Only matrices with determinant 1 can be turned into quaternions."
     );
 
     let t;
     let q;
 
-    if mat[(2, 2)] < 0.0 {
+    if mat[(2, 2)] < T::ZERO {
         if mat[(0, 0)] > mat[(1, 1)] {
-            t = 1.0 + mat[(0, 0)] - mat[(1, 1)] - mat[(2, 2)];
+            t = T::ONE + mat[(0, 0)] - mat[(1, 1)] - mat[(2, 2)];
             q = Quaternion::new(
                 t,
                 mat[(0, 1)] + mat[(1, 0)],
@@ -38,7 +38,7 @@ fn mat_to_quat(mat: Matrix) -> Quaternion<Float> {
                 mat[(1, 2)] - mat[(2, 1)],
             );
         } else {
-            t = 1.0 - mat[(0, 0)] + mat[(1, 1)] - mat[(2, 2)];
+            t = T::ONE - mat[(0, 0)] + mat[(1, 1)] - mat[(2, 2)];
             q = Quaternion::new(
                 mat[(0, 1)] + mat[(1, 0)],
                 t,
@@ -47,7 +47,7 @@ fn mat_to_quat(mat: Matrix) -> Quaternion<Float> {
             );
         }
     } else if mat[(0, 0)] < -mat[(1, 1)] {
-        t = 1.0 - mat[(0, 0)] - mat[(1, 1)] + mat[(2, 2)];
+        t = T::ONE - mat[(0, 0)] - mat[(1, 1)] + mat[(2, 2)];
         q = Quaternion::new(
             mat[(2, 0)] + mat[(0, 2)],
             mat[(1, 2)] + mat[(2, 1)],
@@ -55,7 +55,7 @@ fn mat_to_quat(mat: Matrix) -> Quaternion<Float> {
             mat[(0, 1)] - mat[(1, 0)],
         );
     } else {
-        t = 1.0 + mat[(0, 0)] + mat[(1, 1)] + mat[(2, 2)];
+        t = T::ONE + mat[(0, 0)] + mat[(1, 1)] + mat[(2, 2)];
         q = Quaternion::new(
             mat[(1, 2)] - mat[(2, 1)],
             mat[(2, 0)] - mat[(0, 2)],
@@ -64,14 +64,14 @@ fn mat_to_quat(mat: Matrix) -> Quaternion<Float> {
         );
     }
 
-    q * 0.5 / t.sqrt()
+    q * T::f64(0.5) / t.fsqrt()
 }
 
 /// Converts a quaternion into a matrix, depending on whether it's a left or
 /// right quaternion multiplication.
-fn quat_to_mat(q: Quaternion<Float>, left: bool) -> Matrix {
+fn quat_to_mat<T: Float>(q: Quaternion<T>, left: bool) -> Matrix<T> {
     let size = Dynamic::new(4);
-    let left = if left { 1.0 } else { -1.0 };
+    let left = if left { T::ONE } else { -T::ONE };
 
     Matrix::from_data(VecStorage::new(
         size,
@@ -99,7 +99,7 @@ fn quat_to_mat(q: Quaternion<Float>, left: bool) -> Matrix {
 
 /// Computes the [direct sum](https://en.wikipedia.org/wiki/Block_matrix#Direct_sum)
 /// of two matrices.
-fn direct_sum(mat1: Matrix, mat2: Matrix) -> Matrix {
+fn direct_sum<T: Float>(mat1: Matrix<T>, mat2: Matrix<T>) -> Matrix<T> {
     let dim1 = mat1.nrows();
     let dim = dim1 + mat2.nrows();
 
@@ -108,46 +108,46 @@ fn direct_sum(mat1: Matrix, mat2: Matrix) -> Matrix {
             if j < dim1 {
                 mat1[(i, j)]
             } else {
-                0.0
+                T::ZERO
             }
         } else if j >= dim1 {
             mat2[(i - dim1, j - dim1)]
         } else {
-            0.0
+            T::ZERO
         }
     })
 }
 
 /// An iterator such that `dyn` objects using it can be cloned. Used to get
 /// around orphan rules.
-pub trait GroupIter: Iterator<Item = Matrix> + DynClone {}
-impl<T: Iterator<Item = Matrix> + DynClone> GroupIter for T {}
-dyn_clone::clone_trait_object!(GroupIter);
+pub trait GroupIter<T: Float>: Iterator<Item = Matrix<T>> + DynClone {}
+impl<T: Float, U: Iterator<Item = Matrix<T>> + DynClone> GroupIter<T> for U {}
+dyn_clone::clone_trait_object!(<T> GroupIter<T> where T: Float);
 
 /// A [group](https://en.wikipedia.org/wiki/Group_(mathematics)) of matrices,
 /// acting on a space of a certain dimension.
 #[derive(Clone)]
-pub struct Group {
+pub struct Group<T: Float> {
     /// The dimension of the matrices of the group. Stored separately, since
     /// making the iterator peekable doesn't seem to work.
     dim: usize,
 
     /// The underlying iterator, which actually outputs the matrices.
-    iter: Box<dyn GroupIter>,
+    iter: Box<dyn GroupIter<T>>,
 }
 
-impl Iterator for Group {
-    type Item = Matrix;
+impl<T: Float> Iterator for Group<T> {
+    type Item = Matrix<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next()
     }
 }
 
-impl Group {
+impl<T: Float> Group<T> {
     /// Initializes a new group with a given dimension and a given
     /// [`GroupIter`].
-    pub fn new<T: 'static + GroupIter>(dim: usize, iter: T) -> Self {
+    pub fn new<U: 'static + GroupIter<T>>(dim: usize, iter: U) -> Self {
         Self {
             dim,
             iter: Box::new(iter),
@@ -155,7 +155,7 @@ impl Group {
     }
 
     /// Gets all of the elements of the group. Consumes the iterator.
-    pub fn elements(self) -> Vec<Matrix> {
+    pub fn elements(self) -> Vec<Matrix<T>> {
         self.collect()
     }
 
@@ -165,7 +165,7 @@ impl Group {
     }
 
     /// Initializes a group from a given set of generators.
-    pub fn from_gens(dim: usize, gens: Vec<Matrix>) -> Self {
+    pub fn from_gens(dim: usize, gens: Vec<Matrix<T>>) -> Self {
         Self::new(dim, Box::new(GenIter::new(dim, gens)))
     }
 
@@ -173,13 +173,13 @@ impl Group {
     pub fn rotations(self) -> Self {
         // The determinant might not be exactly 1, so we're extra lenient and
         // just test for positive determinants.
-        Self::new(self.dim, self.filter(|el| el.determinant() > 0.0))
+        Self::new(self.dim, self.filter(|el| el.determinant() > T::ZERO))
     }
 
     /// Builds an iterator over the set of either left or a right quaternions
     /// from a 3D group. **These won't actually generate a group,** as they
     /// don't contain central inversion.
-    fn quaternions(self, left: bool) -> Box<dyn GroupIter> {
+    fn quaternions(self, left: bool) -> Box<dyn GroupIter<T>> {
         if self.dim != 3 {
             panic!("Quaternions can only be generated from 3D matrices.");
         }
@@ -273,7 +273,7 @@ impl Group {
     ///
     /// # Panics
     /// This should never panic. If it does, please file a bug report.
-    pub fn i2(x: Float) -> Self {
+    pub fn i2(x: T) -> Self {
         Self::cox_group(CoxMatrix::i2(x)).unwrap()
     }
 
@@ -295,7 +295,7 @@ impl Group {
 
     /// Generates a step prism group from a base group and a homomorphism into
     /// another group.
-    pub fn step<F: 'static + Clone + FnMut(Matrix) -> Matrix>(g: Self, mut f: F) -> Self {
+    pub fn step<F: 'static + Clone + FnMut(Matrix<T>) -> Matrix<T>>(g: Self, mut f: F) -> Self {
         Self {
             dim: g.dim * 2,
             iter: Box::new(g.map(move |mat| direct_sum(mat.clone(), f(mat)))),
@@ -305,7 +305,7 @@ impl Group {
     /// Generates a Coxeter group from its [`CoxMatrix`](cd::CoxMatrix), or
     /// returns `None` if the group doesn't fit as a matrix group in spherical
     /// space.
-    pub fn cox_group(cox: CoxMatrix) -> Option<Self> {
+    pub fn cox_group(cox: CoxMatrix<T>) -> Option<Self> {
         Some(Self::new(cox.dim(), GenIter::from_cox(cox)?))
     }
 
@@ -315,7 +315,7 @@ impl Group {
         g: Self,
         h: Self,
         dim: usize,
-        mut product: (impl FnMut(Matrix, Matrix) -> Matrix + Clone + 'static),
+        mut product: (impl FnMut(Matrix<T>, Matrix<T>) -> Matrix<T> + Clone + 'static),
     ) -> Self {
         Self::new(
             dim,
@@ -411,7 +411,7 @@ impl Group {
     }
 
     /// Generates the orbit of a point under a given symmetry group.
-    pub fn orbit(self, p: Point) -> Vec<Point> {
+    pub fn orbit(self, p: Point<T>) -> Vec<Point<T>> {
         let mut points = BTreeSet::new();
 
         for m in self {
@@ -430,7 +430,7 @@ impl Group {
 }
 
 /// The result of trying to get the next element in a group.
-pub enum GroupNext {
+pub enum GroupNext<T: Float> {
     /// We've already found all elements of the group.
     None,
 
@@ -438,7 +438,7 @@ pub enum GroupNext {
     Repeat,
 
     /// We found a new element.
-    New(Matrix),
+    New(Matrix<T>),
 }
 
 /// An iterator for a `Group` [generated](https://en.wikipedia.org/wiki/Generator_(mathematics))
@@ -446,20 +446,20 @@ pub enum GroupNext {
 /// It contains a lookup table, used to figure out whether an element has
 /// already been found or not, as well as a queue to store the next elements.
 #[derive(Clone)]
-pub struct GenIter {
+pub struct GenIter<T: Float> {
     /// The number of dimensions the group acts on.
     pub dim: usize,
 
     /// The generators for the group.
-    pub gens: Vec<Matrix>,
+    pub gens: Vec<Matrix<T>>,
 
     /// Stores the elements that have been generated and that can still be
     /// generated again. Is integral for the algorithm to work, as without it,
     /// duplicate group elements will just keep generating forever.
-    elements: BTreeMap<MatrixOrd, usize>,
+    elements: BTreeMap<MatrixOrd<T>, usize>,
 
     /// Stores the elements that haven't yet been processed.
-    queue: VecDeque<MatrixOrd>,
+    queue: VecDeque<MatrixOrd<T>>,
 
     /// Stores the index in (`generators`)[GenGroup.generators] of the generator
     /// that's being checked. All previous once will have already been
@@ -468,8 +468,8 @@ pub struct GenIter {
     gen_idx: usize,
 }
 
-impl Iterator for GenIter {
-    type Item = Matrix;
+impl<T: Float> Iterator for GenIter<T> {
+    type Item = Matrix<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -483,23 +483,22 @@ impl Iterator for GenIter {
 }
 
 /// Builds a reflection matrix from a given vector.
-pub fn refl_mat(n: VectorSlice<'_>) -> Matrix {
+pub fn refl_mat<T: Float>(n: VectorSlice<'_, T>) -> Matrix<T> {
     let dim = n.nrows();
     let nn = n.norm_squared();
-    let identity = Matrix::identity(dim, dim);
+    let mut mat = Matrix::identity(dim, dim);
 
     // Reflects every basis vector, builds a matrix from all of their images.
-    Matrix::from_columns(
-        &identity
-            .column_iter()
-            .map(|e| e - (2.0 * e.dot(&n) / nn) * n)
-            .collect::<Vec<_>>(),
-    )
+    for mut e in mat.column_iter_mut() {
+        e -= n * (T::TWO * e.dot(&n) / nn);
+    }
+
+    mat
 }
 
-impl GenIter {
+impl<T: Float> GenIter<T> {
     /// Builds a new group from a set of generators.
-    fn new(dim: usize, gens: Vec<Matrix>) -> Self {
+    fn new(dim: usize, gens: Vec<Matrix<T>>) -> Self {
         // Initializes the queue with only the identity matrix.
         let mut queue = VecDeque::new();
         queue.push_back(MatrixOrd::new(Matrix::identity(dim, dim)));
@@ -520,7 +519,7 @@ impl GenIter {
     }
 
     /// Inserts a new element into the group. Returns whether the element is new.
-    fn insert(&mut self, el: Matrix) -> bool {
+    fn insert(&mut self, el: Matrix<T>) -> bool {
         let el = MatrixOrd::new(el);
 
         // If the element has been found before.
@@ -546,7 +545,7 @@ impl GenIter {
 
     /// Gets the next element and the next generator to attempt to multiply
     /// with. Advances the iterator.
-    fn next_el_gen(&mut self) -> Option<[Matrix; 2]> {
+    fn next_el_gen(&mut self) -> Option<[Matrix<T>; 2]> {
         let el = self.queue.front()?.0.clone();
         let gen = self.gens[self.gen_idx].clone();
 
@@ -562,7 +561,7 @@ impl GenIter {
 
     /// Multiplies the current element times the current generator, determines
     /// if it is a new element. Advances the iterator.
-    fn try_next(&mut self) -> GroupNext {
+    fn try_next(&mut self) -> GroupNext<T> {
         // If there's a next element and generator.
         if let Some([el, gen]) = self.next_el_gen() {
             let new_el = el * gen;
@@ -584,7 +583,7 @@ impl GenIter {
 
     /// Builds a Coxeter group from the matrix of normal vectors that describes
     /// its mirrors.
-    pub fn from_normals(normals: Matrix) -> Self {
+    pub fn from_normals(normals: Matrix<T>) -> Self {
         Self::new(
             normals.ncols(),
             normals.column_iter().map(refl_mat).collect(),
@@ -592,7 +591,7 @@ impl GenIter {
     }
 
     /// Builds a Coxeter group from a Coxeter matrix.
-    pub fn from_cox(cox: CoxMatrix) -> Option<Self> {
+    pub fn from_cox(cox: CoxMatrix<T>) -> Option<Self> {
         Some(Self::from_normals(cox.normals()?))
     }
 }
@@ -603,7 +602,7 @@ mod tests {
     use gcd::Gcd;
 
     /// Tests a given symmetry group.
-    fn test(group: Group, order: usize, rot_order: usize, name: &str) {
+    fn test(group: Group<f32>, order: usize, rot_order: usize, name: &str) {
         // Makes testing multiple derived groups faster.
         let group = group.cache().debug();
 
@@ -657,7 +656,7 @@ mod tests {
                 }
 
                 test(
-                    Group::i2(n as Float / d as Float),
+                    Group::i2(n as f32 / d as f32),
                     2 * n,
                     n,
                     &format!("I2({})", n),
@@ -676,7 +675,7 @@ mod tests {
             test(
                 Group::swirl(
                     Group::a(3),
-                    Group::direct_product(Group::i2(n as Float), Group::trivial(1)),
+                    Group::direct_product(Group::i2(n as f32), Group::trivial(1)),
                 ),
                 order,
                 order,
@@ -780,7 +779,7 @@ mod tests {
         for n in 1..10 {
             for d in 1..n {
                 test(
-                    Group::step(Group::i2(n as Float).rotations(), move |mat| {
+                    Group::step(Group::i2(n as f32).rotations(), move |mat| {
                         mat.pow(d).unwrap()
                     }),
                     n,

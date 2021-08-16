@@ -1,8 +1,8 @@
 //! All of the code that configures the UI.
 
+use crate::{Point, EPS};
 use approx::abs_diff_eq;
 use bevy_egui::egui::{self, Ui, Widget};
-use miratope_core::{geometry::Point, Consts, Float};
 
 pub mod camera;
 pub mod config;
@@ -76,22 +76,22 @@ impl<'a> Widget for UnitPointWidget<'a> {
                 ui.add(egui::DragValue::new(coord).speed(0.01));
 
                 // The index of the modified coordinate.
-                if abs_diff_eq!(old_point[idx], *coord, epsilon = Float::EPS) {
+                if abs_diff_eq!(old_point[idx], *coord, epsilon = EPS) {
                     modified_coord = idx;
                 }
 
                 // Gets rid of floating point shenanigans.
-                if abs_diff_eq!(*coord, 0.0, epsilon = Float::EPS.sqrt()) {
+                if abs_diff_eq!(*coord, 0.0, epsilon = EPS.sqrt()) {
                     *coord = 0.0;
-                } else if abs_diff_eq!(*coord, 1.0, epsilon = Float::EPS) {
+                } else if abs_diff_eq!(*coord, 1.0, epsilon = EPS) {
                     *coord = 1.0;
-                } else if abs_diff_eq!(*coord, -1.0, epsilon = Float::EPS) {
+                } else if abs_diff_eq!(*coord, -1.0, epsilon = EPS) {
                     *coord = -1.0;
                 }
             }
 
             // Normalizes the point.
-            if self.0.point.try_normalize_mut(Float::EPS).is_none() {
+            if self.0.point.try_normalize_mut(EPS).is_none() {
                 // If this fails, sets it to the axis direction corresponding
                 // to the last modified coordinate.
                 for coord in self.0.point.iter_mut() {

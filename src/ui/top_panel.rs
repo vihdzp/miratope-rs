@@ -3,18 +3,15 @@
 use std::{marker::PhantomData, path::PathBuf};
 
 use super::{camera::ProjectionType, memory::Memory, operations::*, UnitPointWidget};
+use crate::{Float, Hyperplane, NamedConcrete, Point, Vector};
 
 use bevy::prelude::*;
 use bevy_egui::{
     egui::{self, menu, Ui},
     EguiContext,
 };
-use miratope_core::{
-    conc::{file::FromFile, ConcretePolytope},
-    geometry::{Hyperplane, Point, Vector},
-    Float, Polytope,
-};
-use miratope_lang::{poly::NamedConcrete, SelectedLanguage};
+use miratope_core::{conc::file::FromFile, conc::ConcretePolytope, Polytope};
+use miratope_lang::SelectedLanguage;
 use rfd::FileDialog;
 use strum::IntoEnumIterator;
 

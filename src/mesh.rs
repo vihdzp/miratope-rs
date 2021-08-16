@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use crate::ui::camera::ProjectionType;
+use crate::{Concrete, Float, Point, EPS};
 
 use bevy::{
     prelude::Mesh,
@@ -13,10 +14,9 @@ use miratope_core::{
     abs::{ElementList, Ranked},
     conc::{
         cycle::{Cycle, CycleBuilder},
-        Concrete, ConcretePolytope,
+        ConcretePolytope,
     },
-    geometry::{Point, Subspace, Vector},
-    Consts, Float,
+    geometry::{Subspace, Vector},
 };
 
 use vec_like::*;
@@ -103,10 +103,9 @@ struct Triangulation {
 
 impl Triangulation {
     /// Creates a new triangulation from a polytope.
-    fn new(polytope: &Concrete) -> Triangulation {
+    fn new(polytope: &Concrete) -> Self {
         let mut extra_vertices = Vec::new();
         let mut triangles = Vec::new();
-
         let empty_els = ElementList::new();
 
         // Either returns a reference to the element list of a given rank, or
@@ -145,7 +144,7 @@ impl Triangulation {
                         &path,
                         None,
                         &FillOptions::with_fill_rule(Default::default(), FillRule::EvenOdd)
-                            .with_tolerance(f32::EPS),
+                            .with_tolerance(EPS),
                         &mut BuffersBuilder::new(&mut geometry, |vertex: FillVertex<'_>| {
                             vertex.sources().next().unwrap()
                         }),
@@ -214,7 +213,7 @@ fn normals(vertices: &[[f32; 3]]) -> Vec<[f32; 3]> {
         .iter()
         .map(|n| {
             let sq_norm = n[0] * n[0] + n[1] * n[1] + n[2] * n[2];
-            if sq_norm < f32::EPS {
+            if sq_norm < EPS {
                 [0.0, 0.0, 0.0]
             } else {
                 let norm = sq_norm.sqrt();
@@ -240,9 +239,9 @@ fn empty_mesh() -> Mesh {
 }
 
 /// Gets the coordinates of the vertices, after projecting down into 3D.
-fn vertex_coords<'a, T: Iterator<Item = &'a Point>>(
+fn vertex_coords<'a, I: Iterator<Item = &'a Point>>(
     poly: &Concrete,
-    vertices: T,
+    vertices: I,
     projection_type: ProjectionType,
 ) -> Vec<[f32; 3]> {
     let dim = poly.dim_or();
@@ -283,70 +282,74 @@ fn vertex_coords<'a, T: Iterator<Item = &'a Point>>(
     }
 }
 
-/// Builds the mesh of a polytope.
-pub fn mesh(poly: &Concrete, projection_type: ProjectionType) -> Mesh {
-    // If there's no vertices, returns an empty mesh.
-    if poly.vertex_count() == 0 {
-        return empty_mesh();
-    }
-
-    // Triangulates the polytope's faces, projects the vertices of both the
-    // polytope and the triangulation.
-    let triangulation = Triangulation::new(poly);
-    let vertices = vertex_coords(
-        poly,
-        poly.vertices
-            .iter()
-            .chain(triangulation.extra_vertices.iter()),
-        projection_type,
-    );
-
-    // Builds the actual mesh.
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-    mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 1.0]; vertices.len()]);
-    mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals(&vertices));
-    mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
-    mesh.set_indices(Some(Indices::U16(triangulation.triangles)));
-
-    mesh
-}
-
-/// Builds the wireframe of a polytope.
-pub fn wireframe(poly: &Concrete, projection_type: ProjectionType) -> Mesh {
-    let vertex_count = poly.vertex_count();
-
-    // If there's no vertices, returns an empty mesh.
-    if vertex_count == 0 {
-        return empty_mesh();
-    }
-
-    let edge_count = poly.edge_count();
-
-    // We add a single vertex so that Miratope doesn't crash.
-    let vertices = vertex_coords(poly, poly.vertices.iter(), projection_type);
-    let mut indices = Vec::with_capacity(edge_count * 2);
-
-    // Adds the edges to the wireframe.
-    if let Some(edges) = poly.get_edges() {
-        for edge in edges {
-            debug_assert_eq!(
-                edge.subs.len(),
-                2,
-                "Edge must have exactly 2 elements, found {}.",
-                edge.subs.len()
-            );
-
-            indices.push(edge.subs[0] as u16);
-            indices.push(edge.subs[1] as u16);
+pub trait Renderable: ConcretePolytope<Float> {
+    /// Builds the mesh of a polytope.
+    fn mesh(&self, projection_type: ProjectionType) -> Mesh {
+        // If there's no vertices, returns an empty mesh.
+        if self.vertex_count() == 0 {
+            return empty_mesh();
         }
+
+        // Triangulates the polytope's faces, projects the vertices of both the
+        // polytope and the triangulation.
+        let triangulation = Triangulation::new(self.con());
+        let vertices = vertex_coords(
+            self.con(),
+            self.vertices()
+                .iter()
+                .chain(triangulation.extra_vertices.iter()),
+            projection_type,
+        );
+
+        // Builds the actual mesh.
+        let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+        mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 1.0]; vertices.len()]);
+        mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals(&vertices));
+        mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
+        mesh.set_indices(Some(Indices::U16(triangulation.triangles)));
+
+        mesh
     }
 
-    // Sets the mesh attributes.
-    let mut mesh = Mesh::new(PrimitiveTopology::LineList);
-    mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals(&vertices));
-    mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
-    mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0; 2]; vertex_count]);
-    mesh.set_indices(Some(Indices::U16(indices)));
+    /// Builds the wireframe of a polytope.
+    fn wireframe(&self, projection_type: ProjectionType) -> Mesh {
+        let vertex_count = self.vertex_count();
 
-    mesh
+        // If there's no vertices, returns an empty mesh.
+        if vertex_count == 0 {
+            return empty_mesh();
+        }
+
+        let edge_count = self.edge_count();
+
+        // We add a single vertex so that Miratope doesn't crash.
+        let vertices = vertex_coords(self.con(), self.vertices().iter(), projection_type);
+        let mut indices = Vec::with_capacity(edge_count * 2);
+
+        // Adds the edges to the wireframe.
+        if let Some(edges) = self.get_edges() {
+            for edge in edges {
+                debug_assert_eq!(
+                    edge.subs.len(),
+                    2,
+                    "Edge must have exactly 2 elements, found {}.",
+                    edge.subs.len()
+                );
+
+                indices.push(edge.subs[0] as u16);
+                indices.push(edge.subs[1] as u16);
+            }
+        }
+
+        // Sets the mesh attributes.
+        let mut mesh = Mesh::new(PrimitiveTopology::LineList);
+        mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals(&vertices));
+        mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
+        mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0; 2]; vertex_count]);
+        mesh.set_indices(Some(Indices::U16(indices)));
+
+        mesh
+    }
 }
+
+impl<U: ConcretePolytope<Float>> Renderable for U {}

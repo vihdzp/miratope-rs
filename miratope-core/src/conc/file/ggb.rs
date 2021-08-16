@@ -3,9 +3,9 @@
 // This code is unfinished.
 #![allow(dead_code)]
 
-use std::io::Result as IoResult;
+use std::{io::Result as IoResult, str::FromStr};
 
-use crate::{conc::Concrete, geometry::Point};
+use crate::{conc::Concrete, geometry::Point, Float};
 
 use nalgebra::dvector;
 use xml::{
@@ -79,7 +79,10 @@ impl<'a> XmlReader<'a> {
     /// ```xml
     /// <element type="point3d" label="A">
     /// ```
-    fn read_point(&mut self, attributes: &[OwnedAttribute]) -> GgbResult<Vertex> {
+    fn read_point<T: Float + FromStr>(
+        &mut self,
+        attributes: &[OwnedAttribute],
+    ) -> GgbResult<Vertex<T>> {
         let label = attribute(attributes, "label").unwrap_or_default();
         let coord_attributes = self.read_until("coords")?;
 
@@ -87,7 +90,7 @@ impl<'a> XmlReader<'a> {
         /// the same name.
         macro_rules! read_coord {
             ($x:ident) => {
-                let $x: crate::Float;
+                let $x: T;
 
                 if let Some(c) = attribute(&coord_attributes, stringify!($x)) {
                     if let Ok(c) = c.parse() {
@@ -184,9 +187,9 @@ fn attribute<'a>(attributes: &'a [OwnedAttribute], idx: &str) -> Option<&'a str>
 
 /// A vertex in a GGB file.
 #[derive(Debug)]
-struct Vertex {
+struct Vertex<T> {
     /// The coordinates of the vertex.
-    coords: Point,
+    coords: Point<T>,
 
     /// The name of the vertex.
     label: String,
@@ -206,8 +209,8 @@ fn read_face() -> Face {
 }
 
 /// Parses the `geogebra.xml` file to produce a polytope.
-pub(super) fn parse_xml(xml: &str) -> GgbResult<Concrete> {
-    let mut vertices = Vec::new();
+pub(super) fn parse_xml<T: Float + FromStr>(xml: &str) -> GgbResult<Concrete<T>> {
+    let mut vertices: Vec<Vertex<T>> = Vec::new();
     let mut edges = Vec::new();
     let mut xml = XmlReader::new(xml);
 

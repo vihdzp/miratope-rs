@@ -2,7 +2,7 @@
 
 use std::{array, fmt::Debug, fs, iter, marker::PhantomData, mem};
 
-use miratope_core::{abs::Abstract, conc::Concrete, geometry::Point, Consts, Float, Polytope};
+use miratope_core::{abs::Abstract, conc::Concrete, geometry::Point, Float, Polytope};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::Language;
@@ -16,13 +16,17 @@ pub trait NameType: Debug + Clone + PartialEq + Serialize {
     /// The polytope type that may be named by `Self`.
     type Polytope: Polytope;
 
+    /// The floating type associated to `Self`. Might be a dummy value for
+    /// abstract names.
+    type Float: Float;
+
     /// Either `AbsData<Point>` or `ConData<Point>`. Workaround until generic
     /// associated types are stable.
-    type DataPoint: NameData<Point>;
+    type DataPoint: NameData<Point<Self::Float>>;
 
     /// Either `AbsData<Regular>` or `ConData<Regular>`. Workaround until generic
     /// associated types are stable.
-    type DataRegular: NameData<Regular> + Default;
+    type DataRegular: NameData<Regular<Self::Float>> + Default;
 
     /// Either `AbsData<Quadrilateral>` or `ConData<Quadrilateral>`. Workaround until generic
     /// associated types are stable.
@@ -130,23 +134,23 @@ pub trait NameData<T>: Debug + Clone + Serialize + DeserializeOwned {
 ///
 /// Will compare as equal to anything else, and will satisfy any predicate.
 #[derive(Copy, Debug, Serialize, Deserialize)]
-pub struct AbsData<T>(PhantomData<T>);
+pub struct AbsData;
 
 /// The default value is the only possible value.
-impl<T> Default for AbsData<T> {
+impl Default for AbsData {
     fn default() -> Self {
-        Self(PhantomData)
+        Self
     }
 }
 
 /// Since any `AbsData` stores the exact same info, cloning is trivial.
-impl<T> Clone for AbsData<T> {
+impl Clone for AbsData {
     fn clone(&self) -> Self {
         Default::default()
     }
 }
 
-impl<T: Debug> NameData<T> for AbsData<T> {
+impl<T: Debug> NameData<T> for AbsData {
     fn new_lazy<F: FnOnce() -> T>(_: F) -> Self {
         Default::default()
     }
@@ -171,10 +175,11 @@ impl<T: Debug> NameData<T> for AbsData<T> {
 pub struct Abs;
 
 impl NameType for Abs {
+    type Float = f32;
     type Polytope = Abstract;
-    type DataPoint = AbsData<Point>;
-    type DataRegular = AbsData<Regular>;
-    type DataQuadrilateral = AbsData<Quadrilateral>;
+    type DataPoint = AbsData;
+    type DataRegular = AbsData;
+    type DataQuadrilateral = AbsData;
 
     fn is_abstract() -> bool {
         true
@@ -209,12 +214,13 @@ impl<T: PartialEq + Debug + Clone + Serialize + DeserializeOwned> NameData<T> fo
 
 /// A type marker for a name representing a concrete polytope.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct Con;
+pub struct Con<T: Float>(PhantomData<T>);
 
-impl NameType for Con {
-    type Polytope = Concrete;
-    type DataPoint = ConData<Point>;
-    type DataRegular = ConData<Regular>;
+impl<T: Float + DeserializeOwned> NameType for Con<T> {
+    type Float = T;
+    type Polytope = Concrete<T>;
+    type DataPoint = ConData<Point<T>>;
+    type DataRegular = ConData<Regular<T>>;
     type DataQuadrilateral = ConData<Quadrilateral>;
 
     fn is_abstract() -> bool {
@@ -226,26 +232,26 @@ impl NameType for Con {
 /// often indirectly stored as a `NameData<Regular>`, so that all abstract
 /// polytopes behave as regular.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum Regular {
+pub enum Regular<T: Float> {
     /// The polytope is indeed regular.
     Yes {
         /// The center of the polytope.
         // TODO: make into an Option to take the nullitope into account?
-        center: Point,
+        center: Point<T>,
     },
 
     /// The polytope is not regular.
     No,
 }
 
-impl From<Point> for Regular {
-    fn from(center: Point) -> Self {
+impl<T: Float> From<Point<T>> for Regular<T> {
+    fn from(center: Point<T>) -> Self {
         Self::Yes { center }
     }
 }
 
 /// We don't treat something as regular by default.
-impl Default for Regular {
+impl<T: Float> Default for Regular<T> {
     fn default() -> Self {
         Self::No
     }
@@ -477,7 +483,7 @@ impl<T: NameType> Name<T> {
     }
 
     /// Reads a name, serialized from the first line of an OFF file.
-    pub fn from_off<U: AsRef<std::path::Path>>(path: U) -> Option<Self>
+    pub fn from_off<P: AsRef<std::path::Path>>(path: P) -> Option<Self>
     where
         T: DeserializeOwned,
     {
@@ -993,7 +999,7 @@ impl<T: NameType> Name<T> {
 
     /// Makes a multipyramid out of a set of names. Uses the names in roughly
     /// the same order as were given.
-    pub fn multipyramid<U: Iterator<Item = Self>>(bases: U) -> Self {
+    pub fn multipyramid<I: Iterator<Item = Self>>(bases: I) -> Self {
         let mut new_bases = Vec::new();
         let mut pyramid_count = 0;
 
@@ -1036,7 +1042,7 @@ impl<T: NameType> Name<T> {
 
     /// Makes a multiprism out of a set of names. Uses the names in roughly
     /// the same order as were given.
-    pub fn multiprism<U: Iterator<Item = Self>>(bases: U) -> Self {
+    pub fn multiprism<I: Iterator<Item = Self>>(bases: I) -> Self {
         let mut new_bases = Vec::new();
         let mut prism_count = 0;
 
@@ -1088,7 +1094,7 @@ impl<T: NameType> Name<T> {
 
     /// Makes a multitegum out of a set of names. Uses the names in roughly
     /// the same order as were given.
-    pub fn multitegum<U: Iterator<Item = Self>>(bases: U) -> Self {
+    pub fn multitegum<I: Iterator<Item = Self>>(bases: I) -> Self {
         let mut new_bases = Vec::new();
         let mut tegum_count = 0;
 
@@ -1139,7 +1145,7 @@ impl<T: NameType> Name<T> {
 
     /// Makes a multicomb out of a set of names. Uses the names in roughly
     /// the same order as were given.
-    pub fn multicomb<U: Iterator<Item = Name<T>>>(bases: U) -> Self {
+    pub fn multicomb<I: Iterator<Item = Name<T>>>(bases: I) -> Self {
         let mut new_bases = Vec::new();
 
         // Figures out which bases of the multicomb are multicombs themselves,

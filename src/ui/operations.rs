@@ -6,18 +6,14 @@
 use std::marker::PhantomData;
 
 use super::{memory::Memory, PointWidget};
-use miratope_core::{
-    conc::ConcretePolytope,
-    geometry::{Hypersphere, Point},
-    Float, Polytope,
-};
+use crate::{Float, Hypersphere, NamedConcrete, Point};
+use miratope_core::{conc::ConcretePolytope, Polytope};
 
 use bevy::prelude::*;
 use bevy_egui::{
     egui::{self, CtxRef, Layout, Ui, Widget},
     EguiContext,
 };
-use miratope_lang::poly::NamedConcrete;
 
 /// The result of showing a window, updated every frame.
 pub enum ShowResult {
@@ -226,7 +222,7 @@ pub trait UpdateWindow: Window {
         Self: 'static,
     {
         if let Some((poly, _, _)) = query.iter().next() {
-            self_.update(poly.polytope.dim_or());
+            self_.update(poly.dim_or());
         }
     }
 

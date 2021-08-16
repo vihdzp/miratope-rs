@@ -1,11 +1,15 @@
 //! Contains methods to parse and generate Coxeter diagrams and matrices.
 
-use std::{collections::VecDeque, fmt::Display, iter, mem, str::FromStr};
-
-use crate::{
-    geometry::{Matrix, Point, Vector},
-    Consts, Float, FloatOrd,
+use std::{
+    collections::VecDeque,
+    fmt::Display,
+    iter, mem,
+    ops::{Index, IndexMut},
+    str::FromStr,
 };
+
+use crate::geometry::{Matrix, Point, Vector};
+use crate::Float;
 
 use nalgebra::dmatrix;
 use petgraph::{
@@ -109,11 +113,11 @@ impl std::error::Error for CdError {}
 /// corresponds to the value of the edge between the ith and jth node, or 2 if
 /// there's no such edge.
 #[derive(Clone, Debug, PartialEq)]
-pub struct CoxMatrix(Matrix);
+pub struct CoxMatrix<T: Float>(Matrix<T>);
 
-impl CoxMatrix {
+impl<T: Float> CoxMatrix<T> {
     /// Initializes a new CD matrix from a vector of nodes and a matrix.
-    pub fn new(matrix: Matrix) -> Self {
+    pub fn new(matrix: Matrix<T>) -> Self {
         Self(matrix)
     }
 
@@ -129,34 +133,34 @@ impl CoxMatrix {
 
     /// Returns the Coxeter matrix for the trivial 1D group.
     pub fn trivial() -> Self {
-        Self::new(dmatrix![1.0])
+        Self::new(dmatrix![T::ONE])
     }
 
     /// Returns the Coxeter matrix for the I2(x) group.
-    pub fn i2(x: Float) -> Self {
+    pub fn i2(x: T) -> Self {
         Self::from_lin_diagram(vec![x])
     }
 
     /// Returns the Coxeter matrix for the An group.
     pub fn a(n: usize) -> Self {
-        Self::from_lin_diagram(vec![3.0; n - 1])
+        Self::from_lin_diagram(vec![T::usize(3); n - 1])
     }
 
     /// Returns the Coxeter matrix for the Bn group.
     pub fn b(n: usize) -> Self {
-        let mut diagram = vec![3.0; n - 1];
-        diagram[0] = 4.0;
+        let mut diagram = vec![T::usize(3); n - 1];
+        diagram[0] = T::usize(4);
         Self::from_lin_diagram(diagram)
     }
 
     /// Returns a mutable reference to the elements of the matrix.
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Float> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut T> {
         self.0.iter_mut()
     }
 
     /// Creates a Coxeter matrix from a linear diagram, whose edges are
     /// described by the vector.
-    pub fn from_lin_diagram(diagram: Vec<Float>) -> Self {
+    pub fn from_lin_diagram(diagram: Vec<T>) -> Self {
         let dim = diagram.len() + 1;
 
         Self::new(Matrix::from_fn(dim, dim, |mut i, mut j| {
@@ -166,16 +170,16 @@ impl CoxMatrix {
             }
 
             match j - i {
-                0 => 1.0,
+                0 => T::ONE,
                 1 => diagram[i],
-                _ => 2.0,
+                _ => T::TWO,
             }
         }))
     }
 
     /// Returns an upper triangular matrix whose columns are unit normal vectors
     /// for the hyperplanes described by the Coxeter matrix.
-    pub fn normals(&self) -> Option<Matrix> {
+    pub fn normals(&self) -> Option<Matrix<T>> {
         let dim = self.dim();
         let mut mat = Matrix::zeros(dim, dim);
 
@@ -187,15 +191,15 @@ impl CoxMatrix {
             for (j, n_j) in prev_gens.column_iter().enumerate() {
                 // All other entries in the dot product are zero.
                 let dot = n_i.rows_range(0..=j).dot(&n_j.rows_range(0..=j));
-                n_i[j] = ((Float::PI / self[(i, j)]).cos() - dot) / n_j[j];
+                n_i[j] = ((T::PI / self[(i, j)]).fcos() - dot) / n_j[j];
             }
 
             // If the vector doesn't fit in spherical space.
             let norm_sq = n_i.norm_squared();
-            if norm_sq >= 1.0 - Float::EPS {
+            if norm_sq >= T::ONE - T::EPS {
                 return None;
             } else {
-                n_i[i] = (1.0 - norm_sq).sqrt();
+                n_i[i] = (T::ONE - norm_sq).fsqrt();
             }
         }
 
@@ -203,11 +207,17 @@ impl CoxMatrix {
     }
 }
 
-impl std::ops::Index<(usize, usize)> for CoxMatrix {
-    type Output = Float;
+impl<T: Float> Index<(usize, usize)> for CoxMatrix<T> {
+    type Output = T;
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
         &self.0[index]
+    }
+}
+
+impl<T: Float> IndexMut<(usize, usize)> for CoxMatrix<T> {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        &mut self.0[index]
     }
 }
 
@@ -215,7 +225,7 @@ impl std::ops::Index<(usize, usize)> for CoxMatrix {
 /// where a generator point should be located with respect to it, and how it
 /// should interact with it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Node {
+pub enum Node<T: Float> {
     /// An unringed node. Represents a mirror that contains the generator point.
     /// Crucially, reflecting the generator through this mirror doesn't create a
     /// new edge.
@@ -223,33 +233,33 @@ pub enum Node {
 
     /// A ringed node. Represents a mirror at (half) a certain distance from the
     /// generator. Reflecting the generator through this mirror creates an edge.
-    Ringed(FloatOrd),
+    Ringed(T),
 
     /// A snub node. Represents a mirror at (half) a certain distance from the
     /// generator. In contrast to [`Self::Ringed`] nodes, the generator point
     /// and its reflection through this mirror can't simultaneously be in the
     /// polytope.
-    Snub(FloatOrd),
+    Snub(T),
 }
 
-impl Node {
+impl<T: Float> Node<T> {
     /// Returns twice the distance from the generator point to the hyperplane
     /// corresponding to this node.
-    pub fn value(&self) -> Float {
+    pub fn value(&self) -> T {
         match self {
-            Self::Unringed => 0.0,
-            Self::Ringed(val) | Self::Snub(val) => val.0,
+            Self::Unringed => T::ZERO,
+            Self::Ringed(val) | Self::Snub(val) => *val,
         }
     }
 
-    /// Shorthand for `NodeVal::Ringed(FloatOrd::from(x))`.
-    pub fn ringed(x: Float) -> Self {
-        Self::Ringed(FloatOrd::from(x))
+    /// Shorthand for `NodeVal::Ringed(x)`.
+    pub fn ringed(x: T) -> Self {
+        Self::Ringed(x)
     }
 
-    /// Shorthand for `NodeVal::Snub(FloatOrd::from(x))`.
-    pub fn snub(x: Float) -> Self {
-        Self::Snub(FloatOrd::from(x))
+    /// Shorthand for `NodeVal::Snub(x)`.
+    pub fn snub(x: T) -> Self {
+        Self::Snub(x)
     }
 
     /// Returns whether this node is ringed.
@@ -265,24 +275,24 @@ impl Node {
     pub fn from_char(c: char) -> Option<Self> {
         Some(Node::ringed(match c {
             'o' => return Some(Node::Unringed),
-            's' => return Some(Node::snub(1.0)),
-            'v' => (Float::SQRT_5 - 1.0) / 2.0,
-            'x' => 1.0,
-            'q' => Float::SQRT_2,
-            'f' => (Float::SQRT_5 + 1.0) / 2.0,
-            'h' => Float::SQRT_3,
-            'k' => (Float::SQRT_2 + 2.0).sqrt(),
-            'u' => 2.0,
-            'w' => Float::SQRT_2 + 1.0,
-            'F' => (Float::SQRT_5 + 3.0) / 2.0,
-            'e' => Float::SQRT_3 + 1.0,
-            'Q' => Float::SQRT_2 * 2.0,
-            'd' => 3.0,
-            'V' => Float::SQRT_5 + 1.0,
-            'U' => Float::SQRT_2 + 2.0,
-            'A' => (Float::SQRT_5 + 5.0) / 1.0,
-            'X' => Float::SQRT_2 * 2.0 + 1.0,
-            'B' => Float::SQRT_5 + 2.0,
+            's' => return Some(Node::snub(T::ONE)),
+            'v' => (T::SQRT_5 - T::ONE) / T::TWO,
+            'x' => T::ONE,
+            'q' => T::SQRT_2,
+            'f' => (T::SQRT_5 + T::ONE) / T::TWO,
+            'h' => T::SQRT_3,
+            'k' => (T::SQRT_2 + T::TWO).fsqrt(),
+            'u' => T::TWO,
+            'w' => T::SQRT_2 + T::ONE,
+            'F' => (T::SQRT_5 + T::THREE) / T::TWO,
+            'e' => T::SQRT_3 + T::ONE,
+            'Q' => T::SQRT_2 * T::TWO,
+            'd' => T::THREE,
+            'V' => T::SQRT_5 + T::ONE,
+            'U' => T::SQRT_2 + T::TWO,
+            'A' => (T::SQRT_5 + T::ONE) / T::FOUR + T::ONE,
+            'X' => T::SQRT_2 * T::TWO + T::ONE,
+            'B' => T::SQRT_5 + T::TWO,
             _ => return None,
         }))
     }
@@ -294,13 +304,13 @@ impl Node {
     }
 }
 
-impl Display for Node {
+impl<T: Float> Display for Node<T> {
     /// Prints the value that a node contains.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Node::Unringed => writeln!(f, "o"),
-            Node::Ringed(x) => writeln!(f, "x({})", x.0),
-            Node::Snub(s) => writeln!(f, "s({})", s.0),
+            Node::Ringed(x) => writeln!(f, "x({})", x),
+            Node::Snub(s) => writeln!(f, "s({})", s),
         }
     }
 }
@@ -334,8 +344,8 @@ impl Edge {
     }
 
     /// Returns the numerical value of the edge.
-    pub fn value(&self) -> Float {
-        self.num as Float / self.den as Float
+    pub fn value<T: Float>(&self) -> T {
+        T::u32(self.num) / T::u32(self.den)
     }
 
     /// Returns `true` if the edge stores any value equivalent to 2.
@@ -446,7 +456,7 @@ impl EdgeRef {
 ///
 /// * A single integer, like `3` or `15`.
 /// * Two integers separated by a backslash, like `5/2` or `7/3`.
-pub struct CdBuilder<'a> {
+pub struct CdBuilder<'a, T: Float> {
     /// The Coxeter diagram in inline ASCII notation.
     diagram: &'a str,
 
@@ -457,7 +467,7 @@ pub struct CdBuilder<'a> {
     /// Represents the Coxeter diagram itself. However, we don't add any edges
     /// to it until the very last step. These are provisionally stored in
     /// [`Self::edge_queue`] instead.
-    cd: Cd,
+    cd: Cd<T>,
 
     /// A provisional queue in which the [`EdgeRef`]s are stored up and until
     /// [`Self::build`] is called, when they're added to the `Cd`.
@@ -471,7 +481,7 @@ pub struct CdBuilder<'a> {
 }
 
 /// Operations that are commonly done to parse CDs.
-impl<'a> CdBuilder<'a> {
+impl<'a, T: Float> CdBuilder<'a, T> {
     /// Initializes a new CD builder from a string.
     fn new(diagram: &'a str) -> Self {
         Self {
@@ -536,7 +546,7 @@ impl<'a> CdBuilder<'a> {
     }
 
     /// Adds a node to the diagram.
-    fn add_node(&mut self, node: Node) -> NodeIndex {
+    fn add_node(&mut self, node: Node<T>) -> NodeIndex {
         self.cd.add_node(node)
     }
 
@@ -547,7 +557,7 @@ impl<'a> CdBuilder<'a> {
 
     /// Attempts to parse a subslice of characters, determined by the range
     /// `init_idx..=end_idx`. Returns a [`CdError::ParseError`] if it fails.
-    fn parse_slice<T: FromStr>(&mut self, init_idx: usize, end_idx: usize) -> CdResult<T> {
+    fn parse_slice<U: FromStr>(&mut self, init_idx: usize, end_idx: usize) -> CdResult<U> {
         self.diagram[init_idx..=end_idx]
             .parse()
             .map_err(|_| CdError::ParseError { pos: end_idx })
@@ -558,14 +568,14 @@ impl<'a> CdBuilder<'a> {
     ///
     /// By the time this method is called, we've already skipped the opening
     /// parenthesis.
-    fn parse_node(&mut self) -> CdResult<Node> {
+    fn parse_node(&mut self) -> CdResult<Node<T>> {
         let (init_idx, _) = self.peek().expect("Node can't be empty!");
         let mut end_idx = init_idx;
 
         // We read the number until we find the closing parenthesis.
         while let Some((idx, c)) = self.next() {
             if c == ')' {
-                let val: Float = self.parse_slice(init_idx, end_idx)?;
+                let val: T = self.parse_slice(init_idx, end_idx)?;
 
                 // In case the user tries to literally write "NaN" (real funny).
                 return if val.is_nan() {
@@ -715,7 +725,7 @@ impl<'a> CdBuilder<'a> {
     }
 
     /// Finishes building the CD and returns it.
-    fn build(mut self) -> CdResult<Cd> {
+    fn build(mut self) -> CdResult<Cd<T>> {
         let len = self.cd.node_count();
 
         for edge_ref in self.edge_queue.into_iter() {
@@ -745,9 +755,9 @@ impl<'a> CdBuilder<'a> {
 ///
 /// To actually build a Coxeter diagram, we use a [`CdBuilder`].
 #[derive(Default)]
-pub struct Cd(Graph<Node, Edge, Undirected>);
+pub struct Cd<T: Float>(Graph<Node<T>, Edge, Undirected>);
 
-impl Cd {
+impl<T: Float> Cd<T> {
     /// Initializes a new Coxeter diagram with no nodes nor edges.
     pub fn new() -> Self {
         Default::default()
@@ -787,7 +797,7 @@ impl Cd {
     }
 
     /// Returns a reference to the raw node array.
-    pub fn raw_nodes(&self) -> &[GraphNode<Node>] {
+    pub fn raw_nodes(&self) -> &[GraphNode<Node<T>>] {
         self.0.raw_nodes()
     }
 
@@ -797,7 +807,7 @@ impl Cd {
     }
 
     /// Adds a node into the Coxeter diagram.
-    pub fn add_node(&mut self, node: Node) -> NodeIndex {
+    pub fn add_node(&mut self, node: Node<T>) -> NodeIndex {
         self.0.add_node(node)
     }
 
@@ -819,18 +829,18 @@ impl Cd {
 
     /// Returns an iterator over the nodes in the Coxeter diagram, in the order
     /// in which they were found.
-    pub fn node_iter(&self) -> impl Iterator<Item = Node> + '_ {
+    pub fn node_iter(&self) -> impl Iterator<Item = Node<T>> + '_ {
         self.0.raw_nodes().iter().map(|node| node.weight)
     }
 
     /// Returns the nodes in the Coxeter diagram, in the order in which they
     /// were found.
-    pub fn nodes(&self) -> Vec<Node> {
+    pub fn nodes(&self) -> Vec<Node<T>> {
         self.node_iter().collect()
     }
 
     /// Returns the vector whose values represent the node values.
-    pub fn node_vector(&self) -> Vector {
+    pub fn node_vector(&self) -> Vector<T> {
         Vector::from_iterator(self.dim(), self.node_iter().map(|node| node.value()))
     }
 
@@ -851,14 +861,14 @@ impl Cd {
     }
 
     /// Creates a [`CoxMatrix`] from a Coxeter diagram.
-    pub fn cox(&self) -> CoxMatrix {
+    pub fn cox(&self) -> CoxMatrix<T> {
         let dim = self.dim();
         let graph = &self.0;
 
         let matrix = Matrix::from_fn(dim, dim, |i, j| {
             // Every entry in the diagonal of a Coxeter matrix is 1.
             if i == j {
-                return 1.0;
+                return T::ONE;
             }
 
             // If an edge connects two nodes, it adds its value to the matrix.
@@ -867,7 +877,7 @@ impl Cd {
             }
             // Else, we write a 2.
             else {
-                2.0
+                T::TWO
             }
         });
 
@@ -877,29 +887,29 @@ impl Cd {
     /// Returns the circumradius of the polytope specified by the matrix, or
     /// `None` if this doesn't apply. This may or may not be faster than just
     /// calling [`Self::generator`] and taking the norm.
-    pub fn circumradius(&self) -> Option<Float> {
+    pub fn circumradius(&self) -> Option<T> {
         self.generator().as_ref().map(Point::norm)
     }
 
     /// Returns a point in the position specified by the Coxeter diagram,
     /// using the set of mirrors generated by [`CoxMatrix::normals`].    
-    pub fn generator(&self) -> Option<Point> {
-        let normals = self.cox().normals()?;
+    pub fn generator(&self) -> Option<Point<T>> {
         let mut vector = self.node_vector();
 
-        normals
+        self.cox()
+            .normals()?
             .solve_upper_triangular_mut(&mut vector)
             .then(|| vector)
     }
 }
 
-impl From<Cd> for CoxMatrix {
-    fn from(cd: Cd) -> Self {
+impl<T: Float> From<Cd<T>> for CoxMatrix<T> {
+    fn from(cd: Cd<T>) -> Self {
         cd.cox()
     }
 }
 
-impl Display for Cd {
+impl<T: Float + Display> Display for Cd<T> {
     /// Prints the node and edge count, along with the value each node and edge contains
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Prints node and edge counts.
@@ -926,23 +936,23 @@ mod tests {
     use nalgebra::dmatrix;
 
     /// Returns a ringed node at half-unit distance.
-    fn x() -> Node {
+    fn x() -> Node<f32> {
         Node::ringed(1.0)
     }
 
     /// Returns an unringed node.
-    fn o() -> Node {
+    fn o() -> Node<f32> {
         Node::Unringed
     }
 
     /// Returns a snub node at half-unit distance.
-    fn s() -> Node {
+    fn s() -> Node<f32> {
         Node::snub(1.0)
     }
 
     /// Tests that a parsed diagram's nodes and Coxeter matrix match expected
     /// values.
-    fn test(diagram: &str, nodes: Vec<Node>, matrix: Matrix) {
+    fn test(diagram: &str, nodes: Vec<Node<f32>>, matrix: Matrix<f32>) {
         let cd = Cd::parse(diagram).unwrap();
         assert_eq!(cd.nodes(), nodes, "Node mismatch!");
         assert_eq!(cd.cox(), CoxMatrix::new(matrix), "Coxeter matrix mismatch!");
@@ -952,7 +962,7 @@ mod tests {
     /// Tests some of the I2 symmetry groups.
     fn i2() {
         for n in 2..10 {
-            let nf = n as Float;
+            let nf = n as f32;
 
             test(
                 &format!("x{}x", n),
@@ -1093,36 +1103,36 @@ mod tests {
     #[test]
     #[should_panic(expected = "MismatchedParenthesis { pos: 6 }")]
     fn mismatched_parenthesis() {
-        Cd::parse("x(1.0x").unwrap();
+        Cd::<f32>::parse("x(1.0x").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "UnexpectedEnding { pos: 6 }")]
     fn unexpected_ending() {
-        Cd::parse("x4x3x3").unwrap();
+        Cd::<f32>::parse("x4x3x3").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "InvalidSymbol { pos: 2 }")]
     fn invalid_symbol() {
-        Cd::parse("x3⊕5o").unwrap();
+        Cd::<f32>::parse("x3⊕5o").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "ParseError { pos: 5 }")]
     fn parse_error() {
-        Cd::parse("(1.1.1)3(2.0)").unwrap();
+        Cd::<f32>::parse("(1.1.1)3(2.0)").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "InvalidEdge { num: 1, den: 0, pos: 3 }")]
     fn invalid_edge() {
-        Cd::parse("s1/0s").unwrap();
+        Cd::<f32>::parse("s1/0s").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "RepeatEdge { a: 0, b: 1 }")]
     fn repeat_edge() {
-        Cd::parse("x3x xx *c3*d *a3*b").unwrap();
+        Cd::<f32>::parse("x3x xx *c3*d *a3*b").unwrap();
     }
 }

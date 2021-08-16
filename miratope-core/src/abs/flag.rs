@@ -96,11 +96,11 @@ impl Orientation {
 
     /// Returns the "sign" associated with a flag, which is either `1.0` or
     /// `-1.0`.
-    pub fn sign(&self) -> Float {
-        match self {
+    pub fn sign<T: Float>(&self) -> T {
+        T::f64(match self {
             Self::Even => 1.0,
             Self::Odd => -1.0,
-        }
+        })
     }
 }
 

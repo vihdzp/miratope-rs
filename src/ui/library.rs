@@ -7,13 +7,13 @@ use std::{
 };
 
 use super::config::LibPath;
+use crate::{Float, NamedConcrete};
 use miratope_core::{
     conc::{file::FromFile, ConcretePolytope},
     Polytope,
 };
 use miratope_lang::{
     name::{Con, Name},
-    poly::NamedConcrete,
     SelectedLanguage,
 };
 
@@ -220,7 +220,8 @@ impl SpecialLibrary {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum DisplayName {
     /// A name in its language-independent representation.
-    Name(Name<Con>),
+    //todo: make generic?
+    Name(Name<Con<Float>>),
 
     /// A literal string name.
     Literal(String),
@@ -337,13 +338,13 @@ impl Library {
 
     /// Attempts to read the `.name` file in a folder. If it can, it returns the
     /// name.
-    pub fn read_name<T: AsRef<Path>>(path: T) -> Option<DisplayName> {
+    pub fn read_name<U: AsRef<Path>>(path: U) -> Option<DisplayName> {
         ron::from_str(&String::from_utf8(fs::read(path.as_ref().join(".name")).ok()?).ok()?).ok()
     }
 
     /// Creates a new unloaded folder from a given path. If the path doesn't
     /// exist or doesn't refer to a folder, we return `None`.
-    pub fn new_folder<T: AsRef<OsStr>>(path: &T) -> Option<Self> {
+    pub fn new_folder<U: AsRef<OsStr>>(path: &U) -> Option<Self> {
         let path = PathBuf::from(&path);
         if !(path.exists() && path.is_dir()) {
             return None;
@@ -375,7 +376,7 @@ impl Library {
     /// Reads a folder's data from the `.folder` file. If it doesn't exist, it
     /// defaults to loading the folder's name and its data in alphabetical
     /// order. If that also fails, it returns an `Err`.
-    pub fn folder_contents<T: AsRef<OsStr>>(path: T) -> io::Result<Vec<Self>> {
+    pub fn folder_contents<U: AsRef<OsStr>>(path: U) -> io::Result<Vec<Self>> {
         let path = PathBuf::from(&path);
         assert!(
             path.is_dir(),

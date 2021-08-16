@@ -14,6 +14,7 @@ use miratope_core::{
     geometry::Point,
     Float, Polytope,
 };
+use serde::de::DeserializeOwned;
 
 use crate::name::{Abs, Con, ConData, Name, NameData, NameType};
 
@@ -49,7 +50,7 @@ impl<T: NameType> Named<T> {
 pub type NamedAbstract = Named<Abs>;
 
 /// A [`Concrete`] polytope with a [`Name`].
-pub type NamedConcrete = Named<Con>;
+pub type NamedConcrete<T> = Named<Con<T>>;
 
 impl<T: NameType> Polytope for Named<T> {
     type DualError = <T::Polytope as Polytope>::DualError;
@@ -241,20 +242,20 @@ impl<T: NameType> Polytope for Named<T> {
     }
 }
 
-impl ConcretePolytope for NamedConcrete {
-    fn con(&self) -> &Concrete {
+impl<T: Float + DeserializeOwned> ConcretePolytope<T> for NamedConcrete<T> {
+    fn con(&self) -> &Concrete<T> {
         &self.polytope
     }
 
-    fn con_mut(&mut self) -> &mut Concrete {
+    fn con_mut(&mut self) -> &mut Concrete<T> {
         &mut self.polytope
     }
 
-    fn dyad_with(height: Float) -> Self {
+    fn dyad_with(height: T) -> Self {
         Self::new(Concrete::dyad_with(height), Name::Dyad)
     }
 
-    fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: Float) -> Self {
+    fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: T) -> Self {
         Self::new(
             Concrete::grunbaum_star_polygon_with_rot(n, d, rot),
             Name::polygon(ConData::new_lazy(|| Point::zeros(2).into()), n),
@@ -263,7 +264,7 @@ impl ConcretePolytope for NamedConcrete {
 
     fn try_dual_mut_with(
         &mut self,
-        sphere: &miratope_core::geometry::Hypersphere,
+        sphere: &miratope_core::geometry::Hypersphere<T>,
     ) -> Result<(), Self::DualError> {
         let res = self.polytope.try_dual_mut_with(sphere);
         let facet_count = self.facet_count();
@@ -281,31 +282,31 @@ impl ConcretePolytope for NamedConcrete {
         res
     }
 
-    fn pyramid_with(&self, apex: Point) -> Self {
+    fn pyramid_with(&self, apex: Point<T>) -> Self {
         Self::new(
             self.con().pyramid_with(apex),
             Name::pyramid(self.name.clone()),
         )
     }
 
-    fn prism_with(&self, height: Float) -> Self {
+    fn prism_with(&self, height: T) -> Self {
         Self::new(
             self.con().prism_with(height),
             Name::prism(self.name.clone()),
         )
     }
 
-    fn tegum_with(&self, apex1: Point, apex2: Point) -> Self {
+    fn tegum_with(&self, apex1: Point<T>, apex2: Point<T>) -> Self {
         Self::new(
             self.con().tegum_with(apex1, apex2),
             Name::tegum(self.name.clone()),
         )
     }
 
-    fn antiprism_with_vertices<T: Iterator<Item = Point>, U: Iterator<Item = Point>>(
+    fn antiprism_with_vertices<I: Iterator<Item = Point<T>>, J: Iterator<Item = Point<T>>>(
         &self,
-        vertices: T,
-        dual_vertices: U,
+        vertices: I,
+        dual_vertices: J,
     ) -> Self {
         Self::new(
             self.con().antiprism_with_vertices(vertices, dual_vertices),
@@ -316,9 +317,9 @@ impl ConcretePolytope for NamedConcrete {
     fn duopyramid_with(
         p: &Self,
         q: &Self,
-        p_offset: &Point,
-        q_offset: &Point,
-        height: Float,
+        p_offset: &Point<T>,
+        q_offset: &Point<T>,
+        height: T,
     ) -> Self {
         Self::new(
             Concrete::duopyramid_with(p.con(), q.con(), p_offset, q_offset, height),
@@ -326,7 +327,7 @@ impl ConcretePolytope for NamedConcrete {
         )
     }
 
-    fn duotegum_with(p: &Self, q: &Self, p_offset: &Point, q_offset: &Point) -> Self {
+    fn duotegum_with(p: &Self, q: &Self, p_offset: &Point<T>, q_offset: &Point<T>) -> Self {
         Self::new(
             Concrete::duotegum_with(p.con(), q.con(), p_offset, q_offset),
             Name::multitegum(array::IntoIter::new([p.name.clone(), q.name.clone()])),
@@ -338,17 +339,17 @@ impl ConcretePolytope for NamedConcrete {
         self.set_generic();
     }
 
-    fn flatten_into(&mut self, subspace: &miratope_core::geometry::Subspace) {
+    fn flatten_into(&mut self, subspace: &miratope_core::geometry::Subspace<T>) {
         self.con_mut().flatten_into(subspace);
         self.set_generic();
     }
 
-    fn cross_section(&self, slice: &miratope_core::geometry::Hyperplane) -> Self {
+    fn cross_section(&self, slice: &miratope_core::geometry::Hyperplane<T>) -> Self {
         Self::new_generic(self.con().cross_section(slice))
     }
 }
 
-impl FromFile for NamedConcrete {
+impl<T: Float + DeserializeOwned> FromFile for NamedConcrete<T> {
     fn from_off(src: &str) -> OffResult<Self> {
         let con = Concrete::from_off(src)?;
 
