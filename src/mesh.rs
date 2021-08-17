@@ -10,12 +10,10 @@ use bevy::{
     render::{mesh::Indices, pipeline::PrimitiveTopology},
 };
 use lyon::{math::point, path::Path, tessellation::*};
+use miratope_core::abs::Subsupelements;
 use miratope_core::{
     abs::{ElementList, Ranked},
-    conc::{
-        cycle::{Cycle, CycleBuilder},
-        ConcretePolytope,
-    },
+    conc::{cycle::Cycle, ConcretePolytope},
     geometry::{Subspace, Vector},
 };
 
@@ -119,21 +117,8 @@ impl Triangulation {
 
         // We render each face separately.
         for face in faces {
-            let mut vertex_loop = CycleBuilder::with_capacity(face.subs.len());
-
-            // We first figure out the vertices in order.
-            for [v0, v1] in face.subs.iter().map(|&i| {
-                let subs = &edges[i].subs;
-                let len = subs.len();
-
-                debug_assert_eq!(len, 2, "Edge has {} subelements, expected 2.", len);
-                [subs[0], subs[1]]
-            }) {
-                vertex_loop.push(v0, v1);
-            }
-
             // We tesselate this path.
-            let cycles = vertex_loop.cycles();
+            let cycles = Cycle::from_edges(face.subs.iter().map(|&i| edges[i].subs.as_slice()));
             if let Some(path) = path(&cycles, &polytope.vertices) {
                 let mut geometry: VertexBuffers<_, u16> = VertexBuffers::new();
 
@@ -246,16 +231,13 @@ fn vertex_coords<'a, I: Iterator<Item = &'a Point>>(
 ) -> Vec<[f32; 3]> {
     let dim = poly.dim_or();
 
+    // Returns the ith coordinate of p, or 0 if it doesn't exist.
+    let coord = |p: &Point, i: usize| p.get(i).copied().unwrap_or_default();
+
     // If the polytope is at most 3D, we just embed it into 3D space.
     if projection_type.is_orthogonal() || dim <= 3 {
         vertices
-            .map(|point| {
-                let mut iter = point.iter().take(3).map(|&c| c as f32);
-                let x = iter.next().unwrap_or(0.0);
-                let y = iter.next().unwrap_or(0.0);
-                let z = iter.next().unwrap_or(0.0);
-                [x, y, z]
-            })
+            .map(|p| [coord(p, 0), coord(p, 1), coord(p, 2)])
             .collect()
     }
     // Else, we project it down.
@@ -268,15 +250,14 @@ fn vertex_coords<'a, I: Iterator<Item = &'a Point>>(
         let dist = (min as f32 - 1.0).abs().max(max as f32 + 1.0).abs();
 
         vertices
-            .map(|point| {
-                let factor: f32 = point.iter().skip(3).map(|&x| x as f32 + dist).product();
-
+            .map(|p| {
                 // We scale the first three coordinates accordingly.
-                let mut iter = point.iter().copied().take(3).map(|c| c as f32 / factor);
-                let x = iter.next().unwrap();
-                let y = iter.next().unwrap();
-                let z = iter.next().unwrap();
-                [x, y, z]
+                let factor: f32 = p.iter().skip(3).map(|&x| x as f32 + dist).product();
+                [
+                    coord(p, 0) / factor,
+                    coord(p, 1) / factor,
+                    coord(p, 2) / factor,
+                ]
             })
             .collect()
     }
@@ -327,7 +308,7 @@ pub trait Renderable: ConcretePolytope<Float> {
         let mut indices = Vec::with_capacity(edge_count * 2);
 
         // Adds the edges to the wireframe.
-        if let Some(edges) = self.get_edges() {
+        if let Some(edges) = self.get_element_list(2) {
             for edge in edges {
                 debug_assert_eq!(
                     edge.subs.len(),

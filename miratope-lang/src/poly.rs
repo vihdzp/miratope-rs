@@ -1,12 +1,15 @@
 //! Contains the named abstract and concrete polytope types.
 
-use std::array;
+use std::{
+    array,
+    ops::{Index, IndexMut},
+};
 
 use miratope_core::{
-    abs::{flag::Flag, Abstract, Ranked},
+    abs::{flag::Flag, Abstract, Element, ElementList, Ranked},
     conc::{
         file::{
-            off::{OffError, OffResult},
+            off::{OffParseError, OffParseResult},
             FromFile,
         },
         Concrete, ConcretePolytope,
@@ -22,7 +25,7 @@ use crate::name::{Abs, Con, ConData, Name, NameData, NameType};
 #[derive(Clone, Debug)]
 pub struct Named<T: NameType> {
     /// The inner polytope.
-    pub polytope: T::Polytope,
+    pub poly: T::Polytope,
 
     /// The stored name.
     pub name: Name<T>,
@@ -30,8 +33,8 @@ pub struct Named<T: NameType> {
 
 impl<T: NameType> Named<T> {
     /// Initializes a new named polytope.
-    fn new(polytope: T::Polytope, name: Name<T>) -> Self {
-        Self { polytope, name }
+    fn new(poly: T::Polytope, name: Name<T>) -> Self {
+        Self { poly, name }
     }
 
     /// Initializes a new named polytope with a generic name.
@@ -42,7 +45,35 @@ impl<T: NameType> Named<T> {
 
     /// Sets the polytope's name to the corresponding generic name.
     fn set_generic(&mut self) {
-        self.name = Name::generic(self.polytope.facet_count(), self.polytope.rank())
+        self.name = Name::generic(self.poly.facet_count(), self.poly.rank())
+    }
+}
+
+impl<T: NameType> Index<usize> for Named<T> {
+    type Output = ElementList;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.poly[index]
+    }
+}
+
+impl<T: NameType> IndexMut<usize> for Named<T> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.poly[index]
+    }
+}
+
+impl<T: NameType> Index<(usize, usize)> for Named<T> {
+    type Output = Element;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        &self.poly[index]
+    }
+}
+
+impl<T: NameType> IndexMut<(usize, usize)> for Named<T> {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        &mut self.poly[index]
     }
 }
 
@@ -56,15 +87,15 @@ impl<T: NameType> Polytope for Named<T> {
     type DualError = <T::Polytope as Polytope>::DualError;
 
     fn abs(&self) -> &Abstract {
-        self.polytope.abs()
+        self.poly.abs()
     }
 
     fn abs_mut(&mut self) -> &mut Abstract {
-        self.polytope.abs_mut()
+        self.poly.abs_mut()
     }
 
     fn into_abs(self) -> Abstract {
-        self.polytope.into_abs()
+        self.poly.into_abs()
     }
 
     fn nullitope() -> Self {
@@ -87,7 +118,7 @@ impl<T: NameType> Polytope for Named<T> {
     }
 
     fn try_dual(&self) -> Result<Self, Self::DualError> {
-        let poly = self.polytope.try_dual()?;
+        let poly = self.poly.try_dual()?;
         let rank = poly.rank();
 
         let name = self.name.clone().dual(
@@ -100,9 +131,9 @@ impl<T: NameType> Polytope for Named<T> {
     }
 
     fn try_dual_mut(&mut self) -> Result<(), Self::DualError> {
-        self.polytope.try_dual_mut()?;
-        let rank = self.polytope.rank();
-        let facet_count = self.polytope.facet_count();
+        self.poly.try_dual_mut()?;
+        let rank = self.poly.rank();
+        let facet_count = self.poly.facet_count();
 
         self.name.into_mut(|name| {
             name.dual(
@@ -116,16 +147,16 @@ impl<T: NameType> Polytope for Named<T> {
     }
 
     fn comp_append(&mut self, p: Self) {
-        self.polytope.comp_append(p.polytope);
+        self.poly.comp_append(p.poly);
         println!("Compound names are TBA!")
     }
 
     fn element(&self, rank: usize, idx: usize) -> Option<Self> {
-        Some(Self::new_generic(self.polytope.element(rank, idx)?))
+        Some(Self::new_generic(self.poly.element(rank, idx)?))
     }
 
     fn petrial_mut(&mut self) -> bool {
-        let res = self.polytope.petrial_mut();
+        let res = self.poly.petrial_mut();
         if res {
             self.name.into_mut(Name::petrial);
         }
@@ -133,64 +164,64 @@ impl<T: NameType> Polytope for Named<T> {
     }
 
     fn petrie_polygon_with(&mut self, flag: Flag) -> Option<Self> {
-        Some(Self::new_generic(self.polytope.petrie_polygon_with(flag)?))
+        Some(Self::new_generic(self.poly.petrie_polygon_with(flag)?))
     }
 
     fn omnitruncate(&self) -> Self {
-        Self::new_generic(self.polytope.omnitruncate())
+        Self::new_generic(self.poly.omnitruncate())
     }
 
     fn prism(&self) -> Self {
-        Self::new(self.polytope.prism(), self.name.clone().prism())
+        Self::new(self.poly.prism(), self.name.clone().prism())
     }
 
     fn prism_mut(&mut self) {
-        self.polytope.prism_mut();
+        self.poly.prism_mut();
         self.name.into_mut(Name::prism);
     }
 
     fn tegum(&self) -> Self {
-        Self::new(self.polytope.tegum(), self.name.clone().tegum())
+        Self::new(self.poly.tegum(), self.name.clone().tegum())
     }
 
     fn tegum_mut(&mut self) {
-        self.polytope.tegum_mut();
+        self.poly.tegum_mut();
         self.name.into_mut(Name::tegum);
     }
 
     fn pyramid(&self) -> Self {
-        Self::new(self.polytope.pyramid(), self.name.clone().pyramid())
+        Self::new(self.poly.pyramid(), self.name.clone().pyramid())
     }
 
     fn pyramid_mut(&mut self) {
-        self.polytope.pyramid_mut();
+        self.poly.pyramid_mut();
         self.name.into_mut(Name::pyramid);
     }
 
     fn duopyramid(p: &Self, q: &Self) -> Self {
         Self::new(
-            T::Polytope::duopyramid(&p.polytope, &q.polytope),
+            T::Polytope::duopyramid(&p.poly, &q.poly),
             Name::multipyramid(array::IntoIter::new([p.name.clone(), q.name.clone()])),
         )
     }
 
     fn duoprism(p: &Self, q: &Self) -> Self {
         Self::new(
-            T::Polytope::duoprism(&p.polytope, &q.polytope),
+            T::Polytope::duoprism(&p.poly, &q.poly),
             Name::multiprism(array::IntoIter::new([p.name.clone(), q.name.clone()])),
         )
     }
 
     fn duotegum(p: &Self, q: &Self) -> Self {
         Self::new(
-            T::Polytope::duotegum(&p.polytope, &q.polytope),
+            T::Polytope::duotegum(&p.poly, &q.poly),
             Name::multitegum(array::IntoIter::new([p.name.clone(), q.name.clone()])),
         )
     }
 
     fn duocomb(p: &Self, q: &Self) -> Self {
         Self::new(
-            T::Polytope::duocomb(&p.polytope, &q.polytope),
+            T::Polytope::duocomb(&p.poly, &q.poly),
             Name::multicomb(array::IntoIter::new([p.name.clone(), q.name.clone()])),
         )
     }
@@ -215,7 +246,7 @@ impl<T: NameType> Polytope for Named<T> {
 
     fn try_antiprism(&self) -> Result<Self, Self::DualError> {
         Ok(Self::new(
-            self.polytope.try_antiprism()?,
+            self.poly.try_antiprism()?,
             Name::antiprism(self.name.clone()),
         ))
     }
@@ -244,11 +275,11 @@ impl<T: NameType> Polytope for Named<T> {
 
 impl<T: Float + DeserializeOwned> ConcretePolytope<T> for NamedConcrete<T> {
     fn con(&self) -> &Concrete<T> {
-        &self.polytope
+        &self.poly
     }
 
     fn con_mut(&mut self) -> &mut Concrete<T> {
-        &mut self.polytope
+        &mut self.poly
     }
 
     fn dyad_with(height: T) -> Self {
@@ -266,7 +297,7 @@ impl<T: Float + DeserializeOwned> ConcretePolytope<T> for NamedConcrete<T> {
         &mut self,
         sphere: &miratope_core::geometry::Hypersphere<T>,
     ) -> Result<(), Self::DualError> {
-        let res = self.polytope.try_dual_mut_with(sphere);
+        let res = self.poly.try_dual_mut_with(sphere);
         let facet_count = self.facet_count();
         let rank = self.rank();
 
@@ -350,7 +381,7 @@ impl<T: Float + DeserializeOwned> ConcretePolytope<T> for NamedConcrete<T> {
 }
 
 impl<T: Float + DeserializeOwned> FromFile for NamedConcrete<T> {
-    fn from_off(src: &str) -> OffResult<Self> {
+    fn from_off(src: &str) -> OffParseResult<Self> {
         let con = Concrete::from_off(src)?;
 
         if let Some(first_line) = src.lines().next() {
@@ -360,7 +391,7 @@ impl<T: Float + DeserializeOwned> FromFile for NamedConcrete<T> {
                 Self::new_generic(con)
             })
         } else {
-            Err(OffError::Empty)
+            Err(OffParseError::Empty)
         }
     }
 

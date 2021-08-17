@@ -47,6 +47,16 @@ pub trait Subsupelements: VecLike<VecItem = usize> {
 
         Self::from_inner(vec)
     }
+
+    /// Returns a reference to the inner slice.
+    fn as_slice(&self) -> &[usize] {
+        self.as_inner().as_slice()
+    }
+
+    /// Returns a reference to the inner mutable slice.
+    fn as_mut_slice(&mut self) -> &mut [usize] {
+        self.as_inner_mut().as_mut_slice()
+    }
 }
 
 /// Represents a list of subelements in a polytope. Each element is represented
@@ -248,7 +258,9 @@ impl IndexMut<(usize, usize)> for Ranks {
 }
 
 /// The trait for any structure with an underlying set of [`Ranks`].
-pub trait Ranked: Sized {
+pub trait Ranked:
+    Sized + IndexMut<usize, Output = ElementList> + IndexMut<(usize, usize), Output = Element>
+{
     /// Returns a reference to the ranks.
     fn ranks(&self) -> &Ranks;
 
@@ -301,7 +313,7 @@ pub trait Ranked: Sized {
     /// # Panics
     /// Panics if the polytope has not been initialized.
     fn min(&self) -> &Element {
-        &self.ranks()[(0, 0)]
+        &self[(0, 0)]
     }
 
     /// Returns a mutable reference to the minimal element of the polytope.
@@ -309,7 +321,7 @@ pub trait Ranked: Sized {
     /// # Panics
     /// Panics if the polytope has not been initialized.
     fn min_mut(&mut self) -> &mut Element {
-        &mut self.ranks_mut()[(0, 0)]
+        &mut self[(0, 0)]
     }
 
     /// Returns the number of minimal elements. Unless you call this in the
@@ -323,7 +335,7 @@ pub trait Ranked: Sized {
     /// # Panics
     /// Panics if the polytope has not been initialized.
     fn max(&self) -> &Element {
-        &self.ranks()[(self.rank(), 0)]
+        &self[(self.rank(), 0)]
     }
 
     /// Returns a mutable reference to the maximal element of the polytope.
@@ -332,7 +344,7 @@ pub trait Ranked: Sized {
     /// Panics if the polytope has not been initialized.
     fn max_mut(&mut self) -> &mut Element {
         let rank = self.rank();
-        &mut self.ranks_mut()[(rank, 0)]
+        &mut self[(rank, 0)]
     }
 
     /// Returns the number of maximal elements. Unless you call this in the
@@ -341,29 +353,9 @@ pub trait Ranked: Sized {
         self.el_count(self.rank())
     }
 
-    /// Returns a reference to the abstract vertices of the polytope.
-    fn get_vertices(&self) -> Option<&ElementList> {
-        self.get_element_list(1)
-    }
-
-    /// Returns a mutable reference to the abstract vertices of the polytope.
-    fn get_vertices_mut(&mut self) -> Option<&mut ElementList> {
-        self.get_element_list_mut(1)
-    }
-
     /// Returns the number of vertices.
     fn vertex_count(&self) -> usize {
         self.el_count(1)
-    }
-
-    /// Returns a reference to the edges of the polytope.
-    fn get_edges(&self) -> Option<&ElementList> {
-        self.get_element_list(2)
-    }
-
-    /// Returns a mutable reference to the edges of the polytope.
-    fn edges_mut(&mut self) -> Option<&mut ElementList> {
-        self.get_element_list_mut(2)
     }
 
     /// Returns the number of edges.
@@ -377,7 +369,7 @@ pub trait Ranked: Sized {
     }
 
     /// Returns a mutable reference to the facets of the polytope.
-    fn facets_mut(&mut self) -> Option<&mut ElementList> {
+    fn get_facets_mut(&mut self) -> Option<&mut ElementList> {
         self.get_element_list_mut(self.rank().wrapping_sub(1))
     }
 
@@ -393,7 +385,7 @@ pub trait Ranked: Sized {
 
     /// Pushes a given element into the vector of elements of a given rank.
     fn push_at(&mut self, rank: usize, el: Element) {
-        self.ranks_mut()[rank].push(el);
+        self[rank].push(el);
     }
 
     /// Pushes a given element into the vector of elements of a given rank.
@@ -404,7 +396,7 @@ pub trait Ranked: Sized {
 
             // Updates superelements of the lower rank.
             for &sub in &subs {
-                self.ranks_mut()[(rank - 1, sub)].sups.push(i);
+                self[(rank - 1, sub)].sups.push(i);
             }
         }
 

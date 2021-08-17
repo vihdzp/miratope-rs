@@ -1,7 +1,11 @@
 //! Contains the code to convert from a polygon as a set of edges into a polygon
 //! as a cycle of vertices.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+    fmt::Display,
+};
 
 use vec_like::*;
 
@@ -24,6 +28,42 @@ impl<T> Default for Pair<T> {
     }
 }
 
+/// An error when converting a pair into a tuple.
+#[derive(Clone, Copy, Debug)]
+pub struct PairError(bool);
+
+impl PairError {
+    /// Initializes a new error, where the argument specifies whether the pair
+    /// was empty.
+    pub fn new(empty: bool) -> Self {
+        Self(empty)
+    }
+}
+
+impl Display for PairError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.0 {
+            f.write_str("pair was empty")
+        } else {
+            f.write_str("pair had a single member")
+        }
+    }
+}
+
+impl std::error::Error for PairError {}
+
+impl<T> TryFrom<Pair<T>> for (T, T) {
+    type Error = PairError;
+
+    fn try_from(pair: Pair<T>) -> Result<Self, PairError> {
+        if let Pair::Two(v0, v1) = pair {
+            Ok((v0, v1))
+        } else {
+            Err(PairError(pair.is_empty()))
+        }
+    }
+}
+
 impl<T> Pair<T> {
     /// Returns `true` if the pair is `None`.
     pub fn is_empty(&self) -> bool {
@@ -39,28 +79,29 @@ impl<T> Pair<T> {
         }
     }
 
-    /// Pushes a value onto the pair by copy.
+    /// Pushes a value onto the pair by cloning.
     ///
     /// # Panics
     /// The code will panic if you attempt to push a value onto a pair that
     /// already has two elements in it.
     pub fn push(&mut self, value: T)
     where
-        T: Copy,
+        T: Clone,
     {
         *self = match self {
             Self::None => Self::One(value),
-            Self::One(first) => Self::Two(*first, value),
-            Self::Two(_, _) => panic!("Can't push a value onto a pair with two elements!"),
+            Self::One(first) => Self::Two(first.clone(), value),
+            _ => panic!("Can't push a value onto a pair with two elements!"),
         };
     }
 }
 
-/// A helper struct to build a cycle of vertices from a polygonal path.
+/// A helper struct to find cycles in a graph where the degree of all nodes
+/// equals 2. This is most useful when working with (compound) polygons.
 ///
-/// Internally, each vertex is mapped to a [`Pair`], which stores the (at most)
-/// two other vertices it's connected to. By traversing this map, we're able to
-/// recover the vertex cycles.
+/// Internally, each node is mapped to a [`Pair`], which stores the indices of
+/// the (at most) two other nodes it's connected to. By traversing this map,
+/// we're able to recover the cycles.
 #[derive(Default)]
 pub struct CycleBuilder(HashMap<usize, Pair<usize>>);
 
@@ -85,20 +126,20 @@ impl CycleBuilder {
         self.0.len()
     }
 
-    /// Returns the first index and pair in the hash, under some arbitrary
+    /// Returns the first index and pair in the hash map, under some arbitrary
     /// order.
     pub fn first(&self) -> Option<(&usize, &Pair<usize>)> {
         self.0.iter().next()
     }
 
-    /// Removes the entry associated to a given vertex and returns it, or `None`
+    /// Removes the entry associated to a given node and returns it, or `None`
     /// if no such entry exists.
     pub fn remove(&mut self, idx: usize) -> Option<Pair<usize>> {
         self.0.remove(&idx)
     }
 
-    /// Returns a mutable reference to the edge associated to a vertex, adding
-    /// it if it doesn't exist.
+    /// Returns a mutable reference to the edge associated to a node, adding it
+    /// if it doesn't exist.
     pub fn get_mut(&mut self, idx: usize) -> &mut Pair<usize> {
         use std::collections::hash_map::Entry;
 
@@ -117,24 +158,25 @@ impl CycleBuilder {
         self.get_mut(vertex1).push(vertex0);
     }
 
-    /// Returns the indices of the two vertices adjacent to a given one.
+    /// Pushes a given edge into the graph. Asserts that the edge has exactly
+    /// two elements.
+    pub fn push_edge(&mut self, edge: &[usize]) {
+        debug_assert_eq!(edge.len(), 2);
+        self.push(edge[0], edge[1]);
+    }
+
+    /// Returns the indices of the two nodes adjacent to a given one.
     ///
     /// # Panics
     /// This method will panic if there are less than two elements adjacent to
     /// the specified one.
     pub fn get_remove(&mut self, idx: usize) -> (usize, usize) {
-        let pair = self.remove(idx).unwrap_or_default();
-
-        if let Pair::Two(v0, v1) = pair {
-            (v0, v1)
-        } else {
-            panic!("Expected 2 elements in pair, found {}.", pair.len())
-        }
+        self.remove(idx).unwrap_or_default().try_into().unwrap()
     }
 
-    /// Cycles through the vertex loop, returns the vector of vertices in cyclic
+    /// Cycles through the graph, returns a vector of node indices in cyclic
     /// order.
-    pub fn cycles(&mut self) -> Vec<Cycle> {
+    pub fn build(&mut self) -> Vec<Cycle> {
         let mut cycles = Vec::new();
 
         // While there's some vertex from which we haven't generated a cycle:
@@ -145,12 +187,11 @@ impl CycleBuilder {
 
             cycle.push(cur);
 
-            // We traverse the polygon, finding the next vertex over and over, until
-            // we reach the initial vertex again.
+            // We traverse the graph, finding the next node over and over, until
+            // we reach the initial node again.
             loop {
                 // The two candidates for the next vertex.
                 let (next0, next1) = self.get_remove(cur);
-
                 let next_is_next1 = next0 == prev;
                 prev = cur;
 
@@ -181,3 +222,15 @@ impl CycleBuilder {
 /// path and tessellated.
 pub struct Cycle(Vec<usize>);
 impl_veclike!(Cycle, Item = usize, Index = usize);
+
+impl Cycle {
+    /// Builds a set of cycles from an iterator over graph edges.
+    // If stuff like the veclikes implemented AsRef, this would be much cleaner.
+    pub fn from_edges<'a, I: Iterator<Item = &'a [usize]>>(edges: I) -> Vec<Self> {
+        let mut cycle = CycleBuilder::new();
+        for edge in edges {
+            cycle.push_edge(edge);
+        }
+        cycle.build()
+    }
+}

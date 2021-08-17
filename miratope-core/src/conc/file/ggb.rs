@@ -3,7 +3,7 @@
 // This code is unfinished.
 #![allow(dead_code)]
 
-use std::{io::Result as IoResult, str::FromStr};
+use std::io::Result as IoResult;
 
 use crate::{conc::Concrete, geometry::Point, Float};
 
@@ -79,10 +79,7 @@ impl<'a> XmlReader<'a> {
     /// ```xml
     /// <element type="point3d" label="A">
     /// ```
-    fn read_point<T: Float + FromStr>(
-        &mut self,
-        attributes: &[OwnedAttribute],
-    ) -> GgbResult<Vertex<T>> {
+    fn read_point<T: Float>(&mut self, attributes: &[OwnedAttribute]) -> GgbResult<Vertex<T>> {
         let label = attribute(attributes, "label").unwrap_or_default();
         let coord_attributes = self.read_until("coords")?;
 
@@ -209,7 +206,7 @@ fn read_face() -> Face {
 }
 
 /// Parses the `geogebra.xml` file to produce a polytope.
-pub(super) fn parse_xml<T: Float + FromStr>(xml: &str) -> GgbResult<Concrete<T>> {
+pub(super) fn parse_xml<T: Float>(xml: &str) -> GgbResult<Concrete<T>> {
     let mut vertices: Vec<Vertex<T>> = Vec::new();
     let mut edges = Vec::new();
     let mut xml = XmlReader::new(xml);

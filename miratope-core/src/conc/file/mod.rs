@@ -5,22 +5,22 @@ pub mod off;
 
 use self::{
     ggb::{GgbError, GgbResult},
-    off::{OffReader, OffResult},
+    off::{OffParseResult, OffReader},
 };
 use crate::Float;
 
 use super::Concrete;
-use off::OffError;
+use off::OffParseError;
 use zip::result::ZipError;
 
 pub use std::io::Error as IoError;
-use std::{fs::File, str::FromStr, string::FromUtf8Error};
+use std::{fs::File, string::FromUtf8Error};
 
 /// Any error encountered while trying to load a polytope.
 #[derive(Debug)]
 pub enum FileError<'a> {
     /// An error while reading an OFF file.
-    OffError(OffError),
+    OffError(OffParseError),
 
     /// An error while reading a GGB file.
     GgbError(GgbError),
@@ -55,8 +55,8 @@ impl<'a> std::fmt::Display for FileError<'a> {
 impl<'a> std::error::Error for FileError<'a> {}
 
 /// [`OffError`] is a type of [`FileError`].
-impl<'a> From<OffError> for FileError<'a> {
-    fn from(err: OffError) -> Self {
+impl<'a> From<OffParseError> for FileError<'a> {
+    fn from(err: OffParseError) -> Self {
         Self::OffError(err)
     }
 }
@@ -98,7 +98,7 @@ pub trait FromFile: Sized {
     ///
     /// # Todo
     /// Maybe don't load the entire file at once?
-    fn from_off(src: &str) -> OffResult<Self>;
+    fn from_off(src: &str) -> OffParseResult<Self>;
 
     /// Attempts to read a GGB file. If succesful, outputs a polytope in at most
     /// 3D.
@@ -130,8 +130,8 @@ pub trait FromFile: Sized {
     }
 }
 
-impl<T: Float + FromStr> FromFile for Concrete<T> {
-    fn from_off(src: &str) -> OffResult<Self> {
+impl<T: Float> FromFile for Concrete<T> {
+    fn from_off(src: &str) -> OffParseResult<Self> {
         OffReader::new(src).build()
     }
 

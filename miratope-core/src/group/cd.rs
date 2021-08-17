@@ -909,7 +909,7 @@ impl<T: Float> From<Cd<T>> for CoxMatrix<T> {
     }
 }
 
-impl<T: Float + Display> Display for Cd<T> {
+impl<T: Float> Display for Cd<T> {
     /// Prints the node and edge count, along with the value each node and edge contains
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Prints node and edge counts.

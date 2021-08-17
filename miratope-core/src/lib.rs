@@ -26,12 +26,12 @@ pub mod conc;
 pub mod geometry;
 pub mod group;
 
-use std::{collections::HashSet, error::Error, iter};
+use std::{collections::HashSet, error::Error, iter, ops::IndexMut};
 
 use abs::{
     elements::{Ranks, SectionRef},
     flag::{Flag, FlagIter, OrientedFlag, OrientedFlagIter},
-    Abstract, ElementMap, Ranked,
+    Abstract, Element, ElementList, ElementMap, Ranked,
 };
 
 use vec_like::VecLike;
@@ -226,7 +226,9 @@ impl<T: Polytope> Ranked for T {
 }
 
 /// The trait for methods common to all polytopes.
-pub trait Polytope: Clone {
+pub trait Polytope:
+    Clone + IndexMut<usize, Output = ElementList> + IndexMut<(usize, usize), Output = Element>
+{
     /// The error type of taking a dual.
     type DualError: Error;
 
@@ -261,7 +263,7 @@ pub trait Polytope: Clone {
             vertex_map.push(
                 elements
                     .iter()
-                    .map(|el| vertex_map[r - 1][el.subs[0]])
+                    .map(|el| vertex_map[(r - 1, el.subs[0])])
                     .collect(),
             );
         }

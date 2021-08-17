@@ -17,7 +17,7 @@ use super::{
     DualError, Polytope,
 };
 use crate::{
-    abs::{AbstractBuilder, Subelements, Superelements},
+    abs::{AbstractBuilder, Element, Subelements, Superelements},
     geometry::{Hyperplane, Hypersphere, Matrix, Point, PointOrd, Segment, Subspace, Vector},
     Float,
 };
@@ -52,6 +52,22 @@ impl<T: Float> IndexMut<usize> for Concrete<T> {
     /// Gets the list of elements with a given rank.
     fn index_mut(&mut self, rank: usize) -> &mut Self::Output {
         &mut self.abs[rank]
+    }
+}
+
+impl<T: Float> Index<(usize, usize)> for Concrete<T> {
+    type Output = Element;
+
+    /// Gets the list of elements with a given rank.
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        &self.abs[index]
+    }
+}
+
+impl<T: Float> IndexMut<(usize, usize)> for Concrete<T> {
+    /// Gets the list of elements with a given rank.
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        &mut self.abs[index]
     }
 }
 
@@ -556,7 +572,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// # Todo
     /// Maybe make this work in the general case?
     fn midradius(&self) -> T {
-        let edge_subs = &self.ranks()[(2, 0)].subs;
+        let edge_subs = &self[(2, 0)].subs;
         (&self.vertices()[edge_subs[0]] + &self.vertices()[edge_subs[1]]).norm() / T::TWO
     }
 

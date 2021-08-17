@@ -792,7 +792,7 @@ impl Polytope for Abstract {
         self.pop();
 
         // Clears the current edges' superelements.
-        for edge in self.edges_mut().unwrap().iter_mut() {
+        for edge in self[2].iter_mut() {
             edge.sups = Superelements::new();
         }
 
@@ -912,7 +912,7 @@ impl Polytope for Abstract {
             let min = self.min().clone();
             self[0].push(min);
 
-            for v in self.get_vertices_mut().unwrap() {
+            for v in &mut self[0] {
                 v.subs.push(1);
             }
 
