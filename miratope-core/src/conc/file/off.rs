@@ -1,6 +1,6 @@
 //! Contains the code that opens an OFF file and parses it into a polytope.
 
-use std::{collections::HashMap, fmt::Display, io::Result as IoResult, path::Path, str::FromStr};
+use std::{collections::HashMap, fmt::Display, io::Error as IoError, path::Path, str::FromStr};
 
 use crate::{
     abs::{AbstractBuilder, Ranked, SubelementList, Subelements, Subsupelements},
@@ -513,9 +513,20 @@ pub enum OffWriteError {
     CoincidentEdges {
         /// The index of the first edge.
         idx0: usize,
+
         /// The index of the second edge.
         idx1: usize,
     },
+}
+
+impl OffWriteError {
+    fn coincident_edges(mut idx0: usize, mut idx1: usize) -> Self {
+        if idx0 > idx1 {
+            std::mem::swap(&mut idx0, &mut idx1);
+        }
+
+        Self::CoincidentEdges { idx0, idx1 }
+    }
 }
 
 impl Display for OffWriteError {
@@ -598,24 +609,21 @@ impl<'a, T: Float> OffWriter<'a, T> {
     ///
     /// This should only be called for polytopes with rank at least 3.
     fn check_edges(&self) -> OffWriteResult<()> {
+        use std::collections::hash_map::Entry::*;
         let mut hash_edges = HashMap::new();
 
         for (idx0, edge) in self.poly[2].iter().enumerate() {
-            use std::collections::hash_map::Entry::*;
             let subs = &edge.subs;
             let mut edge = (subs[0], subs[1]);
 
+            // We sort each edge.
             if edge.0 > edge.1 {
                 std::mem::swap(&mut edge.0, &mut edge.1);
             }
 
+            // We verify no other edge has the same vertices.
             match hash_edges.entry(edge) {
-                Occupied(entry) => {
-                    return Err(OffWriteError::CoincidentEdges {
-                        idx0,
-                        idx1: *entry.get(),
-                    })
-                }
+                Occupied(entry) => return Err(OffWriteError::coincident_edges(idx0, *entry.get())),
                 Vacant(entry) => {
                     entry.insert(idx0);
                 }
@@ -815,6 +823,41 @@ impl<'a, T: Float> OffWriter<'a, T> {
     }
 }
 
+/// An error when saving an OFF file.
+#[derive(Debug)]
+pub enum OffSaveError {
+    /// The OFF file couldn't be created.
+    OffWriteError(OffWriteError),
+
+    /// There was a problem saving the file.
+    IoError(IoError),
+}
+
+impl From<OffWriteError> for OffSaveError {
+    fn from(err: OffWriteError) -> Self {
+        Self::OffWriteError(err)
+    }
+}
+
+impl From<IoError> for OffSaveError {
+    fn from(err: IoError) -> Self {
+        Self::IoError(err)
+    }
+}
+
+impl Display for OffSaveError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::OffWriteError(err) => err.fmt(f),
+            Self::IoError(err) => err.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for OffSaveError {}
+
+type OffSaveResult<T> = Result<T, OffSaveError>;
+
 //todo: put this in its own trait
 impl<T: Float> Concrete<T> {
     /// Converts a polytope into an OFF file.
@@ -823,8 +866,9 @@ impl<T: Float> Concrete<T> {
     }
 
     /// Writes a polytope's OFF file in a specified file path.
-    pub fn to_path(&self, fp: &impl AsRef<Path>, opt: OffOptions) -> OffWriteResult<IoResult<()>> {
-        Ok(std::fs::write(fp, self.to_off(opt)?))
+    pub fn to_path<P: AsRef<Path>>(&self, fp: P, opt: OffOptions) -> OffSaveResult<()> {
+        std::fs::write(fp, self.to_off(opt)?)?;
+        Ok(())
     }
 }
 
