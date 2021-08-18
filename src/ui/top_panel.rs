@@ -547,7 +547,9 @@ pub fn show_top_panel(
                     // Determines whether the polytope is orientable.
                     if ui.button("Orientability").clicked() {
                         if let Some(mut p) = query.iter_mut().next() {
-                            if p.orientable_mut() {
+                            element_sort!(p);
+
+                            if p.orientable() {
                                 println!("The polytope is orientable.");
                             } else {
                                 println!("The polytope is not orientable.");

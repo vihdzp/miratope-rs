@@ -16,7 +16,7 @@ use super::{
     DualError, Polytope,
 };
 use crate::{
-    abs::{AbstractBuilder, Element, Subelements, Superelements},
+    abs::{AbstractBuilder, Element, ElementMap, Subelements, Superelements},
     geometry::{Hyperplane, Hypersphere, Matrix, Point, PointOrd, Segment, Subspace, Vector},
     Float,
 };
@@ -196,7 +196,7 @@ impl<T: Float> Polytope for Concrete<T> {
     // to vertices? We got some math details to figure out.
     fn omnitruncate(&self) -> Self {
         let (abs, flags) = self.abs.omnitruncate_and_flags();
-        let element_vertices = self.abs.vertex_map();
+        let element_vertices = self.avg_vertex_map();
 
         Self::new(
             flags
@@ -204,7 +204,9 @@ impl<T: Float> Polytope for Concrete<T> {
                 .map(|flag| {
                     flag.into_iter()
                         .enumerate()
-                        .map(|(r, idx)| &self.vertices[element_vertices[(r, idx)]])
+                        .skip(1)
+                        .take(self.rank())
+                        .map(|el| &element_vertices[el])
                         .sum()
                 })
                 .collect(),
@@ -443,7 +445,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
         let gcd = n.gcd(d);
         let angle = T::TAU / T::usize(n);
 
-        Self::compound_iter(
+        Self::compound(
             (0..gcd).into_iter().map(|k| {
                 Self::grunbaum_star_polygon_with_rot(n / gcd, d / gcd, T::usize(k) * angle)
             }),
@@ -546,6 +548,37 @@ pub trait ConcretePolytope<T: Float>: Polytope {
             // The minimum and maximum distances.
             MinMaxResult::MinMax(x, y) => Some((x.0, y.0)),
         }
+    }
+
+    /// Returns a map from the elements in a polytope to a crude average.
+    fn avg_vertex_map(&self) -> ElementMap<Point<T>> {
+        // Maps every element of the polytope to one of its vertices.
+        let mut vertex_map = ElementMap::new();
+        vertex_map.push(Vec::new());
+
+        // Vertices map to themselves.
+        if self.rank() != 0 {
+            vertex_map.push(self.vertices().clone());
+        }
+
+        // Every other element maps to the average of the locations of their
+        // subelements.
+        for (r, elements) in self.ranks().iter().enumerate().skip(2) {
+            vertex_map.push(
+                elements
+                    .iter()
+                    .map(|el| {
+                        el.subs
+                            .iter()
+                            .map(|&idx| &vertex_map[(r - 1, idx)])
+                            .sum::<Point<T>>()
+                            / T::usize(el.subs.len())
+                    })
+                    .collect(),
+            );
+        }
+
+        vertex_map
     }
 
     /// Returns the length of a given edge.

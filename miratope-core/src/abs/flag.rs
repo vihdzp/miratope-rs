@@ -626,8 +626,9 @@ impl PartialEq for FlagSet {
 impl Eq for FlagSet {}
 
 impl FlagSet {
-    /// Creates a new flag set from any flag of the polytope.
-    pub fn new(polytope: &Abstract) -> Self {
+    /// Creates a new flag set from any flag of the polytope, using all possible
+    /// flag changes.
+    pub fn new_all(polytope: &Abstract) -> Self {
         Self::with_flags(
             polytope,
             FlagChanges::all(polytope.rank()),

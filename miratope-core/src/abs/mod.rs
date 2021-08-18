@@ -398,15 +398,16 @@ impl Abstract {
     /// # Panics
     /// This method will panic if the polytope isn't sorted.
     pub fn omnitruncate_and_flags(&self) -> (Self, Vec<Flag>) {
-        let mut flag_sets = vec![FlagSet::new(self)];
+        let mut flag_sets = vec![FlagSet::new_all(self)];
         let mut new_flag_sets = Vec::new();
         let rank = self.rank();
 
         // The elements of each rank... backwards.
         let mut ranks = Vec::with_capacity(rank + 1);
 
-        // Adds elements of each rank.
-        for _ in 0..rank {
+        // Adds elements of each rank, except for vertices and the minimal
+        // element.
+        for _ in 2..=rank {
             let mut subelements = SubelementList::new();
 
             // Gets the subelements of each element.

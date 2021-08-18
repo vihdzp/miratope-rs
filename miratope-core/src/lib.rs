@@ -417,13 +417,8 @@ pub trait Polytope:
         self.element_fig(1, idx)
     }
 
-    /// Builds a compound polytope from a set of components.
-    fn compound(components: Vec<Self>) -> Self {
-        Self::compound_iter(components.into_iter())
-    }
-
     /// Builds a compound polytope from an iterator over components.
-    fn compound_iter<U: Iterator<Item = Self>>(mut components: U) -> Self {
+    fn compound<U: Iterator<Item = Self>>(mut components: U) -> Self {
         if let Some(mut p) = components.next() {
             for q in components {
                 p.comp_append(q);
