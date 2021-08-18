@@ -383,8 +383,10 @@ pub trait Polytope:
 
     /// Gets the element figure with a given rank and index as a polytope.
     fn element_fig(&self, rank: usize, idx: usize) -> Result<Option<Self>, Self::DualError> {
-        if self.rank() >= (rank - 1) {
-            if let Some(mut element_fig) = self.try_dual()?.element(self.rank() - (rank - 1), idx) {
+        if rank <= self.rank() {
+            // todo: this is quite inefficient for a small element figure since
+            // we take the dual of the entire thing.
+            if let Some(mut element_fig) = self.try_dual()?.element(self.rank() - rank, idx) {
                 element_fig.try_dual_mut()?;
                 return Ok(Some(element_fig));
             }
@@ -397,13 +399,11 @@ pub trait Polytope:
     /// a polytope, or returns `None` in case no section is defined by these
     /// elements.
     fn section(&self, section: SectionRef) -> Result<Option<Self>, Self::DualError> {
-        Ok(
-            if let Some(el) = self.element(section.hi_rank, section.hi_idx) {
-                el.element_fig(section.lo_rank, section.lo_idx)?
-            } else {
-                None
-            },
-        )
+        if let Some(el) = self.element(section.hi_rank, section.hi_idx) {
+            el.element_fig(section.lo_rank, section.lo_idx)
+        } else {
+            Ok(None)
+        }
     }
 
     /// Gets the facet associated to the element of a given index as a polytope.
