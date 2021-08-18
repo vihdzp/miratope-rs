@@ -293,7 +293,7 @@ pub trait DuoWindow: Window {
     fn polytopes<'a>(
         &'a self,
         loaded: &'a NamedConcrete,
-        memory: &'a Res<'_, Memory>,
+        memory: &'a Memory,
     ) -> [Option<&'a NamedConcrete>; 2] {
         let [i, j] = self.slots();
         [i.to_poly(memory, loaded), j.to_poly(memory, loaded)]
@@ -301,7 +301,7 @@ pub trait DuoWindow: Window {
 
     /// Returns the dimensions of the polytopes currently selected, or 0 in case
     /// of the nullitope.
-    fn dim_or(&self, polytope: &NamedConcrete, memory: &Res<'_, Memory>) -> [usize; 2] {
+    fn dim_or(&self, polytope: &NamedConcrete, memory: &Memory) -> [usize; 2] {
         let [p, q] = self.polytopes(polytope, memory);
 
         [
@@ -311,16 +311,16 @@ pub trait DuoWindow: Window {
     }
 
     /// Applies the action of the window to the polytope.
-    fn action(&self, polytope: &mut NamedConcrete, memory: &Res<'_, Memory>) {
+    fn action(&self, polytope: &mut NamedConcrete, memory: &Memory) {
         if let [Some(p), Some(q)] = self.polytopes(polytope, memory) {
             *polytope = self.operation(p, q);
         }
     }
 
     /// Builds the window to be shown on screen.
-    fn build(&mut self, _: &mut Ui, _: &NamedConcrete, _: &Res<'_, Memory>) {}
+    fn build(&mut self, _: &mut Ui, _: &NamedConcrete, _: &Memory) {}
 
-    fn build_dropdowns(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Res<'_, Memory>) {
+    fn build_dropdowns(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Memory) {
         use miratope_lang::{lang::En, Language};
 
         const SELECT: &str = "Select";
@@ -398,12 +398,7 @@ pub trait DuoWindow: Window {
     }
 
     /// Shows the window on screen.
-    fn show(
-        &mut self,
-        ctx: &CtxRef,
-        polytope: &NamedConcrete,
-        memory: &Res<'_, Memory>,
-    ) -> ShowResult {
+    fn show(&mut self, ctx: &CtxRef, polytope: &NamedConcrete, memory: &Memory) -> ShowResult {
         let mut open = self.is_open();
         let mut result = ShowResult::None;
 
@@ -882,7 +877,7 @@ impl DuoWindow for DuopyramidWindow {
         &mut self.slots
     }
 
-    fn build(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Res<'_, Memory>) {
+    fn build(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Memory) {
         let [p_dim, q_dim] = self.dim_or(polytope, memory);
 
         resize(&mut self.offsets[0], p_dim);
@@ -984,7 +979,7 @@ impl DuoWindow for DuotegumWindow {
         &mut self.slots
     }
 
-    fn build(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Res<'_, Memory>) {
+    fn build(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Memory) {
         let [p_dim, q_dim] = self.dim_or(polytope, memory);
 
         resize(&mut self.offsets[0], p_dim);

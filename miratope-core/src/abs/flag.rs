@@ -554,6 +554,11 @@ impl FlagEvent {
     pub fn non_orientable(&self) -> bool {
         matches!(self, Self::NonOrientable)
     }
+
+    /// Returns whether `self` does not match `Self::NonOrientable`.
+    pub fn orientable(&self) -> bool {
+        !self.non_orientable()
+    }
 }
 
 impl<'a> Iterator for OrientedFlagIter<'a> {
@@ -685,9 +690,7 @@ mod tests {
 
     /// Tests that a polytope has an expected number of flags, oriented or not.
     fn test(polytope: &mut Abstract, expected: usize) {
-        polytope.element_sort();
-
-        let flag_count = polytope.flags().count();
+        let flag_count = polytope.flags_mut().count();
         assert_eq!(
             expected, flag_count,
             "Expected {} flags, found {}.",

@@ -274,15 +274,17 @@ pub trait Polytope:
 
     /// Returns the indices of a Petrial polygon in cyclic order, or `None` if
     /// it self-intersects.
-    fn petrie_polygon_vertices(&mut self, flag: Flag) -> Option<Vec<usize>> {
+    ///
+    /// # Panics
+    /// Panics if the polytope is not sorted.
+    fn petrie_polygon_vertices(&self, flag: Flag) -> Option<Vec<usize>> {
         let rank = self.rank();
         let mut new_flag = flag.clone();
         let first_vertex = flag[0];
-
         let mut vertices = Vec::new();
         let mut vertex_hash = HashSet::new();
 
-        self.element_sort();
+        assert!(self.abs().sorted);
 
         loop {
             // Applies 0-changes up to (rank-1)-changes in order.
@@ -314,6 +316,13 @@ pub trait Polytope:
         else {
             None
         }
+    }
+
+    /// Returns the indices of a Petrial polygon in cyclic order, or `None` if
+    /// it self-intersects. Sorts the polytope if necessary.
+    fn petrie_polygon_vertices_mut(&mut self, flag: Flag) -> Option<Vec<usize>> {
+        self.element_sort();
+        self.petrie_polygon_vertices(flag)
     }
 
     /// Sorts the subelements and superelements of the entire polytope. This is
@@ -474,6 +483,12 @@ pub trait Polytope:
         FlagIter::new(self.abs())
     }
 
+    /// Returns an iterator over all [`Flag`]s of a polytope.
+    fn flags_mut(&mut self) -> FlagIter<'_> {
+        self.element_sort();
+        self.flags()
+    }
+
     /// Returns an iterator over all [`OrientedFlag`]s of a polytope.
     fn flag_events(&self) -> OrientedFlagIter<'_> {
         OrientedFlagIter::new(self.abs())
@@ -534,17 +549,15 @@ pub trait Polytope:
 
     /// Determines whether a given polytope is
     /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
-    fn orientable(&mut self) -> bool {
-        let abs = self.abs_mut();
-        abs.element_sort();
+    fn orientable(&self) -> bool {
+        self.flag_events().all(|f| f.orientable())
+    }
 
-        for flag_event in abs.flag_events() {
-            if flag_event.non_orientable() {
-                return false;
-            }
-        }
-
-        true
+    /// Determines whether a given polytope is
+    /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
+    fn orientable_mut(&mut self) -> bool {
+        self.element_sort();
+        self.orientable()
     }
 
     /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a

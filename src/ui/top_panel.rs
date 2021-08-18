@@ -10,7 +10,7 @@ use bevy_egui::{
     egui::{self, menu, Ui},
     EguiContext,
 };
-use miratope_core::{conc::ConcretePolytope, file::FromFile, Polytope};
+use miratope_core::{abs::Ranked, conc::ConcretePolytope, file::FromFile, Polytope};
 use miratope_lang::SelectedLanguage;
 use rfd::FileDialog;
 use strum::IntoEnumIterator;
@@ -64,6 +64,16 @@ impl SectionState {
     /// Makes the view inactive.
     pub fn close(&mut self) {
         *self = Self::Inactive;
+    }
+
+    pub fn open(&mut self, original_polytope: NamedConcrete, minmax: (f32, f32)) {
+        *self = SectionState::Active {
+            original_polytope,
+            minmax,
+            hyperplane_pos: (minmax.0 + minmax.1) / 2.0,
+            flatten: true,
+            lock: false,
+        }
     }
 }
 
@@ -150,6 +160,11 @@ impl FileDialogState {
         self.mode = FileDialogMode::Save;
         self.name = Some(name);
     }
+
+    /// Gets the name of the file dialog.
+    pub fn unwrap_name(&self) -> &str {
+        self.name.as_ref().unwrap()
+    }
 }
 
 /// The system in charge of showing the file dialog.
@@ -162,8 +177,7 @@ pub fn file_dialog(
         match file_dialog_state.mode {
             // We want to save a file.
             FileDialogMode::Save => {
-                if let Some(path) = file_dialog.save_file(file_dialog_state.name.as_ref().unwrap())
-                {
+                if let Some(path) = file_dialog.save_file(file_dialog_state.unwrap_name()) {
                     if let Some(p) = query.iter_mut().next() {
                         if let Err(err) = p.con().to_path(&path, Default::default()) {
                             eprintln!("File saving failed: {}", err);
@@ -194,7 +208,7 @@ pub fn file_dialog(
 }
 
 /// Whether the hotkey to enable "advanced" options is enabled.
-pub fn advanced(keyboard: &Res<'_, Input<KeyCode>>) -> bool {
+pub fn advanced(keyboard: &Input<KeyCode>) -> bool {
     keyboard.pressed(KeyCode::LControl) || keyboard.pressed(KeyCode::RControl)
 }
 
@@ -284,6 +298,17 @@ pub fn show_top_panel(
 
             // Anything related to the polytope on screen.
             menu::menu(ui, "Polytope", |ui| {
+                /// Sorts the elements of a polytope. This will only take the polytope as
+                /// mutable if necessary, thus avoiding a potential reload.
+                macro_rules! element_sort {
+                    ($p:ident) => {
+                        if !$p.abs().sorted {
+                            $p.ranks_mut().element_sort();
+                            $p.abs_mut().sorted = true;
+                        }
+                    };
+                }
+
                 // Operations on polytopes.
                 ui.collapsing("Operations", |ui| {
                     // Operations that take a single polytope.
@@ -410,19 +435,16 @@ pub fn show_top_panel(
                     });
 
                     if ui.button("Omnitruncate").clicked() {
-                        if let Some(mut p) = query.iter_mut().next() {
-                            p.element_sort();
-                            *p = p.omnitruncate();
-                        }
+                        let mut p = query.iter_mut().next().unwrap();
+                        element_sort!(p);
+                        *p = p.omnitruncate();
                     }
 
                     ui.separator();
 
                     // Recenters a polytope.
                     if ui.button("Recenter").clicked() {
-                        if let Some(mut p) = query.iter_mut().next() {
-                            p.recenter();
-                        }
+                        query.iter_mut().next().unwrap().recenter();
                     }
 
                     ui.separator();
@@ -435,7 +457,7 @@ pub fn show_top_panel(
                                 original_polytope, ..
                             } => {
                                 *query.iter_mut().next().unwrap() = original_polytope.clone();
-                                *section_state = SectionState::Inactive;
+                                section_state.close();
                             }
 
                             // The view is inactive, but will be activated.
@@ -453,13 +475,7 @@ pub fn show_top_panel(
                                 let minmax = p.minmax(&direction).unwrap_or((-1.0, 1.0));
                                 let original_polytope = p.clone();
 
-                                *section_state = SectionState::Active {
-                                    original_polytope,
-                                    minmax,
-                                    hyperplane_pos: (minmax.0 + minmax.1) / 2.0,
-                                    flatten: true,
-                                    lock: false,
-                                };
+                                section_state.open(original_polytope, minmax);
                                 section_direction.0 = direction;
                             }
                         };
@@ -531,7 +547,7 @@ pub fn show_top_panel(
                     // Determines whether the polytope is orientable.
                     if ui.button("Orientability").clicked() {
                         if let Some(mut p) = query.iter_mut().next() {
-                            if p.orientable() {
+                            if p.orientable_mut() {
                                 println!("The polytope is orientable.");
                             } else {
                                 println!("The polytope is not orientable.");
@@ -542,7 +558,7 @@ pub fn show_top_panel(
                     // Gets the volume of the polytope.
                     if ui.button("Volume").clicked() {
                         if let Some(mut p) = query.iter_mut().next() {
-                            p.element_sort();
+                            element_sort!(p);
 
                             if let Some(vol) = p.volume() {
                                 println!("The volume is {}.", vol);
@@ -554,7 +570,8 @@ pub fn show_top_panel(
 
                     // Gets the number of flags of the polytope.
                     if ui.button("Flag count").clicked() {
-                        if let Some(p) = query.iter_mut().next() {
+                        if let Some(mut p) = query.iter_mut().next() {
+                            element_sort!(p);
                             println!("The polytope has {} flags.", p.flags().count())
                         }
                     }
@@ -623,7 +640,7 @@ pub fn show_top_panel(
             );
 
             // The new background color.
-            let mut new_color = color;
+            let mut new_color = Default::default();
             egui::color_picker::color_edit_button_srgba(
                 ui,
                 &mut new_color,

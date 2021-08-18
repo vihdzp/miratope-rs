@@ -790,6 +790,13 @@ pub trait ConcretePolytope<T: Float>: Polytope {
         Some(volume / T::u32(crate::factorial(rank - 1)))
     }
 
+    /// Computes the volume of a polytope by adding up the contributions of all
+    /// flags. Returns `None` if the volume is undefined.
+    fn volume_mut(&mut self) -> Option<T> {
+        self.element_sort();
+        self.volume()
+    }
+
     /// Projects the vertices of the polytope into the lowest dimension possible.
     /// If the polytope's subspace is already of full rank, this is a no-op.
     fn flatten(&mut self);
