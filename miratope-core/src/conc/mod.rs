@@ -2,7 +2,6 @@
 
 pub mod cycle;
 pub mod element_types;
-pub mod file;
 
 use std::{
     collections::{HashMap, HashSet},

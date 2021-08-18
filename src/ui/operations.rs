@@ -133,7 +133,7 @@ macro_rules! impl_show {
         fn show_system(
             mut self_: ResMut<'_, Self>,
             egui_ctx: Res<'_, EguiContext>,
-            mut query: Query<'_, &mut NamedConcrete>,
+            mut query: Query<'_, '_, &mut NamedConcrete>,
         ) where
             Self: 'static,
         {
@@ -217,7 +217,7 @@ pub trait UpdateWindow: Window {
     /// updated.
     fn update_system(
         mut self_: ResMut<'_, Self>,
-        query: Query<'_, (&NamedConcrete, &Handle<Mesh>, &Children), Changed<NamedConcrete>>,
+        query: Query<'_, '_, (&NamedConcrete, &Handle<Mesh>, &Children), Changed<NamedConcrete>>,
     ) where
         Self: 'static,
     {
@@ -428,7 +428,7 @@ pub trait DuoWindow: Window {
     fn show_system(
         mut self_: ResMut<'_, Self>,
         egui_ctx: Res<'_, EguiContext>,
-        mut query: Query<'_, &mut NamedConcrete>,
+        mut query: Query<'_, '_, &mut NamedConcrete>,
         memory: Res<'_, Memory>,
     ) where
         Self: 'static,

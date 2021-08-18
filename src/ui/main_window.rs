@@ -23,8 +23,8 @@ impl Plugin for MainWindowPlugin {
 
 pub fn update_visible(
     keyboard: Res<'_, Input<KeyCode>>,
-    mut polies_vis: Query<'_, &mut Visible, With<NamedConcrete>>,
-    mut wfs_vis: Query<'_, &mut Visible, Without<NamedConcrete>>,
+    mut polies_vis: Query<'_, '_, &mut Visible, With<NamedConcrete>>,
+    mut wfs_vis: Query<'_, '_, &mut Visible, Without<NamedConcrete>>,
 ) {
     if keyboard.just_pressed(KeyCode::V) {
         if let Some(mut visible) = polies_vis.iter_mut().next() {
@@ -51,8 +51,8 @@ pub fn update_scale_factor(mut egui_settings: ResMut<'_, EguiSettings>, windows:
 /// Updates polytopes after an operation.
 pub fn update_changed_polytopes(
     mut meshes: ResMut<'_, Assets<Mesh>>,
-    polies: Query<'_, (&NamedConcrete, &Handle<Mesh>, &Children), Changed<NamedConcrete>>,
-    wfs: Query<'_, &Handle<Mesh>, Without<NamedConcrete>>,
+    polies: Query<'_, '_, (&NamedConcrete, &Handle<Mesh>, &Children), Changed<NamedConcrete>>,
+    wfs: Query<'_, '_, &Handle<Mesh>, Without<NamedConcrete>>,
     mut windows: ResMut<'_, Windows>,
     mut section_state: ResMut<'_, SectionState>,
     selected_language: Res<'_, SelectedLanguage>,

@@ -7,9 +7,9 @@ use self::{
     ggb::{GgbError, GgbResult},
     off::{OffParseResult, OffReader},
 };
+use crate::conc::Concrete;
 use crate::Float;
 
-use super::Concrete;
 use off::OffParseError;
 use zip::result::ZipError;
 

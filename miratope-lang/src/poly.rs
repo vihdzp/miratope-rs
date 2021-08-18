@@ -7,12 +7,10 @@ use std::{
 
 use miratope_core::{
     abs::{flag::Flag, Abstract, Element, ElementList, Ranked},
-    conc::{
-        file::{
-            off::{OffParseError, OffParseResult},
-            FromFile,
-        },
-        Concrete, ConcretePolytope,
+    conc::{Concrete, ConcretePolytope},
+    file::{
+        off::{OffParseError, OffParseResult},
+        FromFile,
     },
     geometry::Point,
     Float, Polytope,
@@ -395,7 +393,7 @@ impl<T: Float + DeserializeOwned> FromFile for NamedConcrete<T> {
         }
     }
 
-    fn from_ggb(file: std::fs::File) -> miratope_core::conc::file::ggb::GgbResult<Self> {
-        Ok(Self::new_generic(Concrete::from_ggb(file)?))
+    fn from_ggb(file: std::fs::File) -> miratope_core::file::ggb::GgbResult<Self> {
+        Concrete::from_ggb(file).map(Self::new_generic)
     }
 }

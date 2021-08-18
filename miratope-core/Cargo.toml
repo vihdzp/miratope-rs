@@ -22,6 +22,6 @@ zip = "0.5"
 
 # Bevy egui integration with this latest version.
 [dependencies.bevy_egui]
-git = "https://github.com/jakobhellermann/bevy_egui"
+git = "https://github.com/OfficialURL/bevy_egui/"
 branch = "bevy-main"
 optional = true

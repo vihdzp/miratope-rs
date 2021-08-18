@@ -8,10 +8,7 @@ use std::{
 
 use super::config::LibPath;
 use crate::{Float, NamedConcrete};
-use miratope_core::{
-    conc::{file::FromFile, ConcretePolytope},
-    Polytope,
-};
+use miratope_core::{conc::ConcretePolytope, file::FromFile, Polytope};
 use miratope_lang::{
     name::{Con, Name},
     SelectedLanguage,
@@ -493,7 +490,7 @@ impl Library {
 /// The system that shows the Miratope library.
 fn show_library(
     egui_ctx: Res<'_, EguiContext>,
-    mut query: Query<'_, &mut NamedConcrete>,
+    mut query: Query<'_, '_, &mut NamedConcrete>,
     mut library: ResMut<'_, Option<Library>>,
     lib_path: Res<'_, LibPath>,
     selected_language: Res<'_, SelectedLanguage>,

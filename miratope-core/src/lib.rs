@@ -23,6 +23,7 @@
 
 pub mod abs;
 pub mod conc;
+pub mod file;
 pub mod geometry;
 pub mod group;
 

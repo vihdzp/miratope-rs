@@ -203,7 +203,7 @@ impl Config {
 
 /// Saves the configuration at application exit.
 fn save_config(
-    mut exit: EventReader<'_, AppExit>,
+    mut exit: EventReader<'_, '_, AppExit>,
     config_path: Res<'_, ConfigPath>,
     lib_path: Res<'_, LibPath>,
     selected_language: Res<'_, SelectedLanguage>,

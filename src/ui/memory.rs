@@ -25,7 +25,7 @@ impl Memory {
     }
 
     /// Shows the memory menu in a specified Ui.
-    pub fn show(&mut self, ui: &mut egui::Ui, query: &mut Query<'_, &mut NamedConcrete>) {
+    pub fn show(&mut self, ui: &mut egui::Ui, query: &mut Query<'_, '_, &mut NamedConcrete>) {
         use miratope_lang::Language;
 
         egui::menu::menu(ui, "Memory", |ui| {

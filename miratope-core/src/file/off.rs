@@ -4,11 +4,18 @@ use std::{collections::HashMap, fmt::Display, io::Error as IoError, path::Path, 
 
 use crate::{
     abs::{AbstractBuilder, Ranked, SubelementList, Subelements, Subsupelements},
-    conc::{cycle::Cycle, Concrete, Point, Polytope},
-    Float, COMPONENTS, ELEMENT_NAMES,
+    conc::{cycle::Cycle, Concrete},
+    geometry::Point,
+    Float, Polytope, COMPONENTS, ELEMENT_NAMES,
 };
 
 use vec_like::VecLike;
+
+const HEADER: &str = concat!(
+    "Generated using Miratope v",
+    env!("CARGO_PKG_VERSION"),
+    " (https://github.com/OfficialURL/miratope-rs)"
+);
 
 /// A position in a file.
 #[derive(Clone, Copy, Default, Debug)]
@@ -763,7 +770,7 @@ impl<'a, T: Float> OffWriter<'a, T> {
         // Adds the elements' indices.
         for el in &self.poly[rank] {
             let subs = &el.subs;
-            self.off.push_str(&subs.len().to_string());
+            self.push_to_str(subs.len());
 
             for &sub in subs {
                 self.push(' ');
@@ -785,11 +792,10 @@ impl<'a, T: Float> OffWriter<'a, T> {
         self.off.push('\n'); */
 
         // Blatant advertising.
-        if self.options.comments {
-            self.off += &format!(
-                "# Generated using Miratope v{} (https://github.com/OfficialURL/miratope-rs)\n\n",
-                env!("CARGO_PKG_VERSION")
-            );
+        if self.comments() {
+            self.push_str("# ");
+            self.push_str(HEADER);
+            self.push('\n');
         }
 
         // Writes header.
@@ -876,9 +882,8 @@ impl<T: Float> Concrete<T> {
 mod tests {
     // TODO: move all OFF files into a folder.
 
-    use crate::conc::file::FromFile;
-
     use super::*;
+    use crate::file::FromFile;
 
     /// Used to test a particular polytope.
     // TODO: take a `&str` as an argument instead.

@@ -144,7 +144,7 @@ impl CameraInputEvent {
     fn cam_events_from_kb(
         time: &Time,
         keyboard: &Input<KeyCode>,
-        cam_inputs: &mut EventWriter<'_, CameraInputEvent>,
+        cam_inputs: &mut EventWriter<'_, '_, CameraInputEvent>,
         ctx: &CtxRef,
     ) -> (f32, f32) {
         // TODO: make the spin rate modifiable in preferences.
@@ -185,11 +185,11 @@ impl CameraInputEvent {
     /// Processes camera events coming from the mouse buttons.
     fn cam_events_from_mouse(
         mouse_button: &Input<MouseButton>,
-        mut mouse_move: EventReader<'_, MouseMotion>,
+        mut mouse_move: EventReader<'_, '_, MouseMotion>,
         width: f32,
         height: f32,
         real_scale: f32,
-        cam_inputs: &mut EventWriter<'_, Self>,
+        cam_inputs: &mut EventWriter<'_, '_, Self>,
     ) {
         if mouse_button.pressed(MouseButton::Right) {
             for MouseMotion { mut delta } in mouse_move.iter() {
@@ -202,9 +202,9 @@ impl CameraInputEvent {
 
     /// Processes camera events coming from the mouse wheel.
     fn cam_events_from_wheel(
-        mut mouse_wheel: EventReader<'_, MouseWheel>,
+        mut mouse_wheel: EventReader<'_, '_, MouseWheel>,
         scale: f32,
-        cam_inputs: &mut EventWriter<'_, Self>,
+        cam_inputs: &mut EventWriter<'_, '_, Self>,
     ) {
         for MouseWheel { unit, y, .. } in mouse_wheel.iter() {
             let unit_scale = match unit {
@@ -223,10 +223,10 @@ fn add_cam_input_events(
     time: Res<'_, Time>,
     keyboard: Res<'_, Input<KeyCode>>,
     mouse_button: Res<'_, Input<MouseButton>>,
-    mouse_move: EventReader<'_, MouseMotion>,
-    mouse_wheel: EventReader<'_, MouseWheel>,
+    mouse_move: EventReader<'_, '_, MouseMotion>,
+    mouse_wheel: EventReader<'_, '_, MouseWheel>,
     windows: Res<'_, Windows>,
-    mut cam_inputs: EventWriter<'_, CameraInputEvent>,
+    mut cam_inputs: EventWriter<'_, '_, CameraInputEvent>,
     egui_ctx: Res<'_, EguiContext>,
 ) {
     let (width, height) = {
@@ -257,8 +257,9 @@ fn add_cam_input_events(
 }
 
 fn update_cameras_and_anchors(
-    mut events: EventReader<'_, CameraInputEvent>,
+    mut events: EventReader<'_, '_, CameraInputEvent>,
     q: Query<
+        '_,
         '_,
         (
             &mut Transform,

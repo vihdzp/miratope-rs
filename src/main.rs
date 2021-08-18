@@ -71,7 +71,7 @@ use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
 use bevy_egui::EguiPlugin;
-use miratope_core::conc::file::FromFile;
+use miratope_core::file::FromFile;
 use no_cull_pipeline::PbrNoBackfaceBundle;
 
 use ui::{
@@ -113,7 +113,7 @@ fn main() {
 
 /// Initializes the scene.
 fn setup(
-    mut commands: Commands<'_>,
+    mut commands: Commands<'_, '_>,
     mut meshes: ResMut<'_, Assets<Mesh>>,
     mut materials: ResMut<'_, Assets<StandardMaterial>>,
     mut shaders: ResMut<'_, Assets<Shader>>,

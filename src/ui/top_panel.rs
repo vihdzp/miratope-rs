@@ -10,7 +10,7 @@ use bevy_egui::{
     egui::{self, menu, Ui},
     EguiContext,
 };
-use miratope_core::{conc::file::FromFile, conc::ConcretePolytope, Polytope};
+use miratope_core::{conc::ConcretePolytope, file::FromFile, Polytope};
 use miratope_lang::SelectedLanguage;
 use rfd::FileDialog;
 use strum::IntoEnumIterator;
@@ -154,7 +154,7 @@ impl FileDialogState {
 
 /// The system in charge of showing the file dialog.
 pub fn file_dialog(
-    mut query: Query<'_, &mut NamedConcrete>,
+    mut query: Query<'_, '_, &mut NamedConcrete>,
     file_dialog_state: Res<'_, FileDialogState>,
     file_dialog: NonSend<'_, FileDialogToken>,
 ) {
@@ -216,7 +216,7 @@ pub type EguiWindows<'a> = (
 pub fn show_top_panel(
     // Info about the application state.
     egui_ctx: Res<'_, EguiContext>,
-    mut query: Query<'_, &mut NamedConcrete>,
+    mut query: Query<'_, '_, &mut NamedConcrete>,
     mut windows: ResMut<'_, Windows>,
     keyboard: Res<'_, Input<KeyCode>>,
 
@@ -654,7 +654,7 @@ pub fn show_top_panel(
 /// cross-section view.
 fn show_views(
     ui: &mut Ui,
-    mut query: Query<'_, &mut NamedConcrete>,
+    mut query: Query<'_, '_, &mut NamedConcrete>,
     mut section_state: ResMut<'_, SectionState>,
     mut section_direction: ResMut<'_, SectionDirection>,
 ) {
