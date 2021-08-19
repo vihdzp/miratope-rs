@@ -34,16 +34,16 @@ struct TypeData {
 }
 
 // We'll move this over to the translation module... some day.
-const EL_NAMES: [&str; 24] = [
-    "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta", "Xenna",
+const EL_NAMES: [&str; 25] = [
+    "", "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta", "Xenna",
     "Daka", "Henda", "Doka", "Tradaka", "Tedaka", "Pedaka", "Exdaka", "Zedaka", "Yodaka", "Nedaka",
     "Ika", "Ikena", "Ikoda", "Iktra",
 ];
 
-const EL_SUFFIXES: [&str; 24] = [
-    "", "telon", "gon", "hedron", "choron", "teron", "peton", "exon", "zetton", "yotton", "xennon",
-    "dakon", "hendon", "dokon", "tradakon", "tedakon", "pedakon", "exdakon", "zedakon", "yodakon",
-    "nedakon", "ikon", "ikenon", "ikodon",
+const EL_SUFFIXES: [&str; 25] = [
+    "", "", "telon", "gon", "hedron", "choron", "teron", "peton", "exon", "zetton", "yotton",
+    "xennon", "dakon", "hendon", "dokon", "tradakon", "tedakon", "pedakon", "exdakon", "zedakon",
+    "yodakon", "nedakon", "ikon", "ikenon", "ikodon",
 ];
 
 impl<T: Float> Concrete<T> {
@@ -81,7 +81,7 @@ impl<T: Float> Concrete<T> {
         // To limit the number of passes, we can turn this into a `for` loop.
         loop {
             // We build element types from the bottom up.
-            for r in 1..rank {
+            for r in 1..=rank {
                 // All element types of this rank.
                 let mut types_rank: Vec<ElementType> = Vec::new();
                 let mut dict = HashMap::new();
@@ -123,7 +123,7 @@ impl<T: Float> Concrete<T> {
             }
 
             // We do basically the same thing, from the top down.
-            for r in (1..rank).rev() {
+            for r in (0..rank).rev() {
                 // All element types of this rank.
                 let mut types_rank: Vec<ElementType> = Vec::new();
                 let mut dict = HashMap::new();
@@ -177,10 +177,7 @@ impl<T: Float> Concrete<T> {
 
     /// Prints all element types of a polytope into the console.
     pub fn print_element_types(&self) {
-        // An iterator over the element types of each rank.
-        let type_iter = self.element_types().into_iter().skip(1).enumerate();
-
-        for (r, types) in type_iter {
+        for (r, types) in self.element_types().into_iter().enumerate().skip(1) {
             if r == self.rank() {
                 println!();
                 break;
@@ -195,7 +192,7 @@ impl<T: Float> Concrete<T> {
                     self.abs.get_element(r, i).unwrap().subs.len(),
                     EL_SUFFIXES[r],
                     self.abs.get_element(r, i).unwrap().sups.len(),
-                    EL_SUFFIXES[self.rank() - r - 1],
+                    EL_SUFFIXES[self.rank() - r],
                 );
             }
             println!();
