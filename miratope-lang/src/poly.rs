@@ -378,7 +378,7 @@ impl<T: Float + DeserializeOwned> ConcretePolytope<T> for NamedConcrete<T> {
     }
 
     fn truncate(&self, a: Vec<usize>, b: Vec<T>) -> Self {
-        Self::new_generic(self.con().truncate(a,b).clone())
+        Self::new_generic(self.con().truncate(a, b))
     }
 }
 

@@ -445,7 +445,7 @@ pub fn show_top_panel(
                         element_sort!(p);
                         *p = p.omnitruncate();
                     }
-                
+
                     ui.separator();
 
                     // Recenters a polytope.
