@@ -481,6 +481,9 @@ pub trait ConcretePolytope<T: Float>: Polytope {
 
         self
     }
+    
+    /// Returns an arbitrary truncate of a polytope.
+    fn truncate(&self, truncate_type: Vec<usize>, depth: Vec<T>) -> Self;
 
     /// Calculates the circumsphere of a polytope. Returns `None` if the
     /// polytope isn't circumscribable.
@@ -1158,6 +1161,23 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
         }
 
         Self::new(vertices, abs.build())
+    }
+        
+    fn truncate(&self, truncate_type: Vec<usize>, depth: Vec<T>) -> Self {
+        let (abs, subflags) = self.abs().truncate_abs(truncate_type.clone());
+        let element_vertices = self.avg_vertex_map();
+
+        let mut vertex_coords = Vec::<Point<T>>::new();
+        for subflag in subflags {
+            let mut vector = Point::<T>::from_vec(vec![T::f64(0.0); self.rank()-1]);
+            for (r, i) in subflag.iter().enumerate() {
+                vector += element_vertices[truncate_type[r]+1][*i].clone() * depth[r];
+            }
+            vertex_coords.push(vector);
+        }
+        //dbg!(abs.clone());
+
+        Self::new(vertex_coords, abs)
     }
 }
 

@@ -429,6 +429,123 @@ impl Abstract {
         (abs.build(), flags)
     }
 
+    /// Returns an arbitrary truncate as an abstract polytope.
+    pub fn truncate_abs(&self, truncate_type: Vec<usize>) -> (Self, Vec<Vec<usize>>) {
+        let omni_and_flags = self.omnitruncate_and_flags();
+        let omni = omni_and_flags.0;
+        let omni_flags = omni_and_flags.1;
+        let mut cd = vec![false; self.rank()-1];
+        for i in &truncate_type {
+            cd[*i] = true;
+        }
+
+        let mut builder = AbstractBuilder::new();
+
+        // maps omnitruncate elements to new elements
+        let mut dict = Vec::<HashMap<usize, usize>>::new();
+        for _i in 1..self.rank() {
+            dict.push(HashMap::<usize,usize>::new());
+        }
+
+        // maps subflags to new vertices
+        let mut verts_dict = HashMap::<Vec<usize>, usize>::new();
+        let mut verts_subflags = Vec::<Vec<usize>>::new();
+        // current vertex index
+        let mut c = 0;
+        // gets new vertices by identifying all with the same subflag
+        for (i, _vert) in omni[1].iter().enumerate() {
+            let mut subflag = Vec::<usize>::new();
+            for r in truncate_type.iter() {
+                subflag.push(omni_flags[i][*r+1]);
+            }
+            match verts_dict.get(&subflag) {
+                // existing vertex
+                Some(idx) => {
+                    dict[0].insert(i,*idx);
+                },
+                // new vertex
+                None => {
+                    verts_dict.insert(subflag.clone(), c);
+                    verts_subflags.push(subflag);
+                    dict[0].insert(i, c);
+                    c += 1;
+                }
+            }
+        }
+        builder.push_min();
+        builder.push_vertices(c);
+
+        for rank in 2..self.rank() {
+            let mut sublist = SubelementList::new();
+            let mut subs_map = HashMap::<Subelements, usize>::new(); // used for removing duplicate elements
+            c = 0;
+            for (i, el) in omni[rank].iter().enumerate() {
+                // checks if degenerate
+                let verts_of_el = omni.element_vertices(rank, i).unwrap();
+                let mut flags_of_el = Vec::<Flag>::new();
+                for vert_of_el in verts_of_el {
+                    flags_of_el.push(omni_flags[vert_of_el].clone());
+                }
+                // TODO: make this a `FlagChanges`? idk what that's used for
+                let mut flag_changes_of_el = Vec::<usize>::new();
+                for j in 0..self.rank()-1 {
+                    for flag in &flags_of_el {
+                        if flag[j+1] != flags_of_el[0][j+1] {
+                            flag_changes_of_el.push(j);
+                            break;
+                        }
+                    }
+                }
+                let mut valid = true;
+                let mut prev = 123456789; // yes violeta idk how to use None or something
+                for j in flag_changes_of_el {
+                    // same component
+                    if j == prev + 1 {
+                        prev = j;
+                        if !valid {
+                            valid = cd[j];
+                        }
+                    }
+                    // different component
+                    else {
+                        prev = j;
+                        if !valid {
+                            break;
+                        }
+                        valid = cd[j];
+                    }
+                }
+                if !valid {
+                    // is degenerate
+                    continue;
+                }
+
+                let mut subs = Subelements::new();
+                for old_sub in el.subs.clone() {
+                    if let Some(idx) = dict[rank-2].get(&old_sub) {
+                        subs.push(*idx)
+                    }
+                }
+
+                subs.sort();
+                if let Some(idx) = subs_map.get(&subs) {
+                    dict[rank-1].insert(i, *idx);
+                    continue;
+                }
+
+                subs_map.insert(subs.clone(), c);
+                dict[rank-1].insert(i, c);
+                c += 1;
+
+                sublist.push(subs);
+            }
+            builder.push(sublist);
+        }
+        builder.push_max();
+
+        (builder.build(), verts_subflags)
+    }
+
     /// Checks whether the polytope is valid, i.e. whether the polytope is
     /// bounded, dyadic, and all of its indices refer to valid elements.
     pub fn is_valid(&self) -> AbstractResult<()> {

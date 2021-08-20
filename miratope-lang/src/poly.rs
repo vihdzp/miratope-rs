@@ -376,6 +376,10 @@ impl<T: Float + DeserializeOwned> ConcretePolytope<T> for NamedConcrete<T> {
     fn cross_section(&self, slice: &miratope_core::geometry::Hyperplane<T>) -> Self {
         Self::new_generic(self.con().cross_section(slice))
     }
+
+    fn truncate(&self, a: Vec<usize>, b: Vec<T>) -> Self {
+        Self::new_generic(self.con().truncate(a,b).clone())
+    }
 }
 
 impl<T: Float + DeserializeOwned> FromFile for NamedConcrete<T> {

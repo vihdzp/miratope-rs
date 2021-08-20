@@ -434,12 +434,18 @@ pub fn show_top_panel(
                         }
                     });
 
+                    if ui.button("Truncate").clicked() {
+                        let mut p = query.iter_mut().next().unwrap();
+                        element_sort!(p);
+                        *p = p.truncate(vec![0, 1], vec![0.5, 0.5]);
+                    }
+
                     if ui.button("Omnitruncate").clicked() {
                         let mut p = query.iter_mut().next().unwrap();
                         element_sort!(p);
                         *p = p.omnitruncate();
                     }
-
+                
                     ui.separator();
 
                     // Recenters a polytope.
