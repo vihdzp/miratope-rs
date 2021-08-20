@@ -66,13 +66,13 @@ pub enum SpecialLibrary {
     AntiprismPrisms(usize, usize),
 
     /// A simplex.
-    Simplex(usize),
+    Simplex(isize),
 
     /// A hypercube.
-    Hypercube(usize),
+    Hypercube(isize),
 
     /// An orthoplex.
-    Orthoplex(usize),
+    Orthoplex(isize),
 }
 
 /// The result of showing the Miratope library every frame.
@@ -124,10 +124,8 @@ impl SpecialLibrary {
 
             // An {n / d} uniform antiprism.
             Self::Antiprisms(n, d) | Self::AntiprismPrisms(n, d) => {
-                let mut clicked = false;
-
-                ui.horizontal(|ui| {
-                    clicked = ui.button(text).clicked();
+                let clicked = ui.horizontal(|ui| {
+                    let clicked = ui.button(text).clicked();
 
                     // Number of sides.
                     ui.label("n:");
@@ -141,9 +139,11 @@ impl SpecialLibrary {
                     let max_n = *n * 2 / 3;
                     ui.label("d:");
                     ui.add(egui::DragValue::new(d).speed(0.25).clamp_range(1..=max_n));
+
+                    clicked
                 });
 
-                if clicked {
+                if clicked.inner {
                     ShowResult::Special(*self)
                 } else {
                     ShowResult::None
@@ -152,10 +152,8 @@ impl SpecialLibrary {
 
             // An step prism based on two uniform polygons..
             Self::Duoprisms(n1, d1, n2, d2) => {
-                let mut clicked = false;
-
-                ui.horizontal_wrapped(|ui| {
-                    clicked = ui.button(text).clicked();
+                let clicked = ui.horizontal_wrapped(|ui| {
+                    let clicked = ui.button(text).clicked();
 
                     // Number of sides.
                     ui.label("n₁:");
@@ -182,9 +180,11 @@ impl SpecialLibrary {
                     let max_n2 = *n2 / 2;
                     ui.label("d₂:");
                     ui.add(egui::DragValue::new(d2).speed(0.25).clamp_range(1..=max_n2));
+
+                    clicked
                 });
 
-                if clicked {
+                if clicked.inner {
                     ShowResult::Special(*self)
                 } else {
                     ShowResult::None
@@ -193,17 +193,16 @@ impl SpecialLibrary {
 
             // A simplex, hypercube, or orthoplex of a given rank.
             Self::Simplex(rank) | Self::Hypercube(rank) | Self::Orthoplex(rank) => {
-                let mut clicked = false;
+                let clicked = ui.horizontal(|ui| {
+                    let clicked = ui.button(text).clicked();
 
-                ui.horizontal(|ui| {
-                    clicked = ui.button(text).clicked();
-
-                    // Rank.
                     ui.label("Rank:");
                     ui.add(egui::DragValue::new(rank).speed(0.05).clamp_range(-1..=20));
+
+                    clicked
                 });
 
-                if clicked {
+                if clicked.inner {
                     ShowResult::Special(*self)
                 } else {
                     ShowResult::None
@@ -502,86 +501,72 @@ fn show_library(
             .max_width(450.0)
             .show(egui_ctx.ctx(), |ui| {
                 egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
-                    let lib_path = PathBuf::from(lib_path.as_ref());
-
-                    match library.show(ui, lib_path, *selected_language) {
+                    match library.show(ui, PathBuf::from(lib_path.as_ref()), *selected_language) {
                         // No action needs to be taken.
                         ShowResult::None => {}
 
                         // Loads a selected file.
-                        ShowResult::Load(file) => {
-                            if let Some(mut p) = query.iter_mut().next() {
-                                match NamedConcrete::from_path(&file) {
-                                    Ok(q) => *p = q,
-                                    Err(err) => eprintln!("File open failed: {}", err),
-                                }
-                            }
-                        }
+                        ShowResult::Load(file) => match NamedConcrete::from_path(&file) {
+                            Ok(q) => *query.iter_mut().next().unwrap() = q,
+                            Err(err) => eprintln!("File open failed: {}", err),
+                        },
 
                         // Loads a special polytope.
                         ShowResult::Special(special) => match special {
                             // Loads a regular star polygon.
                             SpecialLibrary::Polygons(n, d) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = NamedConcrete::star_polygon(n, d);
-                                }
+                                *query.iter_mut().next().unwrap() =
+                                    NamedConcrete::star_polygon(n, d);
                             }
 
                             // Loads a uniform polygonal prism.
                             SpecialLibrary::Prisms(n, d) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = NamedConcrete::uniform_prism(n, d);
-                                }
+                                *query.iter_mut().next().unwrap() =
+                                    NamedConcrete::uniform_prism(n, d);
                             }
 
                             // Loads a uniform polygonal antiprism.
                             SpecialLibrary::Antiprisms(n, d) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = NamedConcrete::uniform_antiprism(n, d);
-                                }
+                                *query.iter_mut().next().unwrap() =
+                                    NamedConcrete::uniform_antiprism(n, d);
                             }
 
                             // Loads a (uniform 4D) duoprism.
                             SpecialLibrary::Duoprisms(n1, d1, n2, d2) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    let p1 = NamedConcrete::star_polygon(n1, d1);
+                                let mut p = query.iter_mut().next().unwrap();
+                                let p1 = NamedConcrete::star_polygon(n1, d1);
 
-                                    // Avoids duplicate work if possible.
-                                    if n1 == n2 && d1 == d2 {
-                                        *p = NamedConcrete::duoprism(&p1, &p1);
-                                    } else {
-                                        let p2 = NamedConcrete::star_polygon(n2, d2);
-                                        *p = NamedConcrete::duoprism(&p1, &p2);
-                                    }
+                                // Avoids duplicate work if possible.
+                                if n1 == n2 && d1 == d2 {
+                                    *p = NamedConcrete::duoprism(&p1, &p1);
+                                } else {
+                                    let p2 = NamedConcrete::star_polygon(n2, d2);
+                                    *p = NamedConcrete::duoprism(&p1, &p2);
                                 }
                             }
 
                             // Loads a uniform polygonal antiprism.
                             SpecialLibrary::AntiprismPrisms(n, d) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = NamedConcrete::uniform_antiprism(n, d).prism();
-                                }
+                                *query.iter_mut().next().unwrap() =
+                                    NamedConcrete::uniform_antiprism(n, d).prism();
                             }
 
                             // Loads a simplex with a given rank.
                             SpecialLibrary::Simplex(rank) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = NamedConcrete::simplex(rank);
-                                }
+                                *query.iter_mut().next().unwrap() =
+                                    NamedConcrete::simplex((rank + 1) as usize);
                             }
 
                             // Loads a hypercube with a given rank.
                             SpecialLibrary::Hypercube(rank) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = NamedConcrete::hypercube(rank);
-                                }
+                                *query.iter_mut().next().unwrap() =
+                                    NamedConcrete::hypercube((rank + 1) as usize);
                             }
 
                             // Loads an orthoplex with a given rank.
                             SpecialLibrary::Orthoplex(rank) => {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    *p = NamedConcrete::orthoplex(rank);
-                                }
+                                *query.iter_mut().next().unwrap() =
+                                    NamedConcrete::orthoplex((rank + 1) as usize);
                             }
                         },
                     }

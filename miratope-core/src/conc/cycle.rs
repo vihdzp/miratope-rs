@@ -15,7 +15,7 @@ use vec_like::*;
 pub struct Cycle(Vec<usize>);
 impl_veclike!(Cycle, Item = usize, Index = usize);
 
-/// A list of cycles.
+/// A list of [`Cycles`](Cycle).
 pub struct CycleList(Vec<Cycle>);
 impl_veclike!(CycleList, Item = Cycle, Index = usize);
 
@@ -38,15 +38,15 @@ impl<T> Default for Pair<T> {
     }
 }
 
-/// An error when converting a pair into a tuple.
+/// An error when converting a pair into a tuple. The inner value stores whether
+/// the flag was empty (or whether it had a single element).
 #[derive(Clone, Copy, Debug)]
 pub struct PairError(bool);
 
 impl PairError {
-    /// Initializes a new error, where the argument specifies whether the pair
-    /// was empty.
-    pub fn new(empty: bool) -> Self {
-        Self(empty)
+    /// Initializes a new error from a `Pair` with less than two elements.
+    pub fn new<T>(pair: &Pair<T>) -> Self {
+        Self(pair.is_empty())
     }
 }
 
@@ -69,7 +69,7 @@ impl<T> TryFrom<Pair<T>> for (T, T) {
         if let Pair::Two(v0, v1) = pair {
             Ok((v0, v1))
         } else {
-            Err(PairError(pair.is_empty()))
+            Err(PairError::new(&pair))
         }
     }
 }
@@ -89,7 +89,7 @@ impl<T> Pair<T> {
         }
     }
 
-    /// Pushes a value onto the pair by cloning.
+    /// Pushes a value onto the pair.
     ///
     /// # Panics
     /// The code will panic if you attempt to push a value onto a pair that
@@ -180,8 +180,8 @@ impl CycleBuilder {
         self.get_mut(vertex1).push(vertex0);
     }
 
-    /// Pushes a given edge into the graph. Asserts that the edge has exactly
-    /// two elements.
+    /// Pushes a given edge into the graph. In debug mode, asserts that the edge
+    /// has exactly two elements.
     pub fn push_edge(&mut self, edge: &[usize]) {
         debug_assert_eq!(edge.len(), 2);
         self.push(edge[0], edge[1]);

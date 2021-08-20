@@ -501,19 +501,19 @@ impl Abstract {
                 for j in flag_changes_of_el {
                     // same component
                     if j == prev + 1 {
-                        prev = j;
                         if !valid {
                             valid = cd[j];
                         }
                     }
                     // different component
                     else {
-                        prev = j;
                         if !valid {
                             break;
                         }
                         valid = cd[j];
                     }
+
+                    prev = j;
                 }
                 if !valid {
                     // is degenerate
