@@ -10,12 +10,14 @@ use std::{
 
 use super::Abstract;
 
-use rayon::iter::IntoParallelRefMutIterator;
-use rayon::iter::ParallelIterator;
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use vec_like::*;
 
 /// Represents a map from ranks and indices into elements of a given type.
 /// Is internally stored as a jagged array.
+///
+/// This struct is most often used when we want to associate some value to
+/// every element of an abstract polytope.
 #[derive(Clone, Debug)]
 pub struct ElementMap<T>(Vec<Vec<T>>);
 impl_veclike!(@for [T] ElementMap<T>, Item = Vec<T>, Index = usize);
@@ -35,27 +37,15 @@ impl<T> IndexMut<(usize, usize)> for ElementMap<T> {
 }
 
 /// Common boilerplate code for [`Subelements`] and [`Superelements`].
-pub trait Subsupelements: VecLike<VecItem = usize> {
+pub trait Subsupelements: VecLike<VecItem = usize>
+where
+    for<'a> &'a Self: IntoIterator,
+    for<'a> &'a mut Self: IntoIterator,
+{
     /// Constructs a subelement or superelement list consisting of the indices
     /// from `0` to `n - 1`.
     fn count(n: usize) -> Self {
-        let mut vec = Vec::new();
-
-        for i in 0..n {
-            vec.push(i);
-        }
-
-        Self::from_inner(vec)
-    }
-
-    /// Returns a reference to the inner slice.
-    fn as_slice(&self) -> &[usize] {
-        self.as_inner().as_slice()
-    }
-
-    /// Returns a reference to the inner mutable slice.
-    fn as_mut_slice(&mut self) -> &mut [usize] {
-        self.as_inner_mut().as_mut_slice()
+        Self::from_inner((0..n).collect())
     }
 }
 
@@ -149,12 +139,11 @@ impl Element {
 
 /// A list of [`Elements`](Element) of the same
 /// [rank](https://polytope.miraheze.org/wiki/Rank). An [`Abstract`] is built
-/// out of a [`RankVec`] of these.
+/// out of a `Vec` of these. Internally, this is just a wrapper around
+/// `Vec<Element>`.
 ///
 /// If you only want to deal with the subelements of a polytope, consider using
 /// a [`SubelementList`] instead.
-///
-/// Internally, this is just a wrapper around `Vec<Element>`.
 #[derive(Debug, Clone)]
 pub struct ElementList(Vec<Element>);
 impl_veclike!(ElementList, Item = Element, Index = usize);
@@ -198,13 +187,9 @@ impl SubelementList {
 
     /// Returns the subelement list for a set number of vertices in a polytope.
     pub fn vertices(vertex_count: usize) -> Self {
-        let mut els = SubelementList::with_capacity(vertex_count);
-
-        for _ in 0..vertex_count {
-            els.push(Subelements(vec![0]));
-        }
-
-        els
+        iter::repeat(Subelements(vec![0]))
+            .take(vertex_count)
+            .collect()
     }
 
     /// Returns the subelement list for the maximal element in a polytope with a

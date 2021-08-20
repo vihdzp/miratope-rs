@@ -642,7 +642,7 @@ pub fn show_top_panel(
             );
 
             // The new background color.
-            let mut new_color = Default::default();
+            let mut new_color = color;
             egui::color_picker::color_edit_button_srgba(
                 ui,
                 &mut new_color,

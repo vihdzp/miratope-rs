@@ -5,9 +5,19 @@ use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
     fmt::Display,
+    iter::FromIterator,
 };
 
 use vec_like::*;
+
+/// Represents a cyclic list of vertex indices, which may then be turned into a
+/// path and tessellated.
+pub struct Cycle(Vec<usize>);
+impl_veclike!(Cycle, Item = usize, Index = usize);
+
+/// A list of cycles.
+pub struct CycleList(Vec<Cycle>);
+impl_veclike!(CycleList, Item = Cycle, Index = usize);
 
 /// Represents a set with at most two values.
 #[derive(Clone, Copy)]
@@ -96,6 +106,18 @@ impl<T> Pair<T> {
     }
 }
 
+impl<'a, T: 'a + AsRef<[usize]>> FromIterator<T> for CycleBuilder {
+    fn from_iter<I: IntoIterator<Item = T>>(edges: I) -> Self {
+        let mut cycle = CycleBuilder::new();
+
+        for edge in edges {
+            cycle.push_edge(edge.as_ref());
+        }
+
+        cycle
+    }
+}
+
 /// A helper struct to find cycles in a graph where the degree of all nodes
 /// equals 2. This is most useful when working with (compound) polygons.
 ///
@@ -176,8 +198,8 @@ impl CycleBuilder {
 
     /// Cycles through the graph, returns a vector of node indices in cyclic
     /// order.
-    pub fn build(&mut self) -> Vec<Cycle> {
-        let mut cycles = Vec::new();
+    pub fn build(&mut self) -> CycleList {
+        let mut cycles = CycleList::new();
 
         // While there's some vertex from which we haven't generated a cycle:
         while let Some((&init, _)) = self.first() {
@@ -218,19 +240,9 @@ impl CycleBuilder {
     }
 }
 
-/// Represents a cyclic list of vertex indices, which may then be turned into a
-/// path and tessellated.
-pub struct Cycle(Vec<usize>);
-impl_veclike!(Cycle, Item = usize, Index = usize);
-
-impl Cycle {
-    /// Builds a set of cycles from an iterator over graph edges.
-    // If stuff like the veclikes implemented AsRef, this would be much cleaner.
-    pub fn from_edges<'a, I: Iterator<Item = &'a [usize]>>(edges: I) -> Vec<Self> {
-        let mut cycle = CycleBuilder::new();
-        for edge in edges {
-            cycle.push_edge(edge);
-        }
-        cycle.build()
+impl CycleList {
+    /// Builds a list of cycles from a list of edges.
+    pub fn from_edges<'a, T: 'a + AsRef<[usize]>, I: IntoIterator<Item = T>>(edges: I) -> Self {
+        edges.into_iter().collect::<CycleBuilder>().build()
     }
 }

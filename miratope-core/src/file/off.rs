@@ -3,14 +3,15 @@
 use std::{collections::HashMap, fmt::Display, io::Error as IoError, path::Path, str::FromStr};
 
 use crate::{
-    abs::{AbstractBuilder, Ranked, SubelementList, Subelements, Subsupelements},
-    conc::{cycle::Cycle, Concrete},
+    abs::{AbstractBuilder, Ranked, SubelementList, Subelements},
+    conc::{cycle::CycleList, Concrete},
     geometry::Point,
     Float, Polytope, COMPONENTS, ELEMENT_NAMES,
 };
 
 use vec_like::VecLike;
 
+/// The header for OFF files created with Miratope.
 const HEADER: &str = concat!(
     "Generated using Miratope v",
     env!("CARGO_PKG_VERSION"),
@@ -579,28 +580,34 @@ impl<'a, T: Float> OffWriter<'a, T> {
         }
     }
 
+    /// Returns the rank of the polytope.
     fn rank(&self) -> usize {
         self.poly.rank()
     }
 
+    /// Returns the number of elements of a given rank in the polytope.
     fn el_count(&self, rank: usize) -> usize {
         self.poly.el_count(rank)
     }
 
+    /// Whether the OFF file should have comments specifying each face type.
     fn comments(&self) -> bool {
         self.options.comments
     }
 
+    /// Appends a given character to the OFF file.
     fn push(&mut self, ch: char) {
         self.off.push(ch)
     }
 
-    fn push_str(&mut self, string: &str) {
-        self.off.push_str(string)
+    /// Appends a given string slice to the OFF file.
+    fn push_str<U: AsRef<str>>(&mut self, string: U) {
+        self.off.push_str(string.as_ref())
     }
 
+    /// Appends some data to the OFF file.
     fn push_to_str<U: ToString>(&mut self, data: U) {
-        self.push_str(&data.to_string())
+        self.push_str(data.to_string())
     }
 
     /// Writes the OFF format header.
@@ -658,7 +665,7 @@ impl<'a, T: Float> OffWriter<'a, T> {
 
                 for r in 4..rank {
                     self.push_str(", ");
-                    self.push_str(&element_name(r));
+                    self.push_str(element_name(r));
                 }
             }
 
@@ -672,7 +679,7 @@ impl<'a, T: Float> OffWriter<'a, T> {
             3 => {
                 self.push(' ');
                 self.push_to_str(
-                    Cycle::from_edges(self.poly[2].iter().map(|edge| edge.subs.as_slice())).len(),
+                    CycleList::from_edges(self.poly[2].iter().map(|edge| &edge.subs)).len(),
                 );
             }
             _ => {
@@ -697,13 +704,13 @@ impl<'a, T: Float> OffWriter<'a, T> {
         // # Vertices
         if self.comments() {
             self.push_str("\n# ");
-            self.push_str(&element_name(1));
+            self.push_str(element_name(1));
             self.push('\n');
         }
 
         // Adds the coordinates.
         for v in &self.poly.vertices {
-            for c in v.iter() {
+            for c in v {
                 self.push_to_str(c);
                 self.push(' ');
             }
@@ -728,8 +735,7 @@ impl<'a, T: Float> OffWriter<'a, T> {
 
         // Writes the components in the polygonal case.
         if rank == 3 {
-            for component in Cycle::from_edges(self.poly[1].iter().map(|vert| vert.sups.as_slice()))
-            {
+            for component in CycleList::from_edges(self.poly[1].iter().map(|vert| &vert.sups)) {
                 self.push_to_str(component.len());
                 for edge in component {
                     self.push(' ');
@@ -741,7 +747,7 @@ impl<'a, T: Float> OffWriter<'a, T> {
             for (idx, face) in self.poly[3].iter().enumerate() {
                 self.push_to_str(face.subs.len());
                 let mut cycles =
-                    Cycle::from_edges(face.subs.iter().map(|&i| self.poly[(2, i)].subs.as_slice()));
+                    CycleList::from_edges(face.subs.iter().map(|&i| &self.poly[(2, i)].subs));
 
                 if cycles.len() > 1 {
                     return Err(OffWriteError::CompoundFace { idx });
@@ -763,7 +769,7 @@ impl<'a, T: Float> OffWriter<'a, T> {
         // # n-elements
         if self.comments() {
             self.push_str("\n# ");
-            self.push_str(&element_name(rank));
+            self.push_str(element_name(rank));
             self.push('\n');
         }
 

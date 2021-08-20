@@ -28,7 +28,20 @@ impl VecIndex for usize {
 /// A trait for any type that acts as a wrapper around a `Vec<T>`. Will
 /// automatically implement all corresponding methods.
 pub trait VecLike:
-    Default + std::ops::Index<Self::VecIndex> + std::ops::IndexMut<Self::VecIndex> + IntoIterator
+    Default
+    + std::ops::Index<Self::VecIndex>
+    + std::ops::IndexMut<Self::VecIndex>
+    + AsRef<[Self::VecItem]>
+    + AsMut<[Self::VecItem]>
+    + AsRef<Vec<Self::VecItem>>
+    + AsMut<Vec<Self::VecItem>>
+    + Into<Vec<Self::VecItem>>
+    + From<Vec<Self::VecItem>>
+    + IntoIterator
+    + std::iter::FromIterator<Self::VecItem>
+where
+    for<'a> &'a Self: IntoIterator,
+    for<'a> &'a mut Self: IntoIterator,
 {
     /// The item contained in the wrapped vector.
     type VecItem;
@@ -36,26 +49,38 @@ pub trait VecLike:
     /// The type used to index over the vector.
     type VecIndex: VecIndex;
 
-    /// Returns a reference to the inner vector.
-    fn as_inner(&self) -> &Vec<Self::VecItem>;
+    /// Returns a reference to the inner vector. This is equivalent to `as_ref`,
+    /// but is more robust in case any types need to be inferred.
+    fn as_inner(&self) -> &Vec<Self::VecItem> {
+        self.as_ref()
+    }
 
-    /// Returns a mutable reference to the inner vector.
-    fn as_inner_mut(&mut self) -> &mut Vec<Self::VecItem>;
+    /// Returns a mutable reference to the inner vector. This is equivalent to
+    /// `as_mut`, but is more robust in case any types need to be inferred.
+    fn as_inner_mut(&mut self) -> &mut Vec<Self::VecItem> {
+        self.as_mut()
+    }
 
-    /// Returns the owned inner vector.
-    fn into_inner(self) -> Vec<Self::VecItem>;
+    /// Returns the owned inner vector. This is equivalent to `into`, but is
+    /// more robust in case any types need to be inferred
+    fn into_inner(self) -> Vec<Self::VecItem> {
+        self.into()
+    }
 
-    /// Wraps around an owned vector.
-    fn from_inner(vec: Vec<Self::VecItem>) -> Self;
+    /// Wraps around an owned vector. This is equivalent to `into`, but is more
+    /// robust in case any types need to be inferred.
+    fn from_inner(vec: Vec<Self::VecItem>) -> Self {
+        vec.into()
+    }
 
     /// Initializes a new empty `Self` with no elements.
     fn new() -> Self {
-        Self::from_inner(Vec::new())
+        Vec::new().into()
     }
 
     /// Initializes a new empty `Self` with a given capacity.
     fn with_capacity(capacity: usize) -> Self {
-        Self::from_inner(Vec::with_capacity(capacity))
+        Vec::with_capacity(capacity).into()
     }
 
     /// Reserves capacity for at least `additional` more elements to be inserted
@@ -88,6 +113,15 @@ pub trait VecLike:
         self.as_inner_mut().remove(index)
     }
 
+    /// Removes an element from the vector and returns it.
+    ///
+    /// The removed element is replaced by the last element of the vector.
+    ///
+    /// This does not preserve ordering, but is O(1).
+    fn swap_remove(&mut self, index: usize) -> Self::VecItem {
+        self.as_inner_mut().swap_remove(index)
+    }
+
     /// Returns a reference to an element or `None` if out of bounds.
     fn get(&self, index: Self::VecIndex) -> Option<&Self::VecItem> {
         self.as_inner().get(index.index())
@@ -100,17 +134,31 @@ pub trait VecLike:
 
     /// Moves all the elements of `other` into `self`, leaving `other` empty.
     fn append(&mut self, other: &mut Self) {
-        self.as_inner_mut().append(other.as_inner_mut())
+        self.as_inner_mut().append(other.as_mut())
     }
 
+    /// Inserts an element at position `index` within the vector, shifting all
+    /// elements after it to the right.
     fn insert(&mut self, index: Self::VecIndex, element: Self::VecItem) {
         self.as_inner_mut().insert(index.index(), element)
     }
 
+    /// Extracts a slice containing the entire vector.
+    fn as_slice(&self) -> &[Self::VecItem] {
+        self.as_ref()
+    }
+
+    /// Extracts a mutable slice of the entire vector.
+    fn as_mut_slice(&mut self) -> &mut [Self::VecItem] {
+        self.as_mut()
+    }
+
+    /// Returns an iterator over the slice.
     fn iter(&self) -> std::slice::Iter<<Self as VecLike>::VecItem> {
         self.as_inner().iter()
     }
 
+    /// Returns a mutable iterator over the slice.
     fn iter_mut(&mut self) -> std::slice::IterMut<<Self as VecLike>::VecItem> {
         self.as_inner_mut().iter_mut()
     }
@@ -180,16 +228,18 @@ pub trait VecLike:
     }
 }
 
-/// Implements the [`VecLike`] trait for the type of the first argument, setting
-/// the [`VecLike::VecItem`] parameter to the second argument and the
-/// [`VecLike::VecIndex`] parameter to the third argument. Will also implement
-/// all required subtraits automatically.
+/// Implements the [`VecLike`] trait for a given type. This macro will assume
+/// that the type we implement this trait for is a tuple struct containing
+/// either a `Vec` or a type implementing `VecLike` as its first argument.
+///
+/// The [`VecLike::VecItem`] parameter will be set to the second argument, and
+/// the [`VecLike::VecIndex`] parameter will be set to the third argument. This
+/// macro will also implement all required subtraits automatically.
 ///
 /// This macro can either be called like this:
 ///
 /// ```
-/// use vec_like::{VecLike, impl_veclike};
-///
+/// # use vec_like::{VecLike, impl_veclike};
 /// struct VecItem;
 /// struct Wrapper(Vec<VecItem>);
 /// impl_veclike!(Wrapper, Item = VecItem, Index = usize);
@@ -198,35 +248,78 @@ pub trait VecLike:
 /// Or like this:
 ///
 /// ```
-/// use vec_like::{VecLike, impl_veclike};
-///
+/// # use vec_like::{VecLike, impl_veclike};
 /// struct Wrapper<T>(Vec<T>);
 /// impl_veclike!(@for [T] Wrapper<T>, Item = T, Index = usize);
 /// ```
 ///
-/// TODO: probably turn this into something that can be derived.
+/// # Todo
+/// It would be nice to turn this into something that can be derived.
 #[macro_export]
 macro_rules! impl_veclike {
-    ($(@for [$($generics: tt)*])? $Type: ty, Item = $VecItem: ty, Index = $VecIndex: ty $(,)?) => {
-        impl<'a, $($($generics)*)?> vec_like::VecLike for $Type {
-            type VecItem = $VecItem;
-            type VecIndex = $VecIndex;
+    ($(@for [$($generics: tt)*])? $Type:ty, Item = $VecItem:ty, Index = $VecIndex:ty$(,)?) => {
+        vec_like::impl_veclike_field!($(@for [$($generics)*])? $Type, Item = $VecItem, Index = $VecIndex, Field = .0);
 
-            fn as_inner(&self) -> &Vec<$VecItem> {
-                &self.0
-            }
-
-            fn as_inner_mut(&mut self) -> &mut Vec<$VecItem> {
-                &mut self.0
-            }
-
-            fn into_inner(self) -> Vec<$VecItem> {
-                self.0
-            }
-
-            fn from_inner(vec: Vec<$VecItem>) -> Self {
+        impl$(<$($generics)*>)? From<Vec<$VecItem>> for $Type {
+            fn from(vec: Vec<$VecItem>) -> Self {
                 Self(vec)
             }
+        }
+    };
+}
+
+/// Implements the [`VecLike`] trait for a given type. This macro allows one to
+/// specify which of the fields of the type works as the inner storage. You may
+/// also use this with a tuple struct.
+///
+/// The [`VecLike::VecItem`] parameter will be set to the second argument, and
+/// the [`VecLike::VecIndex`] parameter will be set to the third argument. This
+/// macro will also implement almost all required subtraits automatically.
+/// However, one must manually implement `From<Vec<Item>>` for the type.
+///
+/// This macro can either be called like this:
+///
+/// ```
+/// # use vec_like::{VecLike, impl_veclike_field};
+/// struct VecItem;
+/// struct Wrapper {
+///    vec: Vec<VecItem>,
+///    other: ()
+/// }
+///
+/// impl From<Vec<VecItem>> for Wrapper {
+///     // ...
+///     # fn from(vec: Vec<VecItem>) -> Self { Self{vec, other: ()} }
+/// }
+///
+/// impl_veclike_field!(Wrapper, Item = VecItem, Index = usize, Field = .vec);
+/// ```
+///
+/// Or like this:
+///
+/// ```
+/// # use vec_like::{VecLike, impl_veclike_field};
+/// struct Wrapper<T> {
+///    vec: Vec<T>,
+///    other: ()
+/// }
+///
+/// impl<T> From<Vec<T>> for Wrapper<T> {
+///     // ...
+///     # fn from(vec: Vec<T>) -> Self { Self{vec, other: ()} }
+/// }
+///
+/// impl_veclike_field!(@for [T] Wrapper<T>, Item = T, Index = usize, Field = .vec);
+/// ```
+///
+/// # Todo
+/// It would be nice to turn this into something that can be derived.
+#[macro_export]
+macro_rules! impl_veclike_field {
+    ($(@for [$($generics: tt)*])? $Type:ty, Item = $VecItem:ty, Index = $VecIndex:ty, Field = .$field:tt$(,)?) => {
+        impl<$($($generics)*)?> vec_like::VecLike for $Type {
+            type VecItem = $VecItem;
+            type VecIndex = $VecIndex;
         }
 
         impl$(<$($generics)*>)? Default for $Type {
@@ -251,19 +344,47 @@ macro_rules! impl_veclike {
             }
         }
 
+        impl$(<$($generics)*>)? AsRef<Vec<$VecItem>> for $Type {
+            fn as_ref(&self) -> &Vec<$VecItem> {
+                self.$field.as_ref()
+            }
+        }
+
+        impl$(<$($generics)*>)? AsMut<Vec<$VecItem>> for $Type {
+            fn as_mut(&mut self) -> &mut Vec<$VecItem> {
+                self.$field.as_mut()
+            }
+        }
+
+        impl$(<$($generics)*>)? AsRef<[$VecItem]> for $Type {
+            fn as_ref(&self) -> &[$VecItem] {
+                self.as_inner().as_slice()
+            }
+        }
+
+        impl$(<$($generics)*>)? AsMut<[$VecItem]> for $Type {
+            fn as_mut(&mut self) -> &mut [$VecItem] {
+                self.as_inner_mut().as_mut_slice()
+            }
+        }
+
+        impl$(<$($generics)*>)? From<$Type> for Vec<$VecItem> {
+            fn from(t: $Type) -> Self {
+                t.$field.into()
+            }
+        }
+
         impl$(<$($generics)*>)? IntoIterator for $Type {
             type Item = $VecItem;
-
             type IntoIter = std::vec::IntoIter<$VecItem>;
 
             fn into_iter(self) -> Self::IntoIter {
-                self.0.into_iter()
+                self.$field.into_iter()
             }
         }
 
         impl<'a, $($($generics)*)?> IntoIterator for &'a $Type {
             type Item = &'a $VecItem;
-
             type IntoIter = std::slice::Iter<'a, $VecItem>;
 
             fn into_iter(self) -> Self::IntoIter {
@@ -273,11 +394,16 @@ macro_rules! impl_veclike {
 
         impl<'a, $($($generics)*)?> IntoIterator for &'a mut $Type {
             type Item = &'a mut $VecItem;
-
             type IntoIter = std::slice::IterMut<'a, $VecItem>;
 
             fn into_iter(self) -> Self::IntoIter {
                 self.iter_mut()
+            }
+        }
+
+        impl$(<$($generics)*>)? std::iter::FromIterator<$VecItem> for $Type {
+            fn from_iter<__I__: IntoIterator<Item = $VecItem>>(iter: __I__) -> Self {
+                Self::from_inner(iter.into_iter().collect())
             }
         }
     };

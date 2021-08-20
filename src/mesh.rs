@@ -10,10 +10,10 @@ use bevy::{
     render::{mesh::Indices, pipeline::PrimitiveTopology},
 };
 use lyon::{math::point, path::Path, tessellation::*};
-use miratope_core::abs::Subsupelements;
+use miratope_core::conc::cycle::CycleList;
 use miratope_core::{
     abs::{ElementList, Ranked},
-    conc::{cycle::Cycle, ConcretePolytope},
+    conc::ConcretePolytope,
     geometry::{Subspace, Vector},
 };
 
@@ -24,7 +24,7 @@ use vec_like::*;
 /// of the vertices on the path.
 ///
 /// If the cycle isn't 2D, we return `None`.
-pub fn path(cycles: &[Cycle], vertices: &[Point]) -> Option<Path> {
+pub fn path(cycles: &CycleList, vertices: &[Point]) -> Option<Path> {
     let dim = vertices[0].len();
     let mut builder = Path::builder();
 
@@ -118,7 +118,7 @@ impl Triangulation {
         // We render each face separately.
         for face in faces {
             // We tesselate this path.
-            let cycles = Cycle::from_edges(face.subs.iter().map(|&i| edges[i].subs.as_slice()));
+            let cycles = CycleList::from_edges(face.subs.iter().map(|&i| &edges[i].subs));
             if let Some(path) = path(&cycles, &polytope.vertices) {
                 let mut geometry: VertexBuffers<_, u16> = VertexBuffers::new();
 

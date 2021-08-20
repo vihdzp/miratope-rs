@@ -14,7 +14,7 @@ use self::flag::{Flag, FlagSet};
 use super::Polytope;
 
 use strum_macros::Display;
-use vec_like::VecLike;
+use vec_like::{impl_veclike_field, VecLike};
 
 pub use elements::*;
 pub use product::*;
@@ -218,7 +218,7 @@ pub type AbstractResult<T> = Result<T, AbstractError>;
 /// [`Abstract::push_subs`] method, which will push a list of subelements and
 /// automatically set the superelements of the previous rank, under the
 /// assumption that they're empty.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Abstract {
     /// The list of element lists in the polytope.
     pub ranks: Ranks,
@@ -227,21 +227,8 @@ pub struct Abstract {
     pub sorted: bool,
 }
 
-impl Index<usize> for Abstract {
-    type Output = ElementList;
+impl_veclike_field!(Abstract, Item = ElementList, Index = usize, Field = .ranks);
 
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.ranks[index]
-    }
-}
-
-impl IndexMut<usize> for Abstract {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.ranks[index]
-    }
-}
-
-// todo: remove?
 impl From<Ranks> for Abstract {
     fn from(ranks: Ranks) -> Self {
         Self {
@@ -251,33 +238,9 @@ impl From<Ranks> for Abstract {
     }
 }
 
-impl IntoIterator for Abstract {
-    type Item = ElementList;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.ranks.into_iter()
-    }
-}
-
-impl VecLike for Abstract {
-    type VecItem = ElementList;
-    type VecIndex = usize;
-
-    fn as_inner(&self) -> &Vec<ElementList> {
-        self.ranks.as_inner()
-    }
-
-    fn as_inner_mut(&mut self) -> &mut Vec<ElementList> {
-        self.ranks.as_inner_mut()
-    }
-
-    fn into_inner(self) -> Vec<ElementList> {
-        self.ranks.into_inner()
-    }
-
-    fn from_inner(vec: Vec<ElementList>) -> Self {
-        Ranks::from_inner(vec).into()
+impl From<Vec<ElementList>> for Abstract {
+    fn from(vec: Vec<ElementList>) -> Self {
+        Ranks::from(vec).into()
     }
 }
 
@@ -407,7 +370,7 @@ impl Abstract {
 
         // Adds elements of each rank, except for vertices and the minimal
         // element.
-        for _ in 2..=rank {
+        for _ in (2..=rank).rev() {
             let mut subelements = SubelementList::new();
 
             // Gets the subelements of each element.
@@ -415,6 +378,7 @@ impl Abstract {
                 let mut subs = Subelements::new();
 
                 // Each subset represents a new element.
+                // todo: just return an iterator here.
                 for subset in flag_set.subsets(self) {
                     // We do a brute-force check to see if we've found this
                     // element before.
@@ -446,6 +410,7 @@ impl Abstract {
             new_flag_sets = Vec::new();
         }
 
+        // todo: it might be better to just return an iterator.
         let mut flags = Vec::new();
         for flag_set in flag_sets {
             debug_assert_eq!(flag_set.len(), 1);
