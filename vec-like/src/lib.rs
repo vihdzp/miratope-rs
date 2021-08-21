@@ -123,6 +123,14 @@ where
         self.as_inner_mut().swap_remove(index)
     }
 
+    /// Clears the vector, removing all values.
+    ///
+    /// Note that this method has no effect on the allocated capacity of the
+    /// vector.
+    fn clear(&mut self) {
+        self.as_inner_mut().clear()
+    }
+
     /// Returns a reference to an element or `None` if out of bounds.
     fn get(&self, index: Self::VecIndex) -> Option<&Self::VecItem> {
         self.as_inner().get(index.index())
@@ -174,9 +182,16 @@ where
         self.as_inner().len()
     }
 
-    /// Returns the last element of `Self`, or `None` if it's empty.
+    /// Returns a reference to the last element of `Self`, or `None` if it's
+    /// empty.
     fn last(&self) -> Option<&Self::VecItem> {
         self.as_inner().last()
+    }
+
+    /// Returns a mutable reference to the last element of `Self`, or `None` if
+    /// it's empty.
+    fn last_mut(&mut self) -> Option<&mut Self::VecItem> {
+        self.as_inner_mut().last_mut()
     }
 
     /// Reverses the order of elements in `self`, in place.

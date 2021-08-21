@@ -210,7 +210,7 @@ pub type ElementIntoIter = iter::Flatten<iter::Map<vec::IntoIter<ElementList>, I
 /// Represents the [`ElementLists`](ElementList) of each rank that make up an
 /// abstract polytope.
 ///
-/// Contrary to [`Abstract`], there's no requirement that the elements in 
+/// Contrary to [`Abstract`], there's no requirement that the elements in
 /// `Ranks` form a valid polytope.
 #[derive(Debug, Clone)]
 pub struct Ranks(Vec<ElementList>);
@@ -235,6 +235,9 @@ impl IndexMut<(usize, usize)> for Ranks {
 /// This is meant to provide implementations for the methods common to an
 /// abstract polytope and its underlying set of ranks. As such, this trait does
 /// not contain any methods to build polytopes.
+///
+/// Furthermore, none of these methods may assume that it's being called on a
+/// valid polytope, though they may panic under certain conditions.
 pub trait Ranked:
     Sized + IndexMut<usize, Output = ElementList> + IndexMut<(usize, usize), Output = Element>
 {
@@ -249,11 +252,15 @@ pub trait Ranked:
 
     /// Returns the rank of the structure, i.e. the length of the `Ranks` minus
     /// one.
+    ///
+    /// # Panics
+    /// This method will panic if it's called on an empty set of ranks.
     fn rank(&self) -> usize {
         self.ranks().len() - 1
     }
 
-    /// Returns the number of elements of a given rank.
+    /// Returns the number of elements of a given rank. Returns 0 if the rank is
+    /// out of bounds.
     fn el_count(&self, rank: usize) -> usize {
         self.ranks().get(rank).map(ElementList::len).unwrap_or(0)
     }
@@ -267,12 +274,6 @@ pub trait Ranked:
     /// entire polytope it defines, use [`element`](Self::element).
     fn get_element(&self, rank: usize, idx: usize) -> Option<&Element> {
         self.ranks().get(rank)?.get(idx)
-    }
-
-    /// Returns a mutable reference to an element of the polytope. To actually get the
-    /// entire polytope it defines, use [`element`](Self::element).
-    fn get_element_mut(&mut self, rank: usize, idx: usize) -> Option<&mut Element> {
-        self.ranks_mut().get_mut(rank)?.get_mut(idx)
     }
 
     /// Gets a reference to the element list of a given rank.
@@ -293,14 +294,6 @@ pub trait Ranked:
         &self[(0, 0)]
     }
 
-    /// Returns a mutable reference to the minimal element of the polytope.
-    ///
-    /// # Panics
-    /// Panics if the polytope has not been initialized.
-    fn min_mut(&mut self) -> &mut Element {
-        &mut self[(0, 0)]
-    }
-
     /// Returns the number of minimal elements. Unless you call this in the
     /// middle of some other method, this should always be exactly 1.
     fn min_count(&self) -> usize {
@@ -313,15 +306,6 @@ pub trait Ranked:
     /// Panics if the polytope has not been initialized.
     fn max(&self) -> &Element {
         &self[(self.rank(), 0)]
-    }
-
-    /// Returns a mutable reference to the maximal element of the polytope.
-    ///
-    /// # Panics
-    /// Panics if the polytope has not been initialized.
-    fn max_mut(&mut self) -> &mut Element {
-        let rank = self.rank();
-        &mut self[(rank, 0)]
     }
 
     /// Returns the number of maximal elements. Unless you call this in the
@@ -345,70 +329,11 @@ pub trait Ranked:
         self.el_count(self.rank().wrapping_sub(1))
     }
 
-    /// Pushes an [`ElementList`] into the polytope.
-    fn push_elements(&mut self, elements: ElementList) {
-        self.ranks_mut().push(elements);
-    }
-
-    /// Extends `self` with an iterator over [`ElementLists`](ElementList).
-    fn extend_elements<I: IntoIterator<Item = ElementList>>(&mut self, elements: I) {
-        self.ranks_mut().extend(elements);
-    }
-
-    /// Pushes an element with a given list of subelements into the elements of
-    /// a given rank. Updates the superelements of its subelements
-    /// automatically.
-    fn push_subs_at(&mut self, rank: usize, subs: Subelements) {
-        let el_count = self.el_count(rank);
-
-        // Updates superelements of the lower rank.
-        for &sub in &subs {
-            self[(rank - 1, sub)].sups.push(el_count);
-        }
-
-        self[rank].push(subs.into());
-    }
-
-    /// Pushes a new subelement list, assuming that the superelements of the
-    /// current maximal rank haven't already been set. If they have already been
-    /// set, use [`push`](Self::push) instead.
-    fn push_subs(&mut self, subelements: SubelementList) {
-        self.extend_subs(subelements.into_iter())
-    }
-
-    /// Extends the polytope with an iterator over [`Subelements`], assuming
-    /// that the superelements of the current maximal rank haven't already been
-    /// set. If they have already been set, use [`push`](Self::push) instead.
-    fn extend_subs<I: IntoIterator<Item = Subelements>>(&mut self, subelements: I) {
-        let subelements = subelements.into_iter();
-        self.push_elements(ElementList::with_capacity(subelements.size_hint().0));
-
-        for sub_el in subelements {
-            self.push_subs_at(self.rank(), sub_el);
-        }
-    }
-
-    /// Pushes a maximal element into the polytope, with the facets as
-    /// subelements. To be used in circumstances where the elements are built up
-    /// in layers.
-    fn push_max(&mut self) {
-        let facet_count = self.max_count();
-        self.push_subs(SubelementList::max(facet_count));
-    }
-
     /// Returns an iterator over the elements.
     fn element_iter(&self) -> ElementIter<'_> {
         self.ranks()
             .iter()
             .map(ElementList::iter as IterFn)
-            .flatten()
-    }
-
-    /// Returns a mutable iterator over the elements.
-    fn element_iter_mut(&mut self) -> ElementIterMut<'_> {
-        self.ranks_mut()
-            .iter_mut()
-            .map(ElementList::iter_mut as IterMutFn)
             .flatten()
     }
 
@@ -418,21 +343,6 @@ pub trait Ranked:
             .into_iter()
             .map(ElementList::into_iter as IntoIterFn)
             .flatten()
-    }
-
-    /// Applies a function to all elements in parallel.
-    fn for_each_element<F: Fn(&mut Element) + Sync + Send + Clone>(&mut self, f: F) {
-        // No use parallelizing over all minimal or maximal elements.
-        let rank = self.rank();
-        f(self.min_mut());
-
-        if rank != 0 {
-            for elements in self.ranks_mut().iter_mut().skip(1).take(rank - 1) {
-                elements.par_iter_mut().for_each(f.clone());
-            }
-
-            f(self.max_mut());
-        }
     }
 }
 
@@ -457,9 +367,55 @@ impl Ranks {
         Self::with_capacity(rank + 1)
     }
 
+    /// Returns a mutable reference to the minimal element of the polytope.
+    ///
+    /// # Panics
+    /// Panics if the polytope has not been initialized.
+    pub fn min_mut(&mut self) -> &mut Element {
+        &mut self[(0, 0)]
+    }
+
+    /// Returns a mutable reference to the maximal element of the polytope.
+    ///
+    /// # Panics
+    /// Panics if the polytope has not been initialized.
+    pub fn max_mut(&mut self) -> &mut Element {
+        let rank = self.rank();
+        &mut self[(rank, 0)]
+    }
+
+    /// Returns a mutable reference to an element of the polytope. To actually get the
+    /// entire polytope it defines, use [`element`](Self::element).
+    pub fn get_element_mut(&mut self, rank: usize, idx: usize) -> Option<&mut Element> {
+        self.ranks_mut().get_mut(rank)?.get_mut(idx)
+    }
+
+    /// Returns a mutable iterator over the elements.
+    pub fn element_iter_mut(&mut self) -> ElementIterMut<'_> {
+        self.ranks_mut()
+            .iter_mut()
+            .map(ElementList::iter_mut as IterMutFn)
+            .flatten()
+    }
+
+    /// Applies a function to all elements in parallel.
+    pub fn for_each_element_mut<F: Fn(&mut Element) + Sync + Send + Clone>(&mut self, f: F) {
+        // No use parallelizing over all minimal or maximal elements.
+        let rank = self.rank();
+        f(self.min_mut());
+
+        if rank != 0 {
+            for elements in self.ranks_mut().iter_mut().skip(1).take(rank - 1) {
+                elements.par_iter_mut().for_each(f.clone());
+            }
+
+            f(self.max_mut());
+        }
+    }
+
     /// Sorts all of the superelements and subelements by index.
     pub fn element_sort(&mut self) {
-        self.for_each_element(Element::sort)
+        self.for_each_element_mut(Element::sort)
     }
 }
 
@@ -474,6 +430,12 @@ impl Ranks {
 #[derive(Default)]
 pub struct AbstractBuilder(Ranks);
 
+impl From<Ranks> for AbstractBuilder {
+    fn from(ranks: Ranks) -> Self {
+        Self(ranks)
+    }
+}
+
 impl AbstractBuilder {
     /// Initializes a new empty abstract builder.
     pub fn new() -> Self {
@@ -482,7 +444,7 @@ impl AbstractBuilder {
 
     /// Initializes a new empty abstract builder with a capacity to store
     /// elements up and until a given [`Rank`].
-    pub fn with_capacity(rank: usize) -> Self {
+    pub fn with_rank_capacity(rank: usize) -> Self {
         Self(Ranks::with_rank_capacity(rank))
     }
 
@@ -497,23 +459,52 @@ impl AbstractBuilder {
         self.0.reserve(additional)
     }
 
-    /// Pushes a new [`SubelementList`] onto the polytope.
-    pub fn push(&mut self, subelements: SubelementList) {
-        self.0.push_subs(subelements)
+    /// Inserts a new empty [`ElementList`].
+    pub fn push_empty(&mut self) {
+        self.0.push(ElementList::new())
     }
 
-    /// Pushes a new [`SubelementList`] onto the polytope.
-    pub fn extends<I: Iterator<Item = Subelements>>(&mut self, subelements: I) {
-        self.0.extend_subs(subelements)
+    /// Inserts a new empty [`ElementList`] with a given capacity.
+    pub fn push_with_capacity(&mut self, capacity: usize) {
+        self.0.push(ElementList::with_capacity(capacity))
+    }
+
+    /// Pushes an element with a given list of subelements into the elements of
+    /// a given rank. Updates the superelements of its subelements
+    /// automatically.
+    pub fn push_subs(&mut self, subs: Subelements) {
+        let rank = self.0.rank();
+        let el_count = self.0.el_count(rank);
+
+        // Updates superelements of the lower rank.
+        for &sub in &subs {
+            self.0[(rank - 1, sub)].sups.push(el_count);
+        }
+
+        self.0[rank].push(subs.into());
+    }
+
+    /// Pushes a new subelement list, assuming that the superelements of the
+    /// current maximal rank haven't already been set. If they have already been
+    /// set, use [`push`](Self::push) instead.
+    pub fn push(&mut self, subelements: SubelementList) {
+        self.extend(subelements)
     }
 
     /// Pushes an element list with a single empty element into the polytope.
     ///
     /// This method should only be used when the polytope is empty.
     pub fn push_min(&mut self) {
-        // If you're using this method, the polytope should be empty.
         debug_assert!(self.is_empty());
         self.push(SubelementList::min());
+    }
+
+    /// Pushes a maximal element into the polytope.
+    ///
+    /// This should be the last push operation that you apply to a polytope.
+    pub fn push_max(&mut self) {
+        let facet_count = self.0.max_count();
+        self.push(SubelementList::max(facet_count));
     }
 
     /// Pushes an element list with a set number of vertices into the polytope.
@@ -521,22 +512,48 @@ impl AbstractBuilder {
     /// This method should only be used when a single, minimal element list has
     /// been inserted into the polytope.
     pub fn push_vertices(&mut self, vertex_count: usize) {
-        // If you're using this method, the polytope should consist of a single
-        // minimal element.
-        debug_assert_eq!(self.0.rank(), 0);
+        debug_assert_eq!(self.0.len(), 1);
         self.push(SubelementList::vertices(vertex_count))
     }
 
-    /// Pushes a maximal element list into the polytope.
-    ///
-    /// This should be the last push operation that you apply to a polytope.
-    pub fn push_max(&mut self) {
-        self.0.push_max();
+    /// Clears the superelements of the upper rank.
+    pub fn clear_sups(&mut self) {
+        for el in self.0.last_mut().unwrap() {
+            el.sups.clear();
+        }
+    }
+
+    /// Pops the elements of the first `n` ranks.
+    pub fn pop_repeat(&mut self, n: usize) {
+        for _ in 0..n {
+            self.0.pop();
+        }
+
+        self.clear_sups();
     }
 
     /// Returns the built polytope, consuming the builder in the process.
     pub fn build(self) -> Abstract {
         self.0.into()
+    }
+}
+
+impl Extend<Subelements> for AbstractBuilder {
+    fn extend<T: IntoIterator<Item = Subelements>>(&mut self, iter: T) {
+        let iter = iter.into_iter();
+        self.push_with_capacity(iter.size_hint().0);
+
+        for subs in iter {
+            self.push_subs(subs);
+        }
+    }
+}
+
+impl Extend<SubelementList> for AbstractBuilder {
+    fn extend<T: IntoIterator<Item = SubelementList>>(&mut self, iter: T) {
+        for subelements in iter {
+            self.push(subelements);
+        }
     }
 }
 
@@ -627,7 +644,7 @@ impl ElementHash {
                 // We take the corresponding element in the original polytope
                 // and use the hash map to get its sub and superelements in the
                 // new polytope.
-                let el = poly.get_element(r, idx).unwrap();
+                let el = &poly[(r, idx)];
                 let mut new_el = Element::new();
 
                 // Gets the subelements.

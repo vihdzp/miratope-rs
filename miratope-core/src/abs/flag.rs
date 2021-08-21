@@ -1,4 +1,4 @@
-//! Helpful methods and structs for operating on the [`Flags`](Flag) of a 
+//! Helpful methods and structs for operating on the [`Flags`](Flag) of a
 //! polytope.
 
 use std::{
@@ -86,9 +86,9 @@ impl Flag {
         // Determines the common elements between the subelements of the element
         // above and the superelements of the element below.
         let below_idx = self[r - 1];
-        let below = polytope.get_element(r - 1, below_idx).unwrap();
+        let below = &polytope[(r - 1, below_idx)];
         let above_idx = self[r + 1];
-        let above = polytope.get_element(r + 1, above_idx).unwrap();
+        let above = &polytope[(r + 1, above_idx)];
         let (c0, c1) = common(&below.sups, &above.subs);
 
         // Changes the element at idx to the other element in the section

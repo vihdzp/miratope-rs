@@ -459,7 +459,7 @@ pub trait Polytope:
         flag.push(0);
 
         for r in 0..rank {
-            idx = self.get_element(r, idx).unwrap().sups[0];
+            idx = self[(r, idx)].sups[0];
             flag.push(idx);
         }
 

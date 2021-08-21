@@ -161,8 +161,8 @@ impl std::error::Error for AbstractError {}
 /// The return value for [`Abstract::is_valid`].
 pub type AbstractResult<T> = Result<T, AbstractError>;
 
-/// Encodes the ranked poset corresponding to the abstract polytope. Internally,
-/// it wraps around a [`RankVec`] of [`ElementLists`](ElementList).
+/// Encodes the ranked poset corresponding to an abstract polytope. Contains
+/// both a `Vec` of [`ElementLists`](ElementList), and some metadata about it.
 ///
 /// # What is an abstract polytope?
 /// Mathematically, an abstract polytope is a certain kind of **partially
@@ -208,6 +208,18 @@ pub type AbstractResult<T> = Result<T, AbstractError>;
 /// The fact that we store both subelements and superelements is quite useful
 /// for many algorithms. However, it becomes inconvenient when actually building
 /// a polytope, since most of the time, we can only easily generate one of them.
+///
+/// # An invariant
+/// Every method you call on an `Abstract` must be able to assume that its input
+/// is a valid polytope. Furthermore, every single method that returns an
+/// `Abstract` must return a valid polytope. No exceptions.
+///
+/// The only circumstance in which you can have an invalid polytope is in the
+/// middle of a method. The only methods you'll be allowed to call on it are
+/// those corresponding to the [`Ranked`] struct.
+///
+/// # How to use
+/// yada yada
 ///
 /// To get around this, we provide an [`AbstractBuilder`] struct. Instead of
 /// manually setting the superelements in the polytope, one can provide a
@@ -300,11 +312,7 @@ impl Abstract {
             for (section, idx) in section_hash.into_iter() {
                 // Finds all of the subelements of our old section's
                 // lowest element.
-                for &idx_lo in &self
-                    .get_element(section.lo_rank, section.lo_idx)
-                    .unwrap()
-                    .subs
-                {
+                for &idx_lo in &self[(section.lo_rank, section.lo_idx)].subs {
                     // Adds the new sections of the current height, gets
                     // their index, uses that to build the ElementList.
                     let sub = new_section_hash.get(section.with_lo(section.lo_rank - 1, idx_lo));
@@ -314,11 +322,7 @@ impl Abstract {
 
                 // Finds all of the superelements of our old section's
                 // highest element.
-                for &idx_hi in &self
-                    .get_element(section.hi_rank, section.hi_idx)
-                    .unwrap()
-                    .sups
-                {
+                for &idx_hi in &self[(section.hi_rank, section.hi_idx)].sups {
                     // Adds the new sections of the current height, gets
                     // their index, uses that to build the ElementList.
                     let sub = new_section_hash.get(section.with_hi(section.hi_rank + 1, idx_hi));
@@ -346,7 +350,7 @@ impl Abstract {
         }
 
         // We built this backwards, so let's fix it.
-        let mut abs = AbstractBuilder::with_capacity(backwards_abs.len() - 1);
+        let mut abs = AbstractBuilder::with_rank_capacity(backwards_abs.len() - 1);
 
         for subelements in backwards_abs.into_iter().rev() {
             abs.push(subelements);
@@ -356,7 +360,7 @@ impl Abstract {
     }
 
     /// Returns the omnitruncate of a polytope, along with the flags that make
-    /// up its vertices.
+    /// up its respective vertices.
     ///
     /// # Panics
     /// This method will panic if the polytope isn't sorted.
@@ -421,7 +425,7 @@ impl Abstract {
         ranks.push(SubelementList::min());
 
         // TODO: wrap this using an AbstractBuilderRev.
-        let mut abs = AbstractBuilder::with_capacity(rank);
+        let mut abs = AbstractBuilder::with_rank_capacity(rank);
         for subelements in ranks.into_iter().rev() {
             abs.push(subelements);
         }
@@ -764,7 +768,7 @@ impl Polytope for Abstract {
     /// [dyad](https://polytope.miraheze.org/wiki/Dyad), the unique polytope of
     /// rank 1.
     fn dyad() -> Self {
-        let mut abs = AbstractBuilder::with_capacity(2);
+        let mut abs = AbstractBuilder::with_rank_capacity(2);
 
         abs.push_min();
         abs.push_vertices(2);
@@ -788,7 +792,7 @@ impl Polytope for Abstract {
         }
         edges.push(Subelements(vec![0, n - 1]));
 
-        let mut poly = AbstractBuilder::with_capacity(3);
+        let mut poly = AbstractBuilder::with_rank_capacity(3);
 
         poly.push_min();
         poly.push_vertices(n);
@@ -811,8 +815,11 @@ impl Polytope for Abstract {
     /// Converts a polytope into its dual in place. Use [`Self::dual_mut`] instead, as
     /// this method can never fail.
     fn try_dual_mut(&mut self) -> Result<(), Self::DualError> {
-        self.for_each_element(Element::swap_mut);
-        self.reverse();
+        let mut ranks = std::mem::take(self).ranks;
+        ranks.for_each_element_mut(Element::swap_mut);
+        ranks.reverse();
+        *self = ranks.into();
+
         Ok(())
     }
 
@@ -870,20 +877,17 @@ impl Polytope for Abstract {
             faces.push(Subelements(face.into_iter().collect()));
         }
 
-        // Removes the faces and maximal polytope from self.
-        self.pop();
-        self.pop();
+        let mut builder = AbstractBuilder::from(std::mem::take(self).ranks);
 
-        // Clears the current edges' superelements.
-        for edge in self[2].iter_mut() {
-            edge.sups = Superelements::new();
-        }
+        // Removes the faces and maximal polytope from self.
+        builder.pop_repeat(2);
 
         // Pushes the new faces and a new maximal element.
-        self.push_subs(faces);
-        self.push_max();
+        builder.push(faces);
+        builder.push_max();
 
         // Checks for dyadicity, since that sometimes fails.
+        *self = builder.build();
         self.is_dyadic().is_ok()
     }
 
@@ -944,8 +948,8 @@ impl Polytope for Abstract {
         }
 
         // We don't need to do this every single time.
-        *self.min_mut() = Element::min(self.vertex_count());
-        *self.max_mut() = Element::max(self.facet_count());
+        *self.ranks.min_mut() = Element::min(self.vertex_count());
+        *self.ranks.max_mut() = Element::max(self.facet_count());
     }
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
@@ -980,10 +984,19 @@ impl Polytope for Abstract {
     /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
     /// polytope in place. Does nothing in the case of the nullitope.
     fn ditope_mut(&mut self) {
-        let rank = self.rank();
-        if rank != 0 {
-            self.push_subs_at(rank, self.max().subs.clone());
-            self.push_max();
+        if self.rank() != 0 {
+            let rank = self.rank();
+            let ranks = &mut self.ranks;
+
+            for v in &mut ranks[rank - 1] {
+                v.sups.push(1);
+            }
+
+            ranks.max_mut().sups.push(0);
+            let max = ranks.max().clone();
+            ranks[rank].push(max);
+
+            ranks.push(ElementList::max(2));
         }
     }
 
@@ -991,15 +1004,17 @@ impl Polytope for Abstract {
     /// given polytope in place. Does nothing in case of the nullitope.
     fn hosotope_mut(&mut self) {
         if self.rank() != 0 {
-            self.min_mut().subs.push(0);
-            let min = self.min().clone();
-            self[0].push(min);
+            let ranks = &mut self.ranks;
 
-            for v in &mut self[0] {
+            for v in &mut ranks[1] {
                 v.subs.push(1);
             }
 
-            self.insert(0, ElementList::min(2));
+            ranks.min_mut().subs.push(0);
+            let min = ranks.min().clone();
+            ranks[0].push(min);
+
+            ranks.insert(0, ElementList::min(2));
         }
     }
 }

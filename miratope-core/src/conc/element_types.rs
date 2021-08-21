@@ -189,9 +189,9 @@ impl<T: Float> Concrete<T> {
                 println!(
                     "{} × {}-{}, {}-{}",
                     t.count,
-                    self.abs.get_element(r, i).unwrap().subs.len(),
+                    self[(r, i)].subs.len(),
                     EL_SUFFIXES[r],
-                    self.abs.get_element(r, i).unwrap().sups.len(),
+                    self[(r, i)].sups.len(),
                     EL_SUFFIXES[self.rank() - r],
                 );
             }

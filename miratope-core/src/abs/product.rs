@@ -100,7 +100,7 @@ impl Abstract {
     /// `MAX` flag works analogously.
     ///
     /// This method takes in `MIN` and `MAX` as type parameters so that each
-    /// case may be separately optimized. We should probably run some tests to 
+    /// case may be separately optimized. We should probably run some tests to
     /// see if this is actually any better, though.
     ///
     /// The elements of this product are in one to one correspondence to pairs
@@ -127,7 +127,7 @@ impl Abstract {
         // Initializes the element lists. These will only contain the
         // subelements as they're generated. When they're complete, we'll call
         // push_subs for each of them into a new Abstract.
-        let mut builder = AbstractBuilder::with_capacity(rank + 1);
+        let mut builder = AbstractBuilder::with_rank_capacity(rank + 1);
         let offset_memo = OffsetMemo::<MIN, MAX>::new(p, q);
 
         // If MIN, we have to set a minimal element and the vertices manually.
