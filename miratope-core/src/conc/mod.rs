@@ -1076,7 +1076,7 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
         ranks.push(SubelementList::vertices(vertex_count));
 
         // Takes care of building everything else.
-        for r in 2..self.rank() {
+        for r in 3..self.rank() {
             let mut new_hash_element = HashMap::new();
             let mut new_els = SubelementList::new();
 
