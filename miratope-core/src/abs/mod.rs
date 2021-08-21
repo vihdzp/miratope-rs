@@ -212,11 +212,14 @@ pub type AbstractResult<T> = Result<T, AbstractError>;
 /// # An invariant
 /// Every method you call on an `Abstract` must be able to assume that its input
 /// is a valid polytope. Furthermore, every single method that returns an
-/// `Abstract` must return a valid polytope. No exceptions.
+/// `Abstract` must return a valid polytope.
 ///
 /// The only circumstance in which you can have an invalid polytope is in the
 /// middle of a method. The only methods you'll be allowed to call on it are
 /// those corresponding to the [`Ranked`] struct.
+///
+/// This restriction allows us to properly optimize these methods without
+/// worrying about invalid cases.
 ///
 /// # How to use
 /// yada yada
@@ -239,7 +242,7 @@ pub struct Abstract {
     pub sorted: bool,
 }
 
-impl_veclike_field!(Abstract, Item = ElementList, Index = usize, Field = .ranks);
+impl_veclike_field!(Abstract, Item = ElementList, Field = .ranks);
 
 impl From<Ranks> for Abstract {
     fn from(ranks: Ranks) -> Self {
@@ -787,10 +790,10 @@ impl Polytope for Abstract {
         let mut edges = SubelementList::with_capacity(n);
 
         // We add the edges with their indices sorted.
-        for i in 0..(n - 1) {
-            edges.push(Subelements(vec![i, (i + 1)]));
+        for i in 1..n {
+            edges.push(vec![i - 1, i].into());
         }
-        edges.push(Subelements(vec![0, n - 1]));
+        edges.push(vec![0, n - 1].into());
 
         let mut poly = AbstractBuilder::with_rank_capacity(3);
 
@@ -874,7 +877,7 @@ impl Polytope for Abstract {
                 return false;
             }
 
-            faces.push(Subelements(face.into_iter().collect()));
+            faces.push(face.into_iter().collect());
         }
 
         let mut builder = AbstractBuilder::from(std::mem::take(self).ranks);

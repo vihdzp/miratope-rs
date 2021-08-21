@@ -14,13 +14,14 @@ use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use vec_like::*;
 
 /// Represents a map from ranks and indices into elements of a given type.
-/// Is internally stored as a jagged array.
-///
 /// This struct used whenever we want to associate some value to every element
 /// of an abstract polytope.
+///
+/// Internally, this is just a wrapper around a `Vec<Vec<T>>`.
 #[derive(Clone, Debug)]
+#[repr(transparent)]
 pub struct ElementMap<T>(Vec<Vec<T>>);
-impl_veclike!(@for [T] ElementMap<T>, Item = Vec<T>, Index = usize);
+impl_veclike!(@for [T] ElementMap<T>, Item = Vec<T>);
 
 impl<T> Index<(usize, usize)> for ElementMap<T> {
     type Output = T;
@@ -37,30 +38,47 @@ impl<T> IndexMut<(usize, usize)> for ElementMap<T> {
 }
 
 /// Represents a list of subelements in a polytope. Each element is represented
-/// as its index in the [`ElementList`] of the previous rank. Is used as one of
-/// the fields in an [`Element`].
-///
-/// Internally, this is just a wrapper around a `Vec<usize>`.
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Subelements(pub Vec<usize>);
-impl_veclike!(Subelements, Item = usize, Index = usize);
-
-/// Represents a list of superelements in a polytope. Each element is
-/// represented as its index in the [`ElementList`] of the next rank. Is used as
+/// as its index in the [`ElementList`] of the previous rank. This is used as
 /// one of the fields in an [`Element`].
 ///
 /// Internally, this is just a wrapper around a `Vec<usize>`.
+///
+/// # Note on notation
+/// Throughout the code, and unless specified otherwise, we use the word
+/// **subelement** to refer to the elements of rank `r - 1` incident to an
+/// element of rank `r`. This is contrary to mathematical use, where it just
+/// refers to any element that's incident and of lesser rank than another. We
+/// instead use the term **recursive subelement** for the standard mathematical
+/// notion.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Superelements(pub Vec<usize>);
-impl_veclike!(Superelements, Item = usize, Index = usize);
+#[repr(transparent)]
+pub struct Subelements(Vec<usize>);
+impl_veclike!(Subelements, Item = usize);
 
-/// Represents an element in a polytope (also known as a face), which stores the
-/// indices of both its [`Subelements`] and its [`Superelements`]. These make up
-/// the entries of an [`ElementList`].
+/// Represents a list of superelements in a polytope. Each element is
+/// represented as its index in the [`ElementList`] of the previous rank. This
+/// is used as  one of the fields in an [`Element`].
+///
+/// Internally, this is just a wrapper around a `Vec<usize>`.
+///
+/// # Note on notation
+/// Throughout the code, and unless specified otherwise, we use the word
+/// **superelement** to refer to the elements of rank `r + 1` incident to an
+/// element of rank `r`. This is contrary to mathematical use, where it just
+/// refers to any element that's incident and of greater rank than another. We
+/// instead use the term **recursive superelement** for the standard
+/// mathematical notion.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct Superelements(Vec<usize>);
+impl_veclike!(Superelements, Item = usize);
+
+/// Represents an element in a polytope (also known as a face). Each element
+/// stores only the indices of its [`Subelements`] and its [`Superelements`].
 ///
 /// Even though one of these fields would suffice to precisely define an
-/// element in an abstract polytope, we often are in need to use both of them.
-/// To avoid recalculating them every single time, we just store them both.
+/// element in an abstract polytope, we're often are in need of both of them. To
+/// avoid recalculating them every single time, we just store them both.
 #[derive(Default, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Element {
     /// The indices of the subelements of the previous rank.
@@ -122,20 +140,16 @@ impl Element {
     }
 }
 
-/// A list of [`Elements`](Element) of the same
-/// [rank](https://polytope.miraheze.org/wiki/Rank). An [`Abstract`] is built
-/// out of a `Vec` of these. Internally, this is just a wrapper around
-/// `Vec<Element>`.
+/// A list of [`Elements`](Element) of the same rank.
 ///
-/// If you only want to deal with the subelements of a polytope, consider using
-/// a [`SubelementList`] instead.
+/// Internally, this is just a wrapper around a `Vec<Element>`.
 #[derive(Debug, Clone)]
+#[repr(transparent)]
 pub struct ElementList(Vec<Element>);
-impl_veclike!(ElementList, Item = Element, Index = usize);
+impl_veclike!(ElementList, Item = Element);
 
 impl<'a> rayon::iter::IntoParallelIterator for &'a mut ElementList {
     type Iter = rayon::slice::IterMut<'a, Element>;
-
     type Item = &'a mut Element;
 
     fn into_par_iter(self) -> Self::Iter {
@@ -157,12 +171,14 @@ impl ElementList {
     }
 }
 
-/// A list of [`Subelements`] in a polytope. Can be used by an
-/// [`AbstractBuilder`] to build the [`Elements`](Element) of a polytope one
-/// rank at a time.
+/// A list of [`Subelements`] corresponding to [`Elements`](Element) of the same
+/// rank.
+///
+/// Internally, this is just a wrapper around a `Vec<Subelements>`.
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct SubelementList(Vec<Subelements>);
-impl_veclike!(SubelementList, Item = Subelements, Index = usize);
+impl_veclike!(SubelementList, Item = Subelements);
 
 impl SubelementList {
     /// Returns the subelement list for the minimal element in a polytope.
@@ -214,7 +230,7 @@ pub type ElementIntoIter = iter::Flatten<iter::Map<vec::IntoIter<ElementList>, I
 /// `Ranks` form a valid polytope.
 #[derive(Debug, Clone)]
 pub struct Ranks(Vec<ElementList>);
-impl_veclike!(Ranks, Item = ElementList, Index = usize);
+impl_veclike!(Ranks, Item = ElementList);
 
 impl Index<(usize, usize)> for Ranks {
     type Output = Element;
@@ -289,13 +305,13 @@ pub trait Ranked:
     /// Returns a reference to the minimal element of the polytope.
     ///
     /// # Panics
-    /// Panics if the polytope has not been initialized.
+    /// Panics if the minimal element has not been initialized.
     fn min(&self) -> &Element {
         &self[(0, 0)]
     }
 
-    /// Returns the number of minimal elements. Unless you call this in the
-    /// middle of some other method, this should always be exactly 1.
+    /// Returns the number of minimal elements. This always equals 1 in a valid
+    /// polytope.
     fn min_count(&self) -> usize {
         self.el_count(0)
     }
@@ -303,13 +319,13 @@ pub trait Ranked:
     /// Returns a reference to the maximal element of the polytope.
     ///
     /// # Panics
-    /// Panics if the polytope has not been initialized.
+    /// Panics if the maximal element has not been initialized.
     fn max(&self) -> &Element {
         &self[(self.rank(), 0)]
     }
 
-    /// Returns the number of maximal elements. Unless you call this in the
-    /// middle of some other method, this should always be exactly 1.
+    /// Returns the number of maximal elements. This always equals 1 in a valid
+    /// polytope.
     fn max_count(&self) -> usize {
         self.el_count(self.rank())
     }
@@ -370,7 +386,7 @@ impl Ranks {
     /// Returns a mutable reference to the minimal element of the polytope.
     ///
     /// # Panics
-    /// Panics if the polytope has not been initialized.
+    /// Panics if the minimal element has not been initialized.
     pub fn min_mut(&mut self) -> &mut Element {
         &mut self[(0, 0)]
     }
@@ -378,7 +394,7 @@ impl Ranks {
     /// Returns a mutable reference to the maximal element of the polytope.
     ///
     /// # Panics
-    /// Panics if the polytope has not been initialized.
+    /// Panics if the maximal element has not been initialized.
     pub fn max_mut(&mut self) -> &mut Element {
         let rank = self.rank();
         &mut self[(rank, 0)]
@@ -399,14 +415,14 @@ impl Ranks {
     }
 
     /// Applies a function to all elements in parallel.
-    pub fn for_each_element_mut<F: Fn(&mut Element) + Sync + Send + Clone>(&mut self, f: F) {
+    pub fn for_each_element_mut<F: Fn(&mut Element) + Sync + Send>(&mut self, f: F) {
         // No use parallelizing over all minimal or maximal elements.
         let rank = self.rank();
         f(self.min_mut());
 
         if rank != 0 {
             for elements in self.ranks_mut().iter_mut().skip(1).take(rank - 1) {
-                elements.par_iter_mut().for_each(f.clone());
+                elements.par_iter_mut().for_each(&f);
             }
 
             f(self.max_mut());
@@ -419,14 +435,18 @@ impl Ranks {
     }
 }
 
-/// A structure used to build a polytope from the bottom up.
-///
-/// To operate on polytopes, we often need both the [`Subelements`] and
-/// [`Superelements`] of each [`Element`]. However, if we only had one of these
-/// for every `Element`, the other would be uniquely specified. This struct
-/// allows us to build a polytope rank by rank by specifying the
+/// This struct allows us to build a polytope rank by rank by specifying the
 /// [`SubelementLists`](SubelementList) of each succesive rank. It also has a
 /// few convenienece methods to build these lists in specific cases.
+///
+/// # An invariant
+/// An `AbstractBuilder` wraps around a set of [`Ranks`]. Every method you call
+/// on it will make it so that the subelements and superelements of any rank
+/// save for the upper one are consistently filled out. The upper rank's
+/// elements will have no elements.
+///
+/// By calling [`Self::build`], you're asserting that the structure you've built
+/// represents a valid [`Abstract`] polytope.
 #[derive(Default)]
 pub struct AbstractBuilder(Ranks);
 
@@ -517,7 +537,10 @@ impl AbstractBuilder {
     }
 
     /// Clears the superelements of the upper rank.
-    pub fn clear_sups(&mut self) {
+    ///
+    /// This is an inner auxiliary method and should not be made public, as it's
+    /// a no-op assuming the invariant holds.
+    fn clear_sups(&mut self) {
         for el in self.0.last_mut().unwrap() {
             el.sups.clear();
         }
@@ -529,10 +552,15 @@ impl AbstractBuilder {
             self.0.pop();
         }
 
-        self.clear_sups();
+        if n != 0 {
+            self.clear_sups();
+        }
     }
 
     /// Returns the built polytope, consuming the builder in the process.
+    ///
+    /// By calling this method, you're asserting that whatever you've built is
+    /// a valid [`Abstract`] polytope.
     pub fn build(self) -> Abstract {
         self.0.into()
     }
@@ -556,6 +584,9 @@ impl Extend<SubelementList> for AbstractBuilder {
         }
     }
 }
+
+// TODO: The rest of the file contains highly specialized structs for specific
+// algorithms. We should probably move them elsewhere.
 
 /// Maps each recursive subelement of an abstract polytope's element to a
 /// `usize`, representing its index in a new polytope. This is used to build the

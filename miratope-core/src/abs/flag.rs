@@ -68,7 +68,7 @@ fn common<T: AsRef<[usize]>, U: AsRef<[usize]>>(list1: T, list2: U) -> (usize, u
 /// [`Self::change_mut`] method.
 #[derive(Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub struct Flag(Vec<usize>);
-impl_veclike!(Flag, Item = usize, Index = usize);
+impl_veclike!(Flag, Item = usize);
 
 impl Flag {
     /// Applies a specified flag change to the flag in place.
@@ -246,7 +246,7 @@ pub struct OrientedFlag {
     pub orientation: Orientation,
 }
 
-impl_veclike_field!(OrientedFlag, Item = usize, Index = usize, Field = .flag);
+impl_veclike_field!(OrientedFlag, Item = usize, Field = .flag);
 
 /// Makes an oriented flag from a normal flag.
 impl From<Flag> for OrientedFlag {
@@ -302,7 +302,7 @@ impl OrientedFlag {
 /// rank of the element it modifies.
 #[derive(Clone)]
 pub struct FlagChanges(Vec<usize>);
-impl_veclike!(FlagChanges, Item = usize, Index = usize);
+impl_veclike!(FlagChanges, Item = usize);
 
 impl FlagChanges {
     /// Returns the set of all possible flag changes in a polytope of a given

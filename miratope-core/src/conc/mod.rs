@@ -553,27 +553,30 @@ pub trait ConcretePolytope<T: Float>: Polytope {
         }
     }
 
-    /// Returns a map from the elements in a polytope to a crude average.
+    /// Returns a map from the elements in a polytope to a crude average of
+    /// their vertices. Specifically, every vertex is mapped to itself, and
+    /// every other element is mapped to the average of the images of its
+    /// subelements.
     fn avg_vertex_map(&self) -> ElementMap<Point<T>> {
         // Maps every element of the polytope to one of its vertices.
-        let mut vertex_map = ElementMap::new();
-        vertex_map.push(Vec::new());
+        let mut map = ElementMap::new();
+        map.push(Vec::new());
 
         // Vertices map to themselves.
         if self.rank() != 0 {
-            vertex_map.push(self.vertices().clone());
+            map.push(self.vertices().clone());
         }
 
         // Every other element maps to the average of the locations of their
         // subelements.
         for (r, elements) in self.ranks().iter().enumerate().skip(2) {
-            vertex_map.push(
+            map.push(
                 elements
                     .iter()
                     .map(|el| {
                         el.subs
                             .iter()
-                            .map(|&idx| &vertex_map[(r - 1, idx)])
+                            .map(|&idx| &map[(r - 1, idx)])
                             .sum::<Point<T>>()
                             / T::usize(el.subs.len())
                     })
@@ -581,7 +584,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
             );
         }
 
-        vertex_map
+        map
     }
 
     /// Returns the length of a given edge.
@@ -1139,7 +1142,7 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
                     for _ in 1..comps {
                         let v0 = subs.pop().unwrap();
                         let v1 = subs.pop().unwrap();
-                        new_edges.push(Subelements(vec![v0, v1]));
+                        new_edges.push(vec![v0, v1].into());
 
                         for &sup in &edge_sups[edge_idx] {
                             faces[sup].push(edge_num);

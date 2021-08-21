@@ -13,11 +13,11 @@ use vec_like::*;
 /// Represents a cyclic list of vertex indices, which may then be turned into a
 /// path and tessellated.
 pub struct Cycle(Vec<usize>);
-impl_veclike!(Cycle, Item = usize, Index = usize);
+impl_veclike!(Cycle, Item = usize);
 
 /// A list of [`Cycles`](Cycle).
 pub struct CycleList(Vec<Cycle>);
-impl_veclike!(CycleList, Item = Cycle, Index = usize);
+impl_veclike!(CycleList, Item = Cycle);
 
 /// Represents a set with at most two values.
 #[derive(Clone, Copy)]

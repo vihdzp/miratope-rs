@@ -2,35 +2,12 @@
 //! `Vec<T>`s, and an [`impl_veclike`] macro that automatically implements this
 //! trait for a type.
 
-/// A trait for anything that should work as an index in a vector. Any type that
-/// implements this trait should be quickly convertible into a `usize`.
-///
-/// An implementation of this trait might look like this:
-/// ```
-/// struct Number(u8);
-///
-/// impl vec_like::VecIndex for Number {
-///     fn index(self) -> usize {
-///         self.0 as usize
-///     }   
-/// }
-/// ```
-pub trait VecIndex {
-    fn index(self) -> usize;
-}
-
-impl VecIndex for usize {
-    fn index(self) -> usize {
-        self
-    }
-}
-
 /// A trait for any type that acts as a wrapper around a `Vec<T>`. Will
 /// automatically implement all corresponding methods.
 pub trait VecLike:
     Default
-    + std::ops::Index<Self::VecIndex>
-    + std::ops::IndexMut<Self::VecIndex>
+    + std::ops::Index<usize>
+    + std::ops::IndexMut<usize>
     + AsRef<[Self::VecItem]>
     + AsMut<[Self::VecItem]>
     + AsRef<Vec<Self::VecItem>>
@@ -46,9 +23,6 @@ where
 {
     /// The item contained in the wrapped vector.
     type VecItem;
-
-    /// The type used to index over the vector.
-    type VecIndex: VecIndex;
 
     /// Returns a reference to the inner vector. This is equivalent to `as_ref`,
     /// but is more robust in case any types need to be inferred.
@@ -132,13 +106,13 @@ where
     }
 
     /// Returns a reference to an element or `None` if out of bounds.
-    fn get(&self, index: Self::VecIndex) -> Option<&Self::VecItem> {
-        self.as_inner().get(index.index())
+    fn get(&self, index: usize) -> Option<&Self::VecItem> {
+        self.as_inner().get(index)
     }
 
     /// Returns a mutable reference to an element or `None` if out of bounds.
-    fn get_mut(&mut self, index: Self::VecIndex) -> Option<&mut Self::VecItem> {
-        self.as_inner_mut().get_mut(index.index())
+    fn get_mut(&mut self, index: usize) -> Option<&mut Self::VecItem> {
+        self.as_inner_mut().get_mut(index)
     }
 
     /// Moves all the elements of `other` into `self`, leaving `other` empty.
@@ -148,8 +122,8 @@ where
 
     /// Inserts an element at position `index` within the vector, shifting all
     /// elements after it to the right.
-    fn insert(&mut self, index: Self::VecIndex, element: Self::VecItem) {
-        self.as_inner_mut().insert(index.index(), element)
+    fn insert(&mut self, index: usize, element: Self::VecItem) {
+        self.as_inner_mut().insert(index, element)
     }
 
     /// Extracts a slice containing the entire vector.
@@ -231,16 +205,13 @@ where
     /// The first will contain all indices from [0, `mid`) (excluding the index
     /// `mid` itself) and the second will contain all indices from [`mid`,
     /// `len`) (excluding the index `len` itself).
-    fn split_at_mut(
-        &mut self,
-        mid: Self::VecIndex,
-    ) -> (&mut [Self::VecItem], &mut [Self::VecItem]) {
-        self.as_inner_mut().split_at_mut(mid.index())
+    fn split_at_mut(&mut self, mid: usize) -> (&mut [Self::VecItem], &mut [Self::VecItem]) {
+        self.as_inner_mut().split_at_mut(mid)
     }
 
     /// Swaps two elements in `Self`.
-    fn swap(&mut self, a: Self::VecIndex, b: Self::VecIndex) {
-        self.as_inner_mut().swap(a.index(), b.index())
+    fn swap(&mut self, a: usize, b: usize) {
+        self.as_inner_mut().swap(a, b)
     }
 }
 
@@ -258,7 +229,7 @@ where
 /// # use vec_like::{VecLike, impl_veclike};
 /// struct VecItem;
 /// struct Wrapper(Vec<VecItem>);
-/// impl_veclike!(Wrapper, Item = VecItem, Index = usize);
+/// impl_veclike!(Wrapper, Item = VecItem);
 /// ```
 ///
 /// Or like this:
@@ -266,15 +237,15 @@ where
 /// ```
 /// # use vec_like::{VecLike, impl_veclike};
 /// struct Wrapper<T>(Vec<T>);
-/// impl_veclike!(@for [T] Wrapper<T>, Item = T, Index = usize);
+/// impl_veclike!(@for [T] Wrapper<T>, Item = T);
 /// ```
 ///
 /// # Todo
 /// It would be nice to turn this into something that can be derived.
 #[macro_export]
 macro_rules! impl_veclike {
-    ($(@for [$($generics: tt)*])? $Type:ty, Item = $VecItem:ty, Index = $VecIndex:ty$(,)?) => {
-        vec_like::impl_veclike_field!($(@for [$($generics)*])? $Type, Item = $VecItem, Index = $VecIndex, Field = .0);
+    ($(@for [$($generics: tt)*])? $Type:ty, Item = $VecItem:ty) => {
+        vec_like::impl_veclike_field!($(@for [$($generics)*])? $Type, Item = $VecItem, Field = .0);
 
         impl$(<$($generics)*>)? From<Vec<$VecItem>> for $Type {
             fn from(vec: Vec<$VecItem>) -> Self {
@@ -308,7 +279,7 @@ macro_rules! impl_veclike {
 ///     # fn from(vec: Vec<VecItem>) -> Self { Self{vec, other: ()} }
 /// }
 ///
-/// impl_veclike_field!(Wrapper, Item = VecItem, Index = usize, Field = .vec);
+/// impl_veclike_field!(Wrapper, Item = VecItem, Field = .vec);
 /// ```
 ///
 /// Or like this:
@@ -325,17 +296,16 @@ macro_rules! impl_veclike {
 ///     # fn from(vec: Vec<T>) -> Self { Self{vec, other: ()} }
 /// }
 ///
-/// impl_veclike_field!(@for [T] Wrapper<T>, Item = T, Index = usize, Field = .vec);
+/// impl_veclike_field!(@for [T] Wrapper<T>, Item = T, Field = .vec);
 /// ```
 ///
 /// # Todo
 /// It would be nice to turn this into something that can be derived.
 #[macro_export]
 macro_rules! impl_veclike_field {
-    ($(@for [$($generics: tt)*])? $Type:ty, Item = $VecItem:ty, Index = $VecIndex:ty, Field = .$field:tt$(,)?) => {
+    ($(@for [$($generics: tt)*])? $Type:ty, Item = $VecItem:ty, Field = .$field:tt$(,)?) => {
         impl<$($($generics)*)?> vec_like::VecLike for $Type {
             type VecItem = $VecItem;
-            type VecIndex = $VecIndex;
         }
 
         impl$(<$($generics)*>)? Default for $Type {
@@ -344,19 +314,17 @@ macro_rules! impl_veclike_field {
             }
         }
 
-        impl$(<$($generics)*>)? std::ops::Index<$VecIndex> for $Type {
+        impl$(<$($generics)*>)? std::ops::Index<usize> for $Type {
             type Output = $VecItem;
 
-            fn index(&self, index: $VecIndex) -> &Self::Output {
-                use vec_like::VecIndex;
-                &self.as_inner()[index.index()]
+            fn index(&self, index: usize) -> &Self::Output {
+                &self.as_inner()[index]
             }
         }
 
-        impl$(<$($generics)*>)? std::ops::IndexMut<$VecIndex> for $Type {
-            fn index_mut(&mut self, index: $VecIndex) -> &mut Self::Output {
-                use vec_like::VecIndex;
-                &mut self.as_inner_mut()[index.index()]
+        impl$(<$($generics)*>)? std::ops::IndexMut<usize> for $Type {
+            fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+                &mut self.as_inner_mut()[index]
             }
         }
 

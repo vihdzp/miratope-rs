@@ -99,7 +99,7 @@ fn quat_to_mat<T: Float>(q: Quaternion<T>, left: bool) -> Matrix<T> {
 
 /// Computes the [direct sum](https://en.wikipedia.org/wiki/Block_matrix#Direct_sum)
 /// of two matrices.
-fn direct_sum<T: Float>(mat1: Matrix<T>, mat2: Matrix<T>) -> Matrix<T> {
+fn direct_sum<T: Float>(mat1: &Matrix<T>, mat2: &Matrix<T>) -> Matrix<T> {
     let dim1 = mat1.nrows();
     let dim = dim1 + mat2.nrows();
 
@@ -127,16 +127,16 @@ dyn_clone::clone_trait_object!(<T> GroupIter<T> where T: Float);
 /// A [group](https://en.wikipedia.org/wiki/Group_(mathematics)) of matrices,
 /// acting on a space of a certain dimension.
 #[derive(Clone)]
-pub struct Group<T: Float> {
+pub struct Group<'a, T: Float> {
     /// The dimension of the matrices of the group. Stored separately, since
     /// making the iterator peekable doesn't seem to work.
     dim: usize,
 
     /// The underlying iterator, which actually outputs the matrices.
-    iter: Box<dyn GroupIter<T>>,
+    iter: Box<dyn 'a + GroupIter<T>>,
 }
 
-impl<T: Float> Iterator for Group<T> {
+impl<'a, T: Float> Iterator for Group<'a, T> {
     type Item = Matrix<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -144,10 +144,10 @@ impl<T: Float> Iterator for Group<T> {
     }
 }
 
-impl<T: Float> Group<T> {
+impl<'a, T: Float> Group<'a, T> {
     /// Initializes a new group with a given dimension and a given
     /// [`GroupIter`].
-    pub fn new<U: 'static + GroupIter<T>>(dim: usize, iter: U) -> Self {
+    pub fn new<U: 'a + GroupIter<T>>(dim: usize, iter: U) -> Self {
         Self {
             dim,
             iter: Box::new(iter),
@@ -179,7 +179,7 @@ impl<T: Float> Group<T> {
     /// Builds an iterator over the set of either left or a right quaternions
     /// from a 3D group. **These won't actually generate a group,** as they
     /// don't contain central inversion.
-    fn quaternions(self, left: bool) -> Box<dyn GroupIter<T>> {
+    fn quaternions(self, left: bool) -> Box<dyn 'a + GroupIter<T>> {
         if self.dim != 3 {
             panic!("Quaternions can only be generated from 3D matrices.");
         }
@@ -207,7 +207,7 @@ impl<T: Float> Group<T> {
             itertools::iproduct!(g.quaternions(true), h.quaternions(false))
                 .map(|(mat1, mat2)| {
                     let mat = mat1 * mat2;
-                    iter::once(mat.clone()).chain(iter::once(-mat))
+                    iter::once(-&mat).chain(iter::once(mat))
                 })
                 .flatten(),
         )
@@ -295,10 +295,10 @@ impl<T: Float> Group<T> {
 
     /// Generates a step prism group from a base group and a homomorphism into
     /// another group.
-    pub fn step<F: 'static + Clone + FnMut(Matrix<T>) -> Matrix<T>>(g: Self, mut f: F) -> Self {
+    pub fn step<F: 'a + Clone + Fn(&Matrix<T>) -> Matrix<T>>(g: Self, f: F) -> Self {
         Self {
             dim: g.dim * 2,
-            iter: Box::new(g.map(move |mat| direct_sum(mat.clone(), f(mat)))),
+            iter: Box::new(g.map(move |mat| direct_sum(&mat, &f(&mat)))),
         }
     }
 
@@ -315,11 +315,12 @@ impl<T: Float> Group<T> {
         g: Self,
         h: Self,
         dim: usize,
-        mut product: (impl FnMut(Matrix<T>, Matrix<T>) -> Matrix<T> + Clone + 'static),
+        mut product: (impl FnMut(&Matrix<T>, &Matrix<T>) -> Matrix<T> + Clone + 'static),
     ) -> Self {
         Self::new(
             dim,
-            itertools::iproduct!(g, h).map(move |(mat1, mat2)| product(mat1, mat2)),
+            // TODO: get rid of lots of unnecessary cloning
+            itertools::iproduct!(g, h).map(move |(mat1, mat2)| product(&mat1, &mat2)),
         )
     }
 
@@ -327,15 +328,13 @@ impl<T: Float> Group<T> {
     /// first and the second group. **Is meant only for groups that commute with
     /// one another.**
     pub fn matrix_product(g: Self, h: Self) -> Option<Self> {
-        use std::ops::Mul;
-
         // The two matrices must have the same size.
         if g.dim != h.dim {
             return None;
         }
 
         let dim = g.dim;
-        Some(Self::fn_product(g, h, dim, Matrix::mul))
+        Some(Self::fn_product(g, h, dim, |a, b| a * b))
     }
 
     /// Calculates the direct product of two groups. Pairs of matrices are then
@@ -602,7 +601,7 @@ mod tests {
     use gcd::Gcd;
 
     /// Tests a given symmetry group.
-    fn test(group: Group<f32>, order: usize, rot_order: usize, name: &str) {
+    fn test(group: Group<'_, f32>, order: usize, rot_order: usize, name: &str) {
         // Makes testing multiple derived groups faster.
         let group = group.cache().debug();
 

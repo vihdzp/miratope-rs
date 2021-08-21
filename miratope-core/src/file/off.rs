@@ -358,7 +358,7 @@ impl<'a> OffReader<'a> {
                     std::mem::swap(&mut v0, &mut v1);
                 }
 
-                let edge = Subelements(vec![v0, v1]);
+                let edge: Subelements = vec![v0, v1].into();
 
                 if let Some(idx) = hash_edges.get(&edge) {
                     face.push(*idx);
