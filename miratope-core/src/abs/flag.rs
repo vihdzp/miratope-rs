@@ -1,9 +1,5 @@
-//! Helpful methods and structs for operating on the
-//! [`Flags`](Flag) of a polytope.
-//!
-//! Recall that a flag is a maximal set of pairwise incident elements in a
-//! polytope. For convenience, we omit the minimal and maximal elements from our
-//! flags, though we sometimes pretend like they're still there for convenience.
+//! Helpful methods and structs for operating on the [`Flags`](Flag) of a 
+//! polytope.
 
 use std::{
     cmp::Ordering,
@@ -20,25 +16,72 @@ use crate::{
 
 use vec_like::*;
 
+/// Asserts that the subelements and superelements of a polytope are sorted.
+/// This runs only on debug mode, and if the assertion fails, it should be
+/// considered a serious bug.
+fn assert_sorted(p: &Abstract) {
+    debug_assert!(
+        p.sorted,
+        "a polytope's elements must be sorted before iterating over its flags"
+    )
+}
+
+/// An auxiliary method for [`Flag::change_mut`]. Gets the two common elements
+/// of two **sorted** lists.
+///
+/// # Panic
+/// This method will behave erroneously and might panic if the lists are not
+/// sorted. Furthermore, the method will panic if the lists have less than two
+/// common elements.
+fn common<T: AsRef<[usize]>, U: AsRef<[usize]>>(list1: T, list2: U) -> (usize, usize) {
+    let list1 = list1.as_ref();
+    let list2 = list2.as_ref();
+    let mut i = 0;
+    let mut j = 0;
+    let mut prev = None;
+
+    loop {
+        let sub0 = list1[i];
+        let sub1 = list2[j];
+
+        match sub0.cmp(&sub1) {
+            Ordering::Equal => {
+                if let Some(other) = prev {
+                    return (sub0, other);
+                } else {
+                    prev = Some(sub0);
+                }
+
+                i += 1;
+            }
+            Ordering::Greater => j += 1,
+            Ordering::Less => i += 1,
+        }
+    }
+}
+
 /// Represents a [flag](https://polytope.miraheze.org/wiki/Flag) in a polytope.
 /// Stores the indices of the elements of each rank.
-#[derive(Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
+///
+/// The minimal element of the flag must always have index 0. However, we keep
+/// it in memory since it allows us to not have to special-case the
+/// [`Self::change_mut`] method.
+#[derive(Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub struct Flag(Vec<usize>);
 impl_veclike!(Flag, Item = usize, Index = usize);
 
 impl Flag {
     /// Applies a specified flag change to the flag in place.
     ///
-    /// # Panics
-    /// This method should only panic if an invalid polytope is given as an
-    /// argument.
+    /// Recall that an `i`-flag change sends a flag to another that shares all
+    /// elements except for the `i`-th one. In a valid (dyadic) polytope, the
+    /// resulting flag always exists and is unique.
+    ///
+    /// For this flag change to be efficiently applied, we need for all of the
+    /// element and subelement lists of the polytope to be sorted. This is
+    /// verified via various debug assertions.
     pub fn change_mut(&mut self, polytope: &Abstract, r: usize) {
-        let rank = polytope.rank();
-
-        // A flag change is a no-op in a nullitope or point.
-        if rank <= 1 {
-            return;
-        }
+        assert_sorted(polytope);
 
         // Determines the common elements between the subelements of the element
         // above and the superelements of the element below.
@@ -46,24 +89,14 @@ impl Flag {
         let below = polytope.get_element(r - 1, below_idx).unwrap();
         let above_idx = self[r + 1];
         let above = polytope.get_element(r + 1, above_idx).unwrap();
-        let common = common(&below.sups.0, &above.subs.0);
-
-        debug_assert_eq!(
-            common.len(),
-            2,
-            "Diamond property fails between rank {}, index {}, and rank {}, index {}.",
-            r - 1,
-            below_idx,
-            r + 1,
-            above_idx,
-        );
+        let (c0, c1) = common(&below.sups, &above.subs);
 
         // Changes the element at idx to the other element in the section
         // determined by the elements above and below.
-        if self[r] == common[0] {
-            self[r] = common[1];
+        if self[r] == c0 {
+            self[r] = c1;
         } else {
-            self[r] = common[0];
+            self[r] = c0;
         }
     }
 
@@ -97,10 +130,10 @@ impl Orientation {
     /// Returns the "sign" associated with a flag, which is either `1.0` or
     /// `-1.0`.
     pub fn sign<T: Float>(&self) -> T {
-        T::f64(match self {
-            Self::Even => 1.0,
-            Self::Odd => -1.0,
-        })
+        match self {
+            Self::Even => T::ONE,
+            Self::Odd => -T::ONE,
+        }
     }
 }
 
@@ -112,7 +145,8 @@ impl Default for Orientation {
 }
 
 /// An iterator over all [`Flags`](Flag) of a polytope. This iterator works even
-/// if the polytope is a compound polytope.
+/// if the polytope is a compound polytope. However, it is not able to keep
+/// track of orientation.
 ///
 /// Each flag is associated with a sequence whose k-th entry stores the index of
 /// the k-th element as a subelement of its superelement. We iterate over flags
@@ -138,10 +172,7 @@ pub struct FlagIter<'a> {
 impl<'a> FlagIter<'a> {
     /// Initializes an iterator over all flags of a polytope.
     pub fn new(polytope: &'a Abstract) -> Self {
-        assert!(
-            polytope.sorted,
-            "You must make sure that the polytope is sorted before iterating over its flags."
-        );
+        assert_sorted(polytope);
 
         Self {
             polytope,
@@ -198,10 +229,13 @@ impl<'a> Iterator for FlagIter<'a> {
     }
 }
 
-#[derive(Clone, Debug, Eq)]
 /// A flag together with an orientation. Any flag change flips the orientation.
 /// If the polytope associated to the flag is non-orientable, the orientation
 /// will be garbage data.
+///
+/// The implementations for traits like `PartialEq` and `Hash` ignore the
+/// orientation of the flag.
+#[derive(Clone, Debug, Eq)]
 pub struct OrientedFlag {
     /// The indices of the elements the flag contains, excluding the null and
     /// maximal elements.
@@ -231,16 +265,12 @@ impl From<Vec<usize>> for OrientedFlag {
 }
 
 impl Hash for OrientedFlag {
-    /// Returns the hash of the flag. **Does not take orientation into
-    /// account.**
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.flag.hash(state);
     }
 }
 
 impl PartialEq for OrientedFlag {
-    /// Determines whether two flags are equal. **Does not take orientation into
-    /// account.**
     fn eq(&self, other: &Self) -> bool {
         self.flag.eq(&other.flag)
     }
@@ -258,30 +288,6 @@ impl Ord for OrientedFlag {
     }
 }
 
-/// Gets the common elements of two **sorted** lists.
-fn common(vec0: &[usize], vec1: &[usize]) -> Vec<usize> {
-    let mut common = Vec::new();
-    let mut i = 0;
-    let mut j = 0;
-
-    while let Some(&sub0) = vec0.get(i) {
-        if let Some(sub1) = vec1.get(j) {
-            match sub0.cmp(sub1) {
-                Ordering::Equal => {
-                    common.push(sub0);
-                    i += 1;
-                }
-                Ordering::Greater => j += 1,
-                Ordering::Less => i += 1,
-            };
-        } else {
-            break;
-        }
-    }
-
-    common
-}
-
 impl OrientedFlag {
     /// Applies a specified flag change to the flag.
     pub fn change(&self, polytope: &Abstract, idx: usize) -> Self {
@@ -292,13 +298,15 @@ impl OrientedFlag {
     }
 }
 
-/// Represents a set of flag changes.
+/// Represents a set of flag changes. Each flag change is represented by the
+/// rank of the element it modifies.
 #[derive(Clone)]
 pub struct FlagChanges(Vec<usize>);
 impl_veclike!(FlagChanges, Item = usize, Index = usize);
 
 impl FlagChanges {
-    /// Returns the set of all flag changes for a polytope of a given rank.
+    /// Returns the set of all possible flag changes in a polytope of a given
+    /// rank. These are the flag changes of ranks from 1 up to the rank minus 1.
     pub fn all(rank: usize) -> Self {
         Self((1..rank).collect())
     }
@@ -384,6 +392,8 @@ impl<'a> OrientedFlagIter<'a> {
     /// You must [sort](Abstract::sort) the polytope before calling this
     /// method.
     pub fn new(polytope: &'a Abstract) -> Self {
+        assert_sorted(polytope);
+
         // Initializes with any flag from the polytope and all flag changes.
         Self::with_flags(
             polytope,
@@ -402,6 +412,8 @@ impl<'a> OrientedFlagIter<'a> {
         flag_changes: FlagChanges,
         first_flag: OrientedFlag,
     ) -> Self {
+        assert_sorted(polytope);
+
         // Initializes found flags.
         let mut found = HashMap::new();
         found.insert(first_flag.clone(), 0);

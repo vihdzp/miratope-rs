@@ -100,7 +100,8 @@ impl Abstract {
     /// `MAX` flag works analogously.
     ///
     /// This method takes in `MIN` and `MAX` as type parameters so that each
-    /// case may be separately optimized.
+    /// case may be separately optimized. We should probably run some tests to 
+    /// see if this is actually any better, though.
     ///
     /// The elements of this product are in one to one correspondence to pairs
     /// of elements in the set of polytopes. The elements of a specific rank are

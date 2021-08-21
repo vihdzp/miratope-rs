@@ -939,7 +939,7 @@ impl Polytope for Abstract {
                     *sup += sup_offset;
                 }
 
-                self.push_at(r, el);
+                self[r].push(el);
             }
         }
 

@@ -478,7 +478,8 @@ pub trait Polytope:
         FlagIter::new(self.abs())
     }
 
-    /// Returns an iterator over all [`Flag`]s of a polytope.
+    /// Returns an iterator over all [`Flag`]s of a polytope. Will sort the
+    /// elements if needed.
     fn flags_mut(&mut self) -> FlagIter<'_> {
         self.element_sort();
         self.flags()

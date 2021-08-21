@@ -37,6 +37,7 @@ pub trait VecLike:
     + AsMut<Vec<Self::VecItem>>
     + Into<Vec<Self::VecItem>>
     + From<Vec<Self::VecItem>>
+    + Extend<Self::VecItem>
     + IntoIterator
     + std::iter::FromIterator<Self::VecItem>
 where
@@ -371,6 +372,12 @@ macro_rules! impl_veclike_field {
         impl$(<$($generics)*>)? From<$Type> for Vec<$VecItem> {
             fn from(t: $Type) -> Self {
                 t.$field.into()
+            }
+        }
+
+        impl$(<$($generics)*>)? Extend<$VecItem> for $Type {
+            fn extend<I:IntoIterator<Item = $VecItem>>(&mut self, iter: I) {
+                self.as_inner_mut().extend(iter)
             }
         }
 
