@@ -279,7 +279,7 @@ pub trait Polytope:
         let mut vertices = Vec::new();
         let mut vertex_hash = HashSet::new();
 
-        assert!(self.abs().sorted);
+        assert!(self.abs().sorted());
 
         loop {
             // Applies 0-changes up to (rank-1)-changes in order.
@@ -323,13 +323,16 @@ pub trait Polytope:
     /// Sorts the subelements and superelements of the entire polytope. This is
     /// usually called before iterating over the flags of the polytope.
     fn element_sort(&mut self) {
-        if !self.abs().sorted {
+        if !self.abs().sorted() {
             // Safety: changing the order of the indices in an element does not
             // change whether the polytope is valid.
             unsafe { self.ranks_mut().element_sort() }
         }
 
-        self.abs_mut().sorted = true;
+        // Safety: we literally just sorted the elements.
+        unsafe {
+            self.abs_mut().set_sorted();
+        }
     }
 
     /// Returns an instance of the

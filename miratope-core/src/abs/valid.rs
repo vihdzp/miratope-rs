@@ -1,6 +1,8 @@
 //! Contains the code that verifies whether a set of [`Ranks`] correspond to a
 //! valid [`Abstract`] polytope.
 
+// TODO: finish these!
+
 use std::collections::HashMap;
 
 use strum_macros::Display;

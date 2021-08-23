@@ -540,27 +540,6 @@ impl AbstractBuilder {
         self.push(SubelementList::vertices(vertex_count))
     }
 
-    /// Clears the superelements of the upper rank.
-    ///
-    /// This is an inner auxiliary method and should not be made public, as it's
-    /// a no-op assuming the invariant holds.
-    fn clear_sups(&mut self) {
-        for el in self.0.last_mut().unwrap() {
-            el.sups.clear();
-        }
-    }
-
-    /// Pops the elements of the first `n` ranks.
-    pub fn pop_repeat(&mut self, n: usize) {
-        for _ in 0..n {
-            self.0.pop();
-        }
-
-        if n != 0 {
-            self.clear_sups();
-        }
-    }
-
     /// Returns the built polytope, consuming the builder in the process.
     ///
     /// # Safety
@@ -665,16 +644,12 @@ impl ElementHash {
     pub fn to_polytope(&self, poly: &Abstract) -> Abstract {
         // TODO: use an AbstractBuilder instead, probably.
         let rank = self.rank();
-        let mut abs = Abstract::new();
+        let mut abs = Ranks::with_rank_capacity(poly.rank());
 
         // For every rank stored in the element map.
         for r in 0..=rank {
-            let mut elements = ElementList::new();
             let hash = &self.0[r];
-
-            for _ in 0..hash.len() {
-                elements.push(Element::new());
-            }
+            let mut elements: ElementList = iter::repeat(Element::new()).take(hash.len()).collect();
 
             // For every element of rank r in the hash element list.
             for (&idx, &new_idx) in hash {
@@ -682,37 +657,37 @@ impl ElementHash {
                 // and use the hash map to get its sub and superelements in the
                 // new polytope.
                 let el = &poly[(r, idx)];
-                let mut new_el = Element::new();
 
                 // Gets the subelements.
+                let mut subs = Subelements::new();
                 if r >= 1 {
                     if let Some(prev_hash) = self.get(r - 1) {
                         for sub in &el.subs {
                             if let Some(&new_sub) = prev_hash.get(sub) {
-                                new_el.subs.push(new_sub);
+                                subs.push(new_sub);
                             }
                         }
                     }
                 }
 
-                // Gets the superelements.
+                // Gets the superelements. (do I really need to do this?)
+                let mut sups = Superelements::new();
                 if let Some(next_hash) = self.get(r + 1) {
                     for sup in &el.sups {
                         if let Some(&new_sup) = next_hash.get(sup) {
-                            new_el.sups.push(new_sup);
+                            sups.push(new_sup);
                         }
                     }
                 }
 
-                elements[new_idx] = new_el;
+                elements[new_idx] = Element { subs, sups };
             }
 
-            unsafe {
-                abs.ranks_mut().push(elements);
-            }
+            abs.push(elements);
         }
 
-        abs
+        // Safety: TODO document
+        unsafe { Abstract::from_ranks(abs) }
     }
 }
 

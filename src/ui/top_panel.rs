@@ -303,7 +303,7 @@ pub fn show_top_panel(
                 /// reload.
                 macro_rules! element_sort {
                     ($p:ident) => {
-                        if !$p.abs().sorted {
+                        if !$p.abs().sorted() {
                             $p.element_sort();
                         }
                     };

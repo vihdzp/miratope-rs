@@ -21,7 +21,7 @@ use vec_like::*;
 /// considered a serious bug.
 fn assert_sorted(p: &Abstract) {
     debug_assert!(
-        p.sorted,
+        p.sorted(),
         "a polytope's elements must be sorted before iterating over its flags"
     )
 }

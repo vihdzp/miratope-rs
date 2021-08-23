@@ -21,22 +21,45 @@ pub use elements::*;
 pub use product::*;
 pub use valid::*;
 
-/*
 /// Contains some metadata about how a polytope has been built up, which can
 /// then be used by methods on polytopes to avoid expensive recomputations.
 ///
 /// This struct is not stable, and its fields are subject to change as we see
 /// fit.
+#[derive(Clone, Copy, Debug)]
 pub struct Metadata {
     /// Whether every single element's subelements and superelements are sorted
     /// by index. This is a necessary condition for the methods that iterate
     /// over flags.
     sorted: bool,
 }
-*/
+
+impl Default for Metadata {
+    fn default() -> Self {
+        Self { sorted: false }
+    }
+}
+
+impl Metadata {
+    /// Resets the metadata to its default state.
+    pub fn reset(&mut self) {
+        *self = Default::default();
+    }
+}
 
 /// Encodes the ranked poset corresponding to an abstract polytope. Contains
 /// both a `Vec` of [`ElementLists`](ElementList), and some metadata about it.
+///
+/// # Inner representation
+/// An `Abstract` wraps around a list of [`Ranks`], which themselves wrap around
+/// a `Vec<ElementList>`. Elements of rank *r* are stored as the *r*-th list.
+///
+/// An [`ElementList`] wraps around a `Vec` of [`Elements`](Element). Every
+/// element stores the indices of the incident [`Subelements`] of the previous
+/// rank, as well as the [`Superelements`] of the next rank.
+///
+/// The other attribute of the struct is its [`Metadata`], which just caches
+/// the results of expensive computations.
 ///
 /// # Definition
 /// Mathematically, an abstract polytope is a certain kind of **partially
@@ -71,32 +94,6 @@ pub struct Metadata {
 /// For more info, see [Wikipedia](https://en.wikipedia.org/wiki/Abstract_polytope)
 /// or the [Polytope Wiki](https://polytope.miraheze.org/wiki/Abstract_polytope).
 ///
-/// # Inner representation
-/// An `Abstract` wraps around a list of [`Ranks`], which themselves wrap around
-/// a `Vec<ElementList>`. Elements of rank *r* are stored as the *r*-th list.
-///
-/// An [`ElementList`] wraps around a `Vec` of [`Elements`](Element). Every
-/// element stores the indices of the incident [`Subelements`] of the previous
-/// rank, as well as the [`Superelements`] of the next rank.
-///
-/// The other attribute of the struct is its [`Metadata`], which just caches
-/// the results of expensive computations.
-///
-/// # How to use
-/// The fact that we store both subelements and superelements is quite useful
-/// for many algorithms. However, it becomes inconvenient when actually building
-/// a polytope, since most of the time, we can only easily generate one of them.
-///
-/// To get around this, we provide an [`AbstractBuilder`] struct. Instead of
-/// manually setting the superelements in the polytope, one can provide a
-/// [`SubelementList`]. The associated methods to the struct will automatically
-/// set the superelements of the polytope.
-///
-/// If you wish to only set some of the subelements, we provide a
-/// [`Abstract::push_subs`] method, which will push a list of subelements and
-/// automatically set the superelements of the previous rank, under the
-/// assumption that they're empty.
-///
 /// # An invariant
 /// Every method you call on an `Abstract` must be able to assume that its input
 /// is a valid polytope. Furthermore, every single method that returns an
@@ -105,13 +102,25 @@ pub struct Metadata {
 ///
 /// This restriction allows us to properly optimize these methods without
 /// worrying about invalid cases.
-#[derive(Debug, Default, Clone)]
+///
+/// Another thing: the metadata must match the polytope it describes.
+///
+/// # How to use
+/// There are two main ways to build a new `Abstract`. The simplest is via the
+/// [`AbstractBuilder`] struct, which allows one to build a polytope layer by
+/// layer by providing only the [`SubelementLists`](SubelementList) of each
+/// rank. Superelements will be set automatically.
+///
+/// The other way is to build up the `Ranks` manually and convert them into an
+/// `Abstract` via [`Abstract::from_ranks`], although this is much harder and
+/// quite prone to mistakes.
+#[derive(Debug, Clone)]
 pub struct Abstract {
     /// The list of element lists in the polytope.
     ranks: Ranks,
 
-    /// Whether every single element's subelements and superelements are sorted.
-    pub sorted: bool,
+    /// Some metadata about the [`Ranks`].
+    meta: Metadata,
 }
 
 impl From<Abstract> for Ranks {
@@ -154,11 +163,6 @@ impl<T: Polytope> Ranked for T {
 }
 
 impl Abstract {
-    /// Initializes a new polytope.
-    pub fn new() -> Self {
-        Default::default()
-    }
-
     /// Initializes a new polytope from a list of [`Ranks`].
     ///
     /// # Safety
@@ -168,17 +172,35 @@ impl Abstract {
     pub unsafe fn from_ranks(ranks: Ranks) -> Self {
         Self {
             ranks,
-            sorted: false,
+            meta: Default::default(),
         }
     }
 
-    /// Returns a mutable reference to the [`Ranks`] of the polytope.
+    /// Returns a mutable reference to the [`Ranks`] of the polytope. As a side
+    /// effect, this will reset the polytope's metadata.
     ///
     /// # Safety
     /// The user must certify that any modification done to the polytope
     /// ultimately results in a valid [`Abstract`].
     pub unsafe fn ranks_mut(&mut self) -> &mut Ranks {
+        self.meta.reset();
         &mut self.ranks
+    }
+
+    /// Returns whether the indices of all the subelements and superelements are
+    /// sorted. Gets this from the polytope's metadata.
+    pub fn sorted(&self) -> bool {
+        self.meta.sorted
+    }
+
+    /// Sets the metadata of the polytope to be sorted.
+    ///
+    /// # Safety
+    /// All of the indices of all of the subelements and superelements of the
+    /// polytope must be sorted. Setting this flag incorrectly will cause
+    /// algorithms to behave unpredictably.
+    pub unsafe fn set_sorted(&mut self) {
+        self.meta.sorted = true;
     }
 
     /// Returns an iterator over the [`ElementLists`](ElementList) of each rank.
@@ -502,9 +524,11 @@ impl Polytope for Abstract {
     /// [nullitope](https://polytope.miraheze.org/wiki/Nullitope), the unique
     /// polytope of rank &minus;1.
     fn nullitope() -> Self {
-        Self {
-            ranks: Ranks::from_inner(vec![ElementList::min(0)]),
-            sorted: true,
+        // Safety: the nullitope is a valid polytope, and its indices are sorted.
+        unsafe {
+            let mut poly = Self::from_ranks(vec![ElementList::min(0)].into());
+            poly.set_sorted();
+            poly
         }
     }
 
@@ -512,9 +536,11 @@ impl Polytope for Abstract {
     /// [point](https://polytope.miraheze.org/wiki/Point), the unique polytope
     /// of rank 0.
     fn point() -> Self {
-        Self {
-            ranks: Ranks::from_inner(vec![ElementList::min(1), ElementList::max(1)]),
-            sorted: true,
+        // Safety: the point is a valid polytope, and its indices are sorted.
+        unsafe {
+            let mut poly = Self::from_ranks(vec![ElementList::min(1), ElementList::max(1)].into());
+            poly.set_sorted();
+            poly
         }
     }
 
@@ -522,16 +548,17 @@ impl Polytope for Abstract {
     /// [dyad](https://polytope.miraheze.org/wiki/Dyad), the unique polytope of
     /// rank 1.
     fn dyad() -> Self {
-        let mut abs = AbstractBuilder::with_rank_capacity(2);
-        abs.push_min();
-        abs.push_vertices(2);
-        abs.push_max();
+        let mut builder = AbstractBuilder::with_rank_capacity(2);
+        builder.push_min();
+        builder.push_vertices(2);
+        builder.push_max();
 
-        // Safety: this is merely a dyad, which is trivially verified to be a
-        // valid polytope.
-        let mut abs = unsafe { abs.build() };
-        abs.sorted = true;
-        abs
+        // Safety: the dyad is a valid polytope, and its indices are sorted.
+        unsafe {
+            let mut abs = builder.build();
+            abs.set_sorted();
+            abs
+        }
     }
 
     /// Returns an instance of a [polygon](https://polytope.miraheze.org/wiki/Polygon)
@@ -552,14 +579,15 @@ impl Polytope for Abstract {
         builder.push(edges);
         builder.push_max();
 
-        // Safety: this is just a polygon, which is a valid abstract polytope.
-        let mut poly = unsafe { builder.build() };
-        poly.sorted = true;
-        poly
+        // Safety: a polygon is a valid polytope, and its indices are sorted.
+        unsafe {
+            let mut abs = builder.build();
+            abs.set_sorted();
+            abs
+        }
     }
 
-    /// Converts a polytope into its dual. Use [`Self::dual`] instead, as this method
-    /// can never fail.
+    /// Converts a polytope into its dual.
     fn try_dual(&self) -> Result<Self, Self::DualError> {
         let mut clone = self.clone();
         clone.dual_mut();
@@ -572,9 +600,17 @@ impl Polytope for Abstract {
         // Safety: we'll swap the subelements and superelements in each element,
         // then reverse the ranks, thus building the dual, which is a valid
         // abstract polytope.
+        let sorted = self.sorted();
         let ranks = unsafe { self.ranks_mut() };
         ranks.for_each_element_mut(Element::swap_mut);
         ranks.reverse();
+
+        // Safety: if the original elements were sorted, so will these be.
+        if sorted {
+            unsafe {
+                self.set_sorted();
+            }
+        }
 
         Ok(())
     }
@@ -635,24 +671,38 @@ impl Polytope for Abstract {
             faces.push(face.into_iter().collect());
         }
 
-        let mut builder = AbstractBuilder::from(std::mem::take(self).ranks);
+        // Safety: TODO we need to define the safety guarantees of this function.
+        let ranks = unsafe { self.ranks_mut() };
 
         // Removes the faces and maximal polytope from self.
-        builder.pop_repeat(2);
+        ranks.pop();
+        ranks.pop();
 
         // Pushes the new faces and a new maximal element.
-        builder.push(faces);
-        builder.push_max();
-
-        // Checks for dyadicity, since that sometimes fails.
-        let dyadic = builder.ranks().is_dyadic().is_ok();
-        if dyadic {
-            // Safety: dyadicity holds, and the other properties are trivially
-            // verified.
-            *self = unsafe { builder.build() };
+        for el in &mut ranks[2] {
+            el.sups.clear();
         }
 
-        dyadic
+        let face_count = faces.len();
+        let mut new_faces = ElementList::with_capacity(face_count);
+        for (idx, face) in faces.into_iter().enumerate() {
+            for &sub in &face {
+                ranks[(2, sub)].sups.push(idx);
+            }
+
+            new_faces.push(Element {
+                sups: vec![0].into(),
+                subs: face,
+            });
+        }
+
+        ranks.push(new_faces);
+        ranks.push(ElementList::max(face_count));
+
+        // Checks for dyadicity, since that sometimes fails.
+        ranks.ranks().is_dyadic().is_ok()
+
+        // TODO MAKE THIS SOUND!
     }
 
     fn petrie_polygon_with(&mut self, flag: Flag) -> Option<Self> {
