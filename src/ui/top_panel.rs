@@ -10,7 +10,7 @@ use bevy_egui::{
     egui::{self, menu, Ui},
     EguiContext,
 };
-use miratope_core::{abs::Ranked, conc::ConcretePolytope, file::FromFile, Polytope};
+use miratope_core::{conc::ConcretePolytope, file::FromFile, Polytope};
 use miratope_lang::SelectedLanguage;
 use rfd::FileDialog;
 use strum::IntoEnumIterator;
@@ -298,13 +298,13 @@ pub fn show_top_panel(
 
             // Anything related to the polytope on screen.
             menu::menu(ui, "Polytope", |ui| {
-                /// Sorts the elements of a polytope. This will only take the polytope as
-                /// mutable if necessary, thus avoiding a potential reload.
+                /// Sorts the elements of a polytope. This will only take the
+                ///  polytope as mutable if necessary, thus avoiding a potential
+                /// reload.
                 macro_rules! element_sort {
                     ($p:ident) => {
                         if !$p.abs().sorted {
-                            $p.ranks_mut().element_sort();
-                            $p.abs_mut().sorted = true;
+                            $p.element_sort();
                         }
                     };
                 }

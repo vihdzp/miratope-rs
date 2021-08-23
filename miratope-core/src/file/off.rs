@@ -461,7 +461,9 @@ impl<'a> OffReader<'a> {
         }
 
         // Builds the concrete polytope.
-        Ok(Concrete::new(vertices, self.abs.build()))
+
+        // Safety: TODO this isn't actually safe. We need to do some checking.
+        Ok(Concrete::new(vertices, unsafe { self.abs.build() }))
     }
 }
 

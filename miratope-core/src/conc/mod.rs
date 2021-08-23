@@ -1158,12 +1158,14 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
         }
 
         // Builds the polytope.
+        // TODO: no need for ranks, just use the builder directly.
         let mut abs = AbstractBuilder::new();
         for subelements in ranks {
             abs.push(subelements);
         }
 
-        Self::new(vertices, abs.build())
+        // Safety: TODO shit, this one's complicated... I'll come back to it.
+        Self::new(vertices, unsafe { abs.build() })
     }
 
     fn truncate(&self, truncate_type: Vec<usize>, depth: Vec<T>) -> Self {

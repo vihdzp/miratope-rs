@@ -255,16 +255,25 @@ impl IndexMut<(usize, usize)> for Ranks {
 /// Furthermore, none of these methods may assume that it's being called on a
 /// valid polytope, though they may panic under certain conditions.
 pub trait Ranked:
-    Sized + IndexMut<usize, Output = ElementList> + IndexMut<(usize, usize), Output = Element>
+    Sized + Index<usize, Output = ElementList> + Index<(usize, usize), Output = Element>
 {
     /// Returns a reference to the ranks.
     fn ranks(&self) -> &Ranks;
 
-    /// Returns a mutable reference to the ranks.
-    fn ranks_mut(&mut self) -> &mut Ranks;
-
     /// Returns the ranks.
     fn into_ranks(self) -> Ranks;
+
+    /// Asserts that `self` is a valid abstract polytope.
+    fn assert_valid(&self) {
+        self.ranks().is_valid().unwrap();
+    }
+
+    /// Asserts that `self` is a valid abstract polytope in debug mode.
+    fn debug_assert_valid(&self) {
+        if cfg!(debug_assertions) {
+            self.assert_valid();
+        }
+    }
 
     /// Returns the rank of the structure, i.e. the length of the `Ranks` minus
     /// one.
@@ -295,11 +304,6 @@ pub trait Ranked:
     /// Gets a reference to the element list of a given rank.
     fn get_element_list(&self, rank: usize) -> Option<&ElementList> {
         self.ranks().get(rank)
-    }
-
-    /// Gets a mutable reference to the element list of a given rank.
-    fn get_element_list_mut(&mut self, rank: usize) -> Option<&mut ElementList> {
-        self.ranks_mut().get_mut(rank)
     }
 
     /// Returns a reference to the minimal element of the polytope.
@@ -367,10 +371,6 @@ impl Ranked for Ranks {
         self
     }
 
-    fn ranks_mut(&mut self) -> &mut Ranks {
-        self
-    }
-
     fn into_ranks(self) -> Ranks {
         self
     }
@@ -403,13 +403,12 @@ impl Ranks {
     /// Returns a mutable reference to an element of the polytope. To actually get the
     /// entire polytope it defines, use [`element`](Self::element).
     pub fn get_element_mut(&mut self, rank: usize, idx: usize) -> Option<&mut Element> {
-        self.ranks_mut().get_mut(rank)?.get_mut(idx)
+        self.get_mut(rank)?.get_mut(idx)
     }
 
     /// Returns a mutable iterator over the elements.
     pub fn element_iter_mut(&mut self) -> ElementIterMut<'_> {
-        self.ranks_mut()
-            .iter_mut()
+        self.iter_mut()
             .map(ElementList::iter_mut as IterMutFn)
             .flatten()
     }
@@ -421,7 +420,7 @@ impl Ranks {
         f(self.min_mut());
 
         if rank != 0 {
-            for elements in self.ranks_mut().iter_mut().skip(1).take(rank - 1) {
+            for elements in self.iter_mut().skip(1).take(rank - 1) {
                 elements.par_iter_mut().for_each(&f);
             }
 
@@ -460,6 +459,11 @@ impl AbstractBuilder {
     /// Initializes a new empty abstract builder.
     pub fn new() -> Self {
         Default::default()
+    }
+
+    /// Returns a reference to the [`Ranks`].
+    pub fn ranks(&self) -> &Ranks {
+        &self.0
     }
 
     /// Initializes a new empty abstract builder with a capacity to store
@@ -559,10 +563,11 @@ impl AbstractBuilder {
 
     /// Returns the built polytope, consuming the builder in the process.
     ///
+    /// # Safety
     /// By calling this method, you're asserting that whatever you've built is
     /// a valid [`Abstract`] polytope.
-    pub fn build(self) -> Abstract {
-        self.0.into()
+    pub unsafe fn build(self) -> Abstract {
+        Abstract::from_ranks(self.0)
     }
 }
 
@@ -658,8 +663,9 @@ impl ElementHash {
 
     /// Gets the indices of the vertices of a given element in a polytope.
     pub fn to_polytope(&self, poly: &Abstract) -> Abstract {
+        // TODO: use an AbstractBuilder instead, probably.
         let rank = self.rank();
-        let mut abs = Abstract::with_rank_capacity(rank);
+        let mut abs = Abstract::new();
 
         // For every rank stored in the element map.
         for r in 0..=rank {
@@ -701,7 +707,9 @@ impl ElementHash {
                 elements[new_idx] = new_el;
             }
 
-            abs.push(elements);
+            unsafe {
+                abs.ranks_mut().push(elements);
+            }
         }
 
         abs

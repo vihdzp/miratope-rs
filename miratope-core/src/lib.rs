@@ -212,20 +212,6 @@ fn factorial(n: usize) -> u32 {
     FACTORIALS[n]
 }
 
-impl<T: Polytope> Ranked for T {
-    fn ranks(&self) -> &Ranks {
-        &self.abs().ranks
-    }
-
-    fn ranks_mut(&mut self) -> &mut Ranks {
-        &mut self.abs_mut().ranks
-    }
-
-    fn into_ranks(self) -> Ranks {
-        self.into_abs().ranks
-    }
-}
-
 /// The trait for methods common to all polytopes.
 pub trait Polytope:
     Clone + IndexMut<usize, Output = ElementList> + IndexMut<(usize, usize), Output = Element>
@@ -238,6 +224,15 @@ pub trait Polytope:
 
     /// Returns a mutable reference to the underlying abstract polytope.
     fn abs_mut(&mut self) -> &mut Abstract;
+
+    /// Returns a mutable reference to the [`Ranks`] of the polytope.
+    ///
+    /// # Safety
+    /// The user must certify that any modification done to the polytope
+    /// ultimately results in a valid [`Abstract`].
+    unsafe fn ranks_mut(&mut self) -> &mut Ranks {
+        self.abs_mut().ranks_mut()
+    }
 
     /// Returns the underlying abstract polytope.
     fn into_abs(self) -> Abstract;
@@ -329,7 +324,9 @@ pub trait Polytope:
     /// usually called before iterating over the flags of the polytope.
     fn element_sort(&mut self) {
         if !self.abs().sorted {
-            self.ranks_mut().element_sort()
+            // Safety: changing the order of the indices in an element does not
+            // change whether the polytope is valid.
+            unsafe { self.ranks_mut().element_sort() }
         }
 
         self.abs_mut().sorted = true;

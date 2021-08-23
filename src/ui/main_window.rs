@@ -6,7 +6,7 @@ use crate::NamedConcrete;
 
 use bevy::prelude::*;
 use bevy_egui::EguiSettings;
-use miratope_core::Polytope;
+use miratope_core::abs::Ranked;
 use miratope_lang::SelectedLanguage;
 
 /// The plugin in charge of the Miratope main window, and of drawing the
@@ -59,10 +59,8 @@ pub fn update_changed_polytopes(
     orthogonal: Res<'_, ProjectionType>,
 ) {
     for (poly, mesh_handle, children) in polies.iter() {
-        if cfg!(debug_assertions) {
-            println!("Polytope updated");
-            poly.abs().is_valid().unwrap();
-        }
+        println!("Polytope updated");
+        poly.debug_assert_valid();
 
         *meshes.get_mut(mesh_handle).unwrap() = poly.mesh(*orthogonal);
 

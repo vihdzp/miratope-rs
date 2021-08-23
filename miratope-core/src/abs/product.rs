@@ -197,6 +197,10 @@ impl Abstract {
         }
 
         // TODO: If `p` and `q` are sorted, this should be too?
-        builder.build()
+
+        // Safety: we've built one of the four products on polytopes. For a
+        // proof that these constructions yield valid abstract polytopes, see
+        // [TODO: write proof].
+        unsafe { builder.build() }
     }
 }
