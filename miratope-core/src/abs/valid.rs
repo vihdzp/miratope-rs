@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use strum_macros::Display;
 use vec_like::VecLike;
 
-use super::{Ranked, Ranks, SectionRef};
+use super::{Ranked, Ranks, Section};
 
 /// Represents the way in which two elements with one rank of difference are
 /// incident to one another. Used as a field in some [`AbstractError`] variants.
@@ -77,7 +77,7 @@ pub enum AbstractError {
     /// exactly 4 elements.
     Dyadic {
         /// The coordinates of the section at fault.
-        section: SectionRef,
+        section: Section,
 
         /// Whether there were more than 4 elements in the section (or less).
         more: bool,
@@ -85,7 +85,7 @@ pub enum AbstractError {
 
     /// The polytope is not strictly connected, i.e. some section's flags don't
     /// form a connected graph under flag changes.
-    Connected(SectionRef),
+    Connected(Section),
 }
 
 impl std::fmt::Display for AbstractError {
@@ -292,7 +292,7 @@ impl Ranks {
                             // Found for the third time?! Abort!
                             Some(Count::Twice) => {
                                 return Err(AbstractError::Dyadic {
-                                    section: SectionRef::new(r - 2, sub_sub, r, idx),
+                                    section: Section::new(r - 2, sub_sub, r, idx),
                                     more: true,
                                 });
                             }
@@ -305,7 +305,7 @@ impl Ranks {
                 for (sub_sub, count) in hash_sub_subs.into_iter() {
                     if count == Count::Once {
                         return Err(AbstractError::Dyadic {
-                            section: SectionRef::new(r - 2, sub_sub, r, idx),
+                            section: Section::new(r - 2, sub_sub, r, idx),
                             more: false,
                         });
                     }
@@ -318,7 +318,7 @@ impl Ranks {
 
     /// Determines whether the polytope is connected. A valid non-compound
     /// polytope should always return `true`.
-    pub fn is_connected(&self, _section: SectionRef) -> bool {
+    pub fn is_connected(&self, _section: Section) -> bool {
         todo!()
         /*
         let section = self.get_section(section).unwrap();

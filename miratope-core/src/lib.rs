@@ -23,6 +23,7 @@
 
 pub mod abs;
 pub mod conc;
+pub mod cox;
 pub mod file;
 pub mod geometry;
 pub mod group;
@@ -30,7 +31,7 @@ pub mod group;
 use std::{collections::HashSet, error::Error, iter, ops::IndexMut};
 
 use abs::{
-    elements::{Ranks, SectionRef},
+    elements::Ranks,
     flag::{Flag, FlagIter, OrientedFlag, OrientedFlagIter},
     Abstract, Element, ElementList, ElementMap, Ranked,
 };
@@ -398,9 +399,15 @@ pub trait Polytope:
     /// Gets the section defined by two elements with given ranks and indices as
     /// a polytope, or returns `None` in case no section is defined by these
     /// elements.
-    fn section(&self, section: SectionRef) -> Result<Option<Self>, Self::DualError> {
-        if let Some(el) = self.element(section.hi_rank, section.hi_idx) {
-            el.element_fig(section.lo_rank, section.lo_idx)
+    fn section(
+        &self,
+        lo_rank: usize,
+        lo_idx: usize,
+        hi_rank: usize,
+        hi_idx: usize,
+    ) -> Result<Option<Self>, Self::DualError> {
+        if let Some(el) = self.element(hi_rank, hi_idx) {
+            el.element_fig(lo_rank, lo_idx)
         } else {
             Ok(None)
         }

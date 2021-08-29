@@ -3,7 +3,7 @@
 
 use std::{
     collections::HashMap,
-    iter::{self, IntoIterator},
+    iter::{self, FromIterator, IntoIterator},
     ops::{Index, IndexMut},
     slice, vec,
 };
@@ -175,7 +175,7 @@ impl ElementList {
 /// rank.
 ///
 /// Internally, this is just a wrapper around a `Vec<Subelements>`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(transparent)]
 pub struct SubelementList(Vec<Subelements>);
 impl_veclike!(SubelementList, Item = Subelements);
@@ -467,6 +467,12 @@ impl AbstractBuilder {
     }
 
     /// Initializes a new empty abstract builder with a capacity to store
+    /// a specified amount of elements.
+    fn with_capacity(rank: usize) -> Self {
+        Self(Ranks::with_capacity(rank))
+    }
+
+    /// Initializes a new empty abstract builder with a capacity to store
     /// elements up and until a given [`Rank`].
     pub fn with_rank_capacity(rank: usize) -> Self {
         Self(Ranks::with_rank_capacity(rank))
@@ -566,6 +572,15 @@ impl Extend<SubelementList> for AbstractBuilder {
         for subelements in iter {
             self.push(subelements);
         }
+    }
+}
+
+impl FromIterator<SubelementList> for AbstractBuilder {
+    fn from_iter<T: IntoIterator<Item = SubelementList>>(iter: T) -> Self {
+        let iter = iter.into_iter();
+        let mut builder = Self::with_capacity(iter.size_hint().0);
+        builder.extend(iter);
+        builder
     }
 }
 
@@ -688,137 +703,5 @@ impl ElementHash {
 
         // Safety: TODO document
         unsafe { Abstract::from_ranks(abs) }
-    }
-}
-
-/// Represents the lowest and highest element of a section of an abstract
-/// polytope. Not to be confused with a cross-section.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct SectionRef {
-    /// The rank of the lowest element in the section.
-    pub lo_rank: usize,
-
-    /// The index of the lowest element in the section.
-    pub lo_idx: usize,
-
-    /// The rank of the highest element in the section.
-    pub hi_rank: usize,
-
-    /// The index of the highest element in the section.
-    pub hi_idx: usize,
-}
-
-impl std::fmt::Display for SectionRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "section between ({:?}) and ({:?})", self.lo(), self.hi())
-    }
-}
-
-impl SectionRef {
-    /// Initializes a new section between two elements.
-    pub fn new(lo_rank: usize, lo_idx: usize, hi_rank: usize, hi_idx: usize) -> Self {
-        Self {
-            lo_rank,
-            lo_idx,
-            hi_rank,
-            hi_idx,
-        }
-    }
-
-    /// Creates a new singleton section.
-    pub fn singleton(rank: usize, idx: usize) -> Self {
-        Self::new(rank, idx, rank, idx)
-    }
-
-    /// Creates a new section by replacing the lowest element of another.
-    pub fn with_lo(mut self, lo_rank: usize, lo_idx: usize) -> Self {
-        self.lo_rank = lo_rank;
-        self.lo_idx = lo_idx;
-        self
-    }
-
-    /// Creates a new section by replacing the highest element of another.
-    pub fn with_hi(mut self, hi_rank: usize, hi_idx: usize) -> Self {
-        self.hi_rank = hi_rank;
-        self.hi_idx = hi_idx;
-        self
-    }
-
-    /// Returns the lowest element of a section.
-    pub fn lo(self) -> (usize, usize) {
-        (self.lo_rank, self.lo_idx)
-    }
-
-    /// Returns the highest element of a section.
-    pub fn hi(self) -> (usize, usize) {
-        (self.hi_rank, self.hi_idx)
-    }
-}
-
-/// Represents a map from sections in a polytope to their indices in a new
-/// polytope (its [antiprism](Abstract::antiprism)). Exists only to make the
-/// antiprism code a bit easier to understand.
-///
-/// In practice, all of the sections we store have a common height, which means
-/// that we could save some memory by using a representation of [`SectionRef`]
-/// with three arguments instead of four. This probably isn't worth the hassle,
-/// though.
-#[derive(Default, Debug)]
-pub(crate) struct SectionHash(HashMap<SectionRef, usize>);
-
-impl IntoIterator for SectionHash {
-    type Item = (SectionRef, usize);
-
-    type IntoIter = std::collections::hash_map::IntoIter<SectionRef, usize>;
-
-    /// Returns an iterator over the stored section index pairs.
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl SectionHash {
-    /// Initializes a new section hash.
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    /// Returns the number of stored elements.
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Returns all singleton sections of a polytope.
-    pub fn singletons(poly: &Abstract) -> Self {
-        let mut section_hash = Self::new();
-
-        for (rank, elements) in poly.iter().enumerate() {
-            for idx in 0..elements.len() {
-                section_hash
-                    .0
-                    .insert(SectionRef::singleton(rank, idx), section_hash.len());
-            }
-        }
-
-        section_hash
-    }
-
-    /// Gets the index of a section in the hash, inserting it if necessary.
-    pub fn get(&mut self, section: SectionRef) -> usize {
-        use std::collections::hash_map::Entry;
-
-        let len = self.len();
-
-        // We organize by lowest rank, then by hash.
-        match self.0.entry(section) {
-            // Directly returns the index of the section.
-            Entry::Occupied(idx) => *idx.get(),
-
-            // Adds the section, increases the length by 1, then returns its index.
-            Entry::Vacant(entry) => {
-                entry.insert(len);
-                len
-            }
-        }
     }
 }

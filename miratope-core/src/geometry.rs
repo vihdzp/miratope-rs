@@ -20,7 +20,7 @@ use std::{
 use crate::Float;
 
 use approx::{abs_diff_eq, abs_diff_ne};
-use nalgebra::{storage::StorageMut, Dim, Dynamic, VecStorage, U1};
+use nalgebra::{allocator::Allocator, DefaultAllocator, Dim, Dynamic, OMatrix, U1};
 
 /// A hypersphere with a certain center and radius.
 ///
@@ -76,13 +76,9 @@ impl<T: Float> Hypersphere<T> {
             return false;
         }
 
-        // Rescales q.
         q /= s;
         q *= self.squared_radius;
-
-        // Recenters q.
         *p = q + &self.center;
-
         true
     }
 
@@ -335,9 +331,6 @@ impl<'a, T: Float> Segment<'a, T> {
     }
 }
 
-/// A matrix with a given number of rows and columns.
-type MatrixMxN<T, R, C> = nalgebra::Matrix<T, R, C, VecStorage<T, R, C>>;
-
 /// A matrix ordered by fuzzy lexicographic ordering. That is, lexicographic
 /// ordering where two entries that differ by less than an epsilon are
 /// considered equal.
@@ -345,21 +338,22 @@ type MatrixMxN<T, R, C> = nalgebra::Matrix<T, R, C, VecStorage<T, R, C>>;
 /// This struct can be used to build a `BTreeSet` of points or matrices in a way
 /// that's resistant to floating point errors.
 #[derive(Clone, Debug)]
-pub struct MatrixOrdMxN<T: Float, R: Dim, C: Dim>(pub MatrixMxN<T, R, C>)
+#[repr(transparent)]
+pub struct MatrixOrdMxN<T: Float, R: Dim, C: Dim>(pub OMatrix<T, R, C>)
 where
-    VecStorage<T, R, C>: StorageMut<T, R, C>;
+    DefaultAllocator: Allocator<T, R, C>;
 
 impl<T: Float, R: Dim, C: Dim> MatrixOrdMxN<T, R, C>
 where
-    VecStorage<T, R, C>: StorageMut<T, R, C>,
+    DefaultAllocator: Allocator<T, R, C>,
 {
     /// Initializes a new `MatrixOrd` from a `Matrix`.
-    pub fn new(mat: MatrixMxN<T, R, C>) -> Self {
+    pub fn new(mat: OMatrix<T, R, C>) -> Self {
         Self(mat)
     }
 
     /// Returns a reference to the inner matrix.
-    pub fn matrix(&self) -> &MatrixMxN<T, R, C> {
+    pub fn matrix(&self) -> &OMatrix<T, R, C> {
         &self.0
     }
 
@@ -381,7 +375,7 @@ where
 
 impl<T: Float, R: Dim, C: Dim> PartialEq for MatrixOrdMxN<T, R, C>
 where
-    VecStorage<T, R, C>: StorageMut<T, R, C>,
+    DefaultAllocator: Allocator<T, R, C>,
 {
     fn eq(&self, other: &Self) -> bool {
         debug_assert_eq!(self.shape(), other.shape(), "Matrix shape mismatch");
@@ -394,13 +388,13 @@ where
 /// Equality on `MatrixOrds` should be an equality relation, as long as the
 /// distance between the `MatrixOrds` you're comparing is "small".
 impl<T: Float, R: Dim, C: Dim> Eq for MatrixOrdMxN<T, R, C> where
-    VecStorage<T, R, C>: StorageMut<T, R, C>
+    DefaultAllocator: Allocator<T, R, C>
 {
 }
 
 impl<T: Float, R: Dim, C: Dim> PartialOrd for MatrixOrdMxN<T, R, C>
 where
-    VecStorage<T, R, C>: StorageMut<T, R, C>,
+    DefaultAllocator: Allocator<T, R, C>,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         for (x, y) in self.iter().zip(other.iter()) {
@@ -415,7 +409,7 @@ where
 
 impl<T: Float, R: Dim, C: Dim> Ord for MatrixOrdMxN<T, R, C>
 where
-    VecStorage<T, R, C>: StorageMut<T, R, C>,
+    DefaultAllocator: Allocator<T, R, C>,
 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other).expect("Matrix has NaN values")
@@ -424,7 +418,7 @@ where
 
 impl<T: Float, R: Dim, C: Dim> Index<(usize, usize)> for MatrixOrdMxN<T, R, C>
 where
-    VecStorage<T, R, C>: StorageMut<T, R, C>,
+    DefaultAllocator: Allocator<T, R, C>,
 {
     type Output = T;
 
@@ -435,10 +429,19 @@ where
 
 impl<T: Float, R: Dim, C: Dim> IndexMut<(usize, usize)> for MatrixOrdMxN<T, R, C>
 where
-    VecStorage<T, R, C>: StorageMut<T, R, C>,
+    DefaultAllocator: Allocator<T, R, C>,
 {
     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
         &mut self.0[index]
+    }
+}
+
+impl<T: Float, R: Dim, C: Dim> From<OMatrix<T, R, C>> for MatrixOrdMxN<T, R, C>
+where
+    DefaultAllocator: Allocator<T, R, C>,
+{
+    fn from(mat: OMatrix<T, R, C>) -> Self {
+        Self(mat)
     }
 }
 
