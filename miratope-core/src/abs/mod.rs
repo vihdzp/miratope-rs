@@ -227,8 +227,8 @@ impl Abstract {
     /// Returns the omnitruncate of a polytope, along with the flags that make
     /// up its respective vertices.
     ///
-    /// # Panics
-    /// This method will panic if the polytope isn't sorted.
+    /// # Safety
+    /// You must call [`Polytope::element_sort`] before calling this method.
     pub fn omnitruncate_and_flags(&self) -> (Self, Vec<Flag>) {
         let mut flag_sets = vec![FlagSet::new_all(self)];
         let mut new_flag_sets = Vec::new();
@@ -302,7 +302,10 @@ impl Abstract {
     }
 
     /// Returns an arbitrary truncate as an abstract polytope.
-    pub fn truncate_abs(&self, truncate_type: Vec<usize>) -> (Self, Vec<Vec<usize>>) {
+    ///
+    /// # Panics
+    /// You must call [`Polytope::element_sort`] before calling this method.
+    pub fn truncate_and_flags(&self, truncate_type: Vec<usize>) -> (Self, Vec<Vec<usize>>) {
         let omni_and_flags = self.omnitruncate_and_flags();
         let omni = omni_and_flags.0;
         let omni_flags = omni_and_flags.1;

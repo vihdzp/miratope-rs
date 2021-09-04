@@ -16,7 +16,7 @@ authors = [
 edition = "2018"
 
 [dependencies]
-miratope-core = { path = "miratope-core", features = ["bevy_egui"] }
+miratope-core = { path = "miratope-core" }
 miratope-lang = { path = "miratope-lang" }
 vec-like = { path = "vec-like" }
 approx = "0.5"
@@ -50,13 +50,9 @@ git = "https://github.com/OfficialURL/bevy_egui/"
 branch = "bevy-main"
 
 [dependencies.egui]
-version = "0.13.0"
+version = "0.14.2"
 default-features = false
 features = ["multi_threaded"]
-
-[patch.crates-io]
-# Fixes winit issue #1779.
-winit = { git = "https://github.com/OfficialURL/winit", rev = "91591c4e94fc31b5cd3b9e0438873a97abb35a17" }
 
 [profile.release]
 lto = "thin"

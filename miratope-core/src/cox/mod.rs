@@ -26,9 +26,9 @@ use self::cd::{Cd, CdResult};
 /// corresponds to the value of the edge between the ith and jth node, or 2 if
 /// there's no such edge.
 #[derive(Clone, Debug, PartialEq)]
-pub struct CoxMatrix<T: Float>(Matrix<T>);
+pub struct Cox<T: Float>(Matrix<T>);
 
-impl<T: Float> Index<(usize, usize)> for CoxMatrix<T> {
+impl<T: Float> Index<(usize, usize)> for Cox<T> {
     type Output = T;
 
     fn index(&self, index: (usize, usize)) -> &Self::Output {
@@ -36,13 +36,13 @@ impl<T: Float> Index<(usize, usize)> for CoxMatrix<T> {
     }
 }
 
-impl<T: Float> IndexMut<(usize, usize)> for CoxMatrix<T> {
+impl<T: Float> IndexMut<(usize, usize)> for Cox<T> {
     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
         &mut self.0[index]
     }
 }
 
-impl<T: Float> CoxMatrix<T> {
+impl<T: Float> Cox<T> {
     /// Initializes a new CD matrix from a vector of nodes and a matrix.
     pub fn new(matrix: Matrix<T>) -> Self {
         Self(matrix)
@@ -51,6 +51,12 @@ impl<T: Float> CoxMatrix<T> {
     /// Returns the dimensions of the matrix.
     pub fn dim(&self) -> usize {
         self.0.nrows()
+    }
+
+    /// Links together two nodes with a given edge.
+    pub fn link(&mut self, i: usize, j: usize, edge: T) {
+        self[(i, j)] = edge;
+        self[(j, i)] = edge;
     }
 
     /// Parses a [`Cd`] and turns it into a Coxeter matrix.
@@ -100,7 +106,30 @@ impl<T: Float> CoxMatrix<T> {
     /// Returns the Coxeter matrix for the Bn group.
     pub fn b(n: usize) -> Self {
         let mut diagram = vec![T::THREE; n - 1];
-        diagram[0] = T::usize(4);
+        diagram[0] = T::FOUR;
+        Self::from_lin_diagram(&diagram)
+    }
+
+    /// Returns the Coxeter matrix for the Dn group.
+    pub fn d(n: usize) -> Self {
+        let mut cox = Self::a(n);
+        cox.link(0, 1, T::TWO);
+        cox.link(0, 2, T::THREE);
+        cox
+    }
+
+    /// Returns the Coxeter matrix for the En group.
+    pub fn e(n: usize) -> Self {
+        let mut cox = Self::a(n);
+        cox.link(0, 1, T::TWO);
+        cox.link(0, 3, T::THREE);
+        cox
+    }
+
+    /// Returns the Coxeter matrix for the Hn group.
+    pub fn h(n: usize) -> Self {
+        let mut diagram = vec![T::THREE; n];
+        diagram[0] = T::FIVE;
         Self::from_lin_diagram(&diagram)
     }
 

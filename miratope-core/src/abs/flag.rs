@@ -17,10 +17,8 @@ use crate::{
 use vec_like::*;
 
 /// Asserts that the subelements and superelements of a polytope are sorted.
-/// This runs only on debug mode, and if the assertion fails, it should be
-/// considered a serious bug.
 fn assert_sorted(p: &Abstract) {
-    debug_assert!(
+    assert!(
         p.sorted(),
         "a polytope's elements must be sorted before iterating over its flags"
     )
@@ -326,7 +324,7 @@ impl FlagChanges {
 /// either an [`OrientedFlag`], or an event that determines that a polytope is
 /// non-orientable.
 ///
-/// **All methods assume that the polytope has been [sorted](Abstract::sort)
+/// **All methods assume that the polytope has been [sorted](Abstract::element_sort)
 /// beforehand.**
 ///
 /// We store a queue of all [`Flags`](Flag) whose adjacencies need to be
@@ -389,8 +387,8 @@ impl<'a> OrientedFlagIter<'a> {
     /// Initializes a new iterator over the flag events of a polytope, starting
     /// from an arbitrary flag and applying all flag changes.
     ///
-    /// You must [sort](Abstract::sort) the polytope before calling this
-    /// method.
+    /// # Panics
+    /// You must call [`Polytope::element_sort`] before calling this method.
     pub fn new(polytope: &'a Abstract) -> Self {
         assert_sorted(polytope);
 
@@ -405,8 +403,8 @@ impl<'a> OrientedFlagIter<'a> {
     /// Initializes a new iterator over the flag events of a polytope, starting
     /// from a specified flag and applying a given set of flag changes.
     ///
-    /// You must [sort](Abstract::sort) the polytope before calling this
-    /// method.
+    /// # Panics
+    /// You must call [`Polytope::element_sort`] before calling this method.
     pub fn with_flags(
         polytope: &'a Abstract,
         flag_changes: FlagChanges,
@@ -600,7 +598,10 @@ impl Eq for FlagSet {}
 
 impl FlagSet {
     /// Creates a new flag set from any flag of the polytope, using all possible
-    /// flag changes.
+    /// flag changes.    
+    ///
+    /// # Panics
+    /// You must call [`Polytope::element_sort`] before calling this method.
     pub fn new_all(polytope: &Abstract) -> Self {
         Self::with_flags(
             polytope,
@@ -612,6 +613,9 @@ impl FlagSet {
     /// Creates a new flag set defined by all flags in a polytope that can be
     /// obtained by repeatedly applying any in a given set of flag changes to a
     /// specified flag.
+    ///
+    /// # Panics
+    /// You must call [`Polytope::element_sort`] before calling this method.
     pub fn with_flags(polytope: &Abstract, flag_changes: FlagChanges, first_flag: Flag) -> Self {
         Self {
             flags: OrientedFlagIter::with_flags(polytope, flag_changes.clone(), first_flag.into())
@@ -634,6 +638,9 @@ impl FlagSet {
 
     /// Returns the set of all flag sets obtained from this one after removing
     /// exactly one element.
+    ///
+    /// # Panics
+    /// You must call [`Polytope::element_sort`] before calling this method.
     // TODO: make into an iterator instead.
     pub fn subsets(&self, polytope: &Abstract) -> Vec<Self> {
         let mut subsets = Vec::new();

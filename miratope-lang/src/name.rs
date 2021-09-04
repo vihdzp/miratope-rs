@@ -287,7 +287,8 @@ impl Default for Quadrilateral {
 /// name as their respective variants, which will guarantee these invariants for
 /// you.
 ///
-/// For more info on concrete usage of this type, see the [`parse`] function.
+/// For more info on concrete usage of this type, see the [`Language::parse`]
+/// function.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Name<T: NameType> {
     /// A nullitope.

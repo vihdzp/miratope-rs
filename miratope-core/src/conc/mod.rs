@@ -483,7 +483,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     }
 
     /// Returns an arbitrary truncate of a polytope.
-    fn truncate(&self, truncate_type: Vec<usize>, depth: Vec<T>) -> Self;
+    fn truncate_with(&self, truncate_type: Vec<usize>, depth: Vec<T>) -> Self;
 
     /// Calculates the circumsphere of a polytope. Returns `None` if the
     /// polytope isn't circumscribable.
@@ -532,7 +532,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// measuring from a specified direction, or returns `None` in the case of
     /// the nullitope.
     fn minmax(&self, direction: &Vector<T>) -> Option<(T, T)> {
-        use itertools::{Itertools, MinMaxResult};
+        use itertools::{Itertools, MinMaxResult::*};
 
         let hyperplane = Hyperplane::new(direction.clone(), T::ZERO);
 
@@ -543,13 +543,13 @@ pub trait ConcretePolytope<T: Float>: Polytope {
             .minmax()
         {
             // The vertex vector is empty.
-            MinMaxResult::NoElements => None,
+            NoElements => None,
 
             // The single vertex gives both the minimum and maximum distance.
-            MinMaxResult::OneElement(x) => Some((x.0, x.0)),
+            OneElement(x) => Some((x.0, x.0)),
 
             // The minimum and maximum distances.
-            MinMaxResult::MinMax(x, y) => Some((x.0, y.0)),
+            MinMax(x, y) => Some((x.0, y.0)),
         }
     }
 
@@ -623,10 +623,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// This method shouldn't panic. If it does, please file a bug.
     fn try_dual_mut_with(&mut self, sphere: &Hypersphere<T>) -> Result<(), Self::DualError>;
 
-    /// Calls [`try_dual_mut_with`] and unwraps the result.
-    fn dual_mut_with(&mut self, sphere: &Hypersphere<T>) {
-        self.try_dual_mut_with(sphere).unwrap();
-    }
+    
 
     /// Returns the dual of a polytope with a given reciprocation sphere, or
     /// `None` if any facets pass through the reciprocation center.
@@ -634,14 +631,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
         let mut clone = self.clone();
         clone.try_dual_mut_with(sphere).map(|_| clone)
     }
-
-    /// Calls [`try_dual_with`] and unwraps the result.
-    fn dual_with(&self, sphere: &Hypersphere<T>) -> Self {
-        let mut clone = self.clone();
-        clone.dual_mut_with(sphere);
-        clone
-    }
-
+    
     /// Builds a pyramid with a specified apex.
     fn pyramid_with(&self, apex: Point<T>) -> Self;
 
@@ -1168,8 +1158,8 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
         Self::new(vertices, unsafe { abs.build() })
     }
 
-    fn truncate(&self, truncate_type: Vec<usize>, depth: Vec<T>) -> Self {
-        let (abs, subflags) = self.abs().truncate_abs(truncate_type.clone());
+    fn truncate_with(&self, truncate_type: Vec<usize>, depth: Vec<T>) -> Self {
+        let (abs, subflags) = self.abs().truncate_and_flags(truncate_type.clone());
         let element_vertices = self.avg_vertex_map();
 
         let mut vertex_coords = Vec::<Point<T>>::new();

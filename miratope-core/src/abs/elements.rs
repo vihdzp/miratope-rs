@@ -296,7 +296,7 @@ pub trait Ranked:
     }
 
     /// Returns a reference to an element of the polytope. To actually get the
-    /// entire polytope it defines, use [`element`](Self::element).
+    /// entire polytope it defines, use [`Polytope::element`](crate::Polytope::element).
     fn get_element(&self, rank: usize, idx: usize) -> Option<&Element> {
         self.ranks().get(rank)?.get(idx)
     }
@@ -400,8 +400,7 @@ impl Ranks {
         &mut self[(rank, 0)]
     }
 
-    /// Returns a mutable reference to an element of the polytope. To actually get the
-    /// entire polytope it defines, use [`element`](Self::element).
+    /// Returns a mutable reference to an element of the polytope.
     pub fn get_element_mut(&mut self, rank: usize, idx: usize) -> Option<&mut Element> {
         self.get_mut(rank)?.get_mut(idx)
     }
@@ -473,7 +472,7 @@ impl AbstractBuilder {
     }
 
     /// Initializes a new empty abstract builder with a capacity to store
-    /// elements up and until a given [`Rank`].
+    /// elements up and until a given rank.
     pub fn with_rank_capacity(rank: usize) -> Self {
         Self(Ranks::with_rank_capacity(rank))
     }

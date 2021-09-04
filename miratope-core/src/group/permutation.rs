@@ -1,14 +1,44 @@
 //! Deals with permutations and permutation groups.
 
-use std::ops::{Index, Mul, MulAssign};
+use std::{
+    collections::BTreeMap,
+    marker::PhantomData,
+    mem::MaybeUninit,
+    ops::{Index, Mul, MulAssign},
+};
 
-use nalgebra::{allocator::Allocator, Const, DefaultAllocator, Dim, Dynamic, OVector};
+use nalgebra::{
+    allocator::Allocator, Const, DefaultAllocator, Dim, Dynamic, OVector, UninitVector,
+};
+
+use super::group_item::{GroupItem, Wrapper};
 
 /// Represents a permutation on `n` elements. The index `i` is mapped into the
 /// number `self[i]`.
+#[derive(Clone, PartialEq, Debug)]
 pub struct Permutation<N: Dim>(OVector<usize, N>)
 where
     DefaultAllocator: Allocator<usize, N>;
+
+impl<N: Dim> Eq for Permutation<N> where DefaultAllocator: Allocator<usize, N> {}
+
+impl<N: Dim> PartialOrd for Permutation<N>
+where
+    DefaultAllocator: Allocator<usize, N>,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<N: Dim> Ord for Permutation<N>
+where
+    DefaultAllocator: Allocator<usize, N>,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.partial_cmp(&other.0).unwrap()
+    }
+}
 
 /// A statically sized permutation.
 pub type SPermutation<const N: usize> = Permutation<Const<N>>;
@@ -87,7 +117,7 @@ where
     }
 }
 
-impl<const N: usize> Default for Permutation<Const<N>> {
+impl<const N: usize> Default for SPermutation<N> {
     fn default() -> Self {
         Self::id()
     }
@@ -127,26 +157,129 @@ impl DPermutation {
     }
 }
 
-impl<N: Dim> Mul for Permutation<N>
+impl<'a, 'b, N: Dim> Mul<&'b Permutation<N>> for &'a Permutation<N>
 where
     DefaultAllocator: Allocator<usize, N>,
 {
-    type Output = Self;
+    type Output = Permutation<N>;
 
-    fn mul(self, rhs: Self) -> Self::Output {
+    fn mul(self, rhs: &'b Permutation<N>) -> Self::Output {
         // Safety: the composition of two permutations is a permutation.
-        unsafe { Self::from_iterator_generic(self.len(), self.iter().map(|i| rhs[i])) }
+        unsafe { Permutation::from_iterator_generic(self.len(), self.iter().map(|i| rhs[i])) }
     }
 }
 
-impl<N: Dim> MulAssign for Permutation<N>
+impl<'a, N: Dim> MulAssign<&'a Permutation<N>> for Permutation<N>
 where
     DefaultAllocator: Allocator<usize, N>,
 {
-    fn mul_assign(&mut self, rhs: Self) {
+    fn mul_assign(&mut self, rhs: &'a Permutation<N>) {
         // Safety: the composition of two permutations is a permutation.
         for i in unsafe { self.iter_mut() } {
             *i = rhs[*i];
+        }
+    }
+}
+
+impl<N: Dim> GroupItem for Permutation<N>
+where
+    DefaultAllocator: Allocator<usize, N>,
+{
+    type Dim = N;
+    type FuzzyOrd = Self;
+
+    fn id(dim: Self::Dim) -> Self {
+        let n = dim.value();
+        unsafe { Self::from_iterator_generic(n, 0..n) }
+    }
+
+    fn inv(&self) -> Self {
+        let mut uninit = UninitVector::uninit(N::from_usize(self.len()), Const::<1>);
+
+        for (i, j) in self.iter().enumerate() {
+            uninit[j] = MaybeUninit::new(i);
+        }
+
+        // Safety: we must have filled all entries, since permutations are
+        // bijections.
+        Self(unsafe { uninit.assume_init() })
+    }
+
+    fn mul(&self, rhs: &Self) -> Self {
+        self * rhs
+    }
+
+    fn mul_assign(&mut self, rhs: &Self) {
+        *self *= rhs;
+    }
+}
+
+/// An iterator over the permutations associated to a group.
+pub struct PermutationIter<T: GroupItem, D: Dim>
+where
+    DefaultAllocator: Allocator<T, D>,
+{
+    /// The elements of the group, provided for easy iteration.
+    vec: Vec<T>,
+
+    /// Another copy of the elements of the group, provided so that we can map
+    /// each element into an index.
+    indices: BTreeMap<T::FuzzyOrd, usize>,
+
+    /// The number of permutation we're generating.
+    idx: usize,
+
+    dim: PhantomData<D>,
+}
+
+/// A [`PermutationIter`] with a statically known size.
+pub type SPermutationIter<I, const N: usize> = PermutationIter<I, Const<N>>;
+
+/// A [`PermutationIter`] with a dynamically known size.
+pub type DPermutationIter<I> = PermutationIter<I, Dynamic>;
+
+impl<T: GroupItem + Clone, D: Dim> PermutationIter<T, D>
+where
+    DefaultAllocator: Allocator<T, D>,
+{
+    /// Initializes a new iterator over permutations.
+    pub fn new(vec: Vec<T>) -> Self {
+        D::from_usize(vec.len());
+        let mut indices = BTreeMap::new();
+
+        for (i, el) in vec.iter().enumerate() {
+            indices.insert(Wrapper::from_inner(el.clone()), i);
+        }
+
+        Self {
+            vec,
+            indices,
+            idx: 0,
+            dim: PhantomData,
+        }
+    }
+}
+
+impl<T: GroupItem + Clone, D: Dim> Iterator for PermutationIter<T, D>
+where
+    DefaultAllocator: Allocator<usize, D> + Allocator<T, D>,
+{
+    type Item = Permutation<D>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let a = self.vec.get(self.idx)?;
+        self.idx += 1;
+
+        unsafe {
+            Some(Permutation::from_iterator_generic(
+                self.vec.len(),
+                self.vec.iter().map(|b| {
+                    self.indices
+                        .get(&Wrapper::from_inner(a.mul(b)))
+                        .copied()
+                        .unwrap()
+                }),
+            ))
         }
     }
 }

@@ -219,8 +219,7 @@ where
 /// that the type we implement this trait for is a tuple struct containing
 /// either a `Vec` or a type implementing `VecLike` as its first argument.
 ///
-/// The [`VecLike::VecItem`] parameter will be set to the second argument, and
-/// the [`VecLike::VecIndex`] parameter will be set to the third argument. This
+/// The [`VecLike::VecItem`] parameter will be set to the second argument. This
 /// macro will also implement all required subtraits automatically.
 ///
 /// This macro can either be called like this:
@@ -259,8 +258,7 @@ macro_rules! impl_veclike {
 /// specify which of the fields of the type works as the inner storage. You may
 /// also use this with a tuple struct.
 ///
-/// The [`VecLike::VecItem`] parameter will be set to the second argument, and
-/// the [`VecLike::VecIndex`] parameter will be set to the third argument. This
+/// The [`VecLike::VecItem`] parameter will be set to the second argument. This
 /// macro will also implement almost all required subtraits automatically.
 /// However, one must manually implement `From<Vec<Item>>` for the type.
 ///

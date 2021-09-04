@@ -336,7 +336,7 @@ impl<'a, T: Float> CdBuilder<'a, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cox::CoxMatrix;
+    use crate::cox::Cox;
     use crate::geometry::Matrix;
     use nalgebra::dmatrix;
 
@@ -360,7 +360,7 @@ mod tests {
     fn test(diagram: &str, nodes: Vec<Node<f32>>, matrix: Matrix<f32>) {
         let cd = Cd::parse(diagram).unwrap();
         assert_eq!(cd.nodes(), nodes, "Node mismatch!");
-        assert_eq!(cd.cox(), CoxMatrix::new(matrix), "Coxeter matrix mismatch!");
+        assert_eq!(cd.cox(), Cox::new(matrix), "Coxeter matrix mismatch!");
     }
 
     #[test]

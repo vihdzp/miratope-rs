@@ -79,6 +79,9 @@ pub trait Float:
     /// 4
     const FOUR: Self;
 
+    /// 5
+    const FIVE: Self;
+
     /// Archimedes' constant (π)
     const PI: Self;
 
@@ -142,6 +145,7 @@ impl Float for f32 {
     const TWO: f32 = 2.0;
     const THREE: f32 = 3.0;
     const FOUR: f32 = 4.0;
+    const FIVE: f32 = 5.0;
     const PI: f32 = std::f32::consts::PI;
     const TAU: f32 = std::f32::consts::TAU;
     const SQRT_2: f32 = std::f32::consts::SQRT_2;
@@ -170,6 +174,7 @@ impl Float for f64 {
     const TWO: f64 = 2.0;
     const THREE: f64 = 3.0;
     const FOUR: f64 = 4.0;
+    const FIVE: f64 = 5.0;
     const PI: f64 = std::f64::consts::PI;
     const TAU: f64 = std::f64::consts::TAU;
     const SQRT_2: f64 = std::f64::consts::SQRT_2;

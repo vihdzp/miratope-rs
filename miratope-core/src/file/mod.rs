@@ -54,7 +54,7 @@ impl<'a> std::fmt::Display for FileError<'a> {
 
 impl<'a> std::error::Error for FileError<'a> {}
 
-/// [`OffError`] is a type of [`FileError`].
+/// [`OffParseError`] is a type of [`FileError`].
 impl<'a> From<OffParseError> for FileError<'a> {
     fn from(err: OffParseError) -> Self {
         Self::OffError(err)

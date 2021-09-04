@@ -2,6 +2,7 @@
 
 // This code is unfinished.
 #![allow(dead_code)]
+#![allow(clippy::collapsible_match)]
 
 use std::io::Result as IoResult;
 
@@ -63,6 +64,8 @@ impl<'a> XmlReader<'a> {
                         if name.local_name == search {
                             return Ok(attributes);
                         }
+                    } else {
+                        todo!()
                     }
                 }
                 // Something went wrong while fetching the next XML event.

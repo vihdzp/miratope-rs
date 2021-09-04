@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, VecDeque};
 
 use crate::cox::cd::CdResult;
-use crate::cox::CoxMatrix;
+use crate::cox::Cox;
 use crate::geometry::Matrix;
 use crate::group::Group;
 use crate::Float;
@@ -151,7 +151,7 @@ impl<T: GroupItem + Clone> GenIter<T> {
 impl<T: Float> GenIter<Matrix<T>> {
     /// Parses a diagram and turns it into a GenIter.
     pub fn parse(input: &str) -> CdResult<Option<Self>> {
-        CoxMatrix::parse(input).map(|cox| cox.gen_iter())
+        Cox::parse(input).map(|cox| cox.gen_iter())
     }
 
     /// Parses a diagram and turns it into a GenIter.

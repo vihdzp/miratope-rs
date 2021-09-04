@@ -1,5 +1,5 @@
 //! Contains the code that verifies whether a set of [`Ranks`] correspond to a
-//! valid [`Abstract`] polytope.
+//! valid [`Abstract`](crate::Abstract) polytope.
 
 // TODO: finish these!
 
@@ -149,12 +149,12 @@ impl std::fmt::Display for AbstractError {
 
 impl std::error::Error for AbstractError {}
 
-/// The return value for [`Abstract::is_valid`].
+/// The return value for [`Ranks::is_valid`].
 pub type AbstractResult<T> = Result<T, AbstractError>;
 
 impl Ranks {
-    /// Checks whether the polytope is valid, i.e. whether the polytope is
-    /// bounded, dyadic, and all of its indices refer to valid elements.
+    /// Checks whether the ranks form a valid polytope, i.e. whether the poset
+    /// is bounded, dyadic, and all of its indices refer to valid elements.
     pub fn is_valid(&self) -> AbstractResult<()> {
         self.bounded()?;
         self.check_incidences()?;

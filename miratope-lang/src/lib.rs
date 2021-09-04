@@ -597,8 +597,7 @@ macro_rules! impl_parse {
 ///
 /// Many languages require the various words that describe a single object to
 /// match up according to certain rules. This is known as **agreement**. To
-/// account for this, every parsed name takes in and returns some [`ParseInfo`],
-/// including grammatical count and gender.
+/// account for this, every parsed name takes in a grammatical gender.
 ///
 /// A noun doesn't require any `ParseInfo`, but it must output it and propagate
 /// it into its argument and any surrounding adjective (if any). On the other
