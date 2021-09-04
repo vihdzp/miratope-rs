@@ -623,15 +623,13 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// This method shouldn't panic. If it does, please file a bug.
     fn try_dual_mut_with(&mut self, sphere: &Hypersphere<T>) -> Result<(), Self::DualError>;
 
-    
-
     /// Returns the dual of a polytope with a given reciprocation sphere, or
     /// `None` if any facets pass through the reciprocation center.
     fn try_dual_with(&self, sphere: &Hypersphere<T>) -> Result<Self, Self::DualError> {
         let mut clone = self.clone();
         clone.try_dual_mut_with(sphere).map(|_| clone)
     }
-    
+
     /// Builds a pyramid with a specified apex.
     fn pyramid_with(&self, apex: Point<T>) -> Self;
 
