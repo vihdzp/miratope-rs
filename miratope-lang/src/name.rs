@@ -648,7 +648,10 @@ impl<T: NameType> Name<T> {
             // a regular one into a hypercube prism.
             Self::Hyperblock { regular, rank } => {
                 if regular.is_or(&Regular::No, false) {
-                    Self::Hyperblock { regular, rank }
+                    Self::Hyperblock {
+                        regular,
+                        rank: rank + 1,
+                    }
                 } else {
                     Self::Prism(Box::new(Self::Hyperblock { regular, rank }))
                 }
