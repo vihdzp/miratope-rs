@@ -8,8 +8,8 @@ use std::{
     ops::{Index, IndexMut},
 };
 
+use crate::float::Float;
 use crate::group::Group;
-use crate::Float;
 use crate::{geometry::Matrix, group::GenIter};
 
 use nalgebra::dmatrix;

@@ -92,7 +92,7 @@ type Point = miratope_core::geometry::Point<Float>;
 type Vector = miratope_core::geometry::Vector<Float>;
 type Hypersphere = miratope_core::geometry::Hypersphere<Float>;
 type Hyperplane = miratope_core::geometry::Hyperplane<Float>;
-const EPS: Float = <Float as miratope_core::Float>::EPS;
+const EPS: Float = <Float as miratope_core::float::Float>::EPS;
 
 /// The link to the GitHub issues.
 const NEW_ISSUE: &str = "https://github.com/OfficialURL/miratope-rs/issues/new";

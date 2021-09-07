@@ -137,83 +137,76 @@ impl SectionMap {
     }
 }
 
-impl Abstract {
-    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
-    /// based on a given polytope. Also returns the indices of the vertices that
-    /// form the base and the dual base, in that order.
-    pub fn antiprism_and_vertices(&self) -> (Self, Vec<usize>, Vec<usize>) {
-        let rank = self.rank();
-        let mut section_hash = SectionMap::singletons(self);
+/// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
+/// based on a given polytope. Also returns the indices of the vertices that
+/// form the base and the dual base, in that order.
+pub(super) fn antiprism_and_vertices(abs: &Abstract) -> (Abstract, Vec<usize>, Vec<usize>) {
+    let rank = abs.rank();
+    let mut section_hash = SectionMap::singletons(abs);
 
-        // We actually build the elements backwards, which is as awkward as it
-        // seems. Maybe we should fix that in the future?
-        let mut backwards_abs = Vec::with_capacity(rank + 1);
-        backwards_abs.push(SubelementList::max(section_hash.len()));
+    // We actually build the elements backwards, which is as awkward as it
+    // seems. Maybe we should fix that in the future?
+    let mut backwards_abs = Vec::with_capacity(rank + 1);
+    backwards_abs.push(SubelementList::max(section_hash.len()));
 
-        // Indices of base.
-        let vertex_count = self.vertex_count();
-        let mut vertices = Vec::with_capacity(vertex_count);
+    // Indices of base.
+    let vertex_count = abs.vertex_count();
+    let mut vertices = Vec::with_capacity(vertex_count);
 
-        // Indices of dual base.
-        let facet_count = self.facet_count();
-        let mut dual_vertices = Vec::with_capacity(facet_count);
+    // Indices of dual base.
+    let facet_count = abs.facet_count();
+    let mut dual_vertices = Vec::with_capacity(facet_count);
 
-        // Adds all elements corresponding to sections of a given height.
-        for height in 1..=rank + 1 {
-            let mut new_section_hash = SectionMap::new();
-            let mut elements: SubelementList = iter::repeat(Subelements::new())
-                .take(section_hash.len())
-                .collect();
+    // Adds all elements corresponding to sections of a given height.
+    for height in 1..=rank + 1 {
+        let mut new_section_hash = SectionMap::new();
+        let mut elements: SubelementList = iter::repeat(Subelements::new())
+            .take(section_hash.len())
+            .collect();
 
-            // Goes over all sections of the previous height, and builds the
-            // sections of the current height by either changing the upper
-            // element into one of its superelements, or changing the lower
-            // element into one of its subelements.
-            for (section, idx) in section_hash.into_iter() {
-                for &idx_lo in &self[section.lo()].subs {
-                    elements[idx].push(
-                        new_section_hash.get_insert(section.with_lo(section.lo_rank - 1, idx_lo)),
-                    );
-                }
-
-                // Finds all of the superelements of our old section's
-                // highest element.
-                for &idx_hi in &self[section.hi()].sups {
-                    elements[idx].push(
-                        new_section_hash.get_insert(section.with_hi(section.hi_rank + 1, idx_hi)),
-                    );
-                }
+        // Goes over all sections of the previous height, and builds the
+        // sections of the current height by either changing the upper
+        // element into one of its superelements, or changing the lower
+        // element into one of its subelements.
+        for (section, idx) in section_hash.into_iter() {
+            for &idx_lo in &abs[section.lo()].subs {
+                elements[idx].push(
+                    new_section_hash.get_insert(section.with_lo(section.lo_rank - 1, idx_lo)),
+                );
             }
 
-            // We figure out where the vertices of the base and the dual base
-            // were sent.
-            if height == rank - 1 {
-                // We create a map from the base's vertices to the new vertices.
-                for v in 0..vertex_count {
-                    vertices.push(new_section_hash.get_insert(Section::new(1, v, rank, 0)));
-                }
-
-                // We create a map from the dual base's vertices to the new vertices.
-                for f in 0..facet_count {
-                    dual_vertices.push(new_section_hash.get_insert(Section::new(
-                        0,
-                        0,
-                        rank - 1,
-                        f,
-                    )));
-                }
+            // Finds all of the superelements of our old section's
+            // highest element.
+            for &idx_hi in &abs[section.hi()].sups {
+                elements[idx].push(
+                    new_section_hash.get_insert(section.with_hi(section.hi_rank + 1, idx_hi)),
+                );
             }
-
-            backwards_abs.push(elements);
-            section_hash = new_section_hash;
         }
 
-        // We built this backwards, so let's fix it.
-        let builder: AbstractBuilder = backwards_abs.into_iter().rev().collect();
+        // We figure out where the vertices of the base and the dual base
+        // were sent.
+        if height == rank - 1 {
+            // We create a map from the base's vertices to the new vertices.
+            for v in 0..vertex_count {
+                vertices.push(new_section_hash.get_insert(Section::new(1, v, rank, 0)));
+            }
 
-        // Safety: we've built an antiprism based on the polytope. For a proof
-        // that this construction yields a valid abstract polytope, see [TODO:
-        // write proof].
-        (unsafe { builder.build() }, vertices, dual_vertices)
+            // We create a map from the dual base's vertices to the new vertices.
+            for f in 0..facet_count {
+                dual_vertices.push(new_section_hash.get_insert(Section::new(0, 0, rank - 1, f)));
+            }
+        }
+
+        backwards_abs.push(elements);
+        section_hash = new_section_hash;
     }
+
+    // We built this backwards, so let's fix it.
+    let builder: AbstractBuilder = backwards_abs.into_iter().rev().collect();
+
+    // Safety: we've built an antiprism based on the polytope. For a proof
+    // that this construction yields a valid abstract polytope, see [TODO:
+    // write proof].
+    (unsafe { builder.build() }, vertices, dual_vertices)
 }

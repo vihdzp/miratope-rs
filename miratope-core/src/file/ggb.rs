@@ -6,7 +6,7 @@
 
 use std::io::Result as IoResult;
 
-use crate::{conc::Concrete, geometry::Point, Float};
+use crate::{conc::Concrete, float::Float, geometry::Point};
 
 use nalgebra::dvector;
 use xml::{

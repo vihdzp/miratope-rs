@@ -60,7 +60,10 @@ pub fn update_changed_polytopes(
 ) {
     for (poly, mesh_handle, children) in polies.iter() {
         println!("Polytope updated");
-        poly.debug_assert_valid();
+
+        if cfg!(debug_assertions) {
+            poly.assert_valid();
+        }
 
         *meshes.get_mut(mesh_handle).unwrap() = poly.mesh(*orthogonal);
 

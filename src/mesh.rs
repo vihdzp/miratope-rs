@@ -263,6 +263,7 @@ fn vertex_coords<'a, I: Iterator<Item = &'a Point>>(
     }
 }
 
+/// A trait for a polytope for which we can build a mesh.
 pub trait Renderable: ConcretePolytope<Float> {
     /// Builds the mesh of a polytope.
     fn mesh(&self, projection_type: ProjectionType) -> Mesh {

@@ -5,8 +5,8 @@ use std::fmt::Display;
 use petgraph::graph::{Edge as GraphEdge, Node as GraphNode, NodeIndex, UnGraph};
 
 use crate::{
+    float::Float,
     geometry::{Matrix, Point, Vector},
-    Float,
 };
 
 use super::{parse::CdBuilder, Cox};

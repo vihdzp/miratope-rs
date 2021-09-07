@@ -7,8 +7,8 @@ use nalgebra::{allocator::Allocator, Const, DefaultAllocator, Dim, OMatrix, Quat
 use ordered_float::OrderedFloat;
 
 use crate::{
+    float::Float,
     geometry::{Matrix, MatrixOrd, MatrixOrdMxN},
-    Float,
 };
 
 /// A trait for any type that behaves as a wrapper around another type.

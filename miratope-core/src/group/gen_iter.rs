@@ -5,9 +5,9 @@ use std::collections::{BTreeMap, VecDeque};
 
 use crate::cox::cd::CdResult;
 use crate::cox::Cox;
+use crate::float::Float;
 use crate::geometry::Matrix;
 use crate::group::Group;
-use crate::Float;
 
 use super::group_item::Wrapper;
 use super::GroupItem;

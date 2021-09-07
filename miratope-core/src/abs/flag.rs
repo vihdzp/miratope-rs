@@ -11,12 +11,16 @@ use std::{
 
 use crate::{
     abs::{elements::Ranked, Abstract},
-    Float, Polytope,
+    float::Float,
+    Polytope,
 };
 
 use vec_like::*;
 
 /// Asserts that the subelements and superelements of a polytope are sorted.
+///
+/// This is not an expensive test since this metadata is stored in the polytope,
+/// but should still be avoided in methods that will be repeatedly called.
 fn assert_sorted(p: &Abstract) {
     assert!(
         p.sorted(),
@@ -27,7 +31,10 @@ fn assert_sorted(p: &Abstract) {
 /// An auxiliary method for [`Flag::change_mut`]. Gets the two common elements
 /// of two **sorted** lists.
 ///
-/// # Panic
+/// This algorithm is basically a modified version of the merging step in
+/// mergesort.
+///
+/// # Panics
 /// This method will behave erroneously and might panic if the lists are not
 /// sorted. Furthermore, the method will panic if the lists have less than two
 /// common elements.
@@ -39,6 +46,8 @@ fn common<T: AsRef<[usize]>, U: AsRef<[usize]>>(list1: T, list2: U) -> (usize, u
     let mut prev = None;
 
     loop {
+        // We could make these unchecked if we knew for a fact that there are
+        // two common elements.
         let sub0 = list1[i];
         let sub1 = list2[j];
 
@@ -64,7 +73,7 @@ fn common<T: AsRef<[usize]>, U: AsRef<[usize]>>(list1: T, list2: U) -> (usize, u
 /// The minimal element of the flag must always have index 0. However, we keep
 /// it in memory since it allows us to not have to special-case the
 /// [`Self::change_mut`] method.
-#[derive(Clone, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Flag(Vec<usize>);
 impl_veclike!(Flag, Item = usize);
 
@@ -75,11 +84,14 @@ impl Flag {
     /// elements except for the `i`-th one. In a valid (dyadic) polytope, the
     /// resulting flag always exists and is unique.
     ///
-    /// For this flag change to be efficiently applied, we need for all of the
-    /// element and subelement lists of the polytope to be sorted. This is
-    /// verified via various debug assertions.
+    /// # Panics
+    /// You must call [`Polytope::element_sort`] before calling this method.
+    /// Further, flag changes only really make sense from rank 1 up to the rank
+    /// of the polytope minus 1.
     pub fn change_mut(&mut self, polytope: &Abstract, r: usize) {
+        // This is running in a hot loop. Maybe get rid of it?
         assert_sorted(polytope);
+        assert!(r >= 1);
 
         // Determines the common elements between the subelements of the element
         // above and the superelements of the element below.
@@ -170,8 +182,6 @@ pub struct FlagIter<'a> {
 impl<'a> FlagIter<'a> {
     /// Initializes an iterator over all flags of a polytope.
     pub fn new(polytope: &'a Abstract) -> Self {
-        assert_sorted(polytope);
-
         Self {
             polytope,
             flag: Some(polytope.first_flag()),
@@ -390,9 +400,6 @@ impl<'a> OrientedFlagIter<'a> {
     /// # Panics
     /// You must call [`Polytope::element_sort`] before calling this method.
     pub fn new(polytope: &'a Abstract) -> Self {
-        assert_sorted(polytope);
-
-        // Initializes with any flag from the polytope and all flag changes.
         Self::with_flags(
             polytope,
             FlagChanges::all(polytope.rank()),
@@ -521,14 +528,9 @@ impl FlagEvent {
         }
     }
 
-    /// Returns whether `self` matches `Self::NonOrientable`.
-    pub fn non_orientable(&self) -> bool {
-        matches!(self, Self::NonOrientable)
-    }
-
     /// Returns whether `self` does not match `Self::NonOrientable`.
     pub fn orientable(&self) -> bool {
-        !self.non_orientable()
+        !matches!(self, Self::NonOrientable)
     }
 }
 
@@ -672,13 +674,14 @@ mod tests {
 
     /// Tests that a polytope has an expected number of flags, oriented or not.
     fn test(polytope: &mut Abstract, expected: usize) {
-        let flag_count = polytope.flags_mut().count();
+        let flag_count = polytope.flags().count();
         assert_eq!(
             expected, flag_count,
             "Expected {} flags, found {}.",
             expected, flag_count
         );
 
+        polytope.element_sort();
         let flag_count = polytope.flag_events().filter_flags().count();
         assert_eq!(
             expected, flag_count,

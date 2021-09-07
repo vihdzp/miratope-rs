@@ -268,13 +268,6 @@ pub trait Ranked:
         self.ranks().is_valid().unwrap();
     }
 
-    /// Asserts that `self` is a valid abstract polytope in debug mode.
-    fn debug_assert_valid(&self) {
-        if cfg!(debug_assertions) {
-            self.assert_valid();
-        }
-    }
-
     /// Returns the rank of the structure, i.e. the length of the `Ranks` minus
     /// one.
     ///

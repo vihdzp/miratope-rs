@@ -93,114 +93,112 @@ impl<'a, const MIN: bool, const MAX: bool> Index<(usize, usize)> for OffsetMemo<
     }
 }
 
-impl Abstract {
-    /// Takes the [direct product](https://en.wikipedia.org/wiki/Direct_product#Direct_product_of_binary_relations)
-    /// of two polytopes. If the `MIN` flag is turned on, it ignores the
-    /// minimal elements of both of the factors and adds one at the end. The
-    /// `MAX` flag works analogously.
-    ///
-    /// This method takes in `MIN` and `MAX` as type parameters so that each
-    /// case may be separately optimized. We should probably run some tests to
-    /// see if this is actually any better, though.
-    ///
-    /// The elements of this product are in one to one correspondence to pairs
-    /// of elements in the set of polytopes. The elements of a specific rank are
-    /// sorted first by lexicographic order of the ranks, then by lexicographic
-    /// order of the elements.
-    pub fn product<const MIN: bool, const MAX: bool>(p: &Self, q: &Self) -> Self {
-        // The ranks of p and q.
-        let p_rank = p.rank();
-        let q_rank = q.rank();
+/// Takes the [direct product](https://en.wikipedia.org/wiki/Direct_product#Direct_product_of_binary_relations)
+/// of two polytopes. If the `MIN` flag is turned on, it ignores the
+/// minimal elements of both of the factors and adds one at the end. The
+/// `MAX` flag works analogously.
+///
+/// This method takes in `MIN` and `MAX` as type parameters so that each
+/// case may be separately optimized. We should probably run some tests to
+/// see if this is actually any better, though.
+///
+/// The elements of this product are in one to one correspondence to pairs
+/// of elements in the set of polytopes. The elements of a specific rank are
+/// sorted first by lexicographic order of the ranks, then by lexicographic
+/// order of the elements.
+pub(super) fn product<const MIN: bool, const MAX: bool>(p: &Abstract, q: &Abstract) -> Abstract {
+    // The ranks of p and q.
+    let p_rank = p.rank();
+    let q_rank = q.rank();
 
-        // 0 or 1 depending on whether the minimum/maximum elements are in the
-        // polytope.
-        let min_u = MIN as usize;
-        let max_u = MAX as usize;
+    // 0 or 1 depending on whether the minimum/maximum elements are in the
+    // polytope.
+    let min_u = MIN as usize;
+    let max_u = MAX as usize;
 
-        // The highest ranks we'll use to take products in p and q.
-        let p_hi = p_rank - max_u;
-        let q_hi = q_rank - max_u;
+    // The highest ranks we'll use to take products in p and q.
+    let p_hi = p_rank - max_u;
+    let q_hi = q_rank - max_u;
 
-        // The rank of the product.
-        let rank = p_rank + q_rank - min_u - max_u;
+    // The rank of the product.
+    let rank = p_rank + q_rank - min_u - max_u;
 
-        // Initializes the element lists. These will only contain the
-        // subelements as they're generated. When they're complete, we'll call
-        // push_subs for each of them into a new Abstract.
-        let mut builder = AbstractBuilder::with_rank_capacity(rank + 1);
-        let offset_memo = OffsetMemo::<MIN, MAX>::new(p, q);
+    // Initializes the element lists. These will only contain the
+    // subelements as they're generated. When they're complete, we'll call
+    // push_subs for each of them into a new Abstract.
+    let mut builder = AbstractBuilder::with_rank_capacity(rank + 1);
+    let offset_memo = OffsetMemo::<MIN, MAX>::new(p, q);
 
-        // If MIN, we have to set a minimal element and the vertices manually.
-        if MIN {
-            builder.push_min();
-            builder.push_vertices(p.vertex_count() * q.vertex_count());
-        }
+    // If MIN, we have to set a minimal element and the vertices manually.
+    if MIN {
+        builder.push_min();
+        builder.push_vertices(p.vertex_count() * q.vertex_count());
+    }
 
-        let lo = 2 * min_u;
-        let hi = rank - max_u;
+    let lo = 2 * min_u;
+    let hi = rank - max_u;
 
-        // Adds elements in order of rank.
-        for prod_rank in lo..=hi {
-            let lo = if prod_rank + min_u >= q_hi {
-                min_u.max(prod_rank + min_u - q_hi)
-            } else {
-                min_u
-            };
-            let hi = p_hi.min(prod_rank);
-            let mut subelements = SubelementList::new();
+    // Adds elements in order of rank.
+    for prod_rank in lo..=hi {
+        let lo = if prod_rank + min_u >= q_hi {
+            min_u.max(prod_rank + min_u - q_hi)
+        } else {
+            min_u
+        };
+        let hi = p_hi.min(prod_rank);
+        let mut subelements = SubelementList::new();
 
-            // Adds elements by lexicographic order of the ranks.
-            for p_els_rank in lo..=hi {
-                let q_els_rank = prod_rank + min_u - p_els_rank;
+        // Adds elements by lexicographic order of the ranks.
+        for p_els_rank in lo..=hi {
+            let q_els_rank = prod_rank + min_u - p_els_rank;
 
-                // Takes the product of every element in p with rank p_els_rank,
-                // with every element in q with rank q_els_rank.
-                for (p_idx, p_el) in p[p_els_rank].iter().enumerate() {
-                    for (q_idx, q_el) in q[q_els_rank].iter().enumerate() {
-                        let mut subs = Subelements::new();
+            // Takes the product of every element in p with rank p_els_rank,
+            // with every element in q with rank q_els_rank.
+            for (p_idx, p_el) in p[p_els_rank].iter().enumerate() {
+                for (q_idx, q_el) in q[q_els_rank].iter().enumerate() {
+                    let mut subs = Subelements::new();
 
-                        // Products of p's subelements with q.
-                        if !MIN || p_els_rank != 1 {
-                            for &s in &p_el.subs {
-                                subs.push(offset_memo.get_element_index(
-                                    p_els_rank - 1,
-                                    s,
-                                    q_els_rank,
-                                    q_idx,
-                                ))
-                            }
+                    // Products of p's subelements with q.
+                    if !MIN || p_els_rank != 1 {
+                        for &s in &p_el.subs {
+                            subs.push(offset_memo.get_element_index(
+                                p_els_rank - 1,
+                                s,
+                                q_els_rank,
+                                q_idx,
+                            ))
                         }
-
-                        // Products of q's subelements with p.
-                        if !MIN || q_els_rank != 1 {
-                            for &s in &q_el.subs {
-                                subs.push(offset_memo.get_element_index(
-                                    p_els_rank,
-                                    p_idx,
-                                    q_els_rank - 1,
-                                    s,
-                                ))
-                            }
-                        }
-
-                        subelements.push(subs)
                     }
+
+                    // Products of q's subelements with p.
+                    if !MIN || q_els_rank != 1 {
+                        for &s in &q_el.subs {
+                            subs.push(offset_memo.get_element_index(
+                                p_els_rank,
+                                p_idx,
+                                q_els_rank - 1,
+                                s,
+                            ))
+                        }
+                    }
+
+                    subelements.push(subs)
                 }
             }
-
-            builder.push(subelements);
         }
 
-        // If MAX, we have to set a maximal element manually.
-        if MAX {
-            builder.push_max();
-        }
-
-        // TODO: If `p` and `q` are sorted, this should be too?
-
-        // Safety: we've built one of the four products on polytopes. For a
-        // proof that these constructions yield valid abstract polytopes, see
-        // [TODO: write proof].
-        unsafe { builder.build() }
+        builder.push(subelements);
     }
+
+    // If MAX, we have to set a maximal element manually.
+    if MAX {
+        builder.push_max();
+    }
+
+    // TODO: If `p` and `q` are sorted, this should be too?
+
+    // Safety: we've built one of the four products on polytopes. For a
+    // proof that these constructions yield valid abstract polytopes, see
+    // [TODO: write proof].
+    unsafe { builder.build() }
 }

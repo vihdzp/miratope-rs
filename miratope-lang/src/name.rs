@@ -2,7 +2,7 @@
 
 use std::{array, fmt::Debug, fs, iter, marker::PhantomData, mem};
 
-use miratope_core::{abs::Abstract, conc::Concrete, geometry::Point, Float, Polytope};
+use miratope_core::{abs::Abstract, conc::Concrete, float::Float, geometry::Point, Polytope};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::Language;

@@ -4,7 +4,7 @@ use std::{collections::VecDeque, iter, str::FromStr};
 
 use petgraph::graph::NodeIndex;
 
-use crate::Float;
+use crate::float::Float;
 
 use super::cd::{Cd, CdError, CdResult, Edge, EdgeRef, Node, NodeRef};
 

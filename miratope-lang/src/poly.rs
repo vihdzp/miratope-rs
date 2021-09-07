@@ -12,8 +12,9 @@ use miratope_core::{
         off::{OffParseError, OffParseResult},
         FromFile,
     },
+    float::Float,
     geometry::Point,
-    Float, Polytope,
+    Polytope,
 };
 use serde::de::DeserializeOwned;
 

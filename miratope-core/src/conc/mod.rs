@@ -17,8 +17,8 @@ use super::{
 };
 use crate::{
     abs::{AbstractBuilder, Element, ElementMap, Subelements, Superelements},
-    geometry::{Hyperplane, Hypersphere, Matrix, Point, PointOrd, Segment, Subspace, Vector},
-    Float,
+    float::Float,
+    geometry::*,
 };
 
 use approx::{abs_diff_eq, abs_diff_ne};
@@ -739,7 +739,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// flags. Returns `None` if the volume is undefined.
     ///
     /// # Panics
-    /// This method will panic if the polytope is not sorted.
+    /// You must call [`Polytope::element_sort`] before calling this method.
     fn volume(&self) -> Option<T> {
         let rank = self.rank();
 
@@ -857,8 +857,8 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
     /// Builds the Grünbaumian star polygon `{n / d}` with unit circumradius,
     /// rotated by an angle.
     fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: T) -> Self {
-        debug_assert!(n >= 2);
-        debug_assert!(d >= 1);
+        assert!(n >= 2);
+        assert!(d >= 1);
 
         let angle = T::TAU * T::usize(d) / T::usize(n);
 
@@ -1177,7 +1177,7 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
 #[cfg(test)]
 mod tests {
     use super::{Concrete, ConcretePolytope};
-    use crate::{Float, Polytope};
+    use crate::{float::Float, Polytope};
 
     use approx::abs_diff_eq;
 

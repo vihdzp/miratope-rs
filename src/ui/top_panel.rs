@@ -382,7 +382,8 @@ pub fn show_top_panel(
                         // Converts the active polytope into its Petrie polygon.
                         if ui.button("Petrie polygon").clicked() {
                             if let Some(mut p) = query.iter_mut().next() {
-                                match p.petrie_polygon() {
+                                let flag = p.first_flag();
+                                match p.petrie_polygon_with(flag) {
                                     Some(q) => {
                                         *p = q;
                                         println!("Petrie polygon succeeded.")
@@ -578,8 +579,7 @@ pub fn show_top_panel(
 
                     // Gets the number of flags of the polytope.
                     if ui.button("Flag count").clicked() {
-                        if let Some(mut p) = query.iter_mut().next() {
-                            element_sort!(p);
+                        if let Some(p) = query.iter_mut().next() {
                             println!("The polytope has {} flags.", p.flags().count())
                         }
                     }

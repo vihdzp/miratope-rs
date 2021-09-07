@@ -15,12 +15,12 @@ use std::{
 
 use self::flag::{Flag, FlagSet};
 use super::Polytope;
+use product::product;
 
 use vec_like::VecLike;
 
 pub use antiprism::*;
 pub use elements::*;
-pub use product::*;
 pub use valid::*;
 
 /// Contains some metadata about how a polytope has been built up, which can
@@ -209,6 +209,44 @@ impl Abstract {
     /// Returns an iterator over the [`ElementLists`](ElementList) of each rank.
     pub fn iter(&self) -> slice::Iter<'_, ElementList> {
         self.ranks.iter()
+    }
+
+    /// Takes the dual of an abstract polytope in place. This can never fail.
+    pub fn dual_mut(&mut self) {
+        // Safety: we'll swap the subelements and superelements in each element,
+        // then reverse the ranks, thus building the dual, which is a valid
+        // abstract polytope.
+        let sorted = self.sorted();
+        let ranks = unsafe { self.ranks_mut() };
+        ranks.for_each_element_mut(Element::swap_mut);
+        ranks.reverse();
+
+        // Safety: if the original elements were sorted, so will these be.
+        if sorted {
+            unsafe {
+                self.set_sorted();
+            }
+        }
+    }
+
+    /// Takes the dual of an abstract polytope. This can never fail.
+    pub fn dual(&self) -> Self {
+        let mut clone = self.clone();
+        clone.dual_mut();
+        clone
+    }
+
+    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
+    /// based on a given polytope. Also returns the indices of the vertices that
+    /// form the base and the dual base, in that order.
+    pub fn antiprism_and_vertices(&self) -> (Self, Vec<usize>, Vec<usize>) {
+        antiprism_and_vertices(self)
+    }
+
+    /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
+    /// based on a given polytope. This can never fail for an abstract polytope.
+    pub fn antiprism(&self) -> Self {
+        self.antiprism_and_vertices().0
     }
 
     /// Gets the indices of the vertices of an element in the polytope, if it
@@ -507,31 +545,38 @@ impl Polytope for Abstract {
         }
     }
 
+    fn vertex_map(&self) -> ElementMap<usize> {
+        // Maps every element of the polytope to one of its vertices.
+        let mut vertex_map = ElementMap::new();
+        vertex_map.push(Vec::new());
+
+        // Vertices map to themselves.
+        if self.rank() != 0 {
+            vertex_map.push((0..self.vertex_count()).collect());
+        }
+
+        // Every other element maps to the vertex of any subelement.
+        for (r, elements) in self.ranks.iter().enumerate().skip(2) {
+            vertex_map.push(
+                elements
+                    .iter()
+                    .map(|el| vertex_map[(r - 1, el.subs[0])])
+                    .collect(),
+            );
+        }
+
+        vertex_map
+    }
+
     /// Converts a polytope into its dual.
     fn try_dual(&self) -> Result<Self, Self::DualError> {
-        let mut clone = self.clone();
-        clone.dual_mut();
-        Ok(clone)
+        Ok(self.dual())
     }
 
     /// Converts a polytope into its dual in place. Use [`Self::dual_mut`] instead, as
     /// this method can never fail.
     fn try_dual_mut(&mut self) -> Result<(), Self::DualError> {
-        // Safety: we'll swap the subelements and superelements in each element,
-        // then reverse the ranks, thus building the dual, which is a valid
-        // abstract polytope.
-        let sorted = self.sorted();
-        let ranks = unsafe { self.ranks_mut() };
-        ranks.for_each_element_mut(Element::swap_mut);
-        ranks.reverse();
-
-        // Safety: if the original elements were sorted, so will these be.
-        if sorted {
-            unsafe {
-                self.set_sorted();
-            }
-        }
-
+        self.dual_mut();
         Ok(())
     }
 
@@ -561,7 +606,7 @@ impl Polytope for Abstract {
             }
 
             let mut face = BTreeSet::new();
-            let mut edge = flag[1];
+            let mut edge = flag[2];
             let mut loop_continue = true;
 
             // We apply our flag changes and mark our flags until we reach the
@@ -572,13 +617,13 @@ impl Polytope for Abstract {
             while loop_continue {
                 loop_continue = face.insert(edge);
 
-                flag.change_mut(self, 0);
-                traversed_flags.insert(flag.change(self, 2));
                 flag.change_mut(self, 1);
+                traversed_flags.insert(flag.change(self, 3));
                 flag.change_mut(self, 2);
+                flag.change_mut(self, 3);
                 traversed_flags.insert(flag.clone());
 
-                edge = flag[1];
+                edge = flag[2];
             }
 
             // If the edge we found after we returned to the original edge was
@@ -622,7 +667,7 @@ impl Polytope for Abstract {
         // Checks for dyadicity, since that sometimes fails.
         ranks.ranks().is_dyadic().is_ok()
 
-        // TODO MAKE THIS SOUND!
+        // TODO MAKE THIS SOUND instead of just returning whether it failed or not!
     }
 
     fn petrie_polygon_with(&mut self, flag: Flag) -> Option<Self> {
@@ -694,25 +739,25 @@ impl Polytope for Abstract {
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.
     fn duopyramid(p: &Self, q: &Self) -> Self {
-        Self::product::<false, false>(p, q)
+        product::<false, false>(p, q)
     }
 
     /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
     /// from two polytopes.
     fn duoprism(p: &Self, q: &Self) -> Self {
-        Self::product::<true, false>(p, q)
+        product::<true, false>(p, q)
     }
 
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
     /// from two polytopes.
     fn duotegum(p: &Self, q: &Self) -> Self {
-        Self::product::<false, true>(p, q)
+        product::<false, true>(p, q)
     }
 
     /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
     /// from two polytopes.
     fn duocomb(p: &Self, q: &Self) -> Self {
-        Self::product::<true, true>(p, q)
+        product::<true, true>(p, q)
     }
 
     /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given

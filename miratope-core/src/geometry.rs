@@ -17,7 +17,7 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use crate::Float;
+use crate::float::Float;
 
 use approx::{abs_diff_eq, abs_diff_ne};
 use nalgebra::{allocator::Allocator, DefaultAllocator, Dim, Dynamic, OMatrix, U1};
@@ -378,7 +378,7 @@ where
     DefaultAllocator: Allocator<T, R, C>,
 {
     fn eq(&self, other: &Self) -> bool {
-        debug_assert_eq!(self.shape(), other.shape(), "Matrix shape mismatch");
+        assert_eq!(self.shape(), other.shape(), "matrix shape mismatch");
         self.iter()
             .zip(other.iter())
             .all(|(x, y)| abs_diff_eq!(x, y, epsilon = Float::EPS))

@@ -5,9 +5,9 @@ use std::collections::HashMap;
 use crate::{
     abs::{ElementMap, Ranked},
     conc::Concrete,
+    float::Float,
 };
 
-use crate::Float;
 use vec_like::*;
 
 /// Every element in a polytope can be assigned a "type" depending on its

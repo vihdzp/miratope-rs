@@ -5,8 +5,9 @@ use std::{collections::HashMap, fmt::Display, io::Error as IoError, path::Path, 
 use crate::{
     abs::{AbstractBuilder, Ranked, SubelementList, Subelements},
     conc::{cycle::CycleList, Concrete},
+    float::Float,
     geometry::Point,
-    Float, Polytope, COMPONENTS, ELEMENT_NAMES,
+    Polytope, COMPONENTS, ELEMENT_NAMES,
 };
 
 use vec_like::VecLike;

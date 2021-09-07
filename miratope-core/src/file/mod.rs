@@ -8,7 +8,7 @@ use self::{
     off::{OffParseResult, OffReader},
 };
 use crate::conc::Concrete;
-use crate::Float;
+use crate::float::Float;
 
 use off::OffParseError;
 use zip::result::ZipError;

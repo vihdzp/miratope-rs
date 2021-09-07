@@ -16,12 +16,8 @@ use std::{
 
 use crate::{
     cox::{cd::CdResult, Cox},
+    float::Float,
     geometry::Matrix,
-    Float,
-};
-
-use nalgebra::{
-    allocator::Allocator, dmatrix, Const, DefaultAllocator, Quaternion, Rotation, UnitQuaternion,
 };
 
 use self::{
@@ -31,6 +27,12 @@ use self::{
     permutation::{PermutationIter, SPermutation},
 };
 
+use nalgebra::{
+    allocator::Allocator, dmatrix, Const, DefaultAllocator, Quaternion, Rotation, UnitQuaternion,
+};
+
+use unchecked_unwrap::UncheckedUnwrap;
+
 /// The type of the dimension associated to an iterator.
 type Dim<I> = <<I as Iterator>::Item as GroupItem>::Dim;
 
@@ -39,6 +41,7 @@ type Dim<I> = <<I as Iterator>::Item as GroupItem>::Dim;
 /// # Safety
 /// By creating a value of this type, you're asserting a series of various
 /// complex conditions:
+///
 /// 1. The elements of your iterator are closed under some operation `*`.
 /// 2. This operation `*` is associative on the elements of your iterator.
 /// 3. The iterator contains an identity element for `*`.
@@ -48,7 +51,11 @@ pub struct Group<I: Iterator>
 where
     I::Item: GroupItem,
 {
+    /// The "dimension" of the iterator's type, used to distinguish between
+    /// matrices of different sizes, permutations of different sizes, etc.
     dim: Dim<I>,
+
+    /// The underlying iterator which actually outputs the groups.
     iter: I,
 }
 
@@ -146,36 +153,36 @@ impl<T: Float> Group<GenIter<Matrix<T>>> {
         GenIter::parse(input).map(|gens| gens.map(Into::into))
     }
 
-    /// Parses a diagram and turns it into a Coxeter group.
-    pub fn parse_unwrap(input: &str) -> Self {
-        Self::parse(input).unwrap().unwrap()
-    }
-
     /// Returns the A(n) group.
     pub fn simplex(n: usize) -> Self {
-        Cox::a(n).group().unwrap()
+        // Safety: this is always a valid Coxeter group.
+        unsafe { Cox::a(n).group().unchecked_unwrap() }
     }
 
     /// Returns the B(n) group.
     pub fn hypercube(n: usize) -> Self {
-        Cox::b(n).group().unwrap()
+        // Safety: this is always a valid Coxeter group.
+        unsafe { Cox::b(n).group().unchecked_unwrap() }
     }
 
     /// Returns the D(n) group.
     pub fn demihypercube(n: usize) -> Self {
-        Cox::d(n).group().unwrap()
+        // Safety: this is always a valid Coxeter group.
+        unsafe { Cox::d(n).group().unchecked_unwrap() }
     }
 
     /// Returns the E(n) group.
     pub fn gosset(n: usize) -> Self {
         assert!((4..=8).contains(&n));
-        Cox::e(n).group().unwrap()
+        // Safety: this is always a valid Coxeter group.
+        unsafe { Cox::e(n).group().unchecked_unwrap() }
     }
 
     /// Returns the H(n) group.
     pub fn pentagonal(n: usize) -> Self {
         assert!((2..=4).contains(&n));
-        Cox::h(n).group().unwrap()
+        // Safety: this is always a valid Coxeter group.
+        unsafe { Cox::h(n).group().unchecked_unwrap() }
     }
 }
 
@@ -192,17 +199,26 @@ impl<T: GroupItem> Group<array::IntoIter<T, 2>> {
 
 impl<T: Float> Group<array::IntoIter<Matrix<T>, 2>> {
     /// Builds the group containing central inversion only.
+    ///
+    /// # Panics
+    /// This function panics if the dimension is zero.
     pub fn central_inv(dim: usize) -> Self {
         assert!(dim >= 1);
+
         // Safety: (-I)^2 = I.
         unsafe { Self::two(dim, -Matrix::identity(dim, dim)) }
     }
 
     /// Builds the group containing reflection at a given coordinate only.
+    ///
+    /// # Panics
+    /// This function panics if the dimension is zero.
     pub fn reflection_at(dim: usize, idx: usize) -> Self {
         assert!(dim >= 1);
         let mut refl = Matrix::identity(dim, dim);
         refl[(idx, idx)] = -T::ONE;
+
+        // Safety: reflections are involutions.
         unsafe { Self::two(dim, refl) }
     }
 }
@@ -215,6 +231,7 @@ impl Group<array::IntoIter<SPermutation<2>, 2>> {
     }
 }
 
+/// The type of an iterator that maps pairs of matrices into their product.
 type MatrixProductIter<T> = PairMap<
     (Vec<Matrix<T>>, Vec<Matrix<T>>),
     for<'a, 'b> fn(&'a Matrix<T>, &'b Matrix<T>) -> Matrix<T>,
@@ -301,7 +318,8 @@ impl<T: Float, I: Iterator<Item = Matrix<T>>> Group<I> {
         self,
         g: Group<J>,
     ) -> Group<impl Iterator<Item = Matrix<T>>> {
-        // Safety: the direct sum is always a group isomorphic to the Cartesian product.
+        // Safety: the direct sum is always a group isomorphic to the Cartesian
+        // product.
         unsafe {
             Group::new(
                 self.dim + g.dim,
@@ -317,6 +335,9 @@ impl<T: Float, I: Iterator<Item = Matrix<T>>> Group<I> {
     ///
     /// This method allows to specify a homomorphism between both rotation
     /// groups and some abstract group.
+    ///
+    /// # Panics
+    /// This method will panic if the groups are not 3-dimensional.
     ///
     /// # Safety
     /// Both groups must be rotation groups, and the passed functions must be
@@ -450,6 +471,7 @@ impl<T: Float, I: Iterator<Item = Matrix<T>>> Group<I> {
     */
 }
 
+/// Converts a matrix into a unit quaternion.
 fn mat_to_quat<T: Float>(mat: &Matrix<T>) -> UnitQuaternion<T> {
     UnitQuaternion::from_rotation_matrix(&Rotation::from_matrix_unchecked(
         mat.fixed_slice::<3, 3>(0, 0).into(),
@@ -528,6 +550,11 @@ mod tests {
             "The rotational group of {} does not have the expected order.",
             name
         );
+    }
+
+    /// Parses a CD and unwraps it.
+    fn parse_unwrap(input: &str) -> Group<GenIter<Matrix<f32>>> {
+        Group::parse(input).unwrap().unwrap()
     }
 
     /// Tests the trivial group in various dimensions.
@@ -636,14 +663,14 @@ mod tests {
     /// regular dodecahedron and a regular hecatonicosachoron.
     #[test]
     fn h() {
-        test(Group::parse_unwrap("o5o3o"), 120, 60, "H3");
-        test(Group::parse_unwrap("o5o3o3o"), 14400, 7200, "H4");
+        test(parse_unwrap("o5o3o"), 120, 60, "H3");
+        test(parse_unwrap("o5o3o3o"), 14400, 7200, "H4");
     }
 
     /// Tests the E6 symmetry group.
     #[test]
     fn e6() {
-        test(Group::parse_unwrap("o3o3o3o3o *c3o"), 51840, 25920, "E6");
+        test(parse_unwrap("o3o3o3o3o *c3o"), 51840, 25920, "E6");
     }
 
     #[test]
@@ -673,7 +700,7 @@ mod tests {
     #[test]
     /// Tests the direct product of A3 with itself.
     fn a3xa3() {
-        let a3 = Group::parse_unwrap("o3o3o");
+        let a3 = parse_unwrap("o3o3o");
         let g = Group::direct_product(a3.clone(), a3);
         test(g, 576, 288, "A3×A3");
     }

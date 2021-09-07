@@ -229,6 +229,7 @@ where
     /// The number of permutation we're generating.
     idx: usize,
 
+    /// This type determines the size of the permutations to output.
     dim: PhantomData<D>,
 }
 
@@ -242,7 +243,8 @@ impl<T: GroupItem + Clone, D: Dim> PermutationIter<T, D>
 where
     DefaultAllocator: Allocator<T, D>,
 {
-    /// Initializes a new iterator over permutations.
+    /// Initializes a new iterator over permutations from the elements of a
+    /// group.
     pub fn new(vec: Vec<T>) -> Self {
         D::from_usize(vec.len());
         let mut indices = BTreeMap::new();
