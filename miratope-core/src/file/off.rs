@@ -531,6 +531,8 @@ pub enum OffWriteError {
 }
 
 impl OffWriteError {
+    /// Returns the error in which two edges coincide. These must be ordered so
+    /// that we can run consistent tests on these.
     fn coincident_edges(mut idx0: usize, mut idx1: usize) -> Self {
         if idx0 > idx1 {
             std::mem::swap(&mut idx0, &mut idx1);
@@ -871,6 +873,7 @@ impl Display for OffSaveError {
 
 impl std::error::Error for OffSaveError {}
 
+/// The result of trying to save an OFF file.
 type OffSaveResult<T> = Result<T, OffSaveError>;
 
 //todo: put this in its own trait

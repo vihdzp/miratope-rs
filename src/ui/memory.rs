@@ -1,9 +1,12 @@
+//! Manages the memory tab.
+
 use crate::NamedConcrete;
 
 use bevy::prelude::Query;
 use bevy_egui::egui;
 use miratope_lang::lang::En;
 
+/// The compile-time number of slots of memory.
 pub const MEMORY_SLOTS: usize = 8;
 
 /// Represents the memory slots to store polytopes.
@@ -46,39 +49,29 @@ impl Memory {
 
                     // Shows a slot with a polytope on it.
                     Some(poly) => {
-                        let mut clear = false;
-
-                        egui::CollapsingHeader::new(En::parse_uppercase(&poly.name))
+                        let clear = egui::CollapsingHeader::new(En::parse_uppercase(&poly.name))
                             .id_source(idx)
                             .show(ui, |ui| {
                                 // Clones a polytope from memory.
                                 if ui.button("Load").clicked() {
-                                    if let Some(mut p) = query.iter_mut().next() {
-                                        *p = poly.clone();
-                                    }
+                                    *query.iter_mut().next().unwrap() = poly.clone();
                                 }
 
                                 // Swaps the current polytope with the one on memory.
                                 if ui.button("Swap").clicked() {
-                                    if let Some(mut p) = query.iter_mut().next() {
-                                        std::mem::swap(p.as_mut(), poly);
-                                    }
+                                    std::mem::swap(query.iter_mut().next().unwrap().as_mut(), poly);
                                 }
 
                                 // Clones a polytope into memory.
                                 if ui.button("Save").clicked() {
-                                    if let Some(p) = query.iter_mut().next() {
-                                        *poly = p.clone();
-                                    }
+                                    *poly = query.iter_mut().next().unwrap().clone();
                                 }
 
                                 // Clears a polytope from memory.
-                                if ui.button("Clear").clicked() {
-                                    clear = true;
-                                }
+                                ui.button("Clear").clicked()
                             });
 
-                        if clear {
+                        if clear.body_returned == Some(true) {
                             *slot = None;
                         }
                     }

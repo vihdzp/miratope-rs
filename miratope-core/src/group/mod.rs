@@ -172,6 +172,10 @@ impl<T: Float> Group<GenIter<Matrix<T>>> {
     }
 
     /// Returns the E(n) group.
+    ///
+    /// # Panics
+    /// This function will panic if you attempt to build anything other than
+    /// E(4), E(5), E(6), E(7), or E(8).
     pub fn gosset(n: usize) -> Self {
         assert!((4..=8).contains(&n));
         // Safety: this is always a valid Coxeter group.
@@ -179,6 +183,10 @@ impl<T: Float> Group<GenIter<Matrix<T>>> {
     }
 
     /// Returns the H(n) group.
+    ///
+    /// # Panics
+    /// This function will panic if you attempt to build anything other than
+    /// H(2), H(3), or H(4).
     pub fn pentagonal(n: usize) -> Self {
         assert!((2..=4).contains(&n));
         // Safety: this is always a valid Coxeter group.

@@ -265,7 +265,7 @@ impl Abstract {
     /// Returns the omnitruncate of a polytope, along with the flags that make
     /// up its respective vertices.
     ///
-    /// # Safety
+    /// # Panics
     /// You must call [`Polytope::element_sort`] before calling this method.
     pub fn omnitruncate_and_flags(&self) -> (Self, Vec<Flag>) {
         let mut flag_sets = vec![FlagSet::new_all(self)];
@@ -327,16 +327,12 @@ impl Abstract {
         ranks.push(SubelementList::vertices(flags.len()));
         ranks.push(SubelementList::min());
 
-        // TODO: wrap this using an AbstractBuilderRev.
-        let mut abs = AbstractBuilder::with_rank_capacity(rank);
-        for subelements in ranks.into_iter().rev() {
-            abs.push(subelements);
-        }
+        let builder: AbstractBuilder = ranks.into_iter().rev().collect();
 
         // Safety: we've built an omnitruncate based on the polytope. For a
         // proof that this construction yields a valid abstract polytope, see
         // [TODO: write proof].
-        (unsafe { abs.build() }, flags)
+        (unsafe { builder.build() }, flags)
     }
 
     /// Returns an arbitrary truncate as an abstract polytope.

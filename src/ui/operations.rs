@@ -303,11 +303,9 @@ pub trait DuoWindow: Window {
     /// of the nullitope.
     fn dim_or(&self, polytope: &NamedConcrete, memory: &Memory) -> [usize; 2] {
         let [p, q] = self.polytopes(polytope, memory);
-
-        [
-            p.map(|poly| poly.dim()).flatten().unwrap_or_default(),
-            q.map(|poly| poly.dim()).flatten().unwrap_or_default(),
-        ]
+        let dim =
+            |p: Option<&NamedConcrete>| p.map(|poly| poly.dim()).flatten().unwrap_or_default();
+        [dim(p), dim(q)]
     }
 
     /// Applies the action of the window to the polytope.

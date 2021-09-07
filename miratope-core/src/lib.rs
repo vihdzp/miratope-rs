@@ -8,14 +8,12 @@
     future_incompatible,
     missing_copy_implementations
 )]
-// These are helpful to enable while we're building the docs.
 /*
 #![warn(
     clippy::missing_docs_in_private_items,
     clippy::missing_panics_doc,
     missing_docs
-)]
-*/
+)]*/
 
 //! This is the main dependency of
 //! [Miratope](https://github.com/OfficialURL/miratope-rs). It contains all code
