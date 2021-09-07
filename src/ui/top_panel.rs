@@ -23,6 +23,7 @@ impl Plugin for TopPanelPlugin {
             .insert_resource(Memory::default())
             .insert_resource(SectionDirection::default())
             .insert_resource(SectionState::default())
+            .insert_non_send_resource(FileDialogToken::default())
             .add_system(file_dialog.system())
             // Windows must be the first thing shown.
             .add_system(
@@ -90,21 +91,31 @@ impl Default for SectionDirection {
     }
 }
 
-/// Auxiliary function to create a new file dialog.
-fn new_file_dialog() -> rfd::FileDialog {
-    rfd::FileDialog::new()
-        .add_filter("OFF File", &["off"])
-        .add_filter("GGB file", &["ggb"])
-}
+/// Contains all operations that manipulate file dialogs concretely.
+///
+/// Guarantees that file dialogs will be opened on the main thread, so as to
+/// circumvent a MacOS limitation that all GUI operations must be done on the
+/// main thread.
+#[derive(Default)]
+pub struct FileDialogToken(std::marker::PhantomData<*const ()>);
 
-/// Returns the path given by an open file dialog.
-fn pick_file() -> Option<PathBuf> {
-    new_file_dialog().pick_file()
-}
+impl FileDialogToken {
+    /// Auxiliary function to create a new file dialog.
+    fn new_file_dialog() -> rfd::FileDialog {
+        rfd::FileDialog::new()
+            .add_filter("OFF File", &["off"])
+            .add_filter("GGB file", &["ggb"])
+    }
 
-/// Returns the path given by a save file dialog.
-fn save_file(name: &str) -> Option<PathBuf> {
-    new_file_dialog().set_file_name(name).save_file()
+    /// Returns the path given by an open file dialog.
+    fn pick_file(&self) -> Option<PathBuf> {
+        Self::new_file_dialog().pick_file()
+    }
+
+    /// Returns the path given by a save file dialog.
+    fn save_file(&self, name: &str) -> Option<PathBuf> {
+        Self::new_file_dialog().set_file_name(name).save_file()
+    }
 }
 
 /// The type of file dialog we're showing.
@@ -159,12 +170,13 @@ impl FileDialogState {
 pub fn file_dialog(
     mut query: Query<'_, '_, &mut NamedConcrete>,
     file_dialog_state: Res<'_, FileDialogState>,
+    file_dialog: NonSend<'_, FileDialogToken>,
 ) {
     if file_dialog_state.is_changed() {
         match file_dialog_state.mode {
             // We want to save a file.
             FileDialogMode::Save => {
-                if let Some(path) = save_file(file_dialog_state.unwrap_name()) {
+                if let Some(path) = file_dialog.save_file(file_dialog_state.unwrap_name()) {
                     if let Some(p) = query.iter_mut().next() {
                         if let Err(err) = p.con().to_path(&path, Default::default()) {
                             eprintln!("File saving failed: {}", err);
@@ -175,7 +187,7 @@ pub fn file_dialog(
 
             // We want to open a file.
             FileDialogMode::Open => {
-                if let Some(path) = pick_file() {
+                if let Some(path) = file_dialog.pick_file() {
                     if let Some(mut p) = query.iter_mut().next() {
                         match NamedConcrete::from_path(&path) {
                             Ok(q) => {
