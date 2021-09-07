@@ -54,6 +54,9 @@ version = "0.14.2"
 default-features = false
 features = ["multi_threaded"]
 
+[patch.crates-io]
+winit = { git = "https://github.com/OfficialURL/winit", rev = "91591c4e94fc31b5cd3b9e0438873a97abb35a17" }
+
 [profile.release]
 lto = "thin"
 incremental = true
