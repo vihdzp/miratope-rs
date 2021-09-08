@@ -509,7 +509,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
             else if abs_diff_ne!(
                 (&center - &first_vertex).norm(),
                 (&center - vertex).norm(),
-                epsilon = Float::EPS
+                epsilon = T::EPS
             ) {
                 return None;
             }
@@ -597,7 +597,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// a specified edge length.
     fn is_equilateral_with(&self, len: T) -> bool {
         (0..self.edge_count())
-            .all(|idx| abs_diff_eq!(self.edge_len(idx).unwrap(), len, epsilon = Float::EPS))
+            .all(|idx| abs_diff_eq!(self.edge_len(idx).unwrap(), len, epsilon = T::EPS))
     }
 
     /// Checks whether a polytope is equilateral to a fixed precision.
@@ -1192,7 +1192,7 @@ mod tests {
             ));
 
             assert!(
-                abs_diff_eq!(poly_volume, volume, epsilon = Float::EPS),
+                abs_diff_eq!(poly_volume, volume, epsilon = f32::EPS),
                 "Expected volume {} for {}, found volume {}.",
                 volume,
                 "TBA: name",

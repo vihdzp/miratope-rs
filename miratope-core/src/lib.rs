@@ -138,12 +138,6 @@ pub trait Polytope:
     /// with a given number of sides.
     fn polygon(n: usize) -> Self;
 
-    /// Returns a map from the elements in a polytope to the index of one of its
-    /// vertices. Does not map the minimal element anywhere.
-    fn vertex_map(&self) -> ElementMap<usize> {
-        self.abs().vertex_map()
-    }
-
     /// Returns the dual of a polytope. Never fails for an abstract polytope. In
     /// case of failing on a concrete polytope, returns the index of a facet
     /// through the inversion center.
@@ -157,6 +151,12 @@ pub trait Polytope:
     /// "Appends" a polytope into another, creating a compound polytope. Fails
     /// if the polytopes have different ranks.
     fn comp_append(&mut self, p: Self);
+
+    /// Returns a map from the elements in a polytope to the index of one of its
+    /// vertices. Does not map the minimal element anywhere.
+    fn vertex_map(&self) -> ElementMap<usize> {
+        self.abs().vertex_map()
+    }
 
     /// Gets the element with a given rank and index as a polytope, if it exists.
     fn element(&self, rank: usize, idx: usize) -> Option<Self>;
@@ -263,13 +263,7 @@ pub trait Polytope:
         }
 
         // We returned to precisely the initial flag.
-        if flag == new_flag {
-            Some(vertices)
-        }
-        // The Petrie polygon self-intersects.
-        else {
-            None
-        }
+        (flag == new_flag).then(|| vertices)
     }
 
     /// Builds a Petrie polygon from a given flag of the polytope. Returns

@@ -90,8 +90,10 @@ impl Flag {
     /// of the polytope minus 1.
     pub fn change_mut(&mut self, polytope: &Abstract, r: usize) {
         // This is running in a hot loop. Maybe get rid of it?
-        assert_sorted(polytope);
-        assert!(r >= 1);
+        if cfg!(debug_assertions) {
+            assert_sorted(polytope);
+        }
+        debug_assert!(r >= 1);
 
         // Determines the common elements between the subelements of the element
         // above and the superelements of the element below.

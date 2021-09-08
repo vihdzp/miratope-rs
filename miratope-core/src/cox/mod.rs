@@ -4,7 +4,7 @@ pub mod cd;
 pub mod parse;
 
 use std::{
-    mem,
+    iter,
     ops::{Index, IndexMut},
 };
 
@@ -74,23 +74,28 @@ impl<T: Float> Cox<T> {
         self.0.iter_mut()
     }
 
+    /// Creates a Coxeter diagram from an iterator over the entries of its
+    /// linear diagram.
+    pub fn from_lin_diagram_iter<I: Iterator<Item = T>>(iter: I, dim: usize) -> Self {
+        let mut cox = Self(Matrix::from_fn(dim, dim, |i, j| {
+            if i == j {
+                T::ONE
+            } else {
+                T::TWO
+            }
+        }));
+
+        for (i, edge) in iter.enumerate() {
+            cox.link(i, i + 1, edge);
+        }
+
+        cox
+    }
+
     /// Creates a Coxeter matrix from a linear diagram, whose edges are
     /// described by the vector.
     pub fn from_lin_diagram(diagram: &[T]) -> Self {
-        let dim = diagram.len() + 1;
-
-        Self::new(Matrix::from_fn(dim, dim, |mut i, mut j| {
-            // Makes i ≤ j.
-            if i > j {
-                mem::swap(&mut i, &mut j);
-            }
-
-            match j - i {
-                0 => T::ONE,
-                1 => diagram[i],
-                _ => T::TWO,
-            }
-        }))
+        Self::from_lin_diagram_iter(diagram.iter().copied(), diagram.len())
     }
 
     /// Returns the Coxeter matrix for the I2(x) group.
@@ -100,14 +105,15 @@ impl<T: Float> Cox<T> {
 
     /// Returns the Coxeter matrix for the An group.
     pub fn a(n: usize) -> Self {
-        Self::from_lin_diagram(&vec![T::THREE; n - 1])
+        Self::from_lin_diagram_iter(iter::repeat(T::THREE).take(n - 1), n)
     }
 
     /// Returns the Coxeter matrix for the Bn group.
     pub fn b(n: usize) -> Self {
-        let mut diagram = vec![T::THREE; n - 1];
-        diagram[0] = T::FOUR;
-        Self::from_lin_diagram(&diagram)
+        Self::from_lin_diagram_iter(
+            iter::once(T::FOUR).chain(iter::repeat(T::THREE).take(n - 2)),
+            n,
+        )
     }
 
     /// Returns the Coxeter matrix for the Dn group.
@@ -128,9 +134,10 @@ impl<T: Float> Cox<T> {
 
     /// Returns the Coxeter matrix for the Hn group.
     pub fn h(n: usize) -> Self {
-        let mut diagram = vec![T::THREE; n];
-        diagram[0] = T::FIVE;
-        Self::from_lin_diagram(&diagram)
+        Self::from_lin_diagram_iter(
+            iter::once(T::FIVE).chain(iter::repeat(T::THREE).take(n - 2)),
+            n,
+        )
     }
 
     /// Returns an upper triangular matrix whose columns are unit normal vectors
@@ -145,7 +152,7 @@ impl<T: Float> Cox<T> {
             let (prev_gens, mut n_i) = mat.columns_range_pair_mut(0..i, i);
 
             for (j, n_j) in prev_gens.column_iter().enumerate() {
-                // All other entries in the dot product are zero.
+                // All other entries in the dot product between columns are zero.
                 let dot = n_i.rows_range(0..=j).dot(&n_j.rows_range(0..=j));
                 n_i[j] = ((T::PI / self[(i, j)]).fcos() - dot) / n_j[j];
             }
@@ -162,7 +169,7 @@ impl<T: Float> Cox<T> {
         Some(mat)
     }
 
-    /// Returns an iterator over the generators of the Coxeter matrix.
+    /// Returns an iterator over the elements of the Coxeter group.
     pub fn gen_iter(&self) -> Option<GenIter<Matrix<T>>> {
         let normals = self.normals()?;
         let dim = normals.nrows();

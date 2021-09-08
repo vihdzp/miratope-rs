@@ -94,17 +94,17 @@ impl IntoIterator for SectionMap {
 
 impl SectionMap {
     /// Initializes a new section hash.
-    pub fn new() -> Self {
+    fn new() -> Self {
         Default::default()
     }
 
     /// Returns the number of stored elements.
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         self.0.len()
     }
 
     /// Returns all singleton sections of a polytope.
-    pub fn singletons(poly: &Abstract) -> Self {
+    fn singletons(poly: &Abstract) -> Self {
         let mut section_hash = Self::new();
 
         for (rank, elements) in poly.iter().enumerate() {
@@ -119,7 +119,7 @@ impl SectionMap {
     }
 
     /// Gets the index of a section in the hash, inserting it if necessary.
-    pub fn get_insert(&mut self, section: Section) -> usize {
+    fn get_insert(&mut self, section: Section) -> usize {
         use std::collections::hash_map::Entry;
 
         // We organize by lowest rank, then by hash.
@@ -165,9 +165,9 @@ pub(super) fn antiprism_and_vertices(abs: &Abstract) -> (Abstract, Vec<usize>, V
             .collect();
 
         // Goes over all sections of the previous height, and builds the
-        // sections of the current height by either changing the upper
-        // element into one of its superelements, or changing the lower
-        // element into one of its subelements.
+        // sections of the current height by either changing the upper element
+        // into one of its superelements, or changing the lower element into one
+        // of its subelements.
         for (section, idx) in section_hash.into_iter() {
             for &idx_lo in &abs[section.lo()].subs {
                 elements[idx].push(

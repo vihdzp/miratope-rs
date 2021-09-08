@@ -72,7 +72,7 @@ impl<T: Float> Hypersphere<T> {
 
         // If any face passes through the dual center, the dual does
         // not exist, and we return early.
-        if s < Float::EPS {
+        if s < T::EPS {
             return false;
         }
 
@@ -144,7 +144,7 @@ impl<T: Float> Subspace<T> {
     pub fn add(&mut self, p: &Point<T>) -> Option<&Point<T>> {
         let mut v = p - self.project(p);
 
-        if v.normalize_mut() > Float::EPS {
+        if v.normalize_mut() > T::EPS {
             self.basis.push(v);
             self.basis.last()
         } else {
@@ -304,7 +304,7 @@ impl<T: Float> Hyperplane<T> {
 
     /// Returns whether a point is contained on the hyperplane.
     pub fn is_outer(&self, p: &Point<T>) -> bool {
-        abs_diff_eq!(self.distance(p), T::ZERO, epsilon = Float::EPS)
+        abs_diff_eq!(self.distance(p), T::ZERO, epsilon = T::EPS)
     }
 
     /// Returns the intersection of itself and a line segment, or `None` if it
@@ -381,7 +381,7 @@ where
         assert_eq!(self.shape(), other.shape(), "matrix shape mismatch");
         self.iter()
             .zip(other.iter())
-            .all(|(x, y)| abs_diff_eq!(x, y, epsilon = Float::EPS))
+            .all(|(x, y)| abs_diff_eq!(x, y, epsilon = T::EPS))
     }
 }
 
@@ -398,7 +398,7 @@ where
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         for (x, y) in self.iter().zip(other.iter()) {
-            if abs_diff_ne!(x, y, epsilon = Float::EPS) {
+            if abs_diff_ne!(x, y, epsilon = T::EPS) {
                 return x.partial_cmp(y);
             }
         }
@@ -461,7 +461,7 @@ mod tests {
     use nalgebra::dvector;
 
     fn assert_eq(p: Point<f32>, q: Point<f32>) {
-        assert_abs_diff_eq!((p - q).norm(), 0.0, epsilon = Float::EPS)
+        assert_abs_diff_eq!((p - q).norm(), 0.0, epsilon = f32::EPS)
     }
 
     #[test]

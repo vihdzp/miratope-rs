@@ -593,10 +593,7 @@ impl ElementHash {
 
         // A vector of HashMaps. The k-th entry is a map from k-elements of the
         // original polytope into k-elements in a new polytope.
-        let mut hashes = Vec::with_capacity(rank + 1);
-        for _ in 0..=rank {
-            hashes.push(HashMap::new());
-        }
+        let mut hashes: Vec<_> = iter::repeat_with(HashMap::new).take(rank + 1).collect();
         hashes[rank].insert(idx, 0);
 
         // Gets subindices of subindices, until reaching the vertices.

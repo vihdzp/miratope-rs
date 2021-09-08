@@ -15,8 +15,9 @@ pub trait Float:
     + serde::Serialize
     + Copy
 {
-    /// A default epsilon value. Used in general floating point operations that
-    /// would return zero given infinite precision.
+    /// A default epsilon value for comparing values close to `1.0`. Used in
+    /// general floating point operations that would return zero given infinite
+    /// precision.
     // todo: just put it in the methods themselves.
     const EPS: Self;
 
@@ -124,7 +125,7 @@ impl Float for f32 {
 
 /// Constants for `f64`.
 impl Float for f64 {
-    const EPS: f64 = 1e-9;
+    const EPS: f64 = 1e-12;
     const ZERO: f64 = 0.0;
     const ONE: f64 = 1.0;
     const TWO: f64 = 2.0;
