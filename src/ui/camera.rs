@@ -33,7 +33,7 @@ pub enum ProjectionType {
     Perspective,
 }
 
-impl Default for ProjectionType{
+impl Default for ProjectionType {
     fn default() -> Self {
         Self::Perspective
     }
