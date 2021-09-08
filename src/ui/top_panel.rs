@@ -19,11 +19,11 @@ pub struct TopPanelPlugin;
 
 impl Plugin for TopPanelPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(FileDialogState::default())
-            .insert_resource(Memory::default())
-            .insert_resource(SectionDirection::default())
-            .insert_resource(SectionState::default())
-            .insert_non_send_resource(FileDialogToken::default())
+        app.init_resource::<FileDialogState>()
+            .init_resource::<Memory>()
+            .init_resource::<SectionDirection>()
+            .init_resource::<SectionState>()
+            .init_non_send_resource::<FileDialogToken>()
             .add_system(file_dialog.system())
             // Windows must be the first thing shown.
             .add_system(

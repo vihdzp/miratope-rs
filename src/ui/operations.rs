@@ -181,7 +181,7 @@ pub struct PlainWindowPlugin<T: PlainWindow>(PhantomData<T>);
 
 impl<T: PlainWindow + 'static> Plugin for PlainWindowPlugin<T> {
     fn build(&self, app: &mut App) {
-        app.insert_resource(T::default())
+        app.init_resource::<T>()
             .add_system(T::show_system.system().label("show_windows"));
     }
 }
@@ -451,7 +451,7 @@ pub struct DuoWindowPlugin<T: DuoWindow>(PhantomData<T>);
 
 impl<T: DuoWindow + 'static> Plugin for DuoWindowPlugin<T> {
     fn build(&self, app: &mut App) {
-        app.insert_resource(T::default())
+        app.init_resource::<T>()
             .add_system(T::show_system.system().label("show_windows"));
     }
 }

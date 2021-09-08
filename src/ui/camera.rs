@@ -16,7 +16,7 @@ pub struct InputPlugin;
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<CameraInputEvent>()
-            .insert_resource(ProjectionType::Perspective)
+            .init_resource::<ProjectionType>()
             // We register inputs after the library has been shown, so that we
             // know whether mouse input should register.
             .add_system(add_cam_input_events.system().after("show_library"))
@@ -31,6 +31,12 @@ pub enum ProjectionType {
 
     /// We're projecting from a point.
     Perspective,
+}
+
+impl Default for ProjectionType{
+    fn default() -> Self {
+        Self::Perspective
+    }
 }
 
 impl ProjectionType {
