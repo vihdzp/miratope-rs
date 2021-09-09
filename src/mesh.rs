@@ -202,11 +202,7 @@ fn normals(vertices: &[[f32; 3]]) -> Vec<[f32; 3]> {
                 [0.0, 0.0, 0.0]
             } else {
                 let norm = sq_norm.sqrt();
-                let mut n = *n;
-                n[0] /= norm;
-                n[1] /= norm;
-                n[2] /= norm;
-                n
+                n.map(|c| c / norm)
             }
         })
         .collect()
@@ -236,9 +232,7 @@ fn vertex_coords<'a, I: Iterator<Item = &'a Point>>(
 
     // If the polytope is at most 3D, we just embed it into 3D space.
     if projection_type.is_orthogonal() || dim <= 3 {
-        vertices
-            .map(|p| [coord(p, 0), coord(p, 1), coord(p, 2)])
-            .collect()
+        vertices.map(|p| [0, 1, 2].map(|i| coord(p, i))).collect()
     }
     // Else, we project it down.
     else {
@@ -246,18 +240,14 @@ fn vertex_coords<'a, I: Iterator<Item = &'a Point>>(
         let mut direction = Vector::zeros(dim);
         direction[3] = 1.0;
 
-        let (min, max) = poly.minmax(&direction).unwrap();
+        let (min, max) = poly.minmax(direction).unwrap();
         let dist = (min as f32 - 1.0).abs().max(max as f32 + 1.0).abs();
 
         vertices
             .map(|p| {
                 // We scale the first three coordinates accordingly.
                 let factor: f32 = p.iter().skip(3).map(|&x| x as f32 + dist).product();
-                [
-                    coord(p, 0) / factor,
-                    coord(p, 1) / factor,
-                    coord(p, 2) / factor,
-                ]
+                [0, 1, 2].map(|i| coord(p, i) / factor)
             })
             .collect()
     }

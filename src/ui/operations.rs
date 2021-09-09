@@ -83,6 +83,7 @@ fn resize(point: &mut Point, dim: usize) {
 /// The base trait for a window, containing the common code. You probably don't
 /// want to implement **only** this.
 pub trait Window: Send + Sync + Default {
+    /// The name on the window, shown on the upper left.
     const NAME: &'static str;
 
     /// Returns whether the window is open.
@@ -302,10 +303,8 @@ pub trait DuoWindow: Window {
     /// Returns the dimensions of the polytopes currently selected, or 0 in case
     /// of the nullitope.
     fn dim_or(&self, polytope: &NamedConcrete, memory: &Memory) -> [usize; 2] {
-        let [p, q] = self.polytopes(polytope, memory);
-        let dim =
-            |p: Option<&NamedConcrete>| p.map(|poly| poly.dim()).flatten().unwrap_or_default();
-        [dim(p), dim(q)]
+        self.polytopes(polytope, memory)
+            .map(|p| p.map(|poly| poly.dim()).flatten().unwrap_or_default())
     }
 
     /// Applies the action of the window to the polytope.

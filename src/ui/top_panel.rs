@@ -478,7 +478,7 @@ pub fn show_top_panel(
                                     direction[dim - 1] = 1.0;
                                 }
 
-                                let minmax = p.minmax(&direction).unwrap_or((-1.0, 1.0));
+                                let minmax = p.minmax(direction.clone()).unwrap_or((-1.0, 1.0));
                                 let original_polytope = p.clone();
 
                                 section_state.open(original_polytope, minmax);
@@ -638,13 +638,8 @@ pub fn show_top_panel(
             // Background color picker.
 
             // The current background color.
-            let [r, g, b, a] = background_color.0.as_rgba_f32();
-            let color = egui::Color32::from_rgba_premultiplied(
-                (r * 255.0) as u8,
-                (g * 255.0) as u8,
-                (b * 255.0) as u8,
-                (a * 255.0) as u8,
-            );
+            let [r, g, b, a] = background_color.0.as_rgba_f32().map(|c| (c * 255.0) as u8);
+            let color = egui::Color32::from_rgba_premultiplied(r, g, b, a);
 
             // The new background color.
             let mut new_color = color;
@@ -767,7 +762,7 @@ fn show_views(
         } = section_state.as_mut()
         {
             *minmax = original_polytope
-                .minmax(&section_direction.0)
+                .minmax(section_direction.0.clone())
                 .unwrap_or((-1.0, 1.0));
         }
     }
@@ -793,7 +788,7 @@ fn show_views(
                 if let Some(dim) = r.dim() {
                     let hyperplane = Hyperplane::new(section_direction.0.clone(), hyp_pos);
                     *minmax = original_polytope
-                        .minmax(&section_direction.0)
+                        .minmax(section_direction.0.clone())
                         .unwrap_or((-1.0, 1.0));
 
                     let mut slice = r.cross_section(&hyperplane);

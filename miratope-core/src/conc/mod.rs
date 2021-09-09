@@ -531,10 +531,10 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// Gets the least and greatest distance of a vertex of the polytope,
     /// measuring from a specified direction, or returns `None` in the case of
     /// the nullitope.
-    fn minmax(&self, direction: &Vector<T>) -> Option<(T, T)> {
+    fn minmax(&self, direction: Vector<T>) -> Option<(T, T)> {
         use itertools::{Itertools, MinMaxResult::*};
 
-        let hyperplane = Hyperplane::new(direction.clone(), T::ZERO);
+        let hyperplane = Hyperplane::new(direction, T::ZERO);
 
         match self
             .vertices()
@@ -618,9 +618,6 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// place, or does nothing in case any facets go through the reciprocation
     /// center. In case of failure, returns the index of the facet through the
     /// projection center.
-    ///
-    /// # Panics
-    /// This method shouldn't panic. If it does, please file a bug.
     fn try_dual_mut_with(&mut self, sphere: &Hypersphere<T>) -> Result<(), Self::DualError>;
 
     /// Returns the dual of a polytope with a given reciprocation sphere, or
