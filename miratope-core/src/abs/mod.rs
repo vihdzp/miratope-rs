@@ -15,11 +15,10 @@ use std::{
 
 use self::flag::{Flag, FlagSet};
 use super::Polytope;
-use product::product;
 
 use vec_like::VecLike;
 
-pub use antiprism::*;
+pub use antiprism::Section;
 pub use elements::*;
 pub use valid::*;
 
@@ -196,14 +195,14 @@ impl Abstract {
         self.meta.sorted
     }
 
-    /// Sets the metadata of the polytope to be sorted.
+    /// Sets the metadata of the polytope that stores whether the indices of the
+    /// polytope's subelements and superelements are sorted to a given value.
     ///
     /// # Safety
-    /// All of the indices of all of the subelements and superelements of the
-    /// polytope must be sorted. Setting this flag incorrectly will cause
-    /// algorithms to behave unpredictably.
-    pub unsafe fn set_sorted(&mut self) {
-        self.meta.sorted = true;
+    /// Setting this flag incorrectly will cause algorithms to behave
+    /// unpredictably, potentially causing UB.
+    pub unsafe fn set_sorted(&mut self, sorted: bool) {
+        self.meta.sorted = sorted;
     }
 
     /// Returns an iterator over the [`ElementLists`](ElementList) of each rank.
@@ -213,19 +212,15 @@ impl Abstract {
 
     /// Takes the dual of an abstract polytope in place. This can never fail.
     pub fn dual_mut(&mut self) {
-        // Safety: we'll swap the subelements and superelements in each element,
-        // then reverse the ranks, thus building the dual, which is a valid
-        // abstract polytope.
+        // Safety: duals of polytopes are polytopes.
         let sorted = self.sorted();
         let ranks = unsafe { self.ranks_mut() };
         ranks.for_each_element_mut(Element::swap_mut);
         ranks.reverse();
 
         // Safety: if the original elements were sorted, so will these be.
-        if sorted {
-            unsafe {
-                self.set_sorted();
-            }
+        unsafe {
+            self.set_sorted(sorted);
         }
     }
 
@@ -240,13 +235,13 @@ impl Abstract {
     /// based on a given polytope. Also returns the indices of the vertices that
     /// form the base and the dual base, in that order.
     pub fn antiprism_and_vertices(&self) -> (Self, Vec<usize>, Vec<usize>) {
-        antiprism_and_vertices(self)
+        antiprism::antiprism_and_vertices(self)
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope. This can never fail for an abstract polytope.
     pub fn antiprism(&self) -> Self {
-        self.antiprism_and_vertices().0
+       antiprism::antiprism(self)
     }
 
     /// Gets the indices of the vertices of an element in the polytope, if it
@@ -481,7 +476,7 @@ impl Polytope for Abstract {
         // Safety: the nullitope is a valid polytope, and its indices are sorted.
         unsafe {
             let mut poly = Self::from_ranks(vec![ElementList::min(0)].into());
-            poly.set_sorted();
+            poly.set_sorted(true);
             poly
         }
     }
@@ -493,7 +488,7 @@ impl Polytope for Abstract {
         // Safety: the point is a valid polytope, and its indices are sorted.
         unsafe {
             let mut poly = Self::from_ranks(vec![ElementList::min(1), ElementList::max(1)].into());
-            poly.set_sorted();
+            poly.set_sorted(true);
             poly
         }
     }
@@ -509,9 +504,9 @@ impl Polytope for Abstract {
 
         // Safety: the dyad is a valid polytope, and its indices are sorted.
         unsafe {
-            let mut abs = builder.build();
-            abs.set_sorted();
-            abs
+            let mut poly = builder.build();
+            poly.set_sorted(true);
+            poly
         }
     }
 
@@ -535,9 +530,9 @@ impl Polytope for Abstract {
 
         // Safety: a polygon is a valid polytope, and its indices are sorted.
         unsafe {
-            let mut abs = builder.build();
-            abs.set_sorted();
-            abs
+            let mut poly = builder.build();
+            poly.set_sorted(true);
+            poly
         }
     }
 
@@ -734,26 +729,26 @@ impl Polytope for Abstract {
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.
-    fn duopyramid(p: &Self, q: &Self) -> Self {
-        product::<false, false>(p, q)
+    fn duopyramid(&self, other: &Self) -> Self {
+        product::duopyramid(self, other)
     }
 
     /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
     /// from two polytopes.
-    fn duoprism(p: &Self, q: &Self) -> Self {
-        product::<true, false>(p, q)
+    fn duoprism(&self, other: &Self) -> Self {
+        product::duoprism(self, other)
     }
 
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
     /// from two polytopes.
-    fn duotegum(p: &Self, q: &Self) -> Self {
-        product::<false, true>(p, q)
+    fn duotegum(&self, other: &Self) -> Self {
+        product::duotegum(self, other)
     }
 
     /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
     /// from two polytopes.
-    fn duocomb(p: &Self, q: &Self) -> Self {
-        product::<true, true>(p, q)
+    fn duocomb(&self, other: &Self) -> Self {
+        product::duocomb(self, other)
     }
 
     /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
@@ -811,237 +806,103 @@ impl IndexMut<(usize, usize)> for Abstract {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test;
 
-    /// Returns a bunch of varied polytopes to run general tests on. Use only
-    /// for tests that should work on **everything** you give it!
-    fn test_polytopes() -> [Abstract; 19] {
-        [
-            Abstract::nullitope(),
-            Abstract::point(),
-            Abstract::dyad(),
-            Abstract::polygon(2),
-            Abstract::polygon(3),
-            Abstract::polygon(4),
-            Abstract::polygon(5),
-            Abstract::polygon(10),
-            Abstract::hypercube(4),
-            Abstract::hypercube(5),
-            Abstract::hypercube(6),
-            Abstract::simplex(4),
-            Abstract::simplex(5),
-            Abstract::simplex(6),
-            Abstract::orthoplex(4),
-            Abstract::orthoplex(5),
-            Abstract::orthoplex(6),
-            Abstract::duoprism(&Abstract::polygon(6), &Abstract::polygon(7)),
-            Abstract::dyad().ditope().ditope().ditope().ditope(),
-        ]
-    }
-
-    /// Tests whether a polytope's element counts match the expected element
-    /// counts, and whether a polytope is valid.
-    fn test(poly: &Abstract, element_counts: &[usize]) {
-        let poly_counts: Vec<_> = poly.el_count_iter().collect();
-
-        assert_eq!(
-            &poly_counts, &element_counts,
-            "{} element counts don't match expected value.",
-            "TBA: name"
-        );
-
-        poly.assert_valid();
-    }
-
+    /// Checks a nullitope.
     #[test]
-    /// Checks that a nullitope is generated correctly.
     fn nullitope() {
-        test(&Abstract::nullitope(), &[1]);
+        test(&Abstract::nullitope(), [1]);
     }
 
+    /// Checks a point.
     #[test]
-    /// Checks that a point is generated correctly.
     fn point() {
-        test(&Abstract::point(), &[1, 1]);
+        test(&Abstract::point(), [1, 1]);
     }
 
+    /// Checks a dyad.
     #[test]
-    /// Checks that a dyad is generated correctly.
     fn dyad() {
-        test(&Abstract::dyad(), &[1, 2, 1]);
+        test(&Abstract::dyad(), [1, 2, 1]);
     }
 
+    /// Checks some polygons.
     #[test]
-    /// Checks that polygons are generated correctly.
     fn polygon() {
         for n in 2..=10 {
-            test(&Abstract::polygon(n), &[1, n, n, 1]);
+            test(&Abstract::polygon(n), [1, n, n, 1]);
         }
     }
 
+    /// Checks a tetrahedron.
     #[test]
-    /// Checks that polygonal duopyramids are generated correctly.
-    fn duopyramid() {
-        let mut polygons = Vec::new();
-        for n in 2..=5 {
-            polygons.push(Abstract::polygon(n));
-        }
-
-        for m in 2..=5 {
-            for n in m..=5 {
-                test(
-                    &Abstract::duopyramid(&polygons[m - 2], &polygons[n - 2]),
-                    &[
-                        1,
-                        m + n,
-                        m + n + m * n,
-                        2 * m * n + 2,
-                        m + n + m * n,
-                        m + n,
-                        1,
-                    ],
-                );
-            }
-        }
+    fn tetrahedron() {
+        test(&Abstract::tetrahedron(), [1, 4, 6, 4, 1])
     }
 
+    /// Checks a cube.
     #[test]
-    /// Checks that polygonal duoprisms are generated correctly.
-    fn duoprism() {
-        let mut polygons = Vec::new();
-        for n in 2..=5 {
-            polygons.push(Abstract::polygon(n));
-        }
-
-        for m in 2..=5 {
-            for n in m..=5 {
-                test(
-                    &Abstract::duoprism(&polygons[m - 2], &polygons[n - 2]),
-                    &[1, m * n, 2 * m * n, m + n + m * n, m + n, 1],
-                );
-            }
-        }
+    fn cube() {
+        test(&Abstract::cube(), [1, 8, 12, 6, 1])
     }
 
+    /// Checks an octahedron.
     #[test]
-    /// Checks that polygonal duotegums are generated correctly.
-    fn duotegum() {
-        let mut polygons = Vec::new();
-        for n in 2..=5 {
-            polygons.push(Abstract::polygon(n));
-        }
-
-        for m in 2..=5 {
-            for n in m..=5 {
-                test(
-                    &Abstract::duotegum(&polygons[m - 2], &polygons[n - 2]),
-                    &[1, m + n, m + n + m * n, 2 * m * n, m * n, 1],
-                );
-            }
-        }
+    fn octahedron() {
+        test(&Abstract::octahedron(), [1, 6, 12, 8, 1])
     }
 
+    /// Returns the values C(n, 0), ..., C(n, n).
+    fn choose(n: usize) -> Vec<usize> {
+        let mut choose = Vec::with_capacity(n + 1);
+        choose.push(1);
+
+        for k in 0..n {
+            choose.push(choose[k] * (n - k) / (k + 1));
+        }
+
+        choose
+    }
+
+    /// Checks simplices.
     #[test]
-    /// Checks that polygonal duocombs are generated correctly.
-    fn duocomb() {
-        let mut polygons = Vec::new();
-        for n in 2..=5 {
-            polygons.push(Abstract::polygon(n));
-        }
-
-        for m in 2..=5 {
-            for n in m..=5 {
-                test(
-                    &Abstract::duocomb(&polygons[m - 2], &polygons[n - 2]),
-                    &[1, m * n, 2 * m * n, m * n, 1],
-                );
-            }
-        }
-    }
-
-    /// Calculates `n` choose `k`.
-    fn choose(n: usize, k: usize) -> usize {
-        let mut res = 1;
-
-        for r in 0..k {
-            res *= n - r;
-            res /= r + 1;
-        }
-
-        res
-    }
-
-    #[test]
-    /// Checks that simplices are generated correctly.
     fn simplex() {
-        for n in 0..=7 {
-            let simplex = Abstract::simplex(n);
-            let mut element_counts = Vec::with_capacity(n + 1);
+        let mut simplex = Abstract::nullitope();
 
-            for k in 0..=n {
-                element_counts.push(choose(n, k));
-            }
-
-            test(&simplex, &element_counts);
+        for n in 1..=7 {
+            simplex.pyramid_mut();
+            test(&Abstract::simplex(n), choose(n));
         }
     }
 
+    /// Returns an iterator over the element counts of an n-hypercube.
+    fn orthoplex_counts(n: usize) -> impl DoubleEndedIterator<Item = usize> {
+        choose(n - 1)
+            .into_iter()
+            .enumerate()
+            .map(|(k, c)| c << k)
+            .chain(std::iter::once(1))
+    }
+
+    /// Checks hypercubes.
     #[test]
-    /// Checks that hypercubes are generated correctly.
     fn hypercube() {
-        for n in 0..=6 {
-            let hypercube = Abstract::hypercube(n);
-            let mut element_counts = Vec::with_capacity(n + 1);
+        let mut hypercube = Abstract::point();
 
-            element_counts.push(1);
-            for k in 1..=n {
-                element_counts.push(choose(n - 1, k - 1) * (1 << (n - k)));
-            }
-
-            test(&hypercube, &element_counts);
+        for n in 2..=6 {
+            hypercube.prism_mut();
+            test(&hypercube, orthoplex_counts(n).rev());
         }
     }
 
+    /// Checks orthoplices.
     #[test]
-    /// Checks that orthoplices are generated correctly.
     fn orthoplex() {
-        for n in 0..=6 {
-            let orthoplex = Abstract::orthoplex(n);
-            let mut element_counts = Vec::with_capacity(n + 1);
+        let mut orthoplex = Abstract::point();
 
-            for k in 0..n {
-                element_counts.push(choose(n - 1, k) * (1 << k));
-            }
-            element_counts.push(1);
-
-            test(&orthoplex, &element_counts);
-        }
-    }
-
-    #[test]
-    /// Checks that various polytopes are generated correctly.
-    fn general_check() {
-        for poly in test_polytopes().iter_mut() {
-            poly.assert_valid();
-        }
-    }
-
-    #[test]
-    /// Checks that duals are generated correctly.
-    fn dual_check() {
-        for poly in test_polytopes().iter_mut() {
-            // The element counts of the dual should be the same as the reversed
-            // element counts of the original.
-            let el_counts: Vec<_> = poly.el_count_iter().collect();
-            poly.dual_mut();
-            let new_el_counts: Vec<_> = poly.el_count_iter().rev().collect();
-            assert_eq!(
-                el_counts, new_el_counts,
-                "Dual element counts of {} don't match expected value.",
-                "TBA: name"
-            );
-
-            // The duals should also be valid polytopes.
-            poly.assert_valid();
+        for n in 2..=6 {
+            orthoplex.tegum_mut();
+            test(&orthoplex, orthoplex_counts(n))
         }
     }
 }

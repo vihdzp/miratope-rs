@@ -216,37 +216,42 @@ impl<T: Float> Polytope for Concrete<T> {
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// with unit height from two polytopes. Does not offset either polytope.
-    fn duopyramid(p: &Self, q: &Self) -> Self {
+    fn duopyramid(&self, p: &Self) -> Self {
         Self::duopyramid_with(
             p,
-            q,
+            self,
             &Point::zeros(p.dim_or()),
-            &Point::zeros(q.dim_or()),
+            &Point::zeros(self.dim_or()),
             T::ONE,
         )
     }
 
     /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
     /// from two polytopes.
-    fn duoprism(p: &Self, q: &Self) -> Self {
+    fn duoprism(&self, p: &Self) -> Self {
         Self::new(
-            duoprism_vertices(&p.vertices, &q.vertices),
-            Abstract::duoprism(&p.abs, &q.abs),
+            duoprism_vertices(&self.vertices, &p.vertices),
+            self.abs.duoprism(&p.abs),
         )
     }
 
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
     /// from two polytopes.
-    fn duotegum(p: &Self, q: &Self) -> Self {
-        Self::duotegum_with(p, q, &Point::zeros(p.dim_or()), &Point::zeros(q.dim_or()))
+    fn duotegum(&self, other: &Self) -> Self {
+        Self::duotegum_with(
+            self,
+            other,
+            &Point::zeros(self.dim_or()),
+            &Point::zeros(other.dim_or()),
+        )
     }
 
     /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
     /// from two polytopes.
-    fn duocomb(p: &Self, q: &Self) -> Self {
+    fn duocomb(&self, other: &Self) -> Self {
         Self::new(
-            duoprism_vertices(&p.vertices, &q.vertices),
-            Abstract::duocomb(&p.abs, &q.abs),
+            duoprism_vertices(&self.vertices, &other.vertices),
+            self.abs.duocomb(other.abs()),
         )
     }
 
@@ -946,7 +951,7 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
 
     /// Builds a prism with a specified height.
     fn prism_with(&self, height: T) -> Self {
-        Self::duoprism(self, &Self::dyad_with(height))
+     self.duoprism(&Self::dyad_with(height))
     }
 
     /// Builds a tegum with two specified apices.
@@ -1005,7 +1010,7 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
     fn duotegum_with(p: &Self, q: &Self, p_offset: &Point<T>, q_offset: &Point<T>) -> Self {
         Self::new(
             duopyramid_vertices(&p.vertices, &q.vertices, p_offset, q_offset, T::ZERO, true),
-            Abstract::duotegum(&p.abs, &q.abs),
+            p.abs.duotegum(&q.abs),
         )
     }
 
@@ -1280,7 +1285,7 @@ mod tests {
         for m in 0..polygons.len() {
             for n in 0..polygons.len() {
                 test_volume(
-                    Concrete::duoprism(&polygons[m], &polygons[n]),
+                    polygons[m].duoprism(&polygons[n]),
                     Some(areas[m] * areas[n]),
                 )
             }

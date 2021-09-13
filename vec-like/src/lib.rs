@@ -168,7 +168,7 @@ where
         self.as_inner_mut().last_mut()
     }
 
-    /// Reverses the order of elements in `self`, in place.
+    /// Reverses the order of elements in `self` in place.
     fn reverse(&mut self) {
         self.as_inner_mut().reverse()
     }

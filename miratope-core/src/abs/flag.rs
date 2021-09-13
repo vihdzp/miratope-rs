@@ -675,58 +675,52 @@ mod tests {
     use crate::Polytope;
 
     /// Tests that a polytope has an expected number of flags, oriented or not.
-    fn test(polytope: &mut Abstract, expected: usize) {
-        let flag_count = polytope.flags().count();
-        assert_eq!(
-            expected, flag_count,
-            "Expected {} flags, found {}.",
-            expected, flag_count
-        );
+    fn test_flags(polytope: &mut Abstract, expected: usize) {
+        assert_eq!(expected, polytope.flags().count(), "flag count mismatch");
 
         polytope.element_sort();
-        let flag_count = polytope.flag_events().filter_flags().count();
         assert_eq!(
-            expected, flag_count,
-            "Expected {} oriented flags, found {}.",
-            expected, flag_count
+            expected,
+            polytope.flag_events().filter_flags().count(),
+            "oriented flag count mismatch"
         );
     }
 
     #[test]
     fn nullitope() {
-        test(&mut Abstract::nullitope(), 1)
+        test_flags(&mut Abstract::nullitope(), 1)
     }
 
     #[test]
     fn point() {
-        test(&mut Abstract::point(), 1)
+        test_flags(&mut Abstract::point(), 1)
     }
 
     #[test]
     fn dyad() {
-        test(&mut Abstract::dyad(), 2)
+        test_flags(&mut Abstract::dyad(), 2)
     }
 
     #[test]
     fn polygon() {
         for n in 2..=10 {
-            test(&mut Abstract::polygon(n), 2 * n);
+            test_flags(&mut Abstract::polygon(n), 2 * n);
         }
     }
 
     #[test]
     fn simplex() {
         for n in 1..=8 {
-            test(&mut Abstract::simplex(n), crate::factorial(n) as usize);
+            test_flags(&mut Abstract::simplex(n), crate::factorial(n) as usize);
         }
     }
 
     #[test]
     fn hypercube() {
         for n in 1..=7 {
-            test(
+            test_flags(
                 &mut Abstract::hypercube(n),
-                (1 << (n - 1)) * crate::factorial(n - 1) as usize,
+                (crate::factorial(n - 1) as usize) << (n - 1),
             );
         }
     }
@@ -734,9 +728,9 @@ mod tests {
     #[test]
     fn orthoplex() {
         for n in 1..=7 {
-            test(
+            test_flags(
                 &mut Abstract::orthoplex(n),
-                (1 << (n - 1)) * crate::factorial(n - 1) as usize,
+                (crate::factorial(n - 1) as usize) << (n - 1),
             );
         }
     }

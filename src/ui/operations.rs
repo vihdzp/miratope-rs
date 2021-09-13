@@ -915,7 +915,7 @@ impl Window for DuoprismWindow {
 
 impl DuoWindow for DuoprismWindow {
     fn operation(&self, p: &NamedConcrete, q: &NamedConcrete) -> NamedConcrete {
-        NamedConcrete::duoprism(p, q)
+        p.duoprism(q)
     }
 
     fn slots(&self) -> [Slot; 2] {
@@ -1012,7 +1012,7 @@ impl Window for DuocombWindow {
 
 impl DuoWindow for DuocombWindow {
     fn operation(&self, p: &NamedConcrete, q: &NamedConcrete) -> NamedConcrete {
-        NamedConcrete::duocomb(p, q)
+        p.duocomb(q)
     }
 
     fn slots(&self) -> [Slot; 2] {

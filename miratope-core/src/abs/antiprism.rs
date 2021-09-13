@@ -83,7 +83,6 @@ struct SectionMap(HashMap<Section, usize>);
 
 impl IntoIterator for SectionMap {
     type Item = (Section, usize);
-
     type IntoIter = std::collections::hash_map::IntoIter<Section, usize>;
 
     /// Returns an iterator over the stored section index pairs.
@@ -140,21 +139,20 @@ impl SectionMap {
 /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
 /// based on a given polytope. Also returns the indices of the vertices that
 /// form the base and the dual base, in that order.
-pub(super) fn antiprism_and_vertices(abs: &Abstract) -> (Abstract, Vec<usize>, Vec<usize>) {
-    let rank = abs.rank();
-    let mut section_hash = SectionMap::singletons(abs);
+pub(super) fn antiprism_and_vertices(p: &Abstract) -> (Abstract, Vec<usize>, Vec<usize>) {
+    let rank = p.rank();
+    let mut section_hash = SectionMap::singletons(p);
 
-    // We actually build the elements backwards, which is as awkward as it
-    // seems. Maybe we should fix that in the future?
-    let mut backwards_abs = Vec::with_capacity(rank + 1);
-    backwards_abs.push(SubelementList::max(section_hash.len()));
+    // We build the elements backwards.
+    let mut backwards_res = Vec::with_capacity(rank + 1);
+    backwards_res.push(SubelementList::max(section_hash.len()));
 
     // Indices of base.
-    let vertex_count = abs.vertex_count();
+    let vertex_count = p.vertex_count();
     let mut vertices = Vec::with_capacity(vertex_count);
 
     // Indices of dual base.
-    let facet_count = abs.facet_count();
+    let facet_count = p.facet_count();
     let mut dual_vertices = Vec::with_capacity(facet_count);
 
     // Adds all elements corresponding to sections of a given height.
@@ -169,7 +167,7 @@ pub(super) fn antiprism_and_vertices(abs: &Abstract) -> (Abstract, Vec<usize>, V
         // into one of its superelements, or changing the lower element into one
         // of its subelements.
         for (section, idx) in section_hash.into_iter() {
-            for &idx_lo in &abs[section.lo()].subs {
+            for &idx_lo in &p[section.lo()].subs {
                 elements[idx].push(
                     new_section_hash.get_insert(section.with_lo(section.lo_rank - 1, idx_lo)),
                 );
@@ -177,7 +175,7 @@ pub(super) fn antiprism_and_vertices(abs: &Abstract) -> (Abstract, Vec<usize>, V
 
             // Finds all of the superelements of our old section's
             // highest element.
-            for &idx_hi in &abs[section.hi()].sups {
+            for &idx_hi in &p[section.hi()].sups {
                 elements[idx].push(
                     new_section_hash.get_insert(section.with_hi(section.hi_rank + 1, idx_hi)),
                 );
@@ -198,15 +196,44 @@ pub(super) fn antiprism_and_vertices(abs: &Abstract) -> (Abstract, Vec<usize>, V
             }
         }
 
-        backwards_abs.push(elements);
+        backwards_res.push(elements);
         section_hash = new_section_hash;
     }
 
     // We built this backwards, so let's fix it.
-    let builder: AbstractBuilder = backwards_abs.into_iter().rev().collect();
+    let builder: AbstractBuilder = backwards_res.into_iter().rev().collect();
 
     // Safety: we've built an antiprism based on the polytope. For a proof
     // that this construction yields a valid abstract polytope, see [TODO:
     // write proof].
     (unsafe { builder.build() }, vertices, dual_vertices)
+}
+
+/// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
+/// based on a given polytope.
+pub(super) fn antiprism(p: &Abstract) -> Abstract {
+    antiprism_and_vertices(p).0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{test, Polytope};
+
+    /// Checks some polygonal antiprisms.
+    #[test]
+    fn polygon_antiprism() {
+        for n in 2..=10 {
+            test(
+                &Abstract::polygon(n).antiprism(),
+                [1, 2 * n, 4 * n, 2 * n + 2, 1],
+            )
+        }
+    }
+
+    /// Checks a cubic antiprism.
+    #[test]
+    fn cubic_antiprism() {
+        test(&Abstract::cube().antiprism(), [1, 14, 48, 62, 28, 1])
+    }
 }

@@ -103,13 +103,15 @@ pub trait Polytope:
 
     /// Sorts the subelements and superelements of the entire polytope. This is
     /// usually called before iterating over the flags of the polytope.
+    ///
+    /// This will do nothing if the polytope is already sorted.
     fn element_sort(&mut self) {
         if !self.abs().sorted() {
             // Safety: changing the order of the indices in an element does not
             // change whether the polytope is valid.
             unsafe {
                 self.ranks_mut().element_sort();
-                self.abs_mut().set_sorted();
+                self.abs_mut().set_sorted(true);
             }
         }
     }
@@ -137,6 +139,141 @@ pub trait Polytope:
     /// Returns an instance of a [polygon](https://polytope.miraheze.org/wiki/Polygon)
     /// with a given number of sides.
     fn polygon(n: usize) -> Self;
+
+    /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
+    /// from two polytopes.
+    fn duopyramid(&self, p: &Self) -> Self;
+
+    /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
+    /// from two polytopes.
+    fn duoprism(&self, p: &Self) -> Self;
+
+    /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
+    /// from two polytopes.
+    fn duotegum(&self, p: &Self) -> Self;
+
+    /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
+    /// from two polytopes.
+    fn duocomb(&self, p: &Self) -> Self;
+
+    /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
+    /// given base.
+    fn pyramid(&self) -> Self {
+       self.duopyramid(&Self::point())
+    }
+
+    /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
+    /// given base.
+    ///
+    /// This is slightly more optimal in the case of named polytopes.
+    fn pyramid_mut(&mut self) {
+        *self = self.pyramid();
+    }
+
+    /// Builds a [prism](https://polytope.miraheze.org/wiki/Prism) from a
+    /// given base.
+    fn prism(&self) -> Self {
+       self.duoprism(&Self::dyad())
+    }
+
+    /// Builds a [prism](https://polytope.miraheze.org/wiki/Prism) from a
+    /// given base.
+    ///
+    /// This is slightly more optimal in the case of named polytopes.
+    fn prism_mut(&mut self) {
+        *self = self.prism();
+    }
+
+    /// Builds a [tegum](https://polytope.miraheze.org/wiki/Bipyramid) from a
+    /// given base.
+    fn tegum(&self) -> Self {
+        self.duotegum(&Self::dyad())
+    }
+
+    /// Builds a [tegum](https://polytope.miraheze.org/wiki/Bipyramid) from a
+    /// given base.
+    ///
+    /// This is slightly more optimal in the case of named polytopes.
+    fn tegum_mut(&mut self) {
+        *self = self.tegum();
+    }
+
+    /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)
+    /// of an iterator over polytopes.
+    fn multipyramid<'a, I: IntoIterator<Item = &'a Self>>(factors: I) -> Self
+    where
+        Self: 'a,
+    {
+        multiproduct(factors, Self::duopyramid, Self::nullitope)
+    }
+
+    /// Takes the [prism product](https://polytope.miraheze.org/wiki/Prism_product)
+    /// of an iterator over polytopes.
+    fn multiprism<'a, I: IntoIterator<Item = &'a Self>>(factors: I) -> Self
+    where
+        Self: 'a,
+    {
+        multiproduct(factors, Self::duoprism, Self::point)
+    }
+
+    /// Takes the [tegum product](https://polytope.miraheze.org/wiki/Tegum_product)
+    /// of an iterator over polytopes.
+    fn multitegum<'a, I: IntoIterator<Item = &'a Self>>(factors: I) -> Self
+    where
+        Self: 'a,
+    {
+        multiproduct(factors, Self::duotegum, Self::point)
+    }
+
+    /// Takes the [comb product](https://polytope.miraheze.org/wiki/Comb_product)
+    /// of an iterator over polytopes.
+    fn multicomb<'a, I: IntoIterator<Item = &'a Self>>(factors: I) -> Self
+    where
+        Self: 'a,
+    {
+        multiproduct(factors, Self::duocomb, Self::nullitope)
+    }
+
+    /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
+    /// given rank.
+    fn simplex(rank: usize) -> Self {
+        Self::multipyramid(iter::repeat(&Self::point()).take(rank))
+    }
+
+    /// Builds a regular [tetrahedron](https://polytope.miraheze.org/wiki/Tetrahedron).
+    fn tetrahedron() -> Self {
+        Self::simplex(4)
+    }
+
+    /// Builds a [hypercube](https://polytope.miraheze.org/wiki/Hypercube) with
+    /// a given rank.
+    fn hypercube(rank: usize) -> Self {
+        if rank == 0 {
+            Self::nullitope()
+        } else {
+            Self::multiprism(iter::repeat(&Self::dyad()).take(rank - 1))
+        }
+    }
+
+    /// Builds a regular [cube](https://polytope.miraheze.org/wiki/Cube).
+    fn cube() -> Self {
+        Self::hypercube(4)
+    }
+
+    /// Builds an [orthoplex](https://polytope.miraheze.org/wiki/Orthoplex) with
+    /// a given rank.
+    fn orthoplex(rank: usize) -> Self {
+        if rank == 0 {
+            Self::nullitope()
+        } else {
+            Self::multitegum(iter::repeat(&Self::dyad()).take(rank - 1))
+        }
+    }
+
+    /// Builds a regular [octahedron](https://polytope.miraheze.org/wiki/Octahedron).
+    fn octahedron() -> Self {
+        Self::orthoplex(4)
+    }
 
     /// Returns the dual of a polytope. Never fails for an abstract polytope. In
     /// case of failing on a concrete polytope, returns the index of a facet
@@ -309,22 +446,6 @@ pub trait Polytope:
     /// Returns the omnitruncate of a polytope.
     fn omnitruncate(&self) -> Self;
 
-    /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
-    /// from two polytopes.
-    fn duopyramid(p: &Self, q: &Self) -> Self;
-
-    /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
-    /// from two polytopes.
-    fn duoprism(p: &Self, q: &Self) -> Self;
-
-    /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
-    /// from two polytopes.
-    fn duotegum(p: &Self, q: &Self) -> Self;
-
-    /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
-    /// from two polytopes.
-    fn duocomb(p: &Self, q: &Self) -> Self;
-
     /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
     /// polytope.
     fn ditope(&self) -> Self {
@@ -369,127 +490,42 @@ pub trait Polytope:
         self.element_sort();
         self.orientable()
     }
+}
 
-    /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
-    /// given base.
-    fn pyramid(&self) -> Self {
-        Self::duopyramid(self, &Self::point())
-    }
+/// Returns the multiproduct (i.e. multipyramid, multiprism, multitegum, or
+/// multicomb) of an iterator over polytopes. This is built by repeatedly
+/// applying the product on two polytopes. In case the iterator is empty, this
+/// builds a polytope using the specified default function.
+fn multiproduct<'a, T, I, P, D>(factors: I, product: P, default: D) -> T
+where
+    T: Clone + 'a,
+    I: IntoIterator<Item = &'a T>,
+    P: Fn(&T, &T) -> T,
+    D: Fn() -> T,
+{
+    let mut factors = factors.into_iter();
 
-    /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
-    /// given base.
-    ///
-    /// This is slightly more optimal in the case of named polytopes.
-    fn pyramid_mut(&mut self) {
-        *self = self.pyramid();
-    }
-
-    /// Builds a [prism](https://polytope.miraheze.org/wiki/Prism) from a
-    /// given base.
-    fn prism(&self) -> Self {
-        Self::duoprism(self, &Self::dyad())
-    }
-
-    /// Builds a [prism](https://polytope.miraheze.org/wiki/Prism) from a
-    /// given base.
-    ///
-    /// This is slightly more optimal in the case of named polytopes.
-    fn prism_mut(&mut self) {
-        *self = self.prism();
-    }
-
-    /// Builds a [tegum](https://polytope.miraheze.org/wiki/Bipyramid) from a
-    /// given base.
-    fn tegum(&self) -> Self {
-        Self::duotegum(self, &Self::dyad())
-    }
-
-    /// Builds a [tegum](https://polytope.miraheze.org/wiki/Bipyramid) from a
-    /// given base.
-    ///
-    /// This is slightly more optimal in the case of named polytopes.
-    fn tegum_mut(&mut self) {
-        *self = self.tegum();
-    }
-
-    /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)
-    /// of an iterator over polytopes.
-    fn multipyramid<'a, U: Iterator<Item = &'a Self>>(mut factors: U) -> Self
-    where
-        Self: 'a,
-    {
-        if let Some(init) = factors.next().cloned() {
-            factors.fold(init, |p, q| Self::duopyramid(&p, q))
-        } else {
-            Self::nullitope()
-        }
-    }
-
-    /// Takes the [prism product](https://polytope.miraheze.org/wiki/Prism_product)
-    /// of an iterator over polytopes.
-    fn multiprism<'a, U: Iterator<Item = &'a Self>>(mut factors: U) -> Self
-    where
-        Self: 'a,
-    {
-        if let Some(init) = factors.next().cloned() {
-            factors.fold(init, |p, q| Self::duoprism(&p, q))
-        } else {
-            Self::point()
-        }
-    }
-
-    /// Takes the [tegum product](https://polytope.miraheze.org/wiki/Tegum_product)
-    /// of an iterator over polytopes.
-    fn multitegum<'a, U: Iterator<Item = &'a Self>>(mut factors: U) -> Self
-    where
-        Self: 'a,
-    {
-        if let Some(init) = factors.next().cloned() {
-            factors.fold(init, |p, q| Self::duotegum(&p, q))
-        } else {
-            Self::point()
-        }
-    }
-
-    /// Takes the [comb product](https://polytope.miraheze.org/wiki/Comb_product)
-    /// of an iterator over polytopes.
-    fn multicomb<'a, U: Iterator<Item = &'a Self>>(mut factors: U) -> Self
-    where
-        Self: 'a,
-    {
-        if let Some(init) = factors.next().cloned() {
-            factors.fold(init, |p, q| Self::duocomb(&p, q))
-        }
-        // There's no sensible way to take an empty comb product, so we just
-        // make it a nullitope for simplicity.
-        else {
-            Self::nullitope()
-        }
-    }
-
-    /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
-    /// given rank.
-    fn simplex(rank: usize) -> Self {
-        Self::multipyramid(iter::repeat(&Self::point()).take(rank))
-    }
-
-    /// Builds a [hypercube](https://polytope.miraheze.org/wiki/Hypercube) with
-    /// a given rank.
-    fn hypercube(rank: usize) -> Self {
-        if rank == 0 {
-            Self::nullitope()
-        } else {
-            Self::multiprism(iter::repeat(&Self::dyad()).take(rank - 1))
-        }
-    }
-
-    /// Builds an [orthoplex](https://polytope.miraheze.org/wiki/Orthoplex) with
-    /// a given rank.
-    fn orthoplex(rank: usize) -> Self {
-        if rank == 0 {
-            Self::nullitope()
-        } else {
-            Self::multitegum(iter::repeat(&Self::dyad()).take(rank - 1))
-        }
+    match (factors.next(), factors.next()) {
+        (None, _) => default(),
+        (Some(factor), None) => factor.clone(),
+        (Some(first), Some(second)) => factors.fold(product(first, second), |p, q| product(&p, q)),
     }
 }
+
+/// Tests whether a polytope's element counts match the expected element counts,
+/// and whether a polytope is valid.
+#[cfg(test)]
+pub(crate) fn test<I: IntoIterator<Item = usize>>(poly: &Abstract, element_counts: I) {
+    let mut element_counts = element_counts.into_iter();
+    for r in 0..=poly.rank() {
+        assert_eq!(
+            poly.el_count(r),
+            element_counts.next().unwrap_or_default(),
+            "element count mismatch at rank {}",
+            r
+        )
+    }
+
+    poly.assert_valid();
+}
+

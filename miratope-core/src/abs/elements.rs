@@ -264,6 +264,9 @@ pub trait Ranked:
     fn into_ranks(self) -> Ranks;
 
     /// Asserts that `self` is a valid abstract polytope.
+    ///
+    /// # Panics
+    /// This method will panic if the assertion fails.
     fn assert_valid(&self) {
         self.ranks().is_valid().unwrap();
     }
@@ -408,15 +411,12 @@ impl Ranks {
     /// Applies a function to all elements in parallel.
     pub fn for_each_element_mut<F: Fn(&mut Element) + Sync + Send>(&mut self, f: F) {
         // No use parallelizing over all minimal or maximal elements.
-        let rank = self.rank();
         f(self.min_mut());
+        f(self.max_mut());
 
-        if rank != 0 {
-            for elements in self.iter_mut().skip(1).take(rank - 1) {
-                elements.par_iter_mut().for_each(&f);
-            }
-
-            f(self.max_mut());
+        let rank = self.rank();
+        for elements in self.iter_mut().take(rank).skip(1) {
+            elements.par_iter_mut().for_each(&f);
         }
     }
 

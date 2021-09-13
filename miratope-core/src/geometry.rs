@@ -233,11 +233,7 @@ impl<T: Float> Subspace<T> {
         if self.is_full_rank() {
             Cow::Borrowed(vec)
         } else {
-            let mut flat_vec = Vec::new();
-            for v in vec {
-                flat_vec.push(self.flatten(v));
-            }
-            Cow::Owned(flat_vec)
+            Cow::Owned(vec.iter().map(|v| self.flatten(v)).collect())
         }
     }
 

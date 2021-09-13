@@ -106,14 +106,19 @@ impl<T> Pair<T> {
     }
 }
 
-impl<'a, T: 'a + AsRef<[usize]>> FromIterator<T> for CycleBuilder {
-    fn from_iter<I: IntoIterator<Item = T>>(edges: I) -> Self {
-        let mut cycle = CycleBuilder::new();
-
+impl<T: AsRef<[usize]>> Extend<T> for CycleBuilder {
+    fn extend<U: IntoIterator<Item = T>>(&mut self, edges: U) {
         for edge in edges {
-            cycle.push_edge(edge.as_ref());
+            self.push_edge(edge.as_ref());
         }
+    }
+}
 
+impl<T: AsRef<[usize]>> FromIterator<T> for CycleBuilder {
+    fn from_iter<I: IntoIterator<Item = T>>(edges: I) -> Self {
+        let edges = edges.into_iter();
+        let mut cycle = CycleBuilder::with_capacity(edges.size_hint().0);
+        cycle.extend(edges);
         cycle
     }
 }
@@ -180,10 +185,11 @@ impl CycleBuilder {
         self.get_mut(vertex1).push(vertex0);
     }
 
-    /// Pushes a given edge into the graph. In debug mode, asserts that the edge
-    /// has exactly two elements.
+    /// Pushes a given edge into the graph.
+    ///
+    /// # Panics
+    /// This will panic if the edge doesn't have two elements.
     pub fn push_edge(&mut self, edge: &[usize]) {
-        debug_assert_eq!(edge.len(), 2);
         self.push(edge[0], edge[1]);
     }
 
@@ -217,15 +223,11 @@ impl CycleBuilder {
                 let next_is_next1 = next0 == prev;
                 prev = cur;
 
-                // We go to whichever adjacent vertex isn't equal to the one we were
-                // previously at.
-                if next_is_next1 {
-                    cycle.push(next1);
-                    cur = next1;
-                } else {
-                    cycle.push(next0);
-                    cur = next0;
-                };
+                // We go to whichever adjacent vertex isn't equal to the one we
+                // were previously at.
+                let next = if next_is_next1 { next1 } else { next0 };
+                cycle.push(next);
+                cur = next;
 
                 // Whenever we reach the initial vertex, we break out of the loop.
                 if cur == init {
@@ -242,7 +244,7 @@ impl CycleBuilder {
 
 impl CycleList {
     /// Builds a list of cycles from a list of edges.
-    pub fn from_edges<'a, T: 'a + AsRef<[usize]>, I: IntoIterator<Item = T>>(edges: I) -> Self {
+    pub fn from_edges<T: AsRef<[usize]>, I: IntoIterator<Item = T>>(edges: I) -> Self {
         edges.into_iter().collect::<CycleBuilder>().build()
     }
 }

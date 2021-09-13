@@ -197,31 +197,43 @@ impl<T: NameType> Polytope for Named<T> {
         self.name.into_mut(Name::pyramid);
     }
 
-    fn duopyramid(p: &Self, q: &Self) -> Self {
+    fn duopyramid(&self, other: &Self) -> Self {
         Self::new(
-            T::Polytope::duopyramid(&p.poly, &q.poly),
-            Name::multipyramid(array::IntoIter::new([p.name.clone(), q.name.clone()])),
+            self.poly.duopyramid(&other.poly),
+            Name::multipyramid(array::IntoIter::new([
+                self.name.clone(),
+                other.name.clone(),
+            ])),
         )
     }
 
-    fn duoprism(p: &Self, q: &Self) -> Self {
+    fn duoprism(&self, other: &Self) -> Self {
         Self::new(
-            T::Polytope::duoprism(&p.poly, &q.poly),
-            Name::multiprism(array::IntoIter::new([p.name.clone(), q.name.clone()])),
+            self.poly.duoprism(&other.poly),
+            Name::multiprism(array::IntoIter::new([
+                self.name.clone(),
+                other.name.clone(),
+            ])),
         )
     }
 
-    fn duotegum(p: &Self, q: &Self) -> Self {
+    fn duotegum(&self, other: &Self) -> Self {
         Self::new(
-            T::Polytope::duotegum(&p.poly, &q.poly),
-            Name::multitegum(array::IntoIter::new([p.name.clone(), q.name.clone()])),
+            self.poly.duotegum(&other.poly),
+            Name::multitegum(array::IntoIter::new([
+                self.name.clone(),
+                other.name.clone(),
+            ])),
         )
     }
 
-    fn duocomb(p: &Self, q: &Self) -> Self {
+    fn duocomb(&self, other: &Self) -> Self {
         Self::new(
-            T::Polytope::duocomb(&p.poly, &q.poly),
-            Name::multicomb(array::IntoIter::new([p.name.clone(), q.name.clone()])),
+            self.poly.duocomb(&other.poly),
+            Name::multicomb(array::IntoIter::new([
+                self.name.clone(),
+                other.name.clone(),
+            ])),
         )
     }
 
