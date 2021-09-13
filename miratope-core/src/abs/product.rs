@@ -234,6 +234,10 @@ pub(super) fn duoprism(p: &Abstract, q: &Abstract) -> Abstract {
 
 /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
 /// from two polytopes. This is a [`product`] where `!MIN` and `MAX`.
+///
+/// The vertices of the result will be those corresponding to the vertices of
+/// `p` in the same order, following those corresponding to `q` in the same
+/// order.
 pub(super) fn duotegum(p: &Abstract, q: &Abstract) -> Abstract {
     product::<false, true>(p, q)
 }

@@ -889,14 +889,6 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
         if rank == 0 {
             return Ok(());
         }
-        // In the case of points, we reciprocate them.
-        else if rank == 1 {
-            for (idx, v) in self.vertices.iter_mut().enumerate() {
-                if !sphere.reciprocate_mut(v) {
-                    return Err(DualError(idx));
-                }
-            }
-        }
 
         // We project the sphere's center onto the polytope's hyperplane to
         // avoid skew weirdness.
@@ -906,7 +898,7 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
         let mut projections;
 
         // We project our inversion center onto each of the facets.
-        if rank >= 3 {
+        if rank >= 2 {
             let facet_count = self.facet_count();
             projections = Vec::with_capacity(facet_count);
 
@@ -921,24 +913,19 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
                     .project(&o)
                 })
                 .collect_into_vec(&mut projections);
-        }
-        // If our polytope is 1D, the vertices themselves are the facets.
-        else {
+        } else {
             projections = self.vertices.clone();
         }
 
         // Reciprocates the projected points.
         for (idx, v) in projections.iter_mut().enumerate() {
-            if !sphere.reciprocate_mut(v) {
+            if !sphere.reciprocate_mut(v) && rank != 1 {
                 return Err(DualError(idx));
             }
         }
 
         self.vertices = projections;
-
-        // Takes the abstract dual.
         self.abs.dual_mut();
-
         Ok(())
     }
 

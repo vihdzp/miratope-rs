@@ -1,9 +1,9 @@
 //! Declares the [`Abstract`] polytope type and all associated data structures.
 
 pub mod antiprism;
-pub mod ranked;
 pub mod flag;
 pub mod product;
+pub mod ranked;
 pub mod valid;
 
 use std::{
@@ -229,6 +229,12 @@ impl Abstract {
         let mut clone = self.clone();
         clone.dual_mut();
         clone
+    }
+
+    /// Converts an abstract polytope into its dual. This can never fail.
+    pub fn into_dual(mut self) -> Self {
+        self.dual_mut();
+        self
     }
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
@@ -729,6 +735,10 @@ impl Polytope for Abstract {
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// from two polytopes.
+    ///
+    /// The vertices of the result will be those corresponding to the vertices
+    /// of `self` in the same order, following those corresponding to `other` in
+    /// the same order.
     fn duopyramid(&self, other: &Self) -> Self {
         product::duopyramid(self, other)
     }
@@ -741,6 +751,10 @@ impl Polytope for Abstract {
 
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
     /// from two polytopes.
+    ///
+    /// The vertices of the result will be those corresponding to the vertices
+    /// of `self` in the same order, following those corresponding to `other` in
+    /// the same order.
     fn duotegum(&self, other: &Self) -> Self {
         product::duotegum(self, other)
     }
@@ -904,5 +918,13 @@ mod tests {
             orthoplex = orthoplex.tegum();
             test(&orthoplex, orthoplex_counts(n))
         }
+    }
+
+    /// Tests a few duals.
+    #[test]
+    fn dual() {
+        test(&Abstract::nullitope().into_dual(), [1]);
+        test(&Abstract::polygon(6).into_dual(), [1, 6, 6, 1]);
+        test(&Abstract::cube().into_dual(), [1, 6, 12, 8, 1]);
     }
 }

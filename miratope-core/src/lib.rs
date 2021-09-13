@@ -34,8 +34,8 @@ pub mod group;
 use std::{collections::HashSet, error::Error, iter, ops::IndexMut};
 
 use abs::{
-    ranked::Ranks,
     flag::{Flag, FlagIter, OrientedFlag, OrientedFlagIter},
+    ranked::Ranks,
     Abstract, Element, ElementList, ElementMap, Ranked,
 };
 
@@ -491,7 +491,7 @@ where
 /// Tests whether a polytope's element counts match the expected element counts,
 /// and whether a polytope is valid.
 #[cfg(test)]
-pub(crate) fn test<I: IntoIterator<Item = usize>>(poly: &Abstract, element_counts: I) {
+pub(crate) fn test<T: Polytope, I: IntoIterator<Item = usize>>(poly: &T, element_counts: I) {
     let mut element_counts = element_counts.into_iter();
     for r in 0..=poly.rank() {
         assert_eq!(

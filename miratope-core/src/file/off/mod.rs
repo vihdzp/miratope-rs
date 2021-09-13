@@ -430,7 +430,7 @@ impl<'a> OffReader<'a> {
         match rank {
             0 => return Ok(Concrete::nullitope()),
             1 => return Ok(Concrete::point()),
-            2 => return Ok(dbg!(Concrete::dyad())),
+            2 => return Ok(Concrete::dyad()),
             _ => {}
         }
 
@@ -892,114 +892,109 @@ impl<T: Float> Concrete<T> {
 
 #[cfg(test)]
 mod tests {
-    // TODO: move all OFF files into a folder.
-
     use super::*;
     use crate::file::FromFile;
+    use crate::test;
 
-    /// Used to test a particular polytope.
-    // TODO: take a `&str` as an argument instead.
-    fn test_shape(off: &str, el_nums: &[usize]) {
+    /// Tests a particular OFF file.
+    fn test_off_file<I: IntoIterator<Item = usize> + Clone>(src: &str, element_counts: I) {
         // Checks that element counts match up.
-        let p = Concrete::<f32>::from_off(off).expect("OFF file could not be loaded.");
-        let p_counts: Vec<_> = p.el_count_iter().collect();
-        assert_eq!(p_counts, el_nums);
+        let poly = Concrete::<f32>::from_off(src).expect("OFF file could not be loaded.");
+        test(&poly, element_counts.clone());
 
         // Checks that the polytope can be reloaded correctly.
-        let p = Concrete::<f32>::from_off(dbg!(&p.to_off(Default::default()).unwrap()))
-            .expect("OFF file could not be reloaded.");
-        let p_counts: Vec<_> = p.el_count_iter().collect();
-        assert_eq!(p_counts, el_nums);
+        const ERR: &str = "OFF file could not be reloaded.";
+        test(
+            &Concrete::<f32>::from_off(&poly.to_off(Default::default()).expect(ERR)).expect(ERR),
+            element_counts,
+        );
     }
 
-    #[test]
+    /// Tests a particular OFF file in the folder.
+    macro_rules! test_off {
+        ($path:literal, $element_counts:expr) => {
+            test_off_file(include_str!(concat!($path, ".off")), $element_counts)
+        };
+    }
+
     /// Checks that a point has the correct amount of elements.
+    #[test]
     fn point_nums() {
-        test_shape("0OFF", &[1, 1])
+        test_off!("point", [1, 1])
     }
 
-    #[test]
     /// Checks that a dyad has the correct amount of elements.
+    #[test]
     fn dyad_nums() {
-        test_shape("1OFF 2 -1 1 0 1", &[1, 2, 1])
+        test_off!("dyad", [1, 2, 1])
     }
 
-    #[test]
     /// Checks that a hexagon has the correct amount of elements.
+    #[test]
     fn hig_nums() {
-        test_shape( "2OFF 6 1 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 6 0 1 2 3 4 5"
-        , &[1, 6, 6, 1])
+        test_off!("hig", [1, 6, 6, 1])
     }
 
-    #[test]
     /// Checks that a hexagram has the correct amount of elements.
+    #[test]
     fn shig_nums() {
-        test_shape(  "2OFF 6 2 1 0 0.5 0.8660254037844386 -0.5 0.8660254037844386 -1 0 -0.5 -0.8660254037844386 0.5 -0.8660254037844386 3 0 2 4 3 1 3 5"
-        , &[1, 6, 6, 1])
+        test_off!("shig", [1, 6, 6, 1])
     }
 
-    #[test]
     /// Checks that a tetrahedron has the correct amount of elements.
+    #[test]
     fn tet_nums() {
-        test_shape(
-            "OFF 4 4 6 1 1 1 1 -1 -1 -1 1 -1 -1 -1 1 3 0 1 2 3 3 0 2 3 0 1 3 3 3 1 2",
-            &[1, 4, 6, 4, 1],
-        )
+        test_off!("tet", [1, 4, 6, 4, 1])
     }
 
-    #[test]
     /// Checks that a 2-tetrahedron compund has the correct amount of elements.
+    #[test]
     fn so_nums() {
-        test_shape(include_str!("so.off"), &[1, 8, 12, 8, 1])
+        test_off!("so", [1, 8, 12, 8, 1])
     }
 
-    #[test]
     /// Checks that a pentachoron has the correct amount of elements.
-    fn pen_nums() {
-        test_shape(include_str!("pen.off"), &[1, 5, 10, 10, 5, 1])
-    }
-
     #[test]
-    /// Checks that comments are correctly parsed.
-    fn comments() {
-        test_shape(
-            "# So
-        OFF # this
-        4 4 6 # is
-        # a # test # of
-        1 1 1 # the 1234 5678
-        1 -1 -1 # comment 987
-        -1 1 -1 # removal 654
-        -1 -1 1 # system 321
-        3 0 1 2 #let #us #see
-        3 3 0 2# if
-        3 0 1 3#it
-        3 3 1 2#works!#",
-            &[1, 4, 6, 4, 1],
-        )
+    fn pen_nums() {
+        test_off!("pen", [1, 5, 10, 10, 5, 1])
     }
 
+    /// Checks that comments are correctly parsed.
+    #[test]
+    fn comments() {
+        test_off!("comments", [1, 4, 6, 4, 1])
+    }
+
+    /// Attempts to parse an OFF file, unwraps it.
+    fn unwrap_off(src: &str) {
+        Concrete::<f32>::from_off(src).unwrap();
+    }
+
+    /// An empty file should fail.
     #[test]
     #[should_panic(expected = "Empty")]
     fn empty() {
-        Concrete::<f32>::from_off("").unwrap();
+        unwrap_off("")
     }
 
+    /// A file without a valid rank should fail.
     #[test]
     #[should_panic(expected = "Rank(Position { row: 0, column: 3 })")]
     fn rank() {
-        Concrete::<f32>::from_off("   fooOFF").unwrap();
+        unwrap_off("   fooOFF")
     }
 
+    /// A file without the magic word should fail.
     #[test]
     #[should_panic(expected = "MagicWord(Position { row: 1, column: 3 })")]
-    fn magic_num() {
-        Concrete::<f32>::from_off("# comment\n   foo bar").unwrap();
+    fn magic_word() {
+        unwrap_off("# comment\n   foo bar")
     }
 
+    /// A file with some invalid token should fail.
     #[test]
     #[should_panic(expected = "Parsing(Position { row: 1, column: 3 })")]
     fn parse() {
-        Concrete::<f32>::from_off("OFF\n10 foo bar").unwrap();
+        unwrap_off("OFF\n10 foo bar")
     }
 }
