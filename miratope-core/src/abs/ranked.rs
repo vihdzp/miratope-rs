@@ -90,26 +90,20 @@ pub struct Element {
 
 impl From<Subelements> for Element {
     fn from(subs: Subelements) -> Self {
-        Self {
-            subs,
-            sups: Superelements::new(),
-        }
+        Self::new(subs, Superelements::new())
     }
 }
 
 impl From<Superelements> for Element {
     fn from(sups: Superelements) -> Self {
-        Self {
-            subs: Subelements::new(),
-            sups,
-        }
+        Self::new(Subelements::new(), sups)
     }
 }
 
 impl Element {
     /// Initializes a new element with no subelements and no superelements.
-    pub fn new() -> Self {
-        Default::default()
+    pub fn new(subs: Subelements, sups: Superelements) -> Self {
+        Self { subs, sups }
     }
 
     /// Builds a minimal element adjacent to a given amount of vertices.
@@ -717,7 +711,8 @@ impl ElementHash {
         // For every rank stored in the element map.
         for r in 0..=rank {
             let hash = &self.0[r];
-            let mut elements: ElementList = iter::repeat(Element::new()).take(hash.len()).collect();
+            let mut elements: ElementList =
+                iter::repeat(Element::default()).take(hash.len()).collect();
 
             // For every element of rank r in the hash element list.
             for (&idx, &new_idx) in hash {
