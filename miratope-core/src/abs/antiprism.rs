@@ -184,7 +184,7 @@ pub(super) fn antiprism_and_vertices(p: &Abstract) -> (Abstract, Vec<usize>, Vec
 
         // We figure out where the vertices of the base and the dual base
         // were sent.
-        if height == rank - 1 {
+        if height + 1 == rank {
             // We create a map from the base's vertices to the new vertices.
             for v in 0..vertex_count {
                 vertices.push(new_section_hash.get_insert(Section::new(1, v, rank, 0)));
@@ -219,6 +219,12 @@ pub(super) fn antiprism(p: &Abstract) -> Abstract {
 mod tests {
     use super::*;
     use crate::{test, Polytope};
+
+    /// Checks the nullitope antiprism.
+    #[test]
+    fn nullitope_antiprism() {
+        test(&Abstract::nullitope().antiprism(), [1, 1])
+    }
 
     /// Checks some polygonal antiprisms.
     #[test]
