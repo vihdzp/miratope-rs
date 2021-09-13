@@ -18,7 +18,6 @@ use super::Polytope;
 
 use vec_like::VecLike;
 
-pub use antiprism::Section;
 pub use elements::*;
 pub use valid::*;
 

@@ -1,89 +1,68 @@
 //! Contains the code to build an antiprism.
 
-use std::{collections::HashMap, iter};
+use std::collections::HashMap;
 
 use super::{Abstract, AbstractBuilder, Ranked, SubelementList, Subelements};
 
 use vec_like::VecLike;
 
-/// Represents the lowest and highest element of a section of an abstract
-/// polytope. Not to be confused with a cross-section.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Section {
-    /// The rank of the lowest element in the section.
-    pub lo_rank: usize,
+/// Represents sections in a polytope with a common height that is stored
+/// elsewhere.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct PartialSection {
+    /// The rank of the lower element of the section.
+    rank_lo: usize,
 
-    /// The index of the lowest element in the section.
-    pub lo_idx: usize,
+    /// The index of the lower element of the section.
+    idx_lo: usize,
 
-    /// The rank of the highest element in the section.
-    pub hi_rank: usize,
-
-    /// The index of the highest element in the section.
-    pub hi_idx: usize,
+    /// The index of the upper element of the section.
+    idx_hi: usize,
 }
 
-impl std::fmt::Display for Section {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "section between ({:?}) and ({:?})", self.lo(), self.hi())
-    }
-}
-
-impl Section {
-    /// Initializes a new section between two elements.
-    pub fn new(lo_rank: usize, lo_idx: usize, hi_rank: usize, hi_idx: usize) -> Self {
+impl PartialSection {
+    /// Initializes a new partial section.
+    fn new(rank_lo: usize, idx_lo: usize, idx_hi: usize) -> Self {
         Self {
-            lo_rank,
-            lo_idx,
-            hi_rank,
-            hi_idx,
+            rank_lo,
+            idx_lo,
+            idx_hi,
         }
     }
 
-    /// Creates a new singleton section.
-    pub fn singleton(rank: usize, idx: usize) -> Self {
-        Self::new(rank, idx, rank, idx)
+    /// Returns the rank of the highest element, given the height of the
+    /// section.
+    ///
+    /// The height is the difference between the upper and lower ranks.
+    fn hi_rank(self, height: usize) -> usize {
+        self.rank_lo + height
     }
 
-    /// Creates a new section by replacing the lowest element of another.
-    pub fn with_lo(mut self, lo_rank: usize, lo_idx: usize) -> Self {
-        self.lo_rank = lo_rank;
-        self.lo_idx = lo_idx;
-        self
+    /// Returns the singleton partial section with a given element.
+    fn singleton(rank: usize, idx: usize) -> Self {
+        Self::new(rank, idx, idx)
     }
 
-    /// Creates a new section by replacing the highest element of another.
-    pub fn with_hi(mut self, hi_rank: usize, hi_idx: usize) -> Self {
-        self.hi_rank = hi_rank;
-        self.hi_idx = hi_idx;
-        self
+    /// Returns the rank and index of the lowest element.
+    fn lo(self) -> (usize, usize) {
+        (self.rank_lo, self.idx_lo)
     }
 
-    /// Returns the lowest element of a section.
-    pub fn lo(self) -> (usize, usize) {
-        (self.lo_rank, self.lo_idx)
-    }
-
-    /// Returns the highest element of a section.
-    pub fn hi(self) -> (usize, usize) {
-        (self.hi_rank, self.hi_idx)
+    /// Returns the rank and index of the highest element, given the height of
+    /// the section.
+    fn hi(self, height: usize) -> (usize, usize) {
+        (self.hi_rank(height), self.idx_hi)
     }
 }
 
-/// Represents a map from sections in a polytope to their indices in a new
-/// polytope (its [antiprism](Abstract::antiprism)). Exists only to make the
-/// antiprism code a bit easier to understand.
-///
-/// In practice, all of the sections we store have a common height, which means
-/// that we could save some memory by using a representation of [`SectionRef`]
-/// with three arguments instead of four. This probably isn't worth the hassle,
-/// though.
+/// Represents a map from sections of a common height in a polytope to their
+/// indices in its [`antiprism`].
 #[derive(Default, Debug)]
-struct SectionMap(HashMap<Section, usize>);
+struct SectionMap(HashMap<PartialSection, usize>);
 
 impl IntoIterator for SectionMap {
-    type Item = (Section, usize);
-    type IntoIter = std::collections::hash_map::IntoIter<Section, usize>;
+    type Item = (PartialSection, usize);
+    type IntoIter = std::collections::hash_map::IntoIter<PartialSection, usize>;
 
     /// Returns an iterator over the stored section index pairs.
     fn into_iter(self) -> Self::IntoIter {
@@ -102,7 +81,8 @@ impl SectionMap {
         self.0.len()
     }
 
-    /// Returns all singleton sections of a polytope.
+    /// Returns a map from all singleton sections of a polytope to consecutive
+    /// indices.
     fn singletons(poly: &Abstract) -> Self {
         let mut section_hash = Self::new();
 
@@ -110,15 +90,20 @@ impl SectionMap {
             for idx in 0..elements.len() {
                 section_hash
                     .0
-                    .insert(Section::singleton(rank, idx), section_hash.len());
+                    .insert(PartialSection::singleton(rank, idx), section_hash.len());
             }
         }
 
         section_hash
     }
 
+    /// Gets the index of a section in the hash, or `None` if it doesn't exist.
+    fn get(&self, section: PartialSection) -> Option<usize> {
+        self.0.get(&section).copied()
+    }
+
     /// Gets the index of a section in the hash, inserting it if necessary.
-    fn get_insert(&mut self, section: Section) -> usize {
+    fn get_insert(&mut self, section: PartialSection) -> usize {
         use std::collections::hash_map::Entry;
 
         // We organize by lowest rank, then by hash.
@@ -141,11 +126,11 @@ impl SectionMap {
 /// form the base and the dual base, in that order.
 pub(super) fn antiprism_and_vertices(p: &Abstract) -> (Abstract, Vec<usize>, Vec<usize>) {
     let rank = p.rank();
-    let mut section_hash = SectionMap::singletons(p);
+    let mut section_map = SectionMap::singletons(p);
 
     // We build the elements backwards.
     let mut backwards_res = Vec::with_capacity(rank + 1);
-    backwards_res.push(SubelementList::max(section_hash.len()));
+    backwards_res.push(SubelementList::max(section_map.len()));
 
     // Indices of base.
     let vertex_count = p.vertex_count();
@@ -156,48 +141,52 @@ pub(super) fn antiprism_and_vertices(p: &Abstract) -> (Abstract, Vec<usize>, Vec
     let mut dual_vertices = Vec::with_capacity(facet_count);
 
     // Adds all elements corresponding to sections of a given height.
-    for height in 1..=rank + 1 {
-        let mut new_section_hash = SectionMap::new();
-        let mut elements: SubelementList = iter::repeat(Subelements::new())
-            .take(section_hash.len())
+    for height in 0..=rank {
+        let mut new_section_map = SectionMap::new();
+        let mut elements: SubelementList = std::iter::repeat(Subelements::new())
+            .take(section_map.len())
             .collect();
 
         // Goes over all sections of the previous height, and builds the
         // sections of the current height by either changing the upper element
         // into one of its superelements, or changing the lower element into one
         // of its subelements.
-        for (section, idx) in section_hash.into_iter() {
+        for (section, idx) in section_map.into_iter() {
             for &idx_lo in &p[section.lo()].subs {
-                elements[idx].push(
-                    new_section_hash.get_insert(section.with_lo(section.lo_rank - 1, idx_lo)),
-                );
+                elements[idx].push(new_section_map.get_insert(PartialSection::new(
+                    section.rank_lo - 1,
+                    idx_lo,
+                    section.idx_hi,
+                )));
             }
 
             // Finds all of the superelements of our old section's
             // highest element.
-            for &idx_hi in &p[section.hi()].sups {
-                elements[idx].push(
-                    new_section_hash.get_insert(section.with_hi(section.hi_rank + 1, idx_hi)),
-                );
+            for &idx_hi in &p[section.hi(height)].sups {
+                elements[idx].push(new_section_map.get_insert(PartialSection::new(
+                    section.rank_lo,
+                    section.idx_lo,
+                    idx_hi,
+                )));
             }
         }
 
         // We figure out where the vertices of the base and the dual base
         // were sent.
-        if height + 1 == rank {
+        if height + 2 == rank {
             // We create a map from the base's vertices to the new vertices.
             for v in 0..vertex_count {
-                vertices.push(new_section_hash.get_insert(Section::new(1, v, rank, 0)));
+                vertices.push(new_section_map.get(PartialSection::new(1, v, 0)).unwrap());
             }
 
             // We create a map from the dual base's vertices to the new vertices.
             for f in 0..facet_count {
-                dual_vertices.push(new_section_hash.get_insert(Section::new(0, 0, rank - 1, f)));
+                dual_vertices.push(new_section_map.get(PartialSection::new(0, 0, f)).unwrap());
             }
         }
 
         backwards_res.push(elements);
-        section_hash = new_section_hash;
+        section_map = new_section_map;
     }
 
     // We built this backwards, so let's fix it.

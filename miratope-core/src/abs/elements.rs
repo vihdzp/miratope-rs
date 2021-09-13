@@ -200,6 +200,70 @@ impl SubelementList {
     }
 }
 
+/// Represents the lowest and highest element of a section of an abstract
+/// polytope. Not to be confused with a cross-section.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Section {
+    /// The rank of the lowest element in the section.
+    pub lo_rank: usize,
+
+    /// The index of the lowest element in the section.
+    pub lo_idx: usize,
+
+    /// The rank of the highest element in the section.
+    pub hi_rank: usize,
+
+    /// The index of the highest element in the section.
+    pub hi_idx: usize,
+}
+
+impl std::fmt::Display for Section {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "section between ({:?}) and ({:?})", self.lo(), self.hi())
+    }
+}
+
+impl Section {
+    /// Initializes a new section between two elements.
+    pub fn new(lo_rank: usize, lo_idx: usize, hi_rank: usize, hi_idx: usize) -> Self {
+        Self {
+            lo_rank,
+            lo_idx,
+            hi_rank,
+            hi_idx,
+        }
+    }
+
+    /// Creates a new singleton section.
+    pub fn singleton(rank: usize, idx: usize) -> Self {
+        Self::new(rank, idx, rank, idx)
+    }
+
+    /// Creates a new section by replacing the lowest element of another.
+    pub fn with_lo(mut self, lo_rank: usize, lo_idx: usize) -> Self {
+        self.lo_rank = lo_rank;
+        self.lo_idx = lo_idx;
+        self
+    }
+
+    /// Creates a new section by replacing the highest element of another.
+    pub fn with_hi(mut self, hi_rank: usize, hi_idx: usize) -> Self {
+        self.hi_rank = hi_rank;
+        self.hi_idx = hi_idx;
+        self
+    }
+
+    /// Returns the lowest element of a section.
+    pub fn lo(self) -> (usize, usize) {
+        (self.lo_rank, self.lo_idx)
+    }
+
+    /// Returns the highest element of a section.
+    pub fn hi(self) -> (usize, usize) {
+        (self.hi_rank, self.hi_idx)
+    }
+}
+
 /// The signature of the function that turns an `&ElementList` into an iterator.
 type IterFn = for<'r> fn(&'r ElementList) -> slice::Iter<'r, Element>;
 
