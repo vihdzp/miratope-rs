@@ -34,7 +34,7 @@ pub mod group;
 use std::{collections::HashSet, error::Error, iter, ops::IndexMut};
 
 use abs::{
-    elements::Ranks,
+    ranked::Ranks,
     flag::{Flag, FlagIter, OrientedFlag, OrientedFlagIter},
     Abstract, Element, ElementList, ElementMap, Ranked,
 };

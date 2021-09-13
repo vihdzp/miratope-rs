@@ -104,16 +104,16 @@ impl SectionMap {
 
     /// Gets the index of a section in the hash, inserting it if necessary.
     fn get_insert(&mut self, section: PartialSection) -> usize {
-        use std::collections::hash_map::Entry;
+        use std::collections::hash_map::Entry::*;
 
         // We organize by lowest rank, then by hash.
         let len = self.len();
         match self.0.entry(section) {
             // Directly returns the index of the section.
-            Entry::Occupied(idx) => *idx.get(),
+            Occupied(idx) => *idx.get(),
 
             // Adds the section, increases the length by 1, then returns its index.
-            Entry::Vacant(entry) => {
+            Vacant(entry) => {
                 entry.insert(len);
                 len
             }

@@ -10,7 +10,7 @@ use std::{
 };
 
 use crate::{
-    abs::{elements::Ranked, Abstract},
+    abs::{ranked::Ranked, Abstract},
     float::Float,
     Polytope,
 };

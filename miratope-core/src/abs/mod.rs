@@ -1,7 +1,7 @@
 //! Declares the [`Abstract`] polytope type and all associated data structures.
 
 pub mod antiprism;
-pub mod elements;
+pub mod ranked;
 pub mod flag;
 pub mod product;
 pub mod valid;
@@ -18,7 +18,7 @@ use super::Polytope;
 
 use vec_like::VecLike;
 
-pub use elements::*;
+pub use ranked::*;
 pub use valid::*;
 
 /// Contains some metadata about how a polytope has been built up, which can
@@ -89,8 +89,8 @@ impl Metadata {
 ///
 /// The usual convention is to choose the rank function so that the minimal
 /// element has rank &minus;1. However, since indexing is most naturally
-/// expressed with an `usize`, we'll internally start indexing by 0. That is,
-/// vertices have rank 1, edges have rank 2, and so on.
+/// expressed with an unsigned integer, we'll internally start indexing by 0.
+/// That is, vertices have rank 1, edges have rank 2, and so on.
 ///
 /// For more info, see [Wikipedia](https://en.wikipedia.org/wiki/Abstract_polytope)
 /// or the [Polytope Wiki](https://polytope.miraheze.org/wiki/Abstract_polytope).
@@ -153,6 +153,7 @@ impl IntoIterator for Abstract {
     }
 }
 
+/// Every polytope is ranked.
 impl<T: Polytope> Ranked for T {
     fn ranks(&self) -> &Ranks {
         &self.abs().ranks
