@@ -174,27 +174,12 @@ impl<T: NameType> Polytope for Named<T> {
         Self::new(self.poly.prism(), self.name.clone().prism())
     }
 
-    fn prism_mut(&mut self) {
-        self.poly.prism_mut();
-        self.name.into_mut(Name::prism);
-    }
-
     fn tegum(&self) -> Self {
         Self::new(self.poly.tegum(), self.name.clone().tegum())
     }
 
-    fn tegum_mut(&mut self) {
-        self.poly.tegum_mut();
-        self.name.into_mut(Name::tegum);
-    }
-
     fn pyramid(&self) -> Self {
         Self::new(self.poly.pyramid(), self.name.clone().pyramid())
-    }
-
-    fn pyramid_mut(&mut self) {
-        self.poly.pyramid_mut();
-        self.name.into_mut(Name::pyramid);
     }
 
     fn duopyramid(&self, other: &Self) -> Self {

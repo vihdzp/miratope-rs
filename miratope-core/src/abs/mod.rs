@@ -241,7 +241,7 @@ impl Abstract {
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
     /// based on a given polytope. This can never fail for an abstract polytope.
     pub fn antiprism(&self) -> Self {
-       antiprism::antiprism(self)
+        antiprism::antiprism(self)
     }
 
     /// Gets the indices of the vertices of an element in the polytope, if it
@@ -852,16 +852,16 @@ mod tests {
         test(&Abstract::octahedron(), [1, 6, 12, 8, 1])
     }
 
-    /// Returns the values C(n, 0), ..., C(n, n).
+    /// Returns the values C(*n*, 0), ..., C(*n*, *n*).
     fn choose(n: usize) -> Vec<usize> {
-        let mut choose = Vec::with_capacity(n + 1);
-        choose.push(1);
+        let mut res = Vec::with_capacity(n + 1);
+        res.push(1);
 
         for k in 0..n {
-            choose.push(choose[k] * (n - k) / (k + 1));
+            res.push(res[k] * (n - k) / (k + 1));
         }
 
-        choose
+        res
     }
 
     /// Checks simplices.
@@ -870,7 +870,7 @@ mod tests {
         let mut simplex = Abstract::nullitope();
 
         for n in 1..=7 {
-            simplex.pyramid_mut();
+            simplex = simplex.pyramid();
             test(&Abstract::simplex(n), choose(n));
         }
     }
@@ -890,7 +890,7 @@ mod tests {
         let mut hypercube = Abstract::point();
 
         for n in 2..=6 {
-            hypercube.prism_mut();
+            hypercube = hypercube.prism();
             test(&hypercube, orthoplex_counts(n).rev());
         }
     }
@@ -901,7 +901,7 @@ mod tests {
         let mut orthoplex = Abstract::point();
 
         for n in 2..=6 {
-            orthoplex.tegum_mut();
+            orthoplex = orthoplex.tegum();
             test(&orthoplex, orthoplex_counts(n))
         }
     }

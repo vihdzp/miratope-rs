@@ -686,21 +686,25 @@ mod tests {
         );
     }
 
+    /// Checks a nullitope's flags.
     #[test]
     fn nullitope() {
         test_flags(&mut Abstract::nullitope(), 1)
     }
 
+    /// Checks a point's flags.
     #[test]
     fn point() {
         test_flags(&mut Abstract::point(), 1)
     }
 
+    /// Checks a dyad's flags.
     #[test]
     fn dyad() {
         test_flags(&mut Abstract::dyad(), 2)
     }
 
+    /// Checks some polygons' flags.
     #[test]
     fn polygon() {
         for n in 2..=10 {
@@ -708,30 +712,41 @@ mod tests {
         }
     }
 
+    /// Checks some simplexes' flags.
     #[test]
     fn simplex() {
+        let mut simplex = Abstract::nullitope();
+
         for n in 1..=8 {
+            simplex = simplex.pyramid();
             test_flags(&mut Abstract::simplex(n), crate::factorial(n) as usize);
         }
     }
 
+    /// The expected number of flags in an *n*-hypercube.
+    fn hypercube_expected(n: usize) -> usize {
+        (crate::factorial(n - 1) as usize) << (n - 1)
+    }
+
+    /// Checks some hypercubes' flags.
     #[test]
     fn hypercube() {
-        for n in 1..=7 {
-            test_flags(
-                &mut Abstract::hypercube(n),
-                (crate::factorial(n - 1) as usize) << (n - 1),
-            );
+        let mut hypercube = Abstract::point();
+
+        for n in 2..=7 {
+            hypercube = hypercube.prism();
+            test_flags(&mut hypercube, hypercube_expected(n));
         }
     }
 
+    /// Checks some orthoplices' flags.
     #[test]
     fn orthoplex() {
-        for n in 1..=7 {
-            test_flags(
-                &mut Abstract::orthoplex(n),
-                (crate::factorial(n - 1) as usize) << (n - 1),
-            );
+        let mut orthoplex = Abstract::point();
+
+        for n in 2..=7 {
+            orthoplex = orthoplex.tegum();
+            test_flags(&mut orthoplex, hypercube_expected(n));
         }
     }
 }

@@ -159,43 +159,19 @@ pub trait Polytope:
     /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
     /// given base.
     fn pyramid(&self) -> Self {
-       self.duopyramid(&Self::point())
-    }
-
-    /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
-    /// given base.
-    ///
-    /// This is slightly more optimal in the case of named polytopes.
-    fn pyramid_mut(&mut self) {
-        *self = self.pyramid();
+        self.duopyramid(&Self::point())
     }
 
     /// Builds a [prism](https://polytope.miraheze.org/wiki/Prism) from a
     /// given base.
     fn prism(&self) -> Self {
-       self.duoprism(&Self::dyad())
-    }
-
-    /// Builds a [prism](https://polytope.miraheze.org/wiki/Prism) from a
-    /// given base.
-    ///
-    /// This is slightly more optimal in the case of named polytopes.
-    fn prism_mut(&mut self) {
-        *self = self.prism();
+        self.duoprism(&Self::dyad())
     }
 
     /// Builds a [tegum](https://polytope.miraheze.org/wiki/Bipyramid) from a
     /// given base.
     fn tegum(&self) -> Self {
         self.duotegum(&Self::dyad())
-    }
-
-    /// Builds a [tegum](https://polytope.miraheze.org/wiki/Bipyramid) from a
-    /// given base.
-    ///
-    /// This is slightly more optimal in the case of named polytopes.
-    fn tegum_mut(&mut self) {
-        *self = self.tegum();
     }
 
     /// Takes the [pyramid product](https://polytope.miraheze.org/wiki/Pyramid_product)
@@ -528,4 +504,3 @@ pub(crate) fn test<I: IntoIterator<Item = usize>>(poly: &Abstract, element_count
 
     poly.assert_valid();
 }
-

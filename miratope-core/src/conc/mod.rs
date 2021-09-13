@@ -652,10 +652,10 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// The vertices of the base should be specified in the same order as those
     /// of the original polytope. The vertices of the dual face should be
     /// specified in the same order as the facets of the original polytope.
-    fn antiprism_with_vertices<U: Iterator<Item = Point<T>>, V: Iterator<Item = Point<T>>>(
+    fn antiprism_with_vertices<I: Iterator<Item = Point<T>>, J: Iterator<Item = Point<T>>>(
         &self,
-        vertices: U,
-        dual_vertices: V,
+        vertices: I,
+        dual_vertices: J,
     ) -> Self;
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism)
@@ -951,7 +951,7 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
 
     /// Builds a prism with a specified height.
     fn prism_with(&self, height: T) -> Self {
-     self.duoprism(&Self::dyad_with(height))
+        self.duoprism(&Self::dyad_with(height))
     }
 
     /// Builds a tegum with two specified apices.
@@ -968,21 +968,21 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
     /// The vertices of the base should be specified in the same order as those
     /// of the original polytope. The vertices of the dual face should be
     /// specified in the same order as the facets of the original polytope.
-    fn antiprism_with_vertices<U: Iterator<Item = Point<T>>, V: Iterator<Item = Point<T>>>(
+    fn antiprism_with_vertices<I: Iterator<Item = Point<T>>, J: Iterator<Item = Point<T>>>(
         &self,
-        vertices: U,
-        dual_vertices: V,
+        vertices: I,
+        dual_vertices: J,
     ) -> Self {
         let (abs, vertex_indices, dual_vertex_indices) = self.abs.antiprism_and_vertices();
         let vertex_count = abs.vertex_count();
 
         // TODO: is it worth getting into the dark arts of uninitialized buffers?
-        let mut new_vertices = Vec::with_capacity(vertex_count);
-        new_vertices.resize(vertex_count, Vec::new().into());
+        let mut new_vertices = vec![Vec::new().into(); vertex_count];
 
         for (idx, v) in vertices.enumerate() {
             new_vertices[vertex_indices[idx]] = v;
         }
+
         for (idx, v) in dual_vertices.enumerate() {
             new_vertices[dual_vertex_indices[idx]] = v;
         }
@@ -1025,16 +1025,13 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
     /// Flattens the vertices of a polytope into a specified subspace.
     fn flatten_into(&mut self, subspace: &Subspace<T>) {
         if !subspace.is_full_rank() {
-            for v in self.vertices.iter_mut() {
+            for v in &mut self.vertices {
                 *v = subspace.flatten(v);
             }
         }
     }
 
     /// Takes the cross-section of a polytope through a given hyperplane.
-    ///
-    /// # Panics
-    /// This method shouldn't panic. If it does, please file a bug.
     ///
     /// # Todo
     /// We should make this function take a general [`Subspace`] instead.
