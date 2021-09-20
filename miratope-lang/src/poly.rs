@@ -342,15 +342,18 @@ impl<T: Float + DeserializeOwned> ConcretePolytope<T> for NamedConcrete<T> {
     }
 
     fn duopyramid_with(
-        p: &Self,
-        q: &Self,
-        p_offset: &Point<T>,
-        q_offset: &Point<T>,
+        &self,
+        other: &Self,
+        self_offset: &Point<T>,
+        other_offset: &Point<T>,
         height: T,
     ) -> Self {
         Self::new(
-            Concrete::duopyramid_with(p.con(), q.con(), p_offset, q_offset, height),
-            Name::multipyramid(array::IntoIter::new([p.name.clone(), q.name.clone()])),
+            Concrete::duopyramid_with(self.con(), other.con(), self_offset, other_offset, height),
+            Name::multipyramid(array::IntoIter::new([
+                self.name.clone(),
+                other.name.clone(),
+            ])),
         )
     }
 

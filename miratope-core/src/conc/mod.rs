@@ -216,12 +216,11 @@ impl<T: Float> Polytope for Concrete<T> {
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
     /// with unit height from two polytopes. Does not offset either polytope.
-    fn duopyramid(&self, p: &Self) -> Self {
-        Self::duopyramid_with(
-            p,
-            self,
-            &Point::zeros(p.dim_or()),
+    fn duopyramid(&self, other: &Self) -> Self {
+        self.duopyramid_with(
+            other,
             &Point::zeros(self.dim_or()),
+            &Point::zeros(other.dim_or()),
             T::ONE,
         )
     }
@@ -320,8 +319,8 @@ impl<T: Float> Polytope for Concrete<T> {
 /// Generates the vertices for either a tegum or a pyramid product with two
 /// given vertex sets and a given height.
 ///
-/// The vertices are the padded vertices of `q`, followed by the padded
-/// vertices of `p`.
+/// The vertices are the padded vertices of `p`, followed by the padded
+/// vertices of `q`.
 fn duopyramid_vertices<T: Float>(
     p: &[Point<T>],
     q: &[Point<T>],
@@ -341,20 +340,20 @@ fn duopyramid_vertices<T: Float>(
 
     let half_height = height / T::f64(2.0);
 
-    q.iter()
-        // To every point in q, we append zeros to the left.
-        .map(|vq| {
-            let mut v: Vec<_> = p_pad.iter().copied().chain(vq.iter().copied()).collect();
-            if !tegum {
-                v.push(-half_height);
-            }
-            v.into()
-        })
-        // To every point in p, we append zeros to the right.
-        .chain(p.iter().map(|vp| {
+    // To every point in p, we append zeros to the right.
+    p.iter()
+        .map(|vp| {
             let mut v: Vec<_> = vp.iter().copied().chain(q_pad.iter().copied()).collect();
             if !tegum {
                 v.push(half_height);
+            }
+            v.into()
+        })
+        // To every point in q, we append zeros to the left.
+        .chain(q.iter().map(|vq| {
+            let mut v: Vec<_> = p_pad.iter().copied().chain(vq.iter().copied()).collect();
+            if !tegum {
+                v.push(-half_height);
             }
             v.into()
         }))
@@ -727,10 +726,10 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// Generates a duopyramid from two given polytopes with a given height and
     /// a given offset.
     fn duopyramid_with(
-        p: &Self,
-        q: &Self,
-        p_offset: &Point<T>,
-        q_offset: &Point<T>,
+        &self,
+        other: &Self,
+        self_offset: &Point<T>,
+        other_offset: &Point<T>,
         height: T,
     ) -> Self;
 
@@ -932,7 +931,7 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
     /// Builds a pyramid with a specified apex.
     fn pyramid_with(&self, apex: Point<T>) -> Self {
         let mut poly = self.pyramid();
-        poly.vertices[0] = apex;
+        *poly.vertices.last_mut().unwrap() = apex;
         poly
     }
 
@@ -944,8 +943,9 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
     /// Builds a tegum with two specified apices.
     fn tegum_with(&self, apex1: Point<T>, apex2: Point<T>) -> Self {
         let mut poly = self.tegum();
-        poly.vertices[0] = apex1;
-        poly.vertices[1] = apex2;
+        let v = poly.vertices.len();
+        poly.vertices[v - 1] = apex1;
+        poly.vertices[v - 2] = apex2;
         poly
     }
 
@@ -980,16 +980,23 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
     /// Generates a duopyramid from two given polytopes with a given height and
     /// a given offset.
     fn duopyramid_with(
-        p: &Self,
-        q: &Self,
-        p_offset: &Point<T>,
-        q_offset: &Point<T>,
+        &self,
+        other: &Self,
+        self_offset: &Point<T>,
+        other_offset: &Point<T>,
         height: T,
     ) -> Self {
-        Self::new(
-            duopyramid_vertices(&p.vertices, &q.vertices, p_offset, q_offset, height, false),
-            Abstract::duopyramid(&p.abs, &q.abs),
-        )
+        dbg!(Self::new(
+            duopyramid_vertices(
+                &self.vertices,
+                &other.vertices,
+                self_offset,
+                other_offset,
+                height,
+                false
+            ),
+            Abstract::duopyramid(&self.abs, &other.abs),
+        ))
     }
 
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)

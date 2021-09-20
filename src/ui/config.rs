@@ -99,6 +99,7 @@ impl BgColor {
 pub struct LightMode(bool);
 
 impl LightMode {
+    /// Returns the corresponding egui visuals.
     pub fn visuals(&self) -> egui::Visuals {
         if self.0 {
             egui::Visuals::light()
@@ -149,19 +150,14 @@ impl Config {
         ron::from_str(&fs::read_to_string(config_path.as_ref()).ok()?).ok()
     }
 
+    /// Saves the configuration at a gievn location.
     pub fn save<T: AsRef<OsStr>>(&self, config_path: T) {
         match fs::File::create(config_path.as_ref()) {
             // If the file could be created, we write to it.
-            Ok(mut file) => {
-                if file
-                    .write(ron::to_string(self).unwrap().as_bytes())
-                    .is_err()
-                {
-                    eprintln!("Could not write to the configuration file!");
-                } else {
-                    println!("Saved new config!");
-                }
-            }
+            Ok(mut file) => match file.write(ron::to_string(self).unwrap().as_bytes()) {
+                Ok(_) => println!("Saved new config!"),
+                Err(err) => eprintln!("Could not write to the configuration file: {}", err),
+            },
 
             // Otherwise, we print the error.
             Err(err) => {

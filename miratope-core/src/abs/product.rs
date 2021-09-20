@@ -3,9 +3,10 @@
 use super::*;
 
 /// When we compute any polytope product, we add the elements of any given rank
-/// in lexicographic order of the ranks. This struct memoizes how many elements
-/// of the same rank are added by the time we add those of the form
-/// `(p_rank, q_rank)`. It stores this value in `offset_memo[(p_rank, q_rank)]`.
+/// in lexicographic order of the ranks of the elements they come from. This
+/// struct memoizes how many elements of the same rank are added by the time we
+/// add those of the form `(p_rank, q_rank)`. It stores this value in
+/// `offset_memo[(p_rank, q_rank)]`.
 struct OffsetMemo<const MIN: bool, const MAX: bool> {
     /// The memoized values. We store them in a single `Vec` to avoid multiple
     /// allocations.
@@ -113,7 +114,7 @@ impl<const MIN: bool, const MAX: bool> Index<(usize, usize)> for OffsetMemo<MIN,
 /// The elements of this product are in one to one correspondence to pairs
 /// of elements in the set of polytopes. The elements of a specific rank are
 /// sorted first by lexicographic order of the ranks, then by lexicographic
-/// order of the elements.
+/// order of the indices of the elements.
 fn product<const MIN: bool, const MAX: bool>(p: &Abstract, q: &Abstract) -> Abstract {
     // The ranks of p and q.
     let p_rank = p.rank();
@@ -223,7 +224,7 @@ fn product<const MIN: bool, const MAX: bool>(p: &Abstract, q: &Abstract) -> Abst
 /// `p` in the same order, following those corresponding to `q` in the same
 /// order.
 pub(super) fn duopyramid(p: &Abstract, q: &Abstract) -> Abstract {
-    product::<false, false>(p, q)
+    product::<false, false>(q, p)
 }
 
 /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
@@ -239,7 +240,7 @@ pub(super) fn duoprism(p: &Abstract, q: &Abstract) -> Abstract {
 /// `p` in the same order, following those corresponding to `q` in the same
 /// order.
 pub(super) fn duotegum(p: &Abstract, q: &Abstract) -> Abstract {
-    product::<false, true>(p, q)
+    product::<false, true>(q, p)
 }
 
 /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
