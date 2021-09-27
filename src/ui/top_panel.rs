@@ -434,10 +434,34 @@ pub fn show_top_panel(
                         }
                     });
 
+                    if ui.button("Rectate").clicked() {
+                        let mut p = query.iter_mut().next().unwrap();
+                        element_sort!(p);
+                        *p = p.truncate_with(vec![1], vec![1.0]);
+                    }
+
                     if ui.button("Truncate").clicked() {
                         let mut p = query.iter_mut().next().unwrap();
                         element_sort!(p);
                         *p = p.truncate_with(vec![0, 1], vec![0.5, 0.5]);
+                    }
+
+                    if ui.button("Bitruncate").clicked() {
+                        let mut p = query.iter_mut().next().unwrap();
+                        element_sort!(p);
+                        *p = p.truncate_with(vec![1, 2], vec![0.5, 0.5]);
+                    }
+
+                    if ui.button("Cantellate").clicked() {
+                        let mut p = query.iter_mut().next().unwrap();
+                        element_sort!(p);
+                        *p = p.truncate_with(vec![0, 2], vec![0.5, 0.5]);
+                    }
+
+                    if ui.button("Runcinate").clicked() {
+                        let mut p = query.iter_mut().next().unwrap();
+                        element_sort!(p);
+                        *p = p.truncate_with(vec![0, 3], vec![0.5, 0.5]);
                     }
 
                     if ui.button("Omnitruncate").clicked() {
