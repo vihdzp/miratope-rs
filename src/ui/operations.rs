@@ -43,7 +43,8 @@ impl Plugin for OperationsPlugin {
             .add_plugin(DuopyramidWindow::plugin())
             .add_plugin(DuoprismWindow::plugin())
             .add_plugin(DuotegumWindow::plugin())
-            .add_plugin(DuocombWindow::plugin());
+            .add_plugin(DuocombWindow::plugin())
+            .add_plugin(CompoundWindow::plugin());
     }
 }
 
@@ -1013,6 +1014,45 @@ impl Window for DuocombWindow {
 impl DuoWindow for DuocombWindow {
     fn operation(&self, p: &NamedConcrete, q: &NamedConcrete) -> NamedConcrete {
         p.duocomb(q)
+    }
+
+    fn slots(&self) -> [Slot; 2] {
+        self.slots
+    }
+
+    fn slots_mut(&mut self) -> &mut [Slot; 2] {
+        &mut self.slots
+    }
+}
+
+/// A window that allows a user to build a compound, either using the polytopes
+/// in memory or the currently loaded one.
+#[derive(Default)]
+pub struct CompoundWindow {
+    /// Whether the window is open.
+    open: bool,
+
+    /// The slots that are currently selected.
+    slots: [Slot; 2],
+}
+
+impl Window for CompoundWindow {
+    const NAME: &'static str = "Compound";
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.open
+    }
+}
+
+impl DuoWindow for CompoundWindow {
+    fn operation(&self, p: &NamedConcrete, q: &NamedConcrete) -> NamedConcrete {
+        let mut p2 = p.clone();
+        p2.comp_append(q.clone());
+        p2
     }
 
     fn slots(&self) -> [Slot; 2] {

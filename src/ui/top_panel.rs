@@ -222,6 +222,7 @@ pub type EguiWindows<'a> = (
     ResMut<'a, DuoprismWindow>,
     ResMut<'a, DuotegumWindow>,
     ResMut<'a, DuocombWindow>,
+    ResMut<'a, CompoundWindow>,
 );
 
 /// The system that shows the top panel.
@@ -254,6 +255,7 @@ pub fn show_top_panel(
         mut duoprism_window,
         mut duotegum_window,
         mut duocomb_window,
+        mut compound_window,
     ): EguiWindows<'_>,
 ) {
     // The top bar.
@@ -431,6 +433,11 @@ pub fn show_top_panel(
                         // Opens the window to make duocombs.
                         if ui.button("Duocomb").clicked() {
                             duocomb_window.open();
+                        }
+
+                        // Opens the window to make compounds.
+                         if ui.button("Compound").clicked() {
+                            compound_window.open();
                         }
                     });
 
