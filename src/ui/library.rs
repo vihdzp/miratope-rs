@@ -105,14 +105,14 @@ impl SpecialLibrary {
                     ui.label("n:");
                     ui.add(
                         egui::DragValue::new(n)
-                            .speed(0.25)
+                            .speed(0.03)
                             .clamp_range(2..=usize::MAX),
                     );
 
                     // Turning number.
                     let max_n = *n / 2;
                     ui.label("d:");
-                    ui.add(egui::DragValue::new(d).speed(0.25).clamp_range(1..=max_n));
+                    ui.add(egui::DragValue::new(d).speed(0.03).clamp_range(1..=max_n));
                 });
 
                 if clicked {
@@ -131,14 +131,14 @@ impl SpecialLibrary {
                     ui.label("n:");
                     ui.add(
                         egui::DragValue::new(n)
-                            .speed(0.25)
+                            .speed(0.03)
                             .clamp_range(2..=usize::MAX),
                     );
 
                     // Turning number.
                     let max_n = *n * 2 / 3;
                     ui.label("d:");
-                    ui.add(egui::DragValue::new(d).speed(0.25).clamp_range(1..=max_n));
+                    ui.add(egui::DragValue::new(d).speed(0.03).clamp_range(1..=max_n));
 
                     clicked
                 });
@@ -159,27 +159,27 @@ impl SpecialLibrary {
                     ui.label("n₁:");
                     ui.add(
                         egui::DragValue::new(n1)
-                            .speed(0.25)
+                            .speed(0.03)
                             .clamp_range(2..=usize::MAX),
                     );
 
                     // Turning number.
                     let max_n1 = *n1 / 2;
                     ui.label("d₁:");
-                    ui.add(egui::DragValue::new(d1).speed(0.25).clamp_range(1..=max_n1));
+                    ui.add(egui::DragValue::new(d1).speed(0.03).clamp_range(1..=max_n1));
 
                     // Number of sides.
                     ui.label("n₂:");
                     ui.add(
                         egui::DragValue::new(n2)
-                            .speed(0.25)
+                            .speed(0.03)
                             .clamp_range(2..=usize::MAX),
                     );
 
                     // Turning number.
                     let max_n2 = *n2 / 2;
                     ui.label("d₂:");
-                    ui.add(egui::DragValue::new(d2).speed(0.25).clamp_range(1..=max_n2));
+                    ui.add(egui::DragValue::new(d2).speed(0.03).clamp_range(1..=max_n2));
 
                     clicked
                 });
@@ -197,7 +197,7 @@ impl SpecialLibrary {
                     let clicked = ui.button(text).clicked();
 
                     ui.label("Rank:");
-                    ui.add(egui::DragValue::new(rank).speed(0.05).clamp_range(-1..=20));
+                    ui.add(egui::DragValue::new(rank).speed(0.03).clamp_range(-1..=20));
 
                     clicked
                 });
@@ -534,13 +534,13 @@ fn show_library(
                             // Loads a (uniform 4D) duoprism.
                             SpecialLibrary::Duoprisms(n1, d1, n2, d2) => {
                                 let mut p = query.iter_mut().next().unwrap();
-                                let p1 = NamedConcrete::star_polygon(n1, d1);
+                                let p1 = NamedConcrete::star_polygon_with_edge(n1, d1, 1.0);
 
                                 // Avoids duplicate work if possible.
                                 if n1 == n2 && d1 == d2 {
                                     *p = NamedConcrete::duoprism(&p1, &p1);
                                 } else {
-                                    let p2 = NamedConcrete::star_polygon(n2, d2);
+                                    let p2 = NamedConcrete::star_polygon_with_edge(n2, d2, 1.0);
                                     *p = NamedConcrete::duoprism(&p1, &p2);
                                 }
                             }

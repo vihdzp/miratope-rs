@@ -434,7 +434,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
         Self::grunbaum_star_polygon_with_rot(n, d, T::ZERO)
     }
 
-    /// Builds the star polygon `{n / d}`. with unit circumradius. If `n` and `d`
+    /// Builds the star polygon `{n / d}` with unit circumradius. If `n` and `d`
     /// have a common factor, the result is a compound.
     ///
     /// # Panics
@@ -454,6 +454,18 @@ pub trait ConcretePolytope<T: Float>: Polytope {
                 Self::grunbaum_star_polygon_with_rot(n / gcd, d / gcd, T::usize(k) * angle)
             }),
         )
+    }
+
+    /// Builds the star polygon `{n / d}` with edge length `a`. If `n` and `d`
+    /// have a common factor, the result is a compound.
+    ///
+    /// # Panics
+    /// Will panic if either `n < 2` or if `d < 1`, in which case there's
+    /// nothing sensible to do.
+    fn star_polygon_with_edge(n: usize, d: usize, a: f64) -> Self {
+        let mut p = Self::star_polygon(n,d);
+        p.scale(T::f64(a) / T::usize(2) / (T::PI * T::usize(d) / T::usize(n)).fsin());
+        p
     }
 
     /// Scales a polytope by a given factor.
@@ -986,7 +998,7 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
         other_offset: &Point<T>,
         height: T,
     ) -> Self {
-        dbg!(Self::new(
+        Self::new(
             duopyramid_vertices(
                 &self.vertices,
                 &other.vertices,
@@ -996,7 +1008,7 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
                 false
             ),
             Abstract::duopyramid(&self.abs, &other.abs),
-        ))
+        )
     }
 
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
