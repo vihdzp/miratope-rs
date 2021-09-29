@@ -2176,8 +2176,6 @@ dependencies = [
  "rfd",
  "ron",
  "serde",
- "strum",
- "strum_macros",
  "vec-like",
  "webbrowser",
 ]

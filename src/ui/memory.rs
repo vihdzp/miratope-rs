@@ -20,7 +20,6 @@ impl std::ops::Index<usize> for Memory {
     }
 }
 
-
 /// The label for the `n`-th memory slot.
 pub fn slot_label(n: usize) -> String {
     format!("Slot {}", n + 1)

@@ -24,8 +24,6 @@ lyon = "0.17"
 rfd = "0.5"
 ron = "0.6"
 serde = { version = "1.0", features = ["derive"] }
-strum = "0.21"
-strum_macros = "0.21"
 webbrowser = "0.5"
 
 # Use latest version of Bevy (might cause breakage!)
