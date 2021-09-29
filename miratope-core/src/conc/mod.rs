@@ -463,7 +463,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// Will panic if either `n < 2` or if `d < 1`, in which case there's
     /// nothing sensible to do.
     fn star_polygon_with_edge(n: usize, d: usize, a: f64) -> Self {
-        let mut p = Self::star_polygon(n,d);
+        let mut p = Self::star_polygon(n, d);
         p.scale(T::f64(a) / T::usize(2) / (T::PI * T::usize(d) / T::usize(n)).fsin());
         p
     }
@@ -1005,7 +1005,7 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
                 self_offset,
                 other_offset,
                 height,
-                false
+                false,
             ),
             Abstract::duopyramid(&self.abs, &other.abs),
         )

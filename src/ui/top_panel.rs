@@ -436,7 +436,7 @@ pub fn show_top_panel(
                         }
 
                         // Opens the window to make compounds.
-                         if ui.button("Compound").clicked() {
+                        if ui.button("Compound").clicked() {
                             compound_window.open();
                         }
                     });
