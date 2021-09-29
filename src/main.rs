@@ -45,7 +45,7 @@
 //!
 //! Miratope is written in Rust, so if you don't already have the latest version and its Visual Studio C++ Build tools downloaded then you should do that first. Instructions for downloading can be found here: [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install). **You may have to restart your computer for Rust to fully install**.
 //!
-//! 1. Once you have Rust set up click the green button on [the Github page](https://github.com/OfficialURL/miratope-rs) that says "Code".
+//! 1. Once you have Rust set up click the green button on [the Github page](https://github.com/vihdzp/miratope-rs) that says "Code".
 //!    * If you already have Github Desktop, you can just click "Open with Github Desktop".
 //!    * If you don't, click "Download ZIP" and once it's done downloading, extract the `.zip` file.
 //! 2. Next, open a command line. On Windows you can do this by opening Run with `Win+R` and typing `cmd` in the search box.
@@ -59,7 +59,7 @@
 //! ## Where do I get these "`.off` files"?
 //! The **O**bject **F**ile **F**ormat is a format for storing certain kinds of geometric shapes. Although not in widespread use, it has become the standard format for those interested in polyhedra and polytopes. It was initially meant for the [Geomview software](https://people.sc.fsu.edu/~jburkardt/data/off/off.html), and was later adapted for the [Stella software](https://www.software3d.com/StellaManual.php?prod=stella4D#import). Miratope uses a further generalization of the Stella `.off` format for any amount of dimensions.
 //!
-//! Miratope includes a small library simple or generatable polytopes at startup. More complicated polytopes can be downloaded from [OfficialURL's personal collection](https://drive.google.com/drive/u/0/folders/1nQZ-QVVBfgYSck4pkZ7he0djF82T9MVy). Eventually, most files here will be browsable from Miratope itself.
+//! Miratope includes a small library simple or generatable polytopes at startup. More complicated polytopes can be downloaded from [vihdzp's personal collection](https://drive.google.com/drive/u/0/folders/1nQZ-QVVBfgYSck4pkZ7he0djF82T9MVy). Eventually, most files here will be browsable from Miratope itself.
 //!
 //! ## Why is the rendering buggy?
 //! Proper rendering, even in 3D, is a work in progress.
@@ -85,6 +85,9 @@ mod mesh;
 mod no_cull_pipeline;
 mod ui;
 
+/// The link to the [Polytope Wiki](https://polytope.miraheze.org/wiki/).
+pub const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
+
 /// The floating-point type for the entire application. Can be either `f32` or
 /// `f64`, and it should compile the same.
 type Float = f32;
@@ -92,10 +95,6 @@ type Float = f32;
 /// A [`Concrete`](miratope_core::conc::Concrete) polytope with the floating
 /// type for the application.
 type Concrete = miratope_core::conc::Concrete<Float>;
-
-/// A [`NamedConcrete`](miratope_lang::poly::NamedConcrete) polytope with the
-/// floating type for the application.
-type NamedConcrete = miratope_lang::poly::NamedConcrete<Float>;
 
 /// A [`Point`](miratope_core::geometry::Point) polytope with the floating type
 /// for the application.
@@ -117,7 +116,7 @@ type Hyperplane = miratope_core::geometry::Hyperplane<Float>;
 const EPS: Float = <Float as miratope_core::float::Float>::EPS;
 
 /// The link to the GitHub issues.
-const NEW_ISSUE: &str = "https://github.com/OfficialURL/miratope-rs/issues/new";
+const NEW_ISSUE: &str = "https://github.com/vihdzp/miratope-rs/issues/new";
 
 /// Loads all of the necessary systems for the application to run.
 fn main() {
@@ -139,7 +138,7 @@ fn setup(
     mut pipelines: ResMut<'_, Assets<PipelineDescriptor>>,
 ) {
     // Default polytope.
-    let poly = NamedConcrete::from_off(include_str!("default.off")).unwrap();
+    let poly = Concrete::from_off(include_str!("default.off")).unwrap();
 
     // Disables backface culling.
     pipelines.set_untracked(

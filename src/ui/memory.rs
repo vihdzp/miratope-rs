@@ -1,36 +1,39 @@
 //! Manages the memory tab.
 
-use crate::NamedConcrete;
-
 use bevy::prelude::Query;
 use bevy_egui::egui;
-use miratope_lang::lang::En;
+
+use crate::Concrete;
 
 /// The compile-time number of slots of memory.
 pub const MEMORY_SLOTS: usize = 8;
 
 /// Represents the memory slots to store polytopes.
 #[derive(Default)]
-pub struct Memory([Option<NamedConcrete>; MEMORY_SLOTS]);
+pub struct Memory([Option<Concrete>; MEMORY_SLOTS]);
 
 impl std::ops::Index<usize> for Memory {
-    type Output = Option<NamedConcrete>;
+    type Output = Option<Concrete>;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.0[index]
     }
 }
 
+
+/// The label for the `n`-th memory slot.
+pub fn slot_label(n: usize) -> String {
+    format!("Slot {}", n + 1)
+}
+
 impl Memory {
     /// Returns an iterator over the memory slots.
-    pub fn iter(&self) -> std::slice::Iter<'_, Option<NamedConcrete>> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Option<Concrete>> {
         self.0.iter()
     }
 
     /// Shows the memory menu in a specified Ui.
-    pub fn show(&mut self, ui: &mut egui::Ui, query: &mut Query<'_, '_, &mut NamedConcrete>) {
-        use miratope_lang::Language;
-
+    pub fn show(&mut self, ui: &mut egui::Ui, query: &mut Query<'_, '_, &mut Concrete>) {
         egui::menu::menu(ui, "Memory", |ui| {
             for (idx, slot) in self.0.iter_mut().enumerate() {
                 match slot {
@@ -49,7 +52,7 @@ impl Memory {
 
                     // Shows a slot with a polytope on it.
                     Some(poly) => {
-                        let clear = egui::CollapsingHeader::new(En::parse_uppercase(&poly.name))
+                        let clear = egui::CollapsingHeader::new(slot_label(idx))
                             .id_source(idx)
                             .show(ui, |ui| {
                                 // Clones a polytope from memory.

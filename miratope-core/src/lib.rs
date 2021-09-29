@@ -16,7 +16,7 @@
 )]*/
 
 //! This is the main dependency of
-//! [Miratope](https://github.com/OfficialURL/miratope-rs). It contains all code
+//! [Miratope](https://github.com/vihdzp/miratope-rs). It contains all code
 //! to build and name [`Abstract`] and [`Concrete`](conc::Concrete) polytopes
 //! alike.
 //!

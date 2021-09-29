@@ -307,7 +307,7 @@ dependencies = [
 [[package]]
 name = "bevy_egui"
 version = "0.6.1"
-source = "git+https://github.com/OfficialURL/bevy_egui/?branch=bevy-main#d8dcce65ec1d2afc412ca5b31f6bde888ef73846"
+source = "git+https://github.com/vihdzp/bevy_egui/?branch=bevy-main#d8dcce65ec1d2afc412ca5b31f6bde888ef73846"
 dependencies = [
  "bevy",
  "clipboard",
@@ -1164,12 +1164,6 @@ name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
-
-[[package]]
-name = "doc-comment"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
 name = "downcast-rs"
@@ -2179,7 +2173,6 @@ dependencies = [
  "egui",
  "lyon",
  "miratope-core",
- "miratope-lang",
  "rfd",
  "ron",
  "serde",
@@ -2209,21 +2202,6 @@ dependencies = [
  "vec-like",
  "xml-rs",
  "zip",
-]
-
-[[package]]
-name = "miratope-lang"
-version = "0.1.0"
-dependencies = [
- "doc-comment",
- "miratope-core",
- "nalgebra",
- "paste",
- "ron",
- "serde",
- "strum",
- "strum_macros",
- "vec-like",
 ]
 
 [[package]]
@@ -3534,7 +3512,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 [[package]]
 name = "winit"
 version = "0.25.0"
-source = "git+https://github.com/OfficialURL/winit#b8c153d99be7156eceb4d17492a8d808a17afe30"
+source = "git+https://github.com/vihdzp/winit#b8c153d99be7156eceb4d17492a8d808a17afe30"
 dependencies = [
  "bitflags",
  "cocoa",

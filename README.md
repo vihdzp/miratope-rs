@@ -50,7 +50,7 @@ If you have downloaded Miratope previously, updated to the most recent version, 
 The **O**bject **F**ile **F**ormat is a format for storing certain kinds of geometric shapes.
 Although not in widespread use, it has become the standard format for those interested in polyhedra and polytopes. It was initially meant for the [Geomview software](https://people.sc.fsu.edu/~jburkardt/data/off/off.html), and was later adapted for the [Stella software](https://www.software3d.com/StellaManual.php?prod=stella4D#import). Miratope uses a further generalization of the Stella `.off` format for any amount of dimensions.
 
-Miratope includes a small library simple or generatable polytopes at startup. More complicated polytopes can be downloaded from [OfficialURL's personal collection](https://drive.google.com/drive/u/0/folders/1nQZ-QVVBfgYSck4pkZ7he0djF82T9MVy). Eventually, most files here will be browsable from Miratope itself.
+Miratope includes a small library simple or generatable polytopes at startup. More complicated polytopes can be downloaded from [vihdzp's personal collection](https://drive.google.com/drive/u/0/folders/1nQZ-QVVBfgYSck4pkZ7he0djF82T9MVy). Eventually, most files here will be browsable from Miratope itself.
 
 ## Why is the rendering buggy?
 Proper rendering, even in 3D, is a work in progress.

@@ -3,16 +3,12 @@
 use std::{
     ffi::{OsStr, OsString},
     fs, io,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 use super::config::LibPath;
-use crate::{Float, NamedConcrete};
+use crate::Concrete;
 use miratope_core::{conc::ConcretePolytope, file::FromFile, Polytope};
-use miratope_lang::{
-    name::{Con, Name},
-    SelectedLanguage,
-};
 
 use bevy::prelude::*;
 use bevy_egui::{egui, egui::Ui, EguiContext};
@@ -87,10 +83,47 @@ pub enum ShowResult {
     Special(SpecialLibrary),
 }
 
+impl Default for ShowResult {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+impl ShowResult {
+    /// Returns whether `self` matches `ShowResult::None`.
+    pub fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+}
+
+/// Implements the or operator, so that `a | b` is `a` if it isn't `None`, but
+/// `b` otherwise.
+impl std::ops::BitOr for ShowResult {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        if self.is_none() {
+            rhs
+        } else {
+            self
+        }
+    }
+}
+
+/// Implements the or assignment operator, defined in the same way as the or
+/// operator.
+impl std::ops::BitOrAssign for ShowResult {
+    fn bitor_assign(&mut self, rhs: Self) {
+        if !rhs.is_none() {
+            *self = rhs;
+        }
+    }
+}
+
 impl SpecialLibrary {
     /// Shows the special component of the library. Returns the action selected
     /// by the user, if any.
-    pub fn show(&mut self, ui: &mut Ui, _selected_language: SelectedLanguage) -> ShowResult {
+    pub fn show(&mut self, ui: &mut Ui) -> ShowResult {
         let text = self.to_string();
 
         match self {
@@ -212,28 +245,6 @@ impl SpecialLibrary {
     }
 }
 
-/// The display name for a file or folder.
-#[derive(Clone, Serialize, Deserialize)]
-pub enum DisplayName {
-    /// A name in its language-independent representation.
-    //todo: make generic?
-    Name(Name<Con<Float>>),
-
-    /// A literal string name.
-    Literal(String),
-}
-
-impl DisplayName {
-    /// This is running at 60 FPS but name parsing isn't blazing fast. Maybe
-    /// do some sort of cacheing in the future?
-    pub fn parse(&self, selected_language: SelectedLanguage) -> String {
-        match self {
-            Self::Name(name) => selected_language.parse(name),
-            Self::Literal(name) => name.clone(),
-        }
-    }
-}
-
 /// Represents any of the files or folders that make up the Miratope library.
 ///
 /// The library is internally stored is a tree-like structure. Once a folder
@@ -242,20 +253,14 @@ impl DisplayName {
 pub enum Library {
     /// A folder whose contents have not yet been read.
     UnloadedFolder {
-        /// The name of the folder in disk.
-        path_name: String,
-
-        /// The display name of the folder.
-        name: DisplayName,
+        /// The name of the folder.
+        name: String,
     },
 
     /// A folder whose contents have been read.
     LoadedFolder {
-        /// The name of the folder in disk.
-        path_name: String,
-
-        /// The display name of the folder.
-        name: DisplayName,
+        /// The name of the folder.
+        name: String,
 
         /// The contents of the folder.
         contents: Vec<Library>,
@@ -263,79 +268,35 @@ pub enum Library {
 
     /// A file that can be loaded into Miratope.
     File {
-        /// The name of the file in disk.
-        path_name: String,
-
-        /// The display name of the file.
-        name: DisplayName,
+        /// The file name.
+        name: String,
     },
 
     /// Any special file in the library.
     Special(SpecialLibrary),
 }
 
-/// Implements the or operator, so that `a | b` is `a` if it isn't `None`, but
-/// `b` otherwise.
-impl std::ops::BitOr for ShowResult {
-    type Output = Self;
-
-    fn bitor(self, rhs: Self) -> Self::Output {
-        if let Self::None = self {
-            rhs
-        } else {
-            self
-        }
-    }
-}
-
-/// Implements the or assignment operator, defined in the same way as the or
-/// operator.
-impl std::ops::BitOrAssign for ShowResult {
-    fn bitor_assign(&mut self, rhs: Self) {
-        if !matches!(rhs, Self::None) {
-            *self = rhs;
-        }
-    }
-}
-
-/// Converts the given `PathBuf` into a `String`.
-pub fn path_to_str(path: PathBuf) -> String {
-    path.file_name().unwrap().to_string_lossy().into_owned()
-}
-
 impl Library {
-    /// Returns either the file name or the folder name of a given component of
-    /// the library. In case that this doesn't apply, returns the empty string.
-    pub fn path_name(&self) -> String {
+    /// Returns either the folder name of a given component of the library. In
+    /// case that this doesn't apply, returns the empty string.
+    pub fn folder_name(&self) -> &str {
         match self {
-            Library::UnloadedFolder { path_name, .. }
-            | Library::LoadedFolder { path_name, .. }
-            | Library::File { path_name, .. } => path_name.clone(),
-            Library::Special(_) => String::new(),
+            Library::UnloadedFolder { name, .. }
+            | Library::LoadedFolder { name, .. }
+            | Library::File { name, .. } => name,
+            Library::Special(_) => "",
         }
     }
 
     /// Loads the data from a file at a given path.
     pub fn new_file(path: &impl AsRef<OsStr>) -> Self {
-        let path = PathBuf::from(&path);
-        let name = if let Some(name) = Name::from_off(&path) {
-            DisplayName::Name(name)
-        } else {
-            DisplayName::Literal(String::from(
-                path.file_stem().map(|f| f.to_str()).flatten().unwrap_or(""),
-            ))
-        };
-
         Self::File {
-            path_name: path_to_str(path),
-            name,
+            name: PathBuf::from(path)
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned(),
         }
-    }
-
-    /// Attempts to read the `.name` file in a folder. If it can, it returns the
-    /// name.
-    pub fn read_name<U: AsRef<Path>>(path: U) -> Option<DisplayName> {
-        ron::from_str(&String::from_utf8(fs::read(path.as_ref().join(".name")).ok()?).ok()?).ok()
     }
 
     /// Creates a new unloaded folder from a given path. If the path doesn't
@@ -346,26 +307,9 @@ impl Library {
             return None;
         }
 
-        // Attempts to read from the .name file.
-        Some(if let Some(name) = Self::read_name(&path) {
-            Self::UnloadedFolder {
-                path_name: path_to_str(path),
-                name,
-            }
-        }
-        // Else, takes the name from the folder itself.
-        else {
-            let path_name = String::from(
-                path.file_name()
-                    .map(|name| name.to_str())
-                    .flatten()
-                    .unwrap_or(""),
-            );
-
-            Self::UnloadedFolder {
-                name: DisplayName::Literal(path_name.clone()),
-                path_name,
-            }
+        // Takes the name from the folder itself.
+        Some(Self::UnloadedFolder {
+            name: String::from(path.file_name().map(OsStr::to_str).flatten().unwrap_or("")),
         })
     }
 
@@ -374,106 +318,86 @@ impl Library {
     /// order. If that also fails, it returns an `Err`.
     pub fn folder_contents<U: AsRef<OsStr>>(path: U) -> io::Result<Vec<Self>> {
         let path = PathBuf::from(&path);
-        assert!(
-            path.is_dir(),
-            "Path {} not a directory!",
-            path.to_str().unwrap_or_default()
-        );
+        if !path.is_dir() {
+            return Ok(Vec::new());
+        }
 
         // Attempts to read from the .folder file.
-        Ok(
-            if let Some(Ok(folder)) = fs::read(path.join(".folder"))
-                .ok()
-                .map(|file| ron::from_str(&String::from_utf8(file).unwrap()))
-            {
-                folder
+        if let Some(Ok(folder)) = fs::read(path.join(".folder"))
+            .ok()
+            .map(|file| ron::from_str(&String::from_utf8(file).unwrap()))
+        {
+            Ok(folder)
+        }
+        // Otherwise, just manually goes through the files.
+        else {
+            let mut contents = Vec::new();
+
+            for entry in fs::read_dir(path.clone())? {
+                let path = &entry?.path();
+
+                // Adds a new unloaded folder.
+                if let Some(unloaded_folder) = Self::new_folder(path) {
+                    contents.push(unloaded_folder);
+                }
+                // Adds a new file.
+                else {
+                    let ext = path.extension();
+                    if ext == Some(OsStr::new("off")) || ext == Some(OsStr::new("ggb")) {
+                        contents.push(Self::new_file(path));
+                    }
+                }
             }
-            // Otherwise, just manually goes through the files.
-            else {
-                let mut contents = Vec::new();
 
-                for entry in fs::read_dir(path.clone())? {
-                    let path = &entry?.path();
+            // We cache these contents for future use.
+            if fs::write(path.join(".folder"), ron::to_string(&contents).unwrap()).is_ok() {
+                println!(".folder file overwritten!");
+            } else {
+                println!(".folder file could not be overwritten!");
+            }
 
-                    // Adds a new unloaded folder.
-                    if let Some(unloaded_folder) = Self::new_folder(path) {
-                        contents.push(unloaded_folder);
-                    }
-                    // Adds a new file.
-                    else {
-                        let ext = path.extension();
-
-                        if ext == Some(OsStr::new("off")) || ext == Some(OsStr::new("ggb")) {
-                            contents.push(Self::new_file(path));
-                        }
-                    }
-                }
-
-                // We cache these contents for future use.
-                if fs::write(path.join(".folder"), ron::to_string(&contents).unwrap()).is_ok() {
-                    println!(".folder file overwritten!");
-                } else {
-                    println!(".folder file could not be overwritten!");
-                }
-
-                contents
-            },
-        )
+            Ok(contents)
+        }
     }
 
     /// Shows the library in a given `Ui`, starting from a given path.
-    pub fn show(
-        &mut self,
-        ui: &mut Ui,
-        path: PathBuf,
-        selected_language: SelectedLanguage,
-    ) -> ShowResult {
+    pub fn show(&mut self, ui: &mut Ui, path: PathBuf) -> ShowResult {
         match self {
             // Shows a collapsing drop-down, and loads the folder in case it's clicked.
             Self::UnloadedFolder { name, .. } => {
-                // Clones so that the closure doesn't require unique access.
-                let name = name.clone();
-                let mut res = ShowResult::None;
+                *self = Self::LoadedFolder {
+                    name: name.clone(),
+                    contents: Self::folder_contents(&path).unwrap(),
+                };
 
-                ui.collapsing(name.parse(selected_language), |ui| {
-                    let mut contents = Self::folder_contents(&path).unwrap();
-
-                    // Contents of drop down.
-                    for lib in contents.iter_mut() {
-                        let mut new_path = path.clone();
-                        new_path.push(lib.path_name());
-                        res |= lib.show(ui, new_path, selected_language);
-                    }
-
-                    // Opens the folder.
-                    *self = Self::LoadedFolder {
-                        path_name: path_to_str(path),
-                        name,
-                        contents,
-                    };
-                });
-
-                res
+                self.show(ui, path)
             }
 
             // Shows a drop-down with all of the files and folders.
-            Self::LoadedFolder { name, contents, .. } => {
-                let mut res = ShowResult::None;
+            Self::LoadedFolder { name, contents, .. } => ui
+                .collapsing(name.clone(), |ui| {
+                    let mut res = ShowResult::None;
 
-                ui.collapsing(name.parse(selected_language), |ui| {
                     for lib in contents.iter_mut() {
                         let mut new_path = path.clone();
-                        new_path.push(lib.path_name());
-                        res |= lib.show(ui, new_path, selected_language);
+                        new_path.push(lib.folder_name());
+                        res |= lib.show(ui, new_path);
                     }
-                });
 
-                res
-            }
+                    res
+                })
+                .body_returned
+                .unwrap_or_default(),
 
             // Shows a button that loads the file if clicked.
             Self::File { name, .. } => {
-                if ui.button(name.parse(selected_language)).clicked() {
+                let label = PathBuf::from(name as &_)
+                    .file_stem()
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned();
+
+                if ui.button(label).clicked() {
                     ShowResult::Load(path.into_os_string())
                 } else {
                     ShowResult::None
@@ -481,7 +405,7 @@ impl Library {
             }
 
             // Shows any of the special files.
-            Self::Special(special) => special.show(ui, selected_language),
+            Self::Special(special) => special.show(ui),
         }
     }
 }
@@ -489,10 +413,9 @@ impl Library {
 /// The system that shows the Miratope library.
 fn show_library(
     egui_ctx: Res<'_, EguiContext>,
-    mut query: Query<'_, '_, &mut NamedConcrete>,
+    mut query: Query<'_, '_, &mut Concrete>,
     mut library: ResMut<'_, Option<Library>>,
     lib_path: Res<'_, LibPath>,
-    selected_language: Res<'_, SelectedLanguage>,
 ) {
     // Shows the polytope library.
     if let Some(library) = library.as_mut() {
@@ -501,12 +424,12 @@ fn show_library(
             .max_width(450.0)
             .show(egui_ctx.ctx(), |ui| {
                 egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
-                    match library.show(ui, PathBuf::from(lib_path.as_ref()), *selected_language) {
+                    match library.show(ui, PathBuf::from(lib_path.as_ref())) {
                         // No action needs to be taken.
                         ShowResult::None => {}
 
                         // Loads a selected file.
-                        ShowResult::Load(file) => match NamedConcrete::from_path(&file) {
+                        ShowResult::Load(file) => match Concrete::from_path(&file) {
                             Ok(q) => *query.iter_mut().next().unwrap() = q,
                             Err(err) => eprintln!("File open failed: {}", err),
                         },
@@ -515,58 +438,56 @@ fn show_library(
                         ShowResult::Special(special) => match special {
                             // Loads a regular star polygon.
                             SpecialLibrary::Polygons(n, d) => {
-                                *query.iter_mut().next().unwrap() =
-                                    NamedConcrete::star_polygon(n, d);
+                                *query.iter_mut().next().unwrap() = Concrete::star_polygon(n, d);
                             }
 
                             // Loads a uniform polygonal prism.
                             SpecialLibrary::Prisms(n, d) => {
-                                *query.iter_mut().next().unwrap() =
-                                    NamedConcrete::uniform_prism(n, d);
+                                *query.iter_mut().next().unwrap() = Concrete::uniform_prism(n, d);
                             }
 
                             // Loads a uniform polygonal antiprism.
                             SpecialLibrary::Antiprisms(n, d) => {
                                 *query.iter_mut().next().unwrap() =
-                                    NamedConcrete::uniform_antiprism(n, d);
+                                    Concrete::uniform_antiprism(n, d);
                             }
 
                             // Loads a (uniform 4D) duoprism.
                             SpecialLibrary::Duoprisms(n1, d1, n2, d2) => {
                                 let mut p = query.iter_mut().next().unwrap();
-                                let p1 = NamedConcrete::star_polygon_with_edge(n1, d1, 1.0);
+                                let p1 = Concrete::star_polygon_with_edge(n1, d1, 1.0);
 
                                 // Avoids duplicate work if possible.
                                 if n1 == n2 && d1 == d2 {
-                                    *p = NamedConcrete::duoprism(&p1, &p1);
+                                    *p = Concrete::duoprism(&p1, &p1);
                                 } else {
-                                    let p2 = NamedConcrete::star_polygon_with_edge(n2, d2, 1.0);
-                                    *p = NamedConcrete::duoprism(&p1, &p2);
+                                    let p2 = Concrete::star_polygon_with_edge(n2, d2, 1.0);
+                                    *p = Concrete::duoprism(&p1, &p2);
                                 }
                             }
 
                             // Loads a uniform polygonal antiprism.
                             SpecialLibrary::AntiprismPrisms(n, d) => {
                                 *query.iter_mut().next().unwrap() =
-                                    NamedConcrete::uniform_antiprism(n, d).prism();
+                                    Concrete::uniform_antiprism(n, d).prism();
                             }
 
                             // Loads a simplex with a given rank.
                             SpecialLibrary::Simplex(rank) => {
                                 *query.iter_mut().next().unwrap() =
-                                    NamedConcrete::simplex((rank + 1) as usize);
+                                    Concrete::simplex((rank + 1) as usize);
                             }
 
                             // Loads a hypercube with a given rank.
                             SpecialLibrary::Hypercube(rank) => {
                                 *query.iter_mut().next().unwrap() =
-                                    NamedConcrete::hypercube((rank + 1) as usize);
+                                    Concrete::hypercube((rank + 1) as usize);
                             }
 
                             // Loads an orthoplex with a given rank.
                             SpecialLibrary::Orthoplex(rank) => {
                                 *query.iter_mut().next().unwrap() =
-                                    NamedConcrete::orthoplex((rank + 1) as usize);
+                                    Concrete::orthoplex((rank + 1) as usize);
                             }
                         },
                     }

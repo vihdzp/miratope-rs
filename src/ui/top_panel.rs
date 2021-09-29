@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use super::{camera::ProjectionType, memory::Memory, operations::*, UnitPointWidget};
-use crate::{Float, Hyperplane, NamedConcrete, Point, Vector};
+use crate::{Concrete, Float, Hyperplane, Point, Vector};
 
 use bevy::prelude::*;
 use bevy_egui::{
@@ -11,8 +11,6 @@ use bevy_egui::{
     EguiContext,
 };
 use miratope_core::{conc::ConcretePolytope, file::FromFile, Polytope};
-use miratope_lang::SelectedLanguage;
-use strum::IntoEnumIterator;
 
 /// The plugin in charge of everything on the top panel.
 pub struct TopPanelPlugin;
@@ -40,7 +38,7 @@ pub enum SectionState {
     /// The view is active.
     Active {
         /// The polytope from which the cross-section originates.
-        original_polytope: NamedConcrete,
+        original_polytope: Concrete,
 
         /// The range of the slider.
         minmax: (Float, Float),
@@ -65,7 +63,7 @@ impl SectionState {
         *self = Self::Inactive;
     }
 
-    pub fn open(&mut self, original_polytope: NamedConcrete, minmax: (f32, f32)) {
+    pub fn open(&mut self, original_polytope: Concrete, minmax: (f32, f32)) {
         *self = SectionState::Active {
             original_polytope,
             minmax,
@@ -168,7 +166,7 @@ impl FileDialogState {
 
 /// The system in charge of showing the file dialog.
 pub fn file_dialog(
-    mut query: Query<'_, '_, &mut NamedConcrete>,
+    mut query: Query<'_, '_, &mut Concrete>,
     file_dialog_state: Res<'_, FileDialogState>,
     file_dialog: NonSend<'_, FileDialogToken>,
 ) {
@@ -189,7 +187,7 @@ pub fn file_dialog(
             FileDialogMode::Open => {
                 if let Some(path) = file_dialog.pick_file() {
                     if let Some(mut p) = query.iter_mut().next() {
-                        match NamedConcrete::from_path(&path) {
+                        match Concrete::from_path(&path) {
                             Ok(q) => {
                                 *p = q;
                                 p.recenter();
@@ -230,8 +228,7 @@ pub type EguiWindows<'a> = (
 pub fn show_top_panel(
     // Info about the application state.
     egui_ctx: Res<'_, EguiContext>,
-    mut query: Query<'_, '_, &mut NamedConcrete>,
-    mut windows: ResMut<'_, Windows>,
+    mut query: Query<'_, '_, &mut Concrete>,
     keyboard: Res<'_, Input<KeyCode>>,
 
     // The Miratope resources controlled by the top panel.
@@ -241,7 +238,7 @@ pub fn show_top_panel(
     mut projection_type: ResMut<'_, ProjectionType>,
     mut memory: ResMut<'_, Memory>,
     mut background_color: ResMut<'_, ClearColor>,
-    mut selected_language: ResMut<'_, SelectedLanguage>,
+
     mut visuals: ResMut<'_, egui::Visuals>,
 
     // The different windows that can be shown.
@@ -270,9 +267,7 @@ pub fn show_top_panel(
 
                 // Saves a file.
                 if ui.button("Save").clicked() {
-                    if let Some(p) = query.iter_mut().next() {
-                        file_dialog_state.save(selected_language.parse(&p.name));
-                    }
+                    file_dialog_state.save("polytope".to_string());
                 }
 
                 ui.separator();
@@ -618,45 +613,6 @@ pub fn show_top_panel(
 
             memory.show(ui, &mut query);
 
-            // Stuff related to the Polytope Wiki.
-            menu::menu(ui, "Wiki", |ui| {
-                // Goes to the wiki main page.
-                if ui.button("Main Page").clicked() {
-                    if let Err(err) = webbrowser::open(miratope_lang::WIKI_LINK) {
-                        eprintln!("Website opening failed: {}", err);
-                    }
-                }
-
-                // Searches the current polytope on the wiki.
-                if ui.button("Current").clicked() {
-                    if let Some(p) = query.iter_mut().next() {
-                        if let Err(err) = webbrowser::open(&p.name.wiki_link()) {
-                            eprintln!("Website opening failed: {}", err)
-                        }
-                    }
-                }
-            });
-
-            // Switch language.
-            menu::menu(ui, "Preferences", |ui| {
-                ui.collapsing("Language", |ui| {
-                    for lang in SelectedLanguage::iter() {
-                        if ui.button(lang.to_string()).clicked() {
-                            *selected_language = lang;
-                        }
-                    }
-
-                    if selected_language.is_changed() {
-                        if let Some(poly) = query.iter_mut().next() {
-                            windows
-                                .get_primary_mut()
-                                .unwrap()
-                                .set_title(selected_language.parse(&poly.name));
-                        }
-                    }
-                });
-            });
-
             // General help.
             menu::menu(ui, "Help", |ui| {
                 if ui.button("File bug").clicked() {
@@ -704,7 +660,7 @@ pub fn show_top_panel(
 /// cross-section view.
 fn show_views(
     ui: &mut Ui,
-    mut query: Query<'_, '_, &mut NamedConcrete>,
+    mut query: Query<'_, '_, &mut Concrete>,
     mut section_state: ResMut<'_, SectionState>,
     mut section_direction: ResMut<'_, SectionDirection>,
 ) {

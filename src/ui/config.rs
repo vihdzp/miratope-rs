@@ -12,10 +12,8 @@ use bevy_egui::{egui, EguiContext};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
-use miratope_lang::SelectedLanguage;
-
 /// The default path in which we look for the Miratope library.
-const DEFAULT_PATH: &str = "./lib";
+const DEFAULT_PATH: &str = "./lib/Library";
 
 /// The default name for the configuration file.
 const CONF_FILE: &str = "miratope.conf";
@@ -39,7 +37,6 @@ impl Plugin for ConfigPlugin {
         // correspond to the actual stored values themselves.
         app.insert_resource(config_path)
             .insert_resource(config.lib_path)
-            .insert_resource(config.selected_language)
             .insert_resource(config.background_color.clear_color())
             .insert_resource(config.light_mode.visuals())
             .add_system(update_visuals.system())
@@ -125,9 +122,6 @@ pub struct Config {
     /// The path to the Miratope library.
     pub lib_path: LibPath,
 
-    /// The currently selected language.
-    pub selected_language: SelectedLanguage,
-
     /// The background color of the application.
     pub background_color: BgColor,
 
@@ -202,7 +196,7 @@ fn save_config(
     mut exit: EventReader<'_, '_, AppExit>,
     config_path: Res<'_, ConfigPath>,
     lib_path: Res<'_, LibPath>,
-    selected_language: Res<'_, SelectedLanguage>,
+
     background_color: Res<'_, ClearColor>,
     visuals: Res<'_, egui::Visuals>,
 ) {
@@ -210,7 +204,7 @@ fn save_config(
     if exit.iter().next().is_some() {
         let config = Config {
             lib_path: lib_path.clone(),
-            selected_language: *selected_language,
+
             background_color: BgColor::new(background_color.as_ref()),
             light_mode: LightMode(!visuals.dark_mode),
         };

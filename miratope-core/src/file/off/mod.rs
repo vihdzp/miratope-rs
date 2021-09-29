@@ -16,7 +16,7 @@ use vec_like::VecLike;
 const HEADER: &str = concat!(
     "Generated using Miratope v",
     env!("CARGO_PKG_VERSION"),
-    " (https://github.com/OfficialURL/miratope-rs)"
+    " (https://github.com/vihdzp/miratope-rs)"
 );
 
 /// A position in a file.

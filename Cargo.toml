@@ -1,12 +1,12 @@
 [workspace]
-members = ["miratope-core", "miratope-lang", "vec-like"]
+members = ["miratope-core", "vec-like"]
 
 [package]
 name = "miratope"
 description = "A polytope renderer and builder."
 license = "MIT"
 version = "0.1.0"
-repository = "https://github.com/OfficialURL/miratope-rs"
+repository = "https://github.com/vihdzp/miratope-rs"
 keywords = ["polytope", "dimension", "geometry"]
 authors = [
     "Violeta Hernández <vi.hdz.p@gmail.com>",
@@ -17,7 +17,6 @@ edition = "2018"
 
 [dependencies]
 miratope-core = { path = "miratope-core" }
-miratope-lang = { path = "miratope-lang" }
 vec-like = { path = "vec-like" }
 approx = "0.5"
 directories = "4.0"
@@ -46,7 +45,7 @@ features = [
 
 # Bevy egui integration with this latest version.
 [dependencies.bevy_egui]
-git = "https://github.com/OfficialURL/bevy_egui/"
+git = "https://github.com/vihdzp/bevy_egui/"
 branch = "bevy-main"
 
 [dependencies.egui]
@@ -55,7 +54,7 @@ default-features = false
 features = ["multi_threaded"]
 
 [patch.crates-io]
-winit = { git = "https://github.com/OfficialURL/winit" }
+winit = { git = "https://github.com/vihdzp/winit" }
 
 [profile.release]
 lto = "thin"

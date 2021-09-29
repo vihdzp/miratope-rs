@@ -2,12 +2,11 @@
 
 use super::{camera::ProjectionType, top_panel::SectionState};
 use crate::mesh::Renderable;
-use crate::NamedConcrete;
+use crate::Concrete;
 
 use bevy::prelude::*;
 use bevy_egui::EguiSettings;
 use miratope_core::abs::Ranked;
-use miratope_lang::SelectedLanguage;
 
 /// The plugin in charge of the Miratope main window, and of drawing the
 /// polytope onto it.
@@ -23,8 +22,8 @@ impl Plugin for MainWindowPlugin {
 
 pub fn update_visible(
     keyboard: Res<'_, Input<KeyCode>>,
-    mut polies_vis: Query<'_, '_, &mut Visible, With<NamedConcrete>>,
-    mut wfs_vis: Query<'_, '_, &mut Visible, Without<NamedConcrete>>,
+    mut polies_vis: Query<'_, '_, &mut Visible, With<Concrete>>,
+    mut wfs_vis: Query<'_, '_, &mut Visible, Without<Concrete>>,
 ) {
     if keyboard.just_pressed(KeyCode::V) {
         if let Some(mut visible) = polies_vis.iter_mut().next() {
@@ -51,11 +50,10 @@ pub fn update_scale_factor(mut egui_settings: ResMut<'_, EguiSettings>, windows:
 /// Updates polytopes after an operation.
 pub fn update_changed_polytopes(
     mut meshes: ResMut<'_, Assets<Mesh>>,
-    polies: Query<'_, '_, (&NamedConcrete, &Handle<Mesh>, &Children), Changed<NamedConcrete>>,
-    wfs: Query<'_, '_, &Handle<Mesh>, Without<NamedConcrete>>,
-    mut windows: ResMut<'_, Windows>,
+    polies: Query<'_, '_, (&Concrete, &Handle<Mesh>, &Children), Changed<Concrete>>,
+    wfs: Query<'_, '_, &Handle<Mesh>, Without<Concrete>>,
     mut section_state: ResMut<'_, SectionState>,
-    selected_language: Res<'_, SelectedLanguage>,
+
     orthogonal: Res<'_, ProjectionType>,
 ) {
     for (poly, mesh_handle, children) in polies.iter() {
@@ -66,12 +64,6 @@ pub fn update_changed_polytopes(
         }
 
         *meshes.get_mut(mesh_handle).unwrap() = poly.mesh(*orthogonal);
-
-        // Sets the window's name to the polytope's name.
-        windows
-            .get_primary_mut()
-            .unwrap()
-            .set_title(selected_language.parse(&poly.name));
 
         // Updates all wireframes.
         for child in children.iter() {

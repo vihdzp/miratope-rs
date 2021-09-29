@@ -5,8 +5,11 @@
 
 use std::marker::PhantomData;
 
-use super::{memory::Memory, PointWidget};
-use crate::{Float, Hypersphere, NamedConcrete, Point};
+use super::{
+    memory::{slot_label, Memory},
+    PointWidget,
+};
+use crate::{Concrete, Float, Hypersphere, Point};
 use miratope_core::{conc::ConcretePolytope, Polytope};
 
 use bevy::prelude::*;
@@ -14,6 +17,9 @@ use bevy_egui::{
     egui::{self, CtxRef, Layout, Ui, Widget},
     EguiContext,
 };
+
+/// The text on the loaded polytope slot.
+const LOADED_LABEL: &str = "(Loaded polytope)";
 
 /// The result of showing a window, updated every frame.
 pub enum ShowResult {
@@ -135,7 +141,7 @@ macro_rules! impl_show {
         fn show_system(
             mut self_: ResMut<'_, Self>,
             egui_ctx: Res<'_, EguiContext>,
-            mut query: Query<'_, '_, &mut NamedConcrete>,
+            mut query: Query<'_, '_, &mut Concrete>,
         ) where
             Self: 'static,
         {
@@ -158,7 +164,7 @@ macro_rules! impl_show {
 /// doesn't need to be updated when the polytope is changed.
 pub trait PlainWindow: Window {
     /// Applies the action of the window to the polytope.
-    fn action(&self, polytope: &mut NamedConcrete);
+    fn action(&self, polytope: &mut Concrete);
 
     /// Builds the window to be shown on screen.
     fn build(&mut self, ui: &mut Ui);
@@ -192,7 +198,7 @@ impl<T: PlainWindow + 'static> Plugin for PlainWindowPlugin<T> {
 /// to be updated when the dimension of the polytope is changed.
 pub trait UpdateWindow: Window {
     /// Applies the action of the window to the polytope.
-    fn action(&self, polytope: &mut NamedConcrete);
+    fn action(&self, polytope: &mut Concrete);
 
     /// Builds the window to be shown on screen.
     fn build(&mut self, ui: &mut Ui);
@@ -219,7 +225,7 @@ pub trait UpdateWindow: Window {
     /// updated.
     fn update_system(
         mut self_: ResMut<'_, Self>,
-        query: Query<'_, '_, (&NamedConcrete, &Handle<Mesh>, &Children), Changed<NamedConcrete>>,
+        query: Query<'_, '_, (&Concrete, &Handle<Mesh>, &Children), Changed<Concrete>>,
     ) where
         Self: 'static,
     {
@@ -266,11 +272,7 @@ impl Default for Slot {
 }
 
 impl Slot {
-    pub fn to_poly<'a>(
-        self,
-        memory: &'a Memory,
-        loaded: &'a NamedConcrete,
-    ) -> Option<&'a NamedConcrete> {
+    pub fn to_poly<'a>(self, memory: &'a Memory, loaded: &'a Concrete) -> Option<&'a Concrete> {
         match self {
             Self::None => None,
             Self::Memory(idx) => memory[idx].as_ref(),
@@ -283,7 +285,7 @@ impl Slot {
 /// don't need to be updated when the polytope changes.
 pub trait DuoWindow: Window {
     /// The duo-operation to apply.
-    fn operation(&self, p: &NamedConcrete, q: &NamedConcrete) -> NamedConcrete;
+    fn operation(&self, p: &Concrete, q: &Concrete) -> Concrete;
 
     /// The slots in memory.
     fn slots(&self) -> [Slot; 2];
@@ -294,33 +296,31 @@ pub trait DuoWindow: Window {
     /// Returns the references to the polytopes currently selected.
     fn polytopes<'a>(
         &'a self,
-        loaded: &'a NamedConcrete,
+        loaded: &'a Concrete,
         memory: &'a Memory,
-    ) -> [Option<&'a NamedConcrete>; 2] {
+    ) -> [Option<&'a Concrete>; 2] {
         let [i, j] = self.slots();
         [i.to_poly(memory, loaded), j.to_poly(memory, loaded)]
     }
 
     /// Returns the dimensions of the polytopes currently selected, or 0 in case
     /// of the nullitope.
-    fn dim_or(&self, polytope: &NamedConcrete, memory: &Memory) -> [usize; 2] {
+    fn dim_or(&self, polytope: &Concrete, memory: &Memory) -> [usize; 2] {
         self.polytopes(polytope, memory)
             .map(|p| p.map(|poly| poly.dim()).flatten().unwrap_or_default())
     }
 
     /// Applies the action of the window to the polytope.
-    fn action(&self, polytope: &mut NamedConcrete, memory: &Memory) {
+    fn action(&self, polytope: &mut Concrete, memory: &Memory) {
         if let [Some(p), Some(q)] = self.polytopes(polytope, memory) {
             *polytope = self.operation(p, q);
         }
     }
 
     /// Builds the window to be shown on screen.
-    fn build(&mut self, _: &mut Ui, _: &NamedConcrete, _: &Memory) {}
+    fn build(&mut self, _: &mut Ui, _: &Concrete, _: &Memory) {}
 
-    fn build_dropdowns(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Memory) {
-        use miratope_lang::{lang::En, Language};
-
+    fn build_dropdowns(&mut self, ui: &mut Ui, memory: &Memory) {
         const SELECT: &str = "Select";
 
         // Iterates over both slots.
@@ -331,7 +331,7 @@ pub trait DuoWindow: Window {
                 Slot::None => SELECT.to_string(),
 
                 // The loaded polytope is selected.
-                Slot::Loaded => En::parse_uppercase(&polytope.name),
+                Slot::Loaded => LOADED_LABEL.to_string(),
 
                 // Something is selected from the memory.
                 Slot::Memory(selected_idx) => match memory[*selected_idx].as_ref() {
@@ -340,8 +340,9 @@ pub trait DuoWindow: Window {
                         *selected = Slot::None;
                         SELECT.to_string()
                     }
+
                     // Shows the name of the selected polytope.
-                    Some(poly) => En::parse_uppercase(&poly.name),
+                    Some(_) => slot_label(*selected_idx),
                 },
             };
 
@@ -354,11 +355,7 @@ pub trait DuoWindow: Window {
                     // The currently loaded polytope.
                     let mut loaded_selected = false;
 
-                    ui.selectable_value(
-                        &mut loaded_selected,
-                        true,
-                        En::parse_uppercase(&polytope.name),
-                    );
+                    ui.selectable_value(&mut loaded_selected, true, LOADED_LABEL);
 
                     // If the value was changed, update it.
                     if loaded_selected {
@@ -366,7 +363,7 @@ pub trait DuoWindow: Window {
                     }
 
                     // The polytopes in memory.
-                    for (slot_idx, poly) in memory
+                    for (slot_idx, _) in memory
                         .iter()
                         .enumerate()
                         .filter_map(|(idx, s)| s.as_ref().map(|s| (idx, s)))
@@ -374,11 +371,7 @@ pub trait DuoWindow: Window {
                         // This value couldn't be selected by the user.
                         let mut slot_inner = None;
 
-                        ui.selectable_value(
-                            &mut slot_inner,
-                            Some(slot_idx),
-                            En::parse_uppercase(&poly.name),
-                        );
+                        ui.selectable_value(&mut slot_inner, Some(slot_idx), slot_label(slot_idx));
 
                         // If the value was changed, update it.
                         if let Some(idx) = slot_inner {
@@ -396,7 +389,7 @@ pub trait DuoWindow: Window {
     }
 
     /// Shows the window on screen.
-    fn show(&mut self, ctx: &CtxRef, polytope: &NamedConcrete, memory: &Memory) -> ShowResult {
+    fn show(&mut self, ctx: &CtxRef, polytope: &Concrete, memory: &Memory) -> ShowResult {
         let mut open = self.is_open();
         let mut result = ShowResult::None;
 
@@ -404,7 +397,7 @@ pub trait DuoWindow: Window {
             .open(&mut open)
             .resizable(false)
             .show(ctx, |ui| {
-                self.build_dropdowns(ui, polytope, memory);
+                self.build_dropdowns(ui, memory);
                 self.build(ui, polytope, memory);
                 ui.add(OkReset::new(&mut result));
             });
@@ -421,7 +414,7 @@ pub trait DuoWindow: Window {
     fn show_system(
         mut self_: ResMut<'_, Self>,
         egui_ctx: Res<'_, EguiContext>,
-        mut query: Query<'_, '_, &mut NamedConcrete>,
+        mut query: Query<'_, '_, &mut Concrete>,
         memory: Res<'_, Memory>,
     ) where
         Self: 'static,
@@ -491,7 +484,7 @@ impl Window for DualWindow {
 }
 
 impl UpdateWindow for DualWindow {
-    fn action(&self, polytope: &mut NamedConcrete) {
+    fn action(&self, polytope: &mut Concrete) {
         let sphere = Hypersphere::with_radius(self.center.clone(), self.radius);
 
         if let Err(err) = polytope.try_dual_mut_with(&sphere) {
@@ -565,7 +558,7 @@ impl Window for PyramidWindow {
 }
 
 impl UpdateWindow for PyramidWindow {
-    fn action(&self, polytope: &mut NamedConcrete) {
+    fn action(&self, polytope: &mut Concrete) {
         *polytope = polytope.pyramid_with(self.offset.push(self.height));
     }
 
@@ -622,7 +615,7 @@ impl Window for PrismWindow {
 }
 
 impl PlainWindow for PrismWindow {
-    fn action(&self, polytope: &mut NamedConcrete) {
+    fn action(&self, polytope: &mut Concrete) {
         *polytope = polytope.prism_with(self.height);
     }
 
@@ -686,7 +679,7 @@ impl Window for TegumWindow {
 }
 
 impl UpdateWindow for TegumWindow {
-    fn action(&self, polytope: &mut NamedConcrete) {
+    fn action(&self, polytope: &mut Concrete) {
         let half_height = self.height / 2.0;
 
         *polytope = polytope.tegum_with(
@@ -766,7 +759,7 @@ impl Window for AntiprismWindow {
 }
 
 impl UpdateWindow for AntiprismWindow {
-    fn action(&self, polytope: &mut NamedConcrete) {
+    fn action(&self, polytope: &mut Concrete) {
         let radius = self.dual.radius;
         let mut squared_radius = radius * radius;
         if self.retroprism {
@@ -862,9 +855,9 @@ impl Window for DuopyramidWindow {
 }
 
 impl DuoWindow for DuopyramidWindow {
-    fn operation(&self, p: &NamedConcrete, q: &NamedConcrete) -> NamedConcrete {
+    fn operation(&self, p: &Concrete, q: &Concrete) -> Concrete {
         let [p_offset, q_offset] = &self.offsets;
-        NamedConcrete::duopyramid_with(p, q, p_offset, q_offset, self.height)
+        Concrete::duopyramid_with(p, q, p_offset, q_offset, self.height)
     }
 
     fn slots(&self) -> [Slot; 2] {
@@ -875,7 +868,7 @@ impl DuoWindow for DuopyramidWindow {
         &mut self.slots
     }
 
-    fn build(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Memory) {
+    fn build(&mut self, ui: &mut Ui, polytope: &Concrete, memory: &Memory) {
         let [p_dim, q_dim] = self.dim_or(polytope, memory);
 
         resize(&mut self.offsets[0], p_dim);
@@ -915,7 +908,7 @@ impl Window for DuoprismWindow {
 }
 
 impl DuoWindow for DuoprismWindow {
-    fn operation(&self, p: &NamedConcrete, q: &NamedConcrete) -> NamedConcrete {
+    fn operation(&self, p: &Concrete, q: &Concrete) -> Concrete {
         p.duoprism(q)
     }
 
@@ -964,9 +957,9 @@ impl Window for DuotegumWindow {
 }
 
 impl DuoWindow for DuotegumWindow {
-    fn operation(&self, p: &NamedConcrete, q: &NamedConcrete) -> NamedConcrete {
+    fn operation(&self, p: &Concrete, q: &Concrete) -> Concrete {
         let [p_offset, q_offset] = &self.offsets;
-        NamedConcrete::duotegum_with(p, q, p_offset, q_offset)
+        Concrete::duotegum_with(p, q, p_offset, q_offset)
     }
 
     fn slots(&self) -> [Slot; 2] {
@@ -977,7 +970,7 @@ impl DuoWindow for DuotegumWindow {
         &mut self.slots
     }
 
-    fn build(&mut self, ui: &mut Ui, polytope: &NamedConcrete, memory: &Memory) {
+    fn build(&mut self, ui: &mut Ui, polytope: &Concrete, memory: &Memory) {
         let [p_dim, q_dim] = self.dim_or(polytope, memory);
 
         resize(&mut self.offsets[0], p_dim);
@@ -1012,7 +1005,7 @@ impl Window for DuocombWindow {
 }
 
 impl DuoWindow for DuocombWindow {
-    fn operation(&self, p: &NamedConcrete, q: &NamedConcrete) -> NamedConcrete {
+    fn operation(&self, p: &Concrete, q: &Concrete) -> Concrete {
         p.duocomb(q)
     }
 
@@ -1049,7 +1042,7 @@ impl Window for CompoundWindow {
 }
 
 impl DuoWindow for CompoundWindow {
-    fn operation(&self, p: &NamedConcrete, q: &NamedConcrete) -> NamedConcrete {
+    fn operation(&self, p: &Concrete, q: &Concrete) -> Concrete {
         let mut p2 = p.clone();
         p2.comp_append(q.clone());
         p2
