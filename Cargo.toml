@@ -1,6 +1,3 @@
-[workspace]
-members = ["miratope-core", "vec-like"]
-
 [package]
 name = "miratope"
 description = "A polytope renderer and builder."
@@ -14,45 +11,6 @@ authors = [
     "Roman Salinas <ultraroman01@gmail.com>"
 ]
 edition = "2018"
-
-[dependencies]
-miratope-core = { path = "miratope-core" }
-vec-like = { path = "vec-like" }
-approx = "0.5"
-directories = "4.0"
-lyon = "0.17"
-rfd = "0.5"
-ron = "0.6"
-serde = { version = "1.0", features = ["derive"] }
-webbrowser = "0.5"
-
-# Use latest version of Bevy (might cause breakage!)
-[dependencies.bevy]
-git = "https://github.com/bevyengine/bevy"
-branch = "main"
-default-features = false
-features = [
-    "bevy_gltf",
-    "bevy_winit",
-    "bevy_wgpu",
-    "render",
-    "bevy_dynamic_plugin",
-    "hdr",
-    "x11"
-]
-
-# Bevy egui integration with this latest version.
-[dependencies.bevy_egui]
-git = "https://github.com/vihdzp/bevy_egui/"
-branch = "bevy-main"
-
-[dependencies.egui]
-version = "0.14.2"
-default-features = false
-features = ["multi_threaded"]
-
-[patch.crates-io]
-winit = { git = "https://github.com/vihdzp/winit" }
 
 [profile.release]
 lto = "thin"
