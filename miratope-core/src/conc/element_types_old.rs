@@ -96,7 +96,7 @@ impl ElementType {
     /// # Panics
     /// Panics if the data of this element type isn't an
     /// [`Edge`](ElementData::Edge).
-    pub fn len(&self) -> f64 {
+    pub fn len(&self) -> Float {
         if let ElementData::Edge(len) = self.data {
             len.0
         } else {
@@ -150,7 +150,7 @@ impl Concrete {
 
             // Searches for the greatest length smaller than the current one.
             if let Some((prev_len, indices)) = edge_lengths.range_mut(..len).next_back() {
-                if abs_diff_eq!(prev_len.0, len.0, epsilon = f64::EPS) {
+                if abs_diff_eq!(prev_len.0, len.0, epsilon = Float::EPS) {
                     indices.push(edge_idx);
                     continue;
                 }
@@ -158,7 +158,7 @@ impl Concrete {
 
             // Searches for the smallest length greater than the current one.
             if let Some((next_len, indices)) = edge_lengths.range_mut(len..).next() {
-                if abs_diff_eq!(next_len.0, len.0, epsilon = f64::EPS) {
+                if abs_diff_eq!(next_len.0, len.0, epsilon = Float::EPS) {
                     indices.push(edge_idx);
                     continue;
                 }

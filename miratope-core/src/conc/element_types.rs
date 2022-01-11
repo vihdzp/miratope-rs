@@ -6,7 +6,6 @@ use crate::{
     abs::{ElementMap, Ranked},
     conc::Concrete,
     float::Float,
-    geometry::Point,
 };
 
 use vec_like::*;
@@ -14,8 +13,8 @@ use vec_like::*;
 /// Every element in a polytope can be assigned a "type" depending on its
 /// attributes. This struct stores a representative of a single type of
 /// elements.
-#[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
-pub struct ElementType {
+#[derive(PartialOrd, Ord, PartialEq, Eq, Hash)]
+struct ElementType {
     /// The index of the representative for this element type.
     example: usize,
 
@@ -32,12 +31,9 @@ struct TypeData {
     /// The indices of the types of either the subelements or superelements,
     /// depending on what part of the algorithm we're in.
     type_counts: Vec<usize>,
-
-    /// Various heuristics that distinguish types of elements in concrete polytopes.
-    /// Currently just distance from the origin
-    heuristics: usize,
 }
 
+// We'll move this over to the translation module... some day.
 const EL_NAMES: [&str; 25] = [
     "", "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta", "Xenna",
     "Daka", "Henda", "Doka", "Tradaka", "Tedaka", "Pedaka", "Exdaka", "Zedaka", "Yodaka", "Nedaka",
@@ -50,20 +46,21 @@ const EL_SUFFIXES: [&str; 25] = [
     "yodakon", "nedakon", "ikon", "ikenon", "ikodon",
 ];
 
-impl Concrete {
-    /// element type of an element is <index>
-    /// - initialize all elements to <0>
-    /// - repeat:
-    /// - iterate over ranks:
-    ///     - start an indexed hashmap that'll store metadata
-    ///     - iterate over elements:
-    ///     - get a vector where indexes are the previous rank's type indexes and values are numbers of subelements of that type
-    ///     - get its metadata - <current index, vector^> - could add heuristics like edge lengths to this metadata sometimes
-    ///     - if metadata matches one already in the hashmap, give it that index,
-    ///         - if not, add a new entry in hashmap and increment index
-    /// - iterate over ranks backwards, use superelements instead of subelements
-    /// - get number of types in total, if it's the same as previous loop, stop
-    fn element_types_common(&self) -> (ElementMap<ElementType>, ElementMap<usize>) {
+impl<T: Float> Concrete<T> {
+    /*  element type of an element is <index>
+    - initialize all elements to <0>
+    - repeat:
+    - iterate over ranks:
+        - start an indexed hashmap that'll store metadata
+        - iterate over elements:
+        - get a vector where indexes are the previous rank's type indexes and values are numbers of subelements of that type
+        - get its metadata - <current index, vector^> - could add heuristics like edge lengths to this metadata sometimes
+        - if metadata matches one already in the hashmap, give it that index,
+            - if not, add a new entry in hashmap and increment index
+    - iterate over ranks backwards, use superelements instead of subelements
+    - get number of types in total, if it's the same as previous loop, stop
+    */
+    fn element_types(&self) -> ElementMap<ElementType> {
         let rank = self.rank();
 
         // Stores the different types, the counts of each, and the indices of
@@ -79,14 +76,12 @@ impl Concrete {
             type_counts.push(1);
         }
 
-        let mut type_count = rank-1;
-
-        let subspaces = self.element_map_affine_hulls();
+        let mut type_count = rank;
 
         // To limit the number of passes, we can turn this into a `for` loop.
         loop {
             // We build element types from the bottom up.
-            for r in 1..rank {
+            for r in 1..=rank {
                 // All element types of this rank.
                 let mut types_rank: Vec<ElementType> = Vec::new();
                 let mut dict = HashMap::new();
@@ -102,7 +97,6 @@ impl Concrete {
                     let type_data = TypeData {
                         prev_index: type_of_element[r][i],
                         type_counts: sub_type_counts,
-                        heuristics: (subspaces[r-1][i].distance(&Point::zeros(rank-1))/f64::EPS) as usize,
                     };
 
                     match dict.get(&type_data) {
@@ -129,7 +123,7 @@ impl Concrete {
             }
 
             // We do basically the same thing, from the top down.
-            for r in (1..rank).rev() {
+            for r in (0..rank).rev() {
                 // All element types of this rank.
                 let mut types_rank: Vec<ElementType> = Vec::new();
                 let mut dict = HashMap::new();
@@ -145,7 +139,6 @@ impl Concrete {
                     let type_data = TypeData {
                         prev_index: type_of_element[r][i],
                         type_counts: sup_type_counts,
-                        heuristics: (subspaces[r-1][i].distance(&Point::zeros(rank-1))/f64::EPS) as usize,
                     };
 
                     match dict.get(&type_data) {
@@ -179,17 +172,7 @@ impl Concrete {
             type_count = new_type_count;
         }
 
-        (types, type_of_element)
-    }
-
-    /// Returns a list of types of elements.
-    pub fn element_types(&self) -> ElementMap<ElementType> {
-        self.element_types_common().0
-    }
-
-    /// Returns a map from the elements to their type indices.
-    pub fn types_of_elements(&self) -> ElementMap<usize> {
-        self.element_types_common().1
+        types
     }
 
     /// Prints all element types of a polytope into the console.

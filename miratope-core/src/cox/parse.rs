@@ -4,6 +4,8 @@ use std::{collections::VecDeque, iter, str::FromStr};
 
 use petgraph::graph::NodeIndex;
 
+use crate::float::Float;
+
 use super::cd::{Cd, CdError, CdResult, Edge, EdgeRef, Node, NodeRef};
 
 /// Helper struct that parses a [`Cd`] based on a textual notation, adapted from
@@ -35,7 +37,7 @@ use super::cd::{Cd, CdError, CdResult, Edge, EdgeRef, Node, NodeRef};
 ///
 /// * A single integer, like `3` or `15`.
 /// * Two integers separated by a backslash, like `5/2` or `7/3`.
-pub struct CdBuilder<'a> {
+pub struct CdBuilder<'a, T: Float> {
     /// The Coxeter diagram in inline ASCII notation.
     diagram: &'a str,
 
@@ -46,7 +48,7 @@ pub struct CdBuilder<'a> {
     /// Represents the Coxeter diagram itself. However, we don't add any edges
     /// to it until the very last step. These are provisionally stored in
     /// [`Self::edge_queue`] instead.
-    cd: Cd,
+    cd: Cd<T>,
 
     /// A provisional queue in which the [`EdgeRef`]s are stored up and until
     /// [`Self::build`] is called, when they're added to the `Cd`.
@@ -60,7 +62,7 @@ pub struct CdBuilder<'a> {
 }
 
 /// Operations that are commonly done to parse CDs.
-impl<'a> CdBuilder<'a> {
+impl<'a, T: Float> CdBuilder<'a, T> {
     /// Initializes a new CD builder from a string.
     pub fn new(diagram: &'a str) -> Self {
         Self {
@@ -125,7 +127,7 @@ impl<'a> CdBuilder<'a> {
     }
 
     /// Adds a node to the diagram.
-    fn add_node(&mut self, node: Node) -> NodeIndex {
+    fn add_node(&mut self, node: Node<T>) -> NodeIndex {
         self.cd.add_node(node)
     }
 
@@ -147,14 +149,14 @@ impl<'a> CdBuilder<'a> {
     ///
     /// By the time this method is called, we've already skipped the opening
     /// parenthesis.
-    fn parse_node(&mut self) -> CdResult<Node> {
+    fn parse_node(&mut self) -> CdResult<Node<T>> {
         let (init_idx, _) = self.peek().expect("Node can't be empty!");
         let mut end_idx = init_idx;
 
         // We read the number until we find the closing parenthesis.
         while let Some((idx, c)) = self.next() {
             if c == ')' {
-                let val: f64 = self.parse_slice(init_idx, end_idx)?;
+                let val: T = self.parse_slice(init_idx, end_idx)?;
 
                 // In case the user tries to literally write "NaN" (real funny).
                 return if val.is_nan() {
@@ -317,7 +319,7 @@ impl<'a> CdBuilder<'a> {
     }
 
     /// Finishes building the CD and returns it.
-    pub fn build(mut self) -> CdResult<Cd> {
+    pub fn build(mut self) -> CdResult<Cd<T>> {
         // Reads through the diagram.
         self.read()?;
         let len = self.cd.node_count();
@@ -339,23 +341,23 @@ mod tests {
     use nalgebra::dmatrix;
 
     /// Returns a ringed node at half-unit distance.
-    fn x() -> Node {
+    fn x() -> Node<f32> {
         Node::ringed(1.0)
     }
 
     /// Returns an unringed node.
-    fn o() -> Node {
+    fn o() -> Node<f32> {
         Node::Unringed
     }
 
     /// Returns a snub node at half-unit distance.
-    fn s() -> Node {
+    fn s() -> Node<f32> {
         Node::snub(1.0)
     }
 
     /// Tests that a parsed diagram's nodes and Coxeter matrix match expected
     /// values.
-    fn test(diagram: &str, nodes: Vec<Node>, matrix: Matrix<f64>) {
+    fn test(diagram: &str, nodes: Vec<Node<f32>>, matrix: Matrix<f32>) {
         let cd = Cd::parse(diagram).unwrap();
         assert_eq!(cd.nodes(), nodes, "Node mismatch!");
         assert_eq!(cd.cox(), Cox::new(matrix), "Coxeter matrix mismatch!");
@@ -365,7 +367,7 @@ mod tests {
     /// Tests some of the I2 symmetry groups.
     fn i2() {
         for n in 2..10 {
-            let nf = n as f64;
+            let nf = n as f32;
 
             test(
                 &format!("x{}x", n),
@@ -506,36 +508,36 @@ mod tests {
     #[test]
     #[should_panic(expected = "MismatchedParenthesis { pos: 6 }")]
     fn mismatched_parenthesis() {
-        Cd::parse("x(1.0x").unwrap();
+        Cd::<f32>::parse("x(1.0x").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "UnexpectedEnding { pos: 6 }")]
     fn unexpected_ending() {
-        Cd::parse("x4x3x3").unwrap();
+        Cd::<f32>::parse("x4x3x3").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "InvalidSymbol { pos: 2 }")]
     fn invalid_symbol() {
-        Cd::parse("x3⊕5o").unwrap();
+        Cd::<f32>::parse("x3⊕5o").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "ParseError { pos: 5 }")]
     fn parse_error() {
-        Cd::parse("(1.1.1)3(2.0)").unwrap();
+        Cd::<f32>::parse("(1.1.1)3(2.0)").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "InvalidEdge { num: 1, den: 0, pos: 3 }")]
     fn invalid_edge() {
-        Cd::parse("s1/0s").unwrap();
+        Cd::<f32>::parse("s1/0s").unwrap();
     }
 
     #[test]
     #[should_panic(expected = "RepeatEdge { a: 0, b: 1 }")]
     fn repeat_edge() {
-        Cd::parse("x3x xx *c3*d *a3*b").unwrap();
+        Cd::<f32>::parse("x3x xx *c3*d *a3*b").unwrap();
     }
 }

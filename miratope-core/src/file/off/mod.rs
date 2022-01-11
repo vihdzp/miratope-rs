@@ -5,6 +5,7 @@ use std::{collections::HashMap, fmt::Display, io::Error as IoError, path::Path, 
 use crate::{
     abs::{AbstractBuilder, Ranked, SubelementList, Subelements},
     conc::{cycle::CycleList, Concrete},
+    float::Float,
     geometry::Point,
     Polytope, COMPONENTS, ELEMENT_NAMES,
 };
@@ -300,11 +301,11 @@ impl<'a> OffReader<'a> {
     }
 
     /// Parses all vertex coordinates from the OFF file.
-    fn parse_vertices(
+    fn parse_vertices<T: Float>(
         &mut self,
         count: usize,
         dim: usize,
-    ) -> OffParseResult<Vec<Point<f64>>> {
+    ) -> OffParseResult<Vec<Point<T>>> {
         // Reads all vertices.
         let mut vertices = Vec::with_capacity(count);
 
@@ -421,7 +422,7 @@ impl<'a> OffReader<'a> {
     }*/
 
     /// Builds a concrete polytope from the OFF reader.
-    pub fn build(mut self) -> OffParseResult<Concrete> {
+    pub fn build<T: Float>(mut self) -> OffParseResult<Concrete<T>> {
         // Reads the rank of the polytope.
         let rank = self.rank()?;
 
@@ -561,22 +562,22 @@ impl std::error::Error for OffWriteError {}
 type OffWriteResult<T> = Result<T, OffWriteError>;
 
 /// An auxiliary struct to write a polytope to an OFF file.
-pub struct OffWriter<'a> {
+pub struct OffWriter<'a, T: Float> {
     /// The output OFF file, as a string. (Maybe we should use a file writer
     /// or something similar instead?)
     off: String,
 
     /// The polytope that we're converting into an OFF file.
-    poly: &'a Concrete,
+    poly: &'a Concrete<T>,
 
     /// Options for the text output.
     options: OffOptions,
 }
 
-impl<'a> OffWriter<'a> {
+impl<'a, T: Float> OffWriter<'a, T> {
     /// Initializes a new OFF writer from a polytope, with a given set of
     /// options.
-    pub fn new(poly: &'a Concrete, options: OffOptions) -> Self {
+    pub fn new(poly: &'a Concrete<T>, options: OffOptions) -> Self {
         Self {
             off: String::new(),
             poly,
@@ -876,7 +877,7 @@ impl std::error::Error for OffSaveError {}
 type OffSaveResult<T> = Result<T, OffSaveError>;
 
 //todo: put this in its own trait
-impl Concrete {
+impl<T: Float> Concrete<T> {
     /// Converts a polytope into an OFF file.
     pub fn to_off(&self, options: OffOptions) -> OffWriteResult<String> {
         OffWriter::new(self, options).build()
@@ -898,13 +899,13 @@ mod tests {
     /// Tests a particular OFF file.
     fn test_off_file<I: IntoIterator<Item = usize> + Clone>(src: &str, element_counts: I) {
         // Checks that element counts match up.
-        let poly = Concrete::from_off(src).expect("OFF file could not be loaded.");
+        let poly = Concrete::<f32>::from_off(src).expect("OFF file could not be loaded.");
         test(&poly, element_counts.clone());
 
         // Checks that the polytope can be reloaded correctly.
         const ERR: &str = "OFF file could not be reloaded.";
         test(
-            &Concrete::from_off(&poly.to_off(Default::default()).expect(ERR)).expect(ERR),
+            &Concrete::<f32>::from_off(&poly.to_off(Default::default()).expect(ERR)).expect(ERR),
             element_counts,
         );
     }
@@ -966,7 +967,7 @@ mod tests {
 
     /// Attempts to parse an OFF file, unwraps it.
     fn unwrap_off(src: &str) {
-        Concrete::from_off(src).unwrap();
+        Concrete::<f32>::from_off(src).unwrap();
     }
 
     /// An empty file should fail.

@@ -17,14 +17,10 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use crate::{
-    float::Float,
-    ElementMap, conc::Concrete, abs::Ranked, Polytope,
-};
+use crate::float::Float;
 
 use approx::{abs_diff_eq, abs_diff_ne};
 use nalgebra::{allocator::Allocator, DefaultAllocator, Dim, Dynamic, OMatrix, U1};
-use vec_like::VecLike;
 
 /// A hypersphere with a certain center and radius.
 ///
@@ -258,28 +254,6 @@ impl<T: Float> Subspace<T> {
         todo!()
     } */
 }
-
-impl Concrete {
-    /// Computes the affine hull of an element.
-    pub fn affine_hull(&self, rank: usize, idx: usize) -> Subspace<f64> {
-        Subspace::from_points_with(
-            &mut self.element(rank, idx).unwrap().vertices.iter(),
-            rank-1
-        ).unwrap()
-    }
-
-    /// Computes the affine hulls of all elements and puts them in an `ElementMap`.
-    pub fn element_map_affine_hulls(&self) -> ElementMap<Subspace<f64>> {
-        let mut element_map = ElementMap::new();
-        for r in 1..self.rank() {
-            element_map.push(Vec::new());
-            for (idx, _el) in self[r].iter().enumerate() {
-                element_map[r-1].push(self.affine_hull(r, idx));
-            }
-        }
-        element_map
-    }
-} 
 
 /// Represents an (oriented) hyperplane together with a normal vector.
 pub struct Hyperplane<T: Float> {

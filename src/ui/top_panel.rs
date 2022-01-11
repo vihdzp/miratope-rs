@@ -63,7 +63,7 @@ impl SectionState {
         *self = Self::Inactive;
     }
 
-    pub fn open(&mut self, original_polytope: Concrete, minmax: (f64, f64)) {
+    pub fn open(&mut self, original_polytope: Concrete, minmax: (f32, f32)) {
         *self = SectionState::Active {
             original_polytope,
             minmax,
@@ -618,16 +618,6 @@ pub fn show_top_panel(
                 if ui.button("File bug").clicked() {
                     if let Err(err) = webbrowser::open(crate::NEW_ISSUE) {
                         eprintln!("Website opening failed: {}", err);
-                    }
-                }
-            });
-
-            // Testing stuff i'm working on
-            menu::menu(ui, "Test", |ui| {
-                if ui.button("get_symmetry_group").clicked() {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        let group = p.get_symmetry_group();
-                        println!("Symmetry order {}", group.count());
                     }
                 }
             });

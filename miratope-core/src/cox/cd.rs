@@ -102,8 +102,8 @@ impl std::error::Error for CdError {}
 /// A node in a [`Cd`]. Represents a mirror in hyperspace, and specifies both
 /// where a generator point should be located with respect to it, and how it
 /// should interact with it.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Node {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Node<T: Float> {
     /// An unringed node. Represents a mirror that contains the generator point.
     /// Crucially, reflecting the generator through this mirror doesn't create a
     /// new edge.
@@ -111,32 +111,32 @@ pub enum Node {
 
     /// A ringed node. Represents a mirror at (half) a certain distance from the
     /// generator. Reflecting the generator through this mirror creates an edge.
-    Ringed(f64),
+    Ringed(T),
 
     /// A snub node. Represents a mirror at (half) a certain distance from the
     /// generator. In contrast to [`Self::Ringed`] nodes, the generator point
     /// and its reflection through this mirror can't simultaneously be in the
     /// polytope.
-    Snub(f64),
+    Snub(T),
 }
 
-impl Node {
+impl<T: Float> Node<T> {
     /// Returns twice the distance from the generator point to the hyperplane
     /// corresponding to this node.
-    pub fn value(&self) -> f64 {
+    pub fn value(&self) -> T {
         match self {
-            Self::Unringed => 0.0,
+            Self::Unringed => T::ZERO,
             Self::Ringed(val) | Self::Snub(val) => *val,
         }
     }
 
     /// Shorthand for `NodeVal::Ringed(x)`.
-    pub fn ringed(x: f64) -> Self {
+    pub fn ringed(x: T) -> Self {
         Self::Ringed(x)
     }
 
     /// Shorthand for `NodeVal::Snub(x)`.
-    pub fn snub(x: f64) -> Self {
+    pub fn snub(x: T) -> Self {
         Self::Snub(x)
     }
 
@@ -153,24 +153,24 @@ impl Node {
     pub fn from_char(c: char) -> Option<Self> {
         Some(Node::ringed(match c {
             'o' => return Some(Node::Unringed),
-            's' => return Some(Node::snub(f64::ONE)),
-            'v' => (f64::SQRT_5 - f64::ONE) / f64::TWO,
-            'x' => f64::ONE,
-            'q' => f64::SQRT_2,
-            'f' => (f64::SQRT_5 + f64::ONE) / f64::TWO,
-            'h' => f64::SQRT_3,
-            'k' => (f64::SQRT_2 + f64::TWO).fsqrt(),
-            'u' => f64::TWO,
-            'w' => f64::SQRT_2 + f64::ONE,
-            'F' => (f64::SQRT_5 + f64::THREE) / f64::TWO,
-            'e' => f64::SQRT_3 + f64::ONE,
-            'Q' => f64::SQRT_2 * f64::TWO,
-            'd' => f64::THREE,
-            'V' => f64::SQRT_5 + f64::ONE,
-            'U' => f64::SQRT_2 + f64::TWO,
-            'A' => (f64::SQRT_5 + f64::ONE) / f64::FOUR + f64::ONE,
-            'X' => f64::SQRT_2 * f64::TWO + f64::ONE,
-            'B' => f64::SQRT_5 + f64::TWO,
+            's' => return Some(Node::snub(T::ONE)),
+            'v' => (T::SQRT_5 - T::ONE) / T::TWO,
+            'x' => T::ONE,
+            'q' => T::SQRT_2,
+            'f' => (T::SQRT_5 + T::ONE) / T::TWO,
+            'h' => T::SQRT_3,
+            'k' => (T::SQRT_2 + T::TWO).fsqrt(),
+            'u' => T::TWO,
+            'w' => T::SQRT_2 + T::ONE,
+            'F' => (T::SQRT_5 + T::THREE) / T::TWO,
+            'e' => T::SQRT_3 + T::ONE,
+            'Q' => T::SQRT_2 * T::TWO,
+            'd' => T::THREE,
+            'V' => T::SQRT_5 + T::ONE,
+            'U' => T::SQRT_2 + T::TWO,
+            'A' => (T::SQRT_5 + T::ONE) / T::FOUR + T::ONE,
+            'X' => T::SQRT_2 * T::TWO + T::ONE,
+            'B' => T::SQRT_5 + T::TWO,
             _ => return None,
         }))
     }
@@ -182,7 +182,7 @@ impl Node {
     }
 }
 
-impl Display for Node {
+impl<T: Float> Display for Node<T> {
     /// Prints the value that a node contains.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -222,8 +222,8 @@ impl Edge {
     }
 
     /// Returns the numerical value of the edge.
-    pub fn value(&self) -> f64 {
-        f64::u32(self.num) / f64::u32(self.den)
+    pub fn value<T: Float>(&self) -> T {
+        T::u32(self.num) / T::u32(self.den)
     }
 
     /// Returns `true` if the edge stores any value equivalent to 2.
@@ -321,9 +321,9 @@ impl EdgeRef {
 ///
 /// To actually build a Coxeter diagram, we use a [`CdBuilder`].
 #[derive(Default)]
-pub struct Cd(UnGraph<Node, Edge>);
+pub struct Cd<T: Float>(UnGraph<Node<T>, Edge>);
 
-impl Cd {
+impl<T: Float> Cd<T> {
     /// Initializes a new Coxeter diagram with no nodes nor edges.
     pub fn new() -> Self {
         Default::default()
@@ -351,7 +351,7 @@ impl Cd {
     }
 
     /// Returns a reference to the raw node array.
-    pub fn raw_nodes(&self) -> &[GraphNode<Node>] {
+    pub fn raw_nodes(&self) -> &[GraphNode<Node<T>>] {
         self.0.raw_nodes()
     }
 
@@ -361,7 +361,7 @@ impl Cd {
     }
 
     /// Adds a node into the Coxeter diagram.
-    pub fn add_node(&mut self, node: Node) -> NodeIndex {
+    pub fn add_node(&mut self, node: Node<T>) -> NodeIndex {
         self.0.add_node(node)
     }
 
@@ -383,18 +383,18 @@ impl Cd {
 
     /// Returns an iterator over the nodes in the Coxeter diagram, in the order
     /// in which they were found.
-    pub fn node_iter(&self) -> impl Iterator<Item = Node> + '_ {
+    pub fn node_iter(&self) -> impl Iterator<Item = Node<T>> + '_ {
         self.0.raw_nodes().iter().map(|node| node.weight)
     }
 
     /// Returns the nodes in the Coxeter diagram, in the order in which they
     /// were found.
-    pub fn nodes(&self) -> Vec<Node> {
+    pub fn nodes(&self) -> Vec<Node<T>> {
         self.node_iter().collect()
     }
 
     /// Returns the vector whose values represent the node values.
-    pub fn node_vector(&self) -> Vector<f64> {
+    pub fn node_vector(&self) -> Vector<T> {
         Vector::from_iterator(self.dim(), self.node_iter().map(|node| node.value()))
     }
 
@@ -415,14 +415,14 @@ impl Cd {
     }
 
     /// Creates a [`Cox`] from a Coxeter diagram.
-    pub fn cox(&self) -> Cox<f64> {
+    pub fn cox(&self) -> Cox<T> {
         let dim = self.dim();
         let graph = &self.0;
 
         let matrix = Matrix::from_fn(dim, dim, |i, j| {
             // Every entry in the diagonal of a Coxeter matrix is 1.
             if i == j {
-                return 1.0;
+                return T::ONE;
             }
 
             // If an edge connects two nodes, it adds its value to the matrix.
@@ -431,7 +431,7 @@ impl Cd {
             }
             // Else, we write a 2.
             else {
-                2.0
+                T::TWO
             }
         });
 
@@ -441,13 +441,13 @@ impl Cd {
     /// Returns the circumradius of the polytope specified by the matrix, or
     /// `None` if this doesn't apply. This is just
     /// calling [`Self::generator`] and taking the norm.
-    pub fn circumradius(&self) -> Option<f64> {
+    pub fn circumradius(&self) -> Option<T> {
         self.generator().as_ref().map(Point::norm)
     }
 
     /// Returns a point in the position specified by the Coxeter diagram,
     /// using the set of mirrors generated by [`Cox::normals`].    
-    pub fn generator(&self) -> Option<Point<f64>> {
+    pub fn generator(&self) -> Option<Point<T>> {
         let mut vector = self.node_vector();
 
         self.cox()
@@ -457,13 +457,13 @@ impl Cd {
     }
 }
 
-impl From<Cd> for Cox<f64> {
-    fn from(cd: Cd) -> Self {
+impl<T: Float> From<Cd<T>> for Cox<T> {
+    fn from(cd: Cd<T>) -> Self {
         cd.cox()
     }
 }
 
-impl Display for Cd {
+impl<T: Float> Display for Cd<T> {
     /// Prints the node and edge count, along with the value each node and edge contains
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Prints node and edge counts.

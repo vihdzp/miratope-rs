@@ -90,27 +90,27 @@ pub const WIKI_LINK: &str = "https://polytope.miraheze.org/wiki/";
 
 /// The floating-point type for the entire application. Can be either `f32` or
 /// `f64`, and it should compile the same.
-type Float = f64;
+type Float = f32;
 
 /// A [`Concrete`](miratope_core::conc::Concrete) polytope with the floating
 /// type for the application.
-type Concrete = miratope_core::conc::Concrete;
+type Concrete = miratope_core::conc::Concrete<Float>;
 
 /// A [`Point`](miratope_core::geometry::Point) polytope with the floating type
 /// for the application.
-type Point = miratope_core::geometry::Point<f64>;
+type Point = miratope_core::geometry::Point<Float>;
 
 /// A [`Vector`](miratope_core::geometry::Vector) polytope with the floating
 /// type for the application.
-type Vector = miratope_core::geometry::Vector<f64>;
+type Vector = miratope_core::geometry::Vector<Float>;
 
 /// A [`Hypersphere`](miratope_core::geometry::Hypersphere) polytope with the
 /// floating type for the application.
-type Hypersphere = miratope_core::geometry::Hypersphere<f64>;
+type Hypersphere = miratope_core::geometry::Hypersphere<Float>;
 
 /// A [`Hyperplane`](miratope_core::geometry::Hyperplane) polytope with the
 /// floating type for the application.
-type Hyperplane = miratope_core::geometry::Hyperplane<f64>;
+type Hyperplane = miratope_core::geometry::Hyperplane<Float>;
 
 /// The default epsilon value throughout the application.
 const EPS: Float = <Float as miratope_core::float::Float>::EPS;

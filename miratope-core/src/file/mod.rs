@@ -8,6 +8,7 @@ use self::{
     off::{OffParseResult, OffReader},
 };
 use crate::conc::Concrete;
+use crate::float::Float;
 
 use off::OffParseError;
 use zip::result::ZipError;
@@ -129,7 +130,7 @@ pub trait FromFile: Sized {
     }
 }
 
-impl FromFile for Concrete {
+impl<T: Float> FromFile for Concrete<T> {
     fn from_off(src: &str) -> OffParseResult<Self> {
         OffReader::new(src).build()
     }
