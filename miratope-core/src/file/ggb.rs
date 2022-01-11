@@ -6,7 +6,7 @@
 
 use std::io::Result as IoResult;
 
-use crate::{conc::Concrete, float::Float, geometry::Point};
+use crate::{conc::Concrete, geometry::Point};
 
 use nalgebra::dvector;
 use xml::{
@@ -82,7 +82,7 @@ impl<'a> XmlReader<'a> {
     /// ```xml
     /// <element type="point3d" label="A">
     /// ```
-    fn read_point<T: Float>(&mut self, attributes: &[OwnedAttribute]) -> GgbResult<Vertex<T>> {
+    fn read_point(&mut self, attributes: &[OwnedAttribute]) -> GgbResult<Vertex<f64>> {
         let label = attribute(attributes, "label").unwrap_or_default();
         let coord_attributes = self.read_until("coords")?;
 
@@ -90,7 +90,7 @@ impl<'a> XmlReader<'a> {
         /// the same name.
         macro_rules! read_coord {
             ($x:ident) => {
-                let $x: T;
+                let $x: f64;
 
                 if let Some(c) = attribute(&coord_attributes, stringify!($x)) {
                     if let Ok(c) = c.parse() {
@@ -209,8 +209,8 @@ fn read_face() -> Face {
 }
 
 /// Parses the `geogebra.xml` file to produce a polytope.
-pub(super) fn parse_xml<T: Float>(xml: &str) -> GgbResult<Concrete<T>> {
-    let mut vertices: Vec<Vertex<T>> = Vec::new();
+pub(super) fn parse_xml(xml: &str) -> GgbResult<Concrete> {
+    let mut vertices: Vec<Vertex<f64>> = Vec::new();
     let mut edges = Vec::new();
     let mut xml = XmlReader::new(xml);
 
