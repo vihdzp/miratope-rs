@@ -129,7 +129,7 @@ impl Triangulation {
                         &path,
                         None,
                         &FillOptions::with_fill_rule(Default::default(), FillRule::EvenOdd)
-                            .with_tolerance(EPS),
+                            .with_tolerance(EPS as f32),
                         &mut BuffersBuilder::new(&mut geometry, |vertex: FillVertex<'_>| {
                             vertex.sources().next().unwrap()
                         }),
@@ -198,7 +198,7 @@ fn normals(vertices: &[[f32; 3]]) -> Vec<[f32; 3]> {
         .iter()
         .map(|n| {
             let sq_norm = n[0] * n[0] + n[1] * n[1] + n[2] * n[2];
-            if sq_norm < EPS {
+            if sq_norm < EPS as f32 {
                 [0.0, 0.0, 0.0]
             } else {
                 let norm = sq_norm.sqrt();
@@ -232,7 +232,7 @@ fn vertex_coords<'a, I: Iterator<Item = &'a Point>>(
 
     // If the polytope is at most 3D, we just embed it into 3D space.
     if projection_type.is_orthogonal() || dim <= 3 {
-        vertices.map(|p| [0, 1, 2].map(|i| coord(p, i))).collect()
+        vertices.map(|p| [0, 1, 2].map(|i| coord(p, i) as f32)).collect()
     }
     // Else, we project it down.
     else {
@@ -247,14 +247,14 @@ fn vertex_coords<'a, I: Iterator<Item = &'a Point>>(
             .map(|p| {
                 // We scale the first three coordinates accordingly.
                 let factor: f32 = p.iter().skip(3).map(|&x| x as f32 + dist).product();
-                [0, 1, 2].map(|i| coord(p, i) / factor)
+                [0, 1, 2].map(|i| coord(p, i) as f32 / factor)
             })
             .collect()
     }
 }
 
 /// A trait for a polytope for which we can build a mesh.
-pub trait Renderable: ConcretePolytope<Float> {
+pub trait Renderable: ConcretePolytope {
     /// Builds the mesh of a polytope.
     fn mesh(&self, projection_type: ProjectionType) -> Mesh {
         // If there's no vertices, returns an empty mesh.
@@ -324,4 +324,4 @@ pub trait Renderable: ConcretePolytope<Float> {
     }
 }
 
-impl<U: ConcretePolytope<Float>> Renderable for U {}
+impl<U: ConcretePolytope> Renderable for U {}

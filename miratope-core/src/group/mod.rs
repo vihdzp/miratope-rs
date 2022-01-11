@@ -147,7 +147,7 @@ impl<T: Float> Group<Cyclic<Matrix<T>>> {
     }
 }
 
-impl<T: Float> Group<GenIter<Matrix<T>>> {
+impl Group<GenIter<Matrix<f64>>> {
     /// Parses a diagram and turns it into a Coxeter group.
     pub fn parse(input: &str) -> CdResult<Option<Self>> {
         GenIter::parse(input).map(|gens| gens.map(Into::into))
@@ -534,7 +534,7 @@ mod tests {
     use gcd::Gcd;
 
     /// Tests a given symmetry group.
-    fn test<I: Iterator<Item = Matrix<f32>>>(
+    fn test<I: Iterator<Item = Matrix<f64>>>(
         group: Group<I>,
         order: usize,
         rot_order: usize,
@@ -561,7 +561,7 @@ mod tests {
     }
 
     /// Parses a CD and unwraps it.
-    fn parse_unwrap(input: &str) -> Group<GenIter<Matrix<f32>>> {
+    fn parse_unwrap(input: &str) -> Group<GenIter<Matrix<f64>>> {
         Group::parse(input).unwrap().unwrap()
     }
 
@@ -655,7 +655,7 @@ mod tests {
         }
     }
 
-    /// Tests the BC*n* symmetries, which correspond to the symmetries of the
+    /// Tests the B*n* symmetries, which correspond to the symmetries of the
     /// regular hypercube and orthoplex.
     #[test]
     fn hypercube() {
