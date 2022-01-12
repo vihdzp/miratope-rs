@@ -1,12 +1,11 @@
 //! The code used to get the symmetry a polytope and do operations based on that.
 
-use std::{collections::{HashMap, BTreeSet, BTreeMap}, vec, iter::FromIterator};
+use std::{collections::BTreeMap, vec, iter::FromIterator};
 
 use crate::{
-    abs::{ElementMap, Ranked, flag::{FlagIter, Flag}},
+    abs::{Ranked, flag::{FlagIter, Flag}},
     conc::Concrete,
-    float::Float,
-    group::Group, geometry::{Matrix, PointOrd, MatrixOrd}, Polytope,
+    group::Group, geometry::{Matrix, PointOrd}, Polytope,
 };
 
 use vec_like::*;
@@ -46,9 +45,6 @@ impl Concrete {
         }
         let vertices = BTreeMap::from_iter((vertices_pointord).into_iter().zip(0..));
         let mut vertex_map: Vec<Vec<usize>> = Vec::new();
-
-        // dbg!(types);
-        // let affine_hulls = &self.element_map_affine_hulls();
 
         let base_flag = self.first_flag();
         let base_basis = base_flag.clone().vertex_sequence(&self);
