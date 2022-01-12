@@ -6,7 +6,7 @@ use crate::{
     abs::{ElementMap, Ranked},
     conc::Concrete,
     float::Float,
-    geometry::Point,
+    geometry::{Point, Subspace},
 };
 
 use vec_like::*;
@@ -49,6 +49,13 @@ const EL_SUFFIXES: [&str; 25] = [
     "xennon", "dakon", "hendon", "dokon", "tradakon", "tedakon", "pedakon", "exdakon", "zedakon",
     "yodakon", "nedakon", "ikon", "ikenon", "ikodon",
 ];
+
+impl Subspace<f64> {
+    // Huge botch. This should be rewritten.
+    fn distance_heuristic(&self, rank: usize) -> usize {
+        (self.distance(&Point::zeros(rank-1))/0.0001 + f64::PI) as usize
+    }
+}
 
 impl Concrete {
     /// element type of an element is <index>
@@ -102,7 +109,7 @@ impl Concrete {
                     let type_data = TypeData {
                         prev_index: type_of_element[r][i],
                         type_counts: sub_type_counts,
-                        heuristics: (subspaces[r-1][i].distance(&Point::zeros(rank-1))/f64::EPS) as usize,
+                        heuristics: subspaces[r-1][i].distance_heuristic(rank),
                     };
 
                     match dict.get(&type_data) {
@@ -145,7 +152,7 @@ impl Concrete {
                     let type_data = TypeData {
                         prev_index: type_of_element[r][i],
                         type_counts: sup_type_counts,
-                        heuristics: (subspaces[r-1][i].distance(&Point::zeros(rank-1))/f64::EPS) as usize,
+                        heuristics: subspaces[r-1][i].distance_heuristic(rank),
                     };
 
                     match dict.get(&type_data) {

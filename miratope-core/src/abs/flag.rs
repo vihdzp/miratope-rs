@@ -234,7 +234,7 @@ impl<'a> Iterator for FlagIter<'a> {
             r -= 1;
         }
 
-        Some(flag.clone())
+        Some(prev_flag)
     }
 }
 
@@ -675,9 +675,10 @@ mod tests {
 
     /// Tests that a polytope has an expected number of flags, oriented or not.
     fn test_flags(polytope: &mut Abstract, expected: usize) {
+        polytope.element_sort();
+
         assert_eq!(expected, polytope.flags().count(), "flag count mismatch");
 
-        polytope.element_sort();
         assert_eq!(
             expected,
             polytope.flag_events().filter_flags().count(),

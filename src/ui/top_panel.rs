@@ -626,7 +626,7 @@ pub fn show_top_panel(
             menu::menu(ui, "Test", |ui| {
                 if ui.button("get_symmetry_group").clicked() {
                     if let Some(mut p) = query.iter_mut().next() {
-                        let group = p.get_symmetry_group();
+                        let group = p.get_symmetry_group().0;
                         println!("Symmetry order {}", group.count());
                     }
                 }

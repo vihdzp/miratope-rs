@@ -391,10 +391,12 @@ pub trait Polytope:
         let mut idx = 0;
         flag.push(0);
 
-        for r in 0..rank {
-            idx = self[(r, idx)].sups[0];
+        for r in (1..=rank).rev() {
+            idx = self[(r, idx)].subs[0];
             flag.push(idx);
         }
+
+        flag.reverse();
 
         flag
     }
