@@ -698,15 +698,6 @@ pub fn show_top_panel(
 
             memory.show(ui, &mut query);
 
-            // General help.
-            menu::menu(ui, "Help", |ui| {
-                if ui.button("File bug").clicked() {
-                    if let Err(err) = webbrowser::open(crate::NEW_ISSUE) {
-                        eprintln!("Website opening failed: {}", err);
-                    }
-                }
-            });
-
             // Background color picker.
 
             // The current background color.

@@ -61,9 +61,6 @@ type Hyperplane = miratope_core::geometry::Hyperplane<f64>;
 /// The default epsilon value throughout the application.
 const EPS: Float = <Float as miratope_core::float::Float>::EPS;
 
-/// The link to the GitHub issues.
-const NEW_ISSUE: &str = "https://github.com/galoomba1/miratope-rs/issues/new";
-
 /// Loads all of the necessary systems for the application to run.
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
