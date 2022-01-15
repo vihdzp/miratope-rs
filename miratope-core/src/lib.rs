@@ -453,6 +453,9 @@ pub trait Polytope:
     /// through the inversion center.
     fn try_antiprism(&self) -> Result<Self, Self::DualError>;
 
+    /// Splits compound faces into their components.
+    fn untangle_faces(&mut self);
+
     /// Determines whether a given polytope is
     /// [orientable](https://polytope.miraheze.org/wiki/Orientability).
     ///

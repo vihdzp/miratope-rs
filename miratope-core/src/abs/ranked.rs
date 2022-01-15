@@ -50,7 +50,7 @@ impl<T> IndexMut<(usize, usize)> for ElementMap<T> {
 /// refers to any element that's incident and of lesser rank than another. We
 /// instead use the term **recursive subelement** for the standard mathematical
 /// notion.
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct Subelements(Vec<usize>);
 impl_veclike!(Subelements, Item = usize);
@@ -137,7 +137,7 @@ impl Element {
 /// A list of [`Elements`](Element) of the same rank.
 ///
 /// Internally, this is just a wrapper around a `Vec<Element>`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct ElementList(Vec<Element>);
 impl_veclike!(ElementList, Item = Element);
@@ -286,7 +286,7 @@ pub type ElementIntoIter = iter::Flatten<iter::Map<vec::IntoIter<ElementList>, I
 ///
 /// Contrary to [`Abstract`], there's no requirement that the elements in
 /// `Ranks` form a valid polytope.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct Ranks(Vec<ElementList>);
 impl_veclike!(Ranks, Item = ElementList);
 
@@ -481,6 +481,88 @@ impl Ranks {
     /// Sorts all of the superelements and subelements by index.
     pub fn element_sort(&mut self) {
         self.for_each_element_mut(Element::sort)
+    }
+
+    /// Sorts some stuff in a way that's useful for the faceting algorithm.
+    pub fn element_sort_strong(&mut self) {
+        for el in 0..self[2].len() {
+            self[2][el].subs.sort();
+        }
+
+        for rank in 2..self.len()-1 {
+            let mut all_subs = Vec::new();
+            for el in &self[rank] {
+                all_subs.push(el.subs.clone());
+            }
+            let mut sorted = all_subs.clone();
+            sorted.sort();
+
+            let mut perm = Vec::new();
+            for i in &all_subs {
+                perm.push(sorted.iter().position(|x| x == i).unwrap());
+            }
+
+            for i in 0..self[rank].len() {
+                self[rank][i].subs = sorted[i].clone();
+                self[rank][i].subs.sort();
+            }
+
+            let mut new_list = ElementList::new();
+            for i in 0..self[rank+1].len() {
+                let mut new = Element::new(Subelements::new(), Superelements::new());
+                for sub in &self[rank+1][i].subs {
+                    new.subs.push(perm[*sub]);
+                }
+                new.sort();
+                new_list.push(new);
+            }
+            self[rank+1] = new_list;
+        }
+    }
+
+    /// Sorts some stuff in a way that's useful for the faceting algorithm.
+    pub fn element_sort_strong_with_local(&mut self, local: &Ranks) {
+        for el in 0..self[2].len() {
+            self[2][el].subs.sort();
+        }
+
+        for rank in 2..self.len()-1 {
+            let mut all_subs = Vec::new();
+            for el in &self[rank] {
+                all_subs.push(el.subs.clone());
+            }
+            let mut sorted = all_subs.clone();
+            sorted.sort();
+
+            let mut perm = Vec::new();
+            for i in &all_subs {
+                perm.push(sorted.iter().position(|x| x == i).unwrap());
+            }
+
+            for i in 0..self[rank].len() {
+                self[rank][i].subs = sorted[i].clone();
+                self[rank][i].subs.sort();
+            }
+
+            let mut map_to_local = HashMap::new();
+
+            for i in 0..self[rank+1].len() {
+                for j in 0..self[rank+1][i].subs.len() {
+                    map_to_local.insert(self[rank+1][i].subs[j], local[rank+1][i].subs[j]);
+                }
+            }
+
+            let mut new_list = ElementList::new();
+            for i in 0..self[rank+1].len() {
+                let mut new = Element::new(Subelements::new(), Superelements::new());
+                for sub in &self[rank+1][i].subs {
+                    new.subs.push(perm[*map_to_local.get(sub).unwrap()]);
+                }
+                new.sort();
+                new_list.push(new);
+            }
+            self[rank+1] = new_list;
+        }
     }
 }
 

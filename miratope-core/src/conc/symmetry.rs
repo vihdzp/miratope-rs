@@ -1,11 +1,11 @@
-//! The code used to get the symmetry a polytope and do operations based on that.
+//! The code used to get the symmetry of a polytope and do operations based on that.
 
 use std::{collections::BTreeMap, vec, iter::FromIterator};
 
 use crate::{
     abs::{Ranked, flag::{FlagIter, Flag}},
     conc::Concrete,
-    group::Group, geometry::{Matrix, PointOrd}, Polytope,
+    group::{Group, GenIter}, geometry::{Matrix, PointOrd}, Polytope,
 };
 
 use vec_like::*;
@@ -58,19 +58,20 @@ impl Concrete {
                 .enumerate()
                 .map(|(r, x)| (types[r][*x] != types[r][base_flag[r]]) as usize)
                 .sum::<usize>() == 0 // this checks if all the elements in the flag have the same types as the ones in the base flag, else it skips it
-                {
+            {
+
                 // calculate isometry
                 let basis = flag.clone().vertex_sequence(&self);
                 let isometry = basis * &base_basis_inverse;
 
                 // check if vertices match up
                 // Really, you should check if all the elements match up, but this should be enough in most cases.
-                let mut vertex_map_row = Vec::<usize>::new();
+                let mut vertex_map_row = vec![0; self.vertices.len()];
                 for vertex in &vertices {
                     let new_vertex = PointOrd::new(isometry.clone() * vertex.0.matrix());
                     match vertices.get(&new_vertex) {
                         Some(idx) => {
-                            vertex_map_row.push(*idx);
+                            vertex_map_row[*vertex.1] = *idx;
                         }
                         None => {
                             continue 'a;
@@ -86,5 +87,34 @@ impl Concrete {
         unsafe {
             (Group::new(&self.rank()-1, group.into_iter()), vertex_map)
         }
+    }
+
+    /// Fills in the vertex map.
+    /// A vertex map is an array of (group element, vertex index) with values being the index of the vertex after applying the transformation.
+    pub fn get_vertex_map(&mut self, group: Group<GenIter<Matrix<f64>>>) -> Vec<Vec<usize>> {
+        let mut vertices = Vec::<PointOrd<f64>>::new();
+        for v in &self.vertices {
+            vertices.push(PointOrd::new(v.clone()));
+        }
+        let vertices = BTreeMap::from_iter((vertices).into_iter().zip(0..));
+
+        let mut vertex_map: Vec<Vec<usize>> = Vec::new();
+
+        'a: for isometry in group {
+            let mut vertex_map_row = Vec::<usize>::new();
+            for vertex in &vertices {
+                let new_vertex = PointOrd::new(isometry.clone() * vertex.0.matrix());
+                match vertices.get(&new_vertex) {
+                    Some(idx) => {
+                        vertex_map_row.push(*idx);
+                    }
+                    None => {
+                        continue 'a;
+                    }
+                }
+            }
+            vertex_map.push(vertex_map_row);
+        }
+        vertex_map
     }
 }

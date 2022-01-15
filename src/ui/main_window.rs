@@ -57,8 +57,6 @@ pub fn update_changed_polytopes(
     orthogonal: Res<'_, ProjectionType>,
 ) {
     for (poly, mesh_handle, children) in polies.iter() {
-        println!("Polytope updated");
-
         if cfg!(debug_assertions) {
             poly.assert_valid();
         }

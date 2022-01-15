@@ -10,7 +10,7 @@ use super::{
     PointWidget,
 };
 use crate::{Concrete, Float, Hypersphere, Point};
-use miratope_core::{conc::ConcretePolytope, Polytope};
+use miratope_core::{conc::{ConcretePolytope}, Polytope};
 
 use bevy::prelude::*;
 use bevy_egui::{
@@ -50,7 +50,8 @@ impl Plugin for OperationsPlugin {
             .add_plugin(DuoprismWindow::plugin())
             .add_plugin(DuotegumWindow::plugin())
             .add_plugin(DuocombWindow::plugin())
-            .add_plugin(CompoundWindow::plugin());
+            .add_plugin(CompoundWindow::plugin())
+            .add_plugin(ScaleWindow::plugin());
     }
 }
 
@@ -1054,5 +1055,43 @@ impl DuoWindow for CompoundWindow {
 
     fn slots_mut(&mut self) -> &mut [Slot; 2] {
         &mut self.slots
+    }
+}
+
+/// A window that scales a polytope.
+#[derive(Default)]
+pub struct ScaleWindow {
+    /// Whether the window is open.
+    open: bool,
+
+    /// The scale factor.
+    scale: f64,
+}
+
+impl Window for ScaleWindow {
+    const NAME: &'static str = "Scale";
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.open
+    }
+}
+
+impl PlainWindow for ScaleWindow {
+    fn action(&self, polytope: &mut Concrete) {
+        polytope.scale(self.scale);
+    }
+
+    fn build(&mut self, ui: &mut Ui) {
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::DragValue::new(&mut self.scale)
+                    .speed(0.01)
+                    .clamp_range(0.0..=Float::MAX),
+            );
+        });
     }
 }

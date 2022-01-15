@@ -10,7 +10,7 @@ use bevy_egui::{
     egui::{self, menu, Ui},
     EguiContext,
 };
-use miratope_core::{conc::ConcretePolytope, file::FromFile, Polytope};
+use miratope_core::{conc::{ConcretePolytope, faceting::GroupEnum}, file::FromFile, Polytope};
 
 /// The plugin in charge of everything on the top panel.
 pub struct TopPanelPlugin;
@@ -21,6 +21,7 @@ impl Plugin for TopPanelPlugin {
             .init_resource::<Memory>()
             .init_resource::<SectionDirection>()
             .init_resource::<SectionState>()
+            .init_resource::<ExportMemory>()
             .init_non_send_resource::<FileDialogToken>()
             .add_system(file_dialog.system())
             // Windows must be the first thing shown.
@@ -86,6 +87,15 @@ pub struct SectionDirection(Vector);
 impl Default for SectionDirection {
     fn default() -> Self {
         Self(Vector::zeros(0))
+    }
+}
+
+/// Stores whether we're exporting the memory and the index of the memory slot.
+pub struct ExportMemory(bool, usize);
+
+impl Default for ExportMemory {
+    fn default() -> Self {
+        Self(false, 0)
     }
 }
 
@@ -221,7 +231,16 @@ pub type EguiWindows<'a> = (
     ResMut<'a, DuotegumWindow>,
     ResMut<'a, DuocombWindow>,
     ResMut<'a, CompoundWindow>,
+    ResMut<'a, ScaleWindow>,
 );
+
+macro_rules! element_sort {
+    ($p:ident) => {
+        if !$p.abs().sorted() {
+            $p.element_sort();
+        }
+    };
+}
 
 /// The system that shows the top panel.
 #[allow(clippy::too_many_arguments)]
@@ -237,6 +256,7 @@ pub fn show_top_panel(
     mut file_dialog_state: ResMut<'_, FileDialogState>,
     mut projection_type: ResMut<'_, ProjectionType>,
     mut memory: ResMut<'_, Memory>,
+    mut export_memory: ResMut<'_, ExportMemory>,
     mut background_color: ResMut<'_, ClearColor>,
 
     mut visuals: ResMut<'_, egui::Visuals>,
@@ -253,11 +273,13 @@ pub fn show_top_panel(
         mut duotegum_window,
         mut duocomb_window,
         mut compound_window,
+        mut scale_window,
     ): EguiWindows<'_>,
 ) {
     // The top bar.
     egui::TopBottomPanel::top("top_panel").show(egui_ctx.ctx(), |ui| {
         menu::bar(ui, |ui| {
+            
             // Operations on files.
             menu::menu(ui, "File", |ui| {
                 // Loads a file.
@@ -270,6 +292,11 @@ pub fn show_top_panel(
                     file_dialog_state.save("polytope".to_string());
                 }
 
+                if ui.button("Export all memory slots").clicked() {
+                    export_memory.0 = true;
+                    export_memory.1 = 0;
+                }
+
                 ui.separator();
 
                 // Quits the application.
@@ -277,6 +304,25 @@ pub fn show_top_panel(
                     std::process::exit(0);
                 }
             });
+
+            if export_memory.0 {
+                let idx = export_memory.1;
+                if idx == memory.len() {
+                    export_memory.1 = 0;
+                    export_memory.0 = false;
+                }
+                else {
+                    if let Some(poly) = &memory[idx] {
+                        if let Some(mut p) = query.iter_mut().next() {
+                            *p = poly.clone();
+                            let mut name = "polytope ".to_owned();
+                            name.push_str(&idx.to_string());
+                            file_dialog_state.save(name.to_string());
+                        }
+                    }
+                    export_memory.1 += 1;
+                }
+            }
 
             // Configures the view.
             menu::menu(ui, "View", |ui| {
@@ -292,323 +338,362 @@ pub fn show_top_panel(
                 }
             });
 
-            // Anything related to the polytope on screen.
-            menu::menu(ui, "Polytope", |ui| {
-                /// Sorts the elements of a polytope. This will only take the
-                ///  polytope as mutable if necessary, thus avoiding a potential
-                /// reload.
-                macro_rules! element_sort {
-                    ($p:ident) => {
-                        if !$p.abs().sorted() {
-                            $p.element_sort();
-                        }
-                    };
+            menu::menu(ui, "Scale", |ui| {
+            
+                if ui.button("Unit edge length").clicked() {
+                    let mut p = query.iter_mut().next().unwrap();
+                    let e_l = (&p.vertices[p.abs[2][0].subs[0]] - &p.vertices[p.abs[2][0].subs[1]]).norm();
+                    p.scale(1.0/e_l);
                 }
 
-                // Operations on polytopes.
-                ui.collapsing("Operations", |ui| {
-                    // Operations that take a single polytope.
-                    ui.collapsing("Single", |ui| {
-                        // Converts the active polytope into its dual.
-                        if ui.button("Dual").clicked() {
-                            if advanced(&keyboard) {
-                                dual_window.open();
-                            } else if let Some(mut p) = query.iter_mut().next() {
-                                match p.try_dual_mut() {
-                                    Ok(_) => println!("Dual succeeded."),
-                                    Err(err) => eprintln!("Dual failed: {}", err),
-                                }
+                if ui.button("Unit circumradius").clicked() {
+                    let mut p = query.iter_mut().next().unwrap();
+                    match p.circumsphere() {
+                        Some(sphere) => {
+                            p.scale(1.0/sphere.radius());
+                        }
+                        None => println!("The polytope has no circumsphere."),
+                    }
+                }
+
+                // Opens a window to scale a polytope by some factor.
+                if ui.button("Scale...").clicked() {
+                    scale_window.open();
+                }
+                
+                ui.separator();
+
+                // Recenters a polytope.
+                if ui.button("Recenter").clicked() {
+                    query.iter_mut().next().unwrap().recenter();
+                }
+            });
+
+            // Operations on polytopes.
+            menu::menu(ui, "Operations", |ui| {
+                // Converts the active polytope into its dual.
+                if ui.button("Dual").clicked() {
+                    if advanced(&keyboard) {
+                        dual_window.open();
+                    } else if let Some(mut p) = query.iter_mut().next() {
+                        match p.try_dual_mut() {
+                            Ok(_) => println!("Dual succeeded."),
+                            Err(err) => eprintln!("Dual failed: {}", err),
+                        }
+                    }
+                }
+
+                ui.separator();
+
+                // Converts the active polytope into its Petrial.
+                if ui.button("Petrial").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        if p.petrial_mut() {
+                            println!("Petrial succeeded.");
+                        } else {
+                            eprintln!("Petrial failed.");
+                        }
+                    }
+                }
+
+                // Converts the active polytope into its Petrie polygon.
+                if ui.button("Petrie polygon").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        let flag = p.first_flag();
+                        match p.petrie_polygon_with(flag) {
+                            Some(q) => {
+                                *p = q;
+                                println!("Petrie polygon succeeded.")
                             }
+                            None => eprintln!("Petrie polygon failed."),
                         }
+                    }
+                }
 
-                        ui.separator();
+                ui.separator();
 
-                        // Makes a pyramid out of the current polytope.
-                        if ui.button("Pyramid").clicked() {
-                            if advanced(&keyboard) {
-                                pyramid_window.open();
-                            } else if let Some(mut p) = query.iter_mut().next() {
-                                *p = p.pyramid();
-                            }
+                // Makes a pyramid out of the current polytope.
+                if ui.button("Pyramid").clicked() {
+                    if advanced(&keyboard) {
+                        pyramid_window.open();
+                    } else if let Some(mut p) = query.iter_mut().next() {
+                        *p = p.pyramid();
+                    }
+                }
+
+                // Makes a prism out of the current polytope.
+                if ui.button("Prism").clicked() {
+                    if advanced(&keyboard) {
+                        prism_window.open();
+                    } else if let Some(mut p) = query.iter_mut().next() {
+                        *p = p.prism();
+                    }
+                }
+
+                // Makes a tegum out of the current polytope.
+                if ui.button("Tegum").clicked() {
+                    if advanced(&keyboard) {
+                        tegum_window.open();
+                    } else if let Some(mut p) = query.iter_mut().next() {
+                        *p = p.tegum();
+                    }
+                }
+
+                // Converts the active polytope into its antiprism.
+                if ui.button("Antiprism").clicked() {
+                    if advanced(&keyboard) {
+                        antiprism_window.open();
+                    } else if let Some(mut p) = query.iter_mut().next() {
+                        match p.try_antiprism() {
+                            Ok(q) => *p = q,
+                            Err(err) => eprintln!("Antiprism failed: {}", err),
                         }
+                    }
+                }
 
-                        // Makes a prism out of the current polytope.
-                        if ui.button("Prism").clicked() {
-                            if advanced(&keyboard) {
-                                prism_window.open();
-                            } else if let Some(mut p) = query.iter_mut().next() {
-                                *p = p.prism();
-                            }
-                        }
+                // Converts the active polytope into its ditope.
+                if ui.button("Ditope").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        p.ditope_mut();
+                        println!("Ditope succeeded!");
+                    }
+                }
 
-                        // Makes a tegum out of the current polytope.
-                        if ui.button("Tegum").clicked() {
-                            if advanced(&keyboard) {
-                                tegum_window.open();
-                            } else if let Some(mut p) = query.iter_mut().next() {
-                                *p = p.tegum();
-                            }
-                        }
+                // Converts the active polytope into its hosotope.
+                if ui.button("Hosotope").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        p.hosotope_mut();
+                        println!("Hosotope succeeded!");
+                    }
+                }
+                
+                ui.separator();
 
-                        // Converts the active polytope into its antiprism.
-                        if ui.button("Antiprism").clicked() {
-                            if advanced(&keyboard) {
-                                antiprism_window.open();
-                            } else if let Some(mut p) = query.iter_mut().next() {
-                                match p.try_antiprism() {
-                                    Ok(q) => *p = q,
-                                    Err(err) => eprintln!("Antiprism failed: {}", err),
-                                }
-                            }
-                        }
+                // Opens the window to make duopyramids.
+                if ui.button("Duopyramid").clicked() {
+                    duopyramid_window.open();
+                }
 
-                        ui.separator();
+                // Opens the window to make duoprisms.
+                if ui.button("Duoprism").clicked() {
+                    duoprism_window.open();
+                }
 
-                        // Converts the active polytope into its Petrial.
-                        if ui.button("Petrial").clicked() {
-                            if let Some(mut p) = query.iter_mut().next() {
-                                if p.petrial_mut() {
-                                    println!("Petrial succeeded.");
-                                } else {
-                                    eprintln!("Petrial failed.");
-                                }
-                            }
-                        }
+                // Opens the window to make duotegums.
+                if ui.button("Duotegum").clicked() {
+                    duotegum_window.open();
+                }
 
-                        // Converts the active polytope into its Petrie polygon.
-                        if ui.button("Petrie polygon").clicked() {
-                            if let Some(mut p) = query.iter_mut().next() {
-                                let flag = p.first_flag();
-                                match p.petrie_polygon_with(flag) {
-                                    Some(q) => {
-                                        *p = q;
-                                        println!("Petrie polygon succeeded.")
-                                    }
-                                    None => eprintln!("Petrie polygon failed."),
-                                }
-                            }
-                        }
+                // Opens the window to make duocombs.
+                if ui.button("Duocomb").clicked() {
+                    duocomb_window.open();
+                }
 
-                        ui.separator();
+                // Opens the window to make compounds.
+                if ui.button("Compound").clicked() {
+                    compound_window.open();
+                }
 
-                        // Converts the active polytope into its ditope.
-                        if ui.button("Ditope").clicked() {
-                            if let Some(mut p) = query.iter_mut().next() {
-                                p.ditope_mut();
-                                println!("Ditope succeeded!");
-                            }
-                        }
+                ui.separator();
 
-                        // Converts the active polytope into its hosotope.
-                        if ui.button("Hosotope").clicked() {
-                            if let Some(mut p) = query.iter_mut().next() {
-                                p.hosotope_mut();
-                                println!("Hosotope succeeded!");
-                            }
-                        }
-                    });
+                if ui.button("Rectate").clicked() {
+                    let mut p = query.iter_mut().next().unwrap();
+                    element_sort!(p);
+                    *p = p.truncate_with(vec![1], vec![1.0]);
+                }
 
-                    // Operations that take two polytopes an arguments.
-                    ui.collapsing("Double", |ui| {
-                        // Opens the window to make duopyramids.
-                        if ui.button("Duopyramid").clicked() {
-                            duopyramid_window.open();
-                        }
+                if ui.button("Truncate").clicked() {
+                    let mut p = query.iter_mut().next().unwrap();
+                    element_sort!(p);
+                    *p = p.truncate_with(vec![0, 1], vec![0.5, 0.5]);
+                }
 
-                        // Opens the window to make duoprisms.
-                        if ui.button("Duoprism").clicked() {
-                            duoprism_window.open();
-                        }
+                if ui.button("Bitruncate").clicked() {
+                    let mut p = query.iter_mut().next().unwrap();
+                    element_sort!(p);
+                    *p = p.truncate_with(vec![1, 2], vec![0.5, 0.5]);
+                }
 
-                        // Opens the window to make duotegums.
-                        if ui.button("Duotegum").clicked() {
-                            duotegum_window.open();
-                        }
+                if ui.button("Cantellate").clicked() {
+                    let mut p = query.iter_mut().next().unwrap();
+                    element_sort!(p);
+                    *p = p.truncate_with(vec![0, 2], vec![0.5, 0.5]);
+                }
 
-                        // Opens the window to make duocombs.
-                        if ui.button("Duocomb").clicked() {
-                            duocomb_window.open();
-                        }
+                if ui.button("Runcinate").clicked() {
+                    let mut p = query.iter_mut().next().unwrap();
+                    element_sort!(p);
+                    *p = p.truncate_with(vec![0, 3], vec![0.5, 0.5]);
+                }
 
-                        // Opens the window to make compounds.
-                        if ui.button("Compound").clicked() {
-                            compound_window.open();
-                        }
-                    });
+                if ui.button("Omnitruncate").clicked() {
+                    let mut p = query.iter_mut().next().unwrap();
+                    element_sort!(p);
+                    *p = p.omnitruncate();
+                }
+            });
 
-                    if ui.button("Rectate").clicked() {
+            // Toggles cross-section mode.
+            if ui.button("Cross-section").clicked() {
+                match section_state.as_mut() {
+                    // The view is active, but will be inactivated.
+                    SectionState::Active {
+                        original_polytope, ..
+                    } => {
+                        *query.iter_mut().next().unwrap() = original_polytope.clone();
+                        section_state.close();
+                    }
+
+                    // The view is inactive, but will be activated.
+                    SectionState::Inactive => {
                         let mut p = query.iter_mut().next().unwrap();
+                        p.flatten();
+
+                        // The default direction is in the last coordinate axis.
+                        let dim = p.dim_or();
+                        let mut direction = Vector::zeros(dim);
+                        if dim > 0 {
+                            direction[dim - 1] = 1.0;
+                        }
+
+                        let minmax = p.minmax(direction.clone()).unwrap_or((-1.0, 1.0));
+                        let original_polytope = p.clone();
+
+                        section_state.open(original_polytope, minmax);
+                        section_direction.0 = direction;
+                    }
+                };
+            }
+
+            // Operates on the elements of the loaded polytope.
+            menu::menu(ui, "Elements", |ui| {
+                // Converts the active polytope into any of its facets.
+                if ui.button("Facet").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        println!("Facet");
+
+                        if let Some(mut facet) = p.facet(0) {
+                            facet.flatten();
+                            facet.recenter();
+                            *p = facet;
+
+                            println!("Facet succeeded.")
+                        } else {
+                            eprintln!("Facet failed: no facets.")
+                        }
+                    }
+                }
+
+                // Converts the active polytope into any of its verfs.
+                if ui.button("Verf").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        println!("Verf");
+
+                        match p.verf(0) {
+                            Ok(Some(mut verf)) => {
+                                verf.flatten();
+                                verf.recenter();
+                                *p = verf;
+
+                                println!("Verf succeeded.")
+                            }
+                            Ok(None) => eprintln!("Verf failed: no vertices."),
+                            Err(err) => eprintln!("Verf failed: {}", err),
+                        }
+                    }
+                }
+
+                // Outputs the element types, currently just prints to console.
+                if ui.button("Counts").clicked() {
+                    if let Some(p) = query.iter_mut().next() {
+                        p.con().print_element_types();
+                    }
+                }
+            });
+
+            // Prints out properties about the loaded polytope.
+            menu::menu(ui, "Properties", |ui| {
+                // Determines the circumsphere of the polytope.
+                if ui.button("Circumsphere").clicked() {
+                    if let Some(p) = query.iter_mut().next() {
+                        match p.circumsphere() {
+                            Some(sphere) => println!(
+                                "The circumradius is {} and the circumcenter is {}.",
+                                sphere.radius(),
+                                sphere.center
+                            ),
+                            None => println!("The polytope has no circumsphere."),
+                        }
+                    }
+                }
+
+                // Determines whether the polytope is orientable.
+                if ui.button("Orientability").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
                         element_sort!(p);
-                        *p = p.truncate_with(vec![1], vec![1.0]);
-                    }
 
-                    if ui.button("Truncate").clicked() {
-                        let mut p = query.iter_mut().next().unwrap();
+                        if p.orientable() {
+                            println!("The polytope is orientable.");
+                        } else {
+                            println!("The polytope is not orientable.");
+                        }
+                    }
+                }
+
+                // Gets the volume of the polytope.
+                if ui.button("Volume").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
                         element_sort!(p);
-                        *p = p.truncate_with(vec![0, 1], vec![0.5, 0.5]);
-                    }
 
-                    if ui.button("Bitruncate").clicked() {
-                        let mut p = query.iter_mut().next().unwrap();
-                        element_sort!(p);
-                        *p = p.truncate_with(vec![1, 2], vec![0.5, 0.5]);
-                    }
-
-                    if ui.button("Cantellate").clicked() {
-                        let mut p = query.iter_mut().next().unwrap();
-                        element_sort!(p);
-                        *p = p.truncate_with(vec![0, 2], vec![0.5, 0.5]);
-                    }
-
-                    if ui.button("Runcinate").clicked() {
-                        let mut p = query.iter_mut().next().unwrap();
-                        element_sort!(p);
-                        *p = p.truncate_with(vec![0, 3], vec![0.5, 0.5]);
-                    }
-
-                    if ui.button("Omnitruncate").clicked() {
-                        let mut p = query.iter_mut().next().unwrap();
-                        element_sort!(p);
-                        *p = p.omnitruncate();
-                    }
-
-                    ui.separator();
-
-                    // Recenters a polytope.
-                    if ui.button("Recenter").clicked() {
-                        query.iter_mut().next().unwrap().recenter();
-                    }
-
-                    ui.separator();
-
-                    // Toggles cross-section mode.
-                    if ui.button("Cross-section").clicked() {
-                        match section_state.as_mut() {
-                            // The view is active, but will be inactivated.
-                            SectionState::Active {
-                                original_polytope, ..
-                            } => {
-                                *query.iter_mut().next().unwrap() = original_polytope.clone();
-                                section_state.close();
-                            }
-
-                            // The view is inactive, but will be activated.
-                            SectionState::Inactive => {
-                                let mut p = query.iter_mut().next().unwrap();
-                                p.flatten();
-
-                                // The default direction is in the last coordinate axis.
-                                let dim = p.dim_or();
-                                let mut direction = Vector::zeros(dim);
-                                if dim > 0 {
-                                    direction[dim - 1] = 1.0;
-                                }
-
-                                let minmax = p.minmax(direction.clone()).unwrap_or((-1.0, 1.0));
-                                let original_polytope = p.clone();
-
-                                section_state.open(original_polytope, minmax);
-                                section_direction.0 = direction;
-                            }
-                        };
-                    }
-                });
-
-                // Operates on the elements of the loaded polytope.
-                ui.collapsing("Elements", |ui| {
-                    // Converts the active polytope into any of its facets.
-                    if ui.button("Facet").clicked() {
-                        if let Some(mut p) = query.iter_mut().next() {
-                            println!("Facet");
-
-                            if let Some(mut facet) = p.facet(0) {
-                                facet.flatten();
-                                facet.recenter();
-                                *p = facet;
-
-                                println!("Facet succeeded.")
-                            } else {
-                                eprintln!("Facet failed: no facets.")
-                            }
+                        if let Some(vol) = p.volume() {
+                            println!("The volume is {}.", vol);
+                        } else {
+                            println!("The polytope has no volume.");
                         }
                     }
+                }
 
-                    // Converts the active polytope into any of its verfs.
-                    if ui.button("Verf").clicked() {
-                        if let Some(mut p) = query.iter_mut().next() {
-                            println!("Verf");
+                // Gets the number of flags of the polytope.
+                if ui.button("Flag count").clicked() {
+                    if let Some(p) = query.iter_mut().next() {
+                        println!("The polytope has {} flags.", p.flags().count())
+                    }
+                }
 
-                            match p.verf(0) {
-                                Ok(Some(mut verf)) => {
-                                    verf.flatten();
-                                    verf.recenter();
-                                    *p = verf;
+                // Gets the order of the symmetry group of the polytope
+                if ui.button("Symmetry group").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        let group = p.get_symmetry_group().0;
+                        println!("Symmetry order {}", group.count());
+                    }
+                }
+            });
 
-                                    println!("Verf succeeded.")
-                                }
-                                Ok(None) => eprintln!("Verf failed: no vertices."),
-                                Err(err) => eprintln!("Verf failed: {}", err),
-                            }
+            menu::menu(ui, "Faceting", |ui| {
+                if ui.button("Full faceting").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        let facetings = p.faceting(GroupEnum::None, None, None);
+                        for faceting in facetings {
+                            memory.push(faceting);
                         }
                     }
-
-                    // Outputs the element types, currently just prints to console.
-                    if ui.button("Counts").clicked() {
-                        if let Some(p) = query.iter_mut().next() {
-                            p.con().print_element_types();
+                }
+                if ui.button("Superregiment faceting").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        let facetings = p.faceting(GroupEnum::None, Some(1.0), None);
+                        for faceting in facetings {
+                            memory.push(faceting);
                         }
                     }
-                });
-
-                // Prints out properties about the loaded polytope.
-                ui.collapsing("Properties", |ui| {
-                    // Determines the circumsphere of the polytope.
-                    if ui.button("Circumsphere").clicked() {
-                        if let Some(p) = query.iter_mut().next() {
-                            match p.circumsphere() {
-                                Some(sphere) => println!(
-                                    "The circumradius is {} and the circumcenter is {}.",
-                                    sphere.radius(),
-                                    sphere.center
-                                ),
-                                None => println!("The polytope has no circumsphere."),
-                            }
+                }
+                if ui.button("Isotopic faceting").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        let facetings = p.faceting(GroupEnum::None, None, Some(1));
+                        for faceting in facetings {
+                            memory.push(faceting);
                         }
                     }
-
-                    // Determines whether the polytope is orientable.
-                    if ui.button("Orientability").clicked() {
-                        if let Some(mut p) = query.iter_mut().next() {
-                            element_sort!(p);
-
-                            if p.orientable() {
-                                println!("The polytope is orientable.");
-                            } else {
-                                println!("The polytope is not orientable.");
-                            }
-                        }
-                    }
-
-                    // Gets the volume of the polytope.
-                    if ui.button("Volume").clicked() {
-                        if let Some(mut p) = query.iter_mut().next() {
-                            element_sort!(p);
-
-                            if let Some(vol) = p.volume() {
-                                println!("The volume is {}.", vol);
-                            } else {
-                                println!("The polytope has no volume.");
-                            }
-                        }
-                    }
-
-                    // Gets the number of flags of the polytope.
-                    if ui.button("Flag count").clicked() {
-                        if let Some(p) = query.iter_mut().next() {
-                            println!("The polytope has {} flags.", p.flags().count())
-                        }
-                    }
-                });
+                }
             });
 
             memory.show(ui, &mut query);
@@ -618,16 +703,6 @@ pub fn show_top_panel(
                 if ui.button("File bug").clicked() {
                     if let Err(err) = webbrowser::open(crate::NEW_ISSUE) {
                         eprintln!("Website opening failed: {}", err);
-                    }
-                }
-            });
-
-            // Testing stuff i'm working on
-            menu::menu(ui, "Test", |ui| {
-                if ui.button("get_symmetry_group").clicked() {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        let group = p.get_symmetry_group().0;
-                        println!("Symmetry order {}", group.count());
                     }
                 }
             });

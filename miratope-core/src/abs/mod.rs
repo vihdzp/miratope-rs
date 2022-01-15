@@ -18,6 +18,8 @@ use super::Polytope;
 
 use vec_like::VecLike;
 
+use partitions::PartitionVec;
+
 pub use ranked::*;
 pub use valid::*;
 
@@ -800,6 +802,71 @@ impl Polytope for Abstract {
 
             ranks.insert(0, ElementList::min(2));
         }
+    }
+
+    /// Splits compound faces into their components.
+    fn untangle_faces(&mut self) {
+        if self.rank() < 4 {
+            return
+        }
+        let mut new_faces = ElementList::new();
+        let self_3_len = self[3].len();
+
+        for f_i in 0..self_3_len {
+            let current_len = new_faces.len();
+            let mut map = HashMap::new();
+            let mut partition = PartitionVec::new();
+            let edge_idxs = &self[3][f_i].subs.clone();
+            
+            for edge_idx in edge_idxs {
+                let edge = &self[2][*edge_idx];
+                for i in 0..=1 {
+                    if map.get(&edge.subs[i]).is_none() {
+                        map.insert(edge.subs[i], map.len());
+                        partition.push(edge.subs[i]);
+                    }
+                }
+                partition.union(
+                    *map.get(&edge.subs[0]).unwrap(),
+                    *map.get(&edge.subs[1]).unwrap()
+                );
+            }
+
+            let mut set_of_vertex = HashMap::new();
+            for (i, set) in partition.all_sets().enumerate() {
+                for (_, v) in set {
+                    set_of_vertex.insert(v, i);
+                }
+                if i > 0 {
+                    for sup in &self[3][f_i].sups.clone() {
+                        self[4][*sup].subs.push(new_faces.len() + self_3_len);
+                    }
+                    new_faces.push(Element::new(Subelements::new(), self[3][f_i].sups.clone()));
+                }
+            }
+
+            let mut new_face = self[3][f_i].clone();
+            new_face.subs.clear();
+
+            for edge_idx in edge_idxs {
+                let set_idx = set_of_vertex.get(&self[2][*edge_idx].subs[0]).unwrap();
+                if set_idx > &0 {
+                    let idx = current_len + set_idx - 1;
+                    new_faces[idx].subs.push(*edge_idx);
+                    for sup_i in 0..self[2][*edge_idx].sups.len() {
+                        if &self[2][*edge_idx].sups[sup_i] == &f_i {
+                            self[2][*edge_idx].sups[sup_i] = idx + self_3_len;
+                        }
+                    }
+                }
+                else {
+                    new_face.subs.push(*edge_idx);
+                }
+            }
+
+            self[3][f_i] = new_face;
+        }
+        self[3].append(&mut new_faces);
     }
 }
 

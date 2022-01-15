@@ -125,7 +125,7 @@ impl Float for f32 {
 
 /// Constants for `f64`.
 impl Float for f64 {
-    const EPS: f64 = 1e-9;
+    const EPS: f64 = 1e-7;
     const ZERO: f64 = 0.0;
     const ONE: f64 = 1.0;
     const TWO: f64 = 2.0;

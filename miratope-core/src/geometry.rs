@@ -45,7 +45,7 @@ impl<T: Float> Hypersphere<T> {
     /// Returns the radius of the hypersphere, or `NaN` if its squared radius is
     /// negative.
     pub fn radius(&self) -> T {
-        self.squared_radius.fsqrt()
+        self.squared_radius // ????
     }
 
     /// Constructs a hypersphere with a given dimension and radius,
@@ -98,6 +98,7 @@ impl<T: Float> Hypersphere<T> {
 ///
 /// TODO: Use asserts to guarantee that the basis is an orthogonal basis of unit
 /// vectors.
+#[derive(Clone,)]
 pub struct Subspace<T: Float> {
     /// An orthogonal basis for the subspace, defined by unit vectors.
     pub basis: Vec<Vector<T>>,
@@ -262,10 +263,9 @@ impl<T: Float> Subspace<T> {
 impl Concrete {
     /// Computes the affine hull of an element.
     pub fn affine_hull(&self, rank: usize, idx: usize) -> Subspace<f64> {
-        Subspace::from_points_with(
+        Subspace::from_points(
             &mut self.element(rank, idx).unwrap().vertices.iter(),
-            rank-1
-        ).unwrap()
+        )
     }
 
     /// Computes the affine hulls of all elements and puts them in an `ElementMap`.

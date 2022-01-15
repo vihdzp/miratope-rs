@@ -2,6 +2,7 @@
 
 pub mod cycle;
 pub mod element_types;
+pub mod faceting;
 pub mod symmetry;
 
 use std::{
@@ -314,6 +315,11 @@ impl Polytope for Concrete {
             simplex.recenter();
             simplex
         }
+    }
+
+    /// Splits compound faces into their components.
+    fn untangle_faces(&mut self) {
+        self.abs.untangle_faces();
     }
 }
 

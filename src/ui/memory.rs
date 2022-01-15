@@ -5,12 +5,9 @@ use bevy_egui::egui;
 
 use crate::Concrete;
 
-/// The compile-time number of slots of memory.
-pub const MEMORY_SLOTS: usize = 8;
-
 /// Represents the memory slots to store polytopes.
 #[derive(Default)]
-pub struct Memory([Option<Concrete>; MEMORY_SLOTS]);
+pub struct Memory(Vec<Option<Concrete>>);
 
 impl std::ops::Index<usize> for Memory {
     type Output = Option<Concrete>;
@@ -26,14 +23,35 @@ pub fn slot_label(n: usize) -> String {
 }
 
 impl Memory {
+    /// Returns the length of the memory vector.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     /// Returns an iterator over the memory slots.
     pub fn iter(&self) -> std::slice::Iter<'_, Option<Concrete>> {
         self.0.iter()
     }
 
+    /// Appends an element.
+    pub fn push(&mut self, a: Concrete) {
+        self.0.push(Some(a));
+    }
+
     /// Shows the memory menu in a specified Ui.
     pub fn show(&mut self, ui: &mut egui::Ui, query: &mut Query<'_, '_, &mut Concrete>) {
         egui::menu::menu(ui, "Memory", |ui| {
+
+            if ui.button("Clear memory").clicked() {
+                self.0.clear();
+            }
+
+            if ui.button("Add slot").clicked() {
+                self.0.push(None);
+            }
+
+            ui.separator();
+
             for (idx, slot) in self.0.iter_mut().enumerate() {
                 match slot {
                     // Shows an empty slot.
