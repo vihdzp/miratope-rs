@@ -145,8 +145,8 @@ fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>
     let mut checked = HashSet::<Vec<usize>>::new();
     let mut hyperplanes_vertices = Vec::new();
 
-    for mut pair_orbit in pair_orbits {
-        let rep = &mut pair_orbit[0];
+    for pair_orbit in pair_orbits {
+        let rep = &pair_orbit[0];
 
         let mut new_vertices = vec![0; rank-3];
         let mut update = 0;
@@ -167,8 +167,8 @@ fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>
                 tuple.append(&mut new_vertices.clone());
 
                 let mut first_points = Vec::new();
-                for v in &mut *tuple {
-                    first_points.push(&flat_points[*v].0);
+                for v in tuple {
+                    first_points.push(&flat_points[v].0);
                 }
 
                 let hyperplane = Subspace::from_points(first_points.clone().into_iter());
@@ -215,7 +215,7 @@ fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>
                 break
             }
             loop { // Increment new_vertices.
-                if new_vertices[update] == total_vert_count - 1 {
+                if new_vertices[update] == total_vert_count + update - rank + 3 {
                     if update < 1 {
                         break 'b;
                     }
@@ -516,14 +516,8 @@ fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>
 
                 output.push((ranks, facets.clone()));
 
-                let t = facets.last_mut().unwrap();
-                if t.1 == possible_facets[t.0].len() - 1 {
-                    t.0 += 1;
-                    t.1 = 0;
-                }
-                else {
-                    t.1 += 1;
-                }
+                let t = facets.last().unwrap().clone();
+                facets.push((t.0 + 1, 0));
             }
             1 => {
                 let t = facets.last_mut().unwrap();
@@ -1024,14 +1018,21 @@ impl Concrete {
                         }
                     }
 
-                    let t = facets.last_mut().unwrap();
-                    if t.1 == possible_facets[t.0].len() - 1 {
-                        t.0 += 1;
-                        t.1 = 0;
+                    if let Some(max_facets) = noble {
+                        if facets.len() == max_facets {
+                            let t = facets.last_mut().unwrap();
+                            if t.1 == possible_facets[t.0].len() - 1 {
+                                t.0 += 1;
+                                t.1 = 0;
+                            }
+                            else {
+                                t.1 += 1;
+                            }
+                            continue
+                        }
                     }
-                    else {
-                        t.1 += 1;
-                    }
+                    let t = facets.last().unwrap().clone();
+                    facets.push((t.0 + 1, 0));
                 }
                 1 => {
                     let t = facets.last_mut().unwrap();
