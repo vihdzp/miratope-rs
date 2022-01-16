@@ -128,7 +128,7 @@ impl Triangulation {
                         path.id_iter(),
                         &path,
                         None,
-                        &FillOptions::with_fill_rule(Default::default(), FillRule::EvenOdd)
+                        &FillOptions::with_fill_rule(Default::default(), FillRule::NonZero)
                             .with_tolerance(EPS as f32),
                         &mut BuffersBuilder::new(&mut geometry, |vertex: FillVertex<'_>| {
                             vertex.sources().next().unwrap()

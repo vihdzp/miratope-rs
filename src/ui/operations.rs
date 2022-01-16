@@ -1090,7 +1090,6 @@ impl PlainWindow for ScaleWindow {
             ui.add(
                 egui::DragValue::new(&mut self.scale)
                     .speed(0.01)
-                    .clamp_range(0.0..=Float::MAX),
             );
         });
     }
