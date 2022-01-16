@@ -11,8 +11,6 @@
 
 //! A tool for building and visualizing polytopes. Still in alpha development.
 
-use std::env;
-
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::{camera::PerspectiveProjection, pipeline::PipelineDescriptor};
@@ -63,8 +61,6 @@ const EPS: Float = <Float as miratope_core::float::Float>::EPS;
 
 /// Loads all of the necessary systems for the application to run.
 fn main() {
-    env::set_var("RUST_BACKTRACE", "1");
-    
     App::new()
         .insert_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
