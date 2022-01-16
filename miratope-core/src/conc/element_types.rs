@@ -52,8 +52,9 @@ const EL_SUFFIXES: [&str; 25] = [
 
 impl Subspace<f64> {
     // Huge botch. This should be rewritten.
-    fn distance_heuristic(&self, rank: usize) -> usize {
-        (self.distance(&Point::zeros(rank-1))/0.0001 + f64::PI) as usize
+    fn distance_heuristic(&self) -> usize {
+        let dim = self.offset.len();
+        (self.distance(&Point::zeros(dim))/0.0001 + f64::PI) as usize
     }
 }
 
@@ -109,7 +110,7 @@ impl Concrete {
                     let type_data = TypeData {
                         prev_index: type_of_element[r][i],
                         type_counts: sub_type_counts,
-                        heuristics: subspaces[r-1][i].distance_heuristic(rank),
+                        heuristics: subspaces[r-1][i].distance_heuristic(),
                     };
 
                     match dict.get(&type_data) {
@@ -152,7 +153,7 @@ impl Concrete {
                     let type_data = TypeData {
                         prev_index: type_of_element[r][i],
                         type_counts: sup_type_counts,
-                        heuristics: subspaces[r-1][i].distance_heuristic(rank),
+                        heuristics: subspaces[r-1][i].distance_heuristic(),
                     };
 
                     match dict.get(&type_data) {
