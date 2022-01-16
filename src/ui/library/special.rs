@@ -52,7 +52,7 @@ impl SpecialLibrary {
             Self::Prism(_, _) => "Prism",
             Self::Antiprism(_, _) => "Antiprism",
             Self::Duoprism(_, _, _, _) => "Duoprism",
-            Self::AntiprismPrism(_, _) => "Antiprismatic prism",
+            Self::AntiprismPrism(_, _) => "Antiprism prism",
             Self::Simplex(_) => "Simplex",
             Self::Hypercube(_) => "Hypercube",
             Self::Orthoplex(_) => "Orthoplex",
@@ -194,7 +194,7 @@ impl SpecialLibrary {
             // Loads a uniform polygonal antiprism.
             Self::Antiprism(n, d) => Concrete::uniform_antiprism(n, d),
 
-            // Loads a (uniform 4D) duoprism.
+            // Loads a uniform polygonal duoprism.
             Self::Duoprism(n1, d1, n2, d2) => {
                 let p1 = Concrete::star_polygon_with_edge(n1, d1, 1.0);
 
@@ -207,7 +207,7 @@ impl SpecialLibrary {
                 }
             }
 
-            // Loads a uniform polygonal antiprism.
+            // Loads a uniform polygonal antiprism prism.
             Self::AntiprismPrism(n, d) => Concrete::uniform_antiprism(n, d).prism(),
 
             // Loads a simplex with a given rank.

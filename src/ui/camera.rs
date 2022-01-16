@@ -201,7 +201,7 @@ impl CameraInputEvent {
             for MouseMotion { mut delta } in mouse_move.iter() {
                 delta.x /= width;
                 delta.y /= height;
-                cam_inputs.send(Self::RotateAnchor(-100.0 * real_scale * delta))
+                cam_inputs.send(Self::RotateAnchor(-400.0 * real_scale * delta))
             }
         }
     }
