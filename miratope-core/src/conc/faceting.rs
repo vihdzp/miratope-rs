@@ -22,7 +22,7 @@ pub enum GroupEnum {
     Chiral(bool),
 }
 
-fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>, vertex_map: Vec<Vec<usize>>, edge_length: Option<f64>) ->
+fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>, vertex_map: Vec<Vec<usize>>, edge_length: Option<f64>, irc: bool) ->
     (Vec<(Ranks, Vec<(usize, usize)>)>, // Vec of facetings, along with the facet types of each of them
     Vec<usize>, // Counts of each hyperplane orbit
     Vec<Vec<Ranks>> // Possible facets, these will be the possible ridges one dimension up
@@ -276,7 +276,7 @@ fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>
         }
 
         let (possible_facets_row, ff_counts_row, ridges_row) =
-            faceting_subdim(rank-1, hp, points, new_stabilizer.clone(), edge_length);
+            faceting_subdim(rank-1, hp, points, new_stabilizer.clone(), edge_length, irc);
 
         let mut possible_facets_global_row = Vec::new();
         for f in &possible_facets_row {
@@ -517,8 +517,19 @@ fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>
 
                 output.push((ranks, facets.clone()));
 
-                let t = facets.last().unwrap().clone();
-                facets.push((t.0 + 1, 0));
+                if irc {
+                    let t = facets.last().unwrap().clone();
+                    facets.push((t.0 + 1, 0));
+                } else {
+                    let t = facets.last_mut().unwrap();
+                    if t.1 == possible_facets[t.0].len() - 1 {
+                        t.0 += 1;
+                        t.1 = 0;
+                    }
+                    else {
+                        t.1 += 1;
+                    }
+                }
             }
             1 => {
                 let t = facets.last_mut().unwrap();
@@ -552,7 +563,7 @@ fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>
 impl Concrete {
     /// Enumerates the facetings of a polytope under a provided symmetry group or vertex map.
     /// If the symmetry group is not provided, it uses the full symmetry of the polytope.
-    pub fn faceting(&mut self, symmetry: GroupEnum, edge_length: Option<f64>, noble: Option<usize>) -> Vec<Concrete> {
+    pub fn faceting(&mut self, symmetry: GroupEnum, edge_length: Option<f64>, noble: Option<usize>, irc: bool) -> Vec<Concrete> {
         let rank = self.rank();
 
         let mut vertices_ord = Vec::<PointOrd<f64>>::new();
@@ -765,7 +776,8 @@ impl Concrete {
                 points.push(vertices_ord[*v].clone());
             }
 
-            let (possible_facets_row, ff_counts_row, ridges_row) = faceting_subdim(rank-1, hp, points, new_stabilizer, edge_length);
+            let (possible_facets_row, ff_counts_row, ridges_row) =
+                faceting_subdim(rank-1, hp, points, new_stabilizer, edge_length, irc);
             let mut possible_facets_global_row = Vec::new();
             for f in &possible_facets_row {
                 let mut new_f = f.clone();
@@ -1040,8 +1052,19 @@ impl Concrete {
                             continue
                         }
                     }
-                    let t = facets.last().unwrap().clone();
-                    facets.push((t.0 + 1, 0));
+                    if irc {
+                        let t = facets.last().unwrap().clone();
+                        facets.push((t.0 + 1, 0));
+                    } else {
+                        let t = facets.last_mut().unwrap();
+                        if t.1 == possible_facets[t.0].len() - 1 {
+                            t.0 += 1;
+                            t.1 = 0;
+                        }
+                        else {
+                            t.1 += 1;
+                        }
+                    }
                 }
                 1 => {
                     let t = facets.last_mut().unwrap();

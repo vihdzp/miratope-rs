@@ -1110,6 +1110,9 @@ pub struct FacetingSettings {
 
     /// Whether to use unit edges only (superregiment).
     pub unit_edges: bool,
+
+    /// Whether to look for mixed compounds. `false` doesn't exclude them yet.
+    pub irc: bool,
 }
 
 impl Window for FacetingSettings {
@@ -1145,6 +1148,11 @@ impl PlainWindow for FacetingSettings {
         ui.horizontal(|ui| {
             ui.add(
                 egui::Checkbox::new(&mut self.chiral, "Chiral subgroup")
+            );
+        });
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::Checkbox::new(&mut self.irc, "Include mixed compounds")
             );
         });
     }

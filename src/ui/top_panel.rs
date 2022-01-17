@@ -677,7 +677,8 @@ pub fn show_top_panel(
                         let facetings = p.faceting(
                             GroupEnum::Chiral(faceting_settings.chiral), 
                             if faceting_settings.unit_edges {Some(1.0)} else {None}, 
-                            if faceting_settings.max_facet_types == 0 {None} else {Some(faceting_settings.max_facet_types)}
+                            if faceting_settings.max_facet_types == 0 {None} else {Some(faceting_settings.max_facet_types)},
+                            faceting_settings.irc
                         );
                         for faceting in facetings {
                             memory.push(faceting);
