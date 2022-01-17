@@ -22,6 +22,32 @@ pub enum GroupEnum {
     Chiral(bool),
 }
 
+fn filter_irc(vec: &mut Vec<Vec<(usize,usize)>>) -> Vec<usize> {
+    let mut out = Vec::new();
+    'a: for a in 0..vec.len() {
+        for b in a+1..vec.len() {
+            if vec[b][0].0 > vec[a][0].0 || vec[b][0].1 > vec[a][0].1 {
+                break
+            }
+            let mut i = 0;
+            for f in &vec[a] {
+                if &vec[b][i] > f {
+                    continue
+                }
+                if &vec[b][i] < f {
+                    break
+                }
+                i += 1;
+                if i >= vec[b].len() {
+                    continue 'a;
+                }
+            }
+        }
+        out.push(a)
+    }
+    out
+}
+
 fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>, vertex_map: Vec<Vec<usize>>, edge_length: Option<f64>, irc: bool) ->
     (Vec<(Ranks, Vec<(usize, usize)>)>, // Vec of facetings, along with the facet types of each of them
     Vec<usize>, // Counts of each hyperplane orbit
@@ -375,6 +401,7 @@ fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>
 
     // Actually do the faceting
     let mut output = Vec::new();
+    let mut output_facets = Vec::new();
 
     let mut facets = vec![(0, 0)];
 
@@ -516,20 +543,10 @@ fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>
                 ranks.push(vec![Element::new(Subelements::from_iter(0..n_r_len), Superelements::new())].into()); // body
 
                 output.push((ranks, facets.clone()));
+                output_facets.push(facets.clone());
 
-                if irc {
-                    let t = facets.last().unwrap().clone();
-                    facets.push((t.0 + 1, 0));
-                } else {
-                    let t = facets.last_mut().unwrap();
-                    if t.1 == possible_facets[t.0].len() - 1 {
-                        t.0 += 1;
-                        t.1 = 0;
-                    }
-                    else {
-                        t.1 += 1;
-                    }
-                }
+                let t = facets.last().unwrap().clone();
+                facets.push((t.0 + 1, 0));
             }
             1 => {
                 let t = facets.last_mut().unwrap();
@@ -574,19 +591,19 @@ impl Concrete {
 
         let vertex_map = match symmetry {
             GroupEnum::ConcGroup(group) => {
-                println!("Computing vertex map...");
+                println!("\nComputing vertex map...");
                 self.get_vertex_map(group)
             },
             GroupEnum::VertexMap(a) => a,
             GroupEnum::Chiral(chiral) => {
                 if chiral {
-                    println!("Computing rotation symmetry group...");
+                    println!("\nComputing rotation symmetry group...");
                     let g = self.get_rotation_group();
                     println!("Rotation symmetry order {}", g.0.count());
                     g.1
                 }
                 else {
-                    println!("Computing symmetry group...");
+                    println!("\nComputing symmetry group...");
                     let g = self.get_symmetry_group();
                     println!("Symmetry order {}", g.0.count());
                     g.1
@@ -594,7 +611,7 @@ impl Concrete {
             },
         };
 
-        println!("Enumerating hyperplanes...");
+        println!("\nEnumerating hyperplanes...");
         
         // Checking every r-tuple of vertices would take too long, so we put pairs into orbits first to reduce the number.
         // I don't think we need to store the whole orbits at this point, but they might be useful if we want to improve the algorithm.
@@ -734,7 +751,7 @@ impl Concrete {
         }
 
         println!("Found {} hyperplanes in {} orbits", checked.len(), hyperplane_orbits.len());
-        println!("Faceting hyperplanes...");
+        println!("\nFaceting hyperplanes...");
 
         // Facet the hyperplanes
         let mut possible_facets = Vec::new();
@@ -794,12 +811,12 @@ impl Concrete {
 
                 possible_facets_global_row.push(new_f);
             }
-            possible_facets.push(possible_facets_row);
+            possible_facets.push(possible_facets_row.clone());
             possible_facets_global.push(possible_facets_global_row);
             ridges.push(ridges_row);
             ff_counts.push(ff_counts_row);
 
-            println!("{}/{}", idx+1, hyperplane_orbits.len());
+            println!("{}: {} facets", idx, possible_facets_row.len());
         }
 
         let mut ridge_idx_orbits = Vec::new();
@@ -875,8 +892,8 @@ impl Concrete {
         }
 
         // Actually do the faceting
-        println!("Combining...");
-        let mut output = Vec::new();
+        println!("\nCombining...");
+        let mut output_facets = Vec::new();
 
         let mut facets = vec![(0, 0)];
 
@@ -937,107 +954,12 @@ impl Concrete {
             }
             match valid {
                 0 => {
-                    // Output the faceted polytope. We will build it from the set of its facets.
-
-                    let mut facet_set = HashSet::new();
-                    for facet_orbit in &facets {
-                        let facet = &possible_facets_global[facet_orbit.0][facet_orbit.1].0;
-                        let facet_local = &possible_facets[facet_orbit.0][facet_orbit.1].0;
-                        for row in &vertex_map {
-                            let mut new_facet = facet.clone();
-
-                            let mut new_list = ElementList::new();
-                            for i in 0..new_facet[2].len() {
-                                let mut new = Element::new(Subelements::new(), Superelements::new());
-                                for sub in &new_facet[2][i].subs {
-                                    new.subs.push(row[*sub])
-                                }
-                                new_list.push(new);
-                            }
-                            new_facet[2] = new_list;
-
-                            new_facet.element_sort_strong_with_local(facet_local);
-                            facet_set.insert(new_facet);
-                        }
+                    let mut facets_fmt = String::new();
+                    for facet in &facets {
+                        facets_fmt.push_str(&format!("({},{}) ", facet.0, facet.1));
                     }
-
-                    let mut facet_vec = Vec::from_iter(facet_set);
-
-                    let mut ranks = Ranks::new();
-                    ranks.push(vec![Element::new(vec![].into(), vec![].into())].into()); // nullitope
-                    ranks.push(vec![Element::new(vec![0].into(), vec![].into()); self.vertices.len()].into()); // vertices
-
-                    for r in 2..rank-1 { // edges and up
-                        let mut subs_to_idx = HashMap::new();
-                        let mut idx_to_subs = Vec::new();
-                        let mut idx = 0;
-
-                        for facet in &facet_vec {
-                            let els = &facet[r];
-                            for el in els {
-                                if subs_to_idx.get(&el.subs).is_none() {
-                                    subs_to_idx.insert(el.subs.clone(), idx);
-                                    idx_to_subs.push(el.subs.clone());
-                                    idx += 1;
-                                }
-                            }
-                        }
-                        for i in 0..facet_vec.len() {
-                            let mut new_list = ElementList::new();
-                            for j in 0..facet_vec[i][r+1].len() {
-                                let mut new = Element::new(Subelements::new(), Superelements::new());
-                                for sub in &facet_vec[i][r+1][j].subs {
-                                    let sub_subs = &facet_vec[i][r][*sub].subs;
-                                    new.subs.push(*subs_to_idx.get(sub_subs).unwrap())
-                                }
-                                new_list.push(new);
-                            }
-                            facet_vec[i][r+1] = new_list;
-                        }
-                        let mut new_rank = ElementList::new();
-                        for el in idx_to_subs {
-                            new_rank.push(Element::new(el, vec![].into()));
-                        }
-                        ranks.push(new_rank);
-                    }
-
-                    let mut new_rank = ElementList::new();
-                    let mut set = HashSet::new();
-
-                    for f_i in 0..facet_vec.len() {
-                        facet_vec[f_i][rank-1][0].subs.sort();
-                        let subs = facet_vec[f_i][rank-1][0].subs.clone();
-                        if !set.contains(&subs) {
-                            new_rank.push(Element::new(subs.clone(), Superelements::new()));
-                            set.insert(subs);
-                        }
-                    }
-                    let n_r_len = new_rank.len();
-                    ranks.push(new_rank); // facets
-    
-                    ranks.push(vec![Element::new(Subelements::from_iter(0..n_r_len), Superelements::new())].into()); // body
-    
-                    unsafe {
-                        let mut builder = AbstractBuilder::new();
-                        for rank in ranks {
-                            builder.push_empty();
-                            for el in rank {
-                                builder.push_subs(el.subs);
-                            }
-                        }
-
-                        if builder.ranks().is_dyadic().is_ok() {
-                            let abs = builder.build();
-                            let mut poly = Concrete {
-                                vertices: self.vertices.clone(),
-                                abs,
-                            };
-                            
-                            println!("Faceting found");
-                            poly.untangle_faces();
-                            output.push(poly);
-                        }
-                    }
+                    println!("Faceting found: {}", facets_fmt);
+                    output_facets.push(facets.clone());
 
                     if let Some(max_facets) = noble {
                         if facets.len() == max_facets {
@@ -1097,7 +1019,131 @@ impl Concrete {
             }
         }
 
-        println!("Found {} facetings", output.len());
+        if !irc {
+            println!("\nFiltering mixed compounds...");
+            let output_idxs = filter_irc(&mut output_facets);
+            let mut output_new = Vec::new();
+            for idx in output_idxs {
+                output_new.push(output_facets[idx].clone());
+            }
+            output_facets = output_new;
+        }
+
+        // Output the faceted polytope. We will build it from the set of its facets.
+
+        println!("Found {} facetings", output_facets.len());
+        println!("\nBuilding...");
+        let mut output = Vec::new();
+
+        for facets in output_facets {
+            let mut facet_set = HashSet::new();
+            for facet_orbit in &facets {
+                let facet = &possible_facets_global[facet_orbit.0][facet_orbit.1].0;
+                let facet_local = &possible_facets[facet_orbit.0][facet_orbit.1].0;
+                for row in &vertex_map {
+                    let mut new_facet = facet.clone();
+    
+                    let mut new_list = ElementList::new();
+                    for i in 0..new_facet[2].len() {
+                        let mut new = Element::new(Subelements::new(), Superelements::new());
+                        for sub in &new_facet[2][i].subs {
+                            new.subs.push(row[*sub])
+                        }
+                        new_list.push(new);
+                    }
+                    new_facet[2] = new_list;
+    
+                    new_facet.element_sort_strong_with_local(facet_local);
+                    facet_set.insert(new_facet);
+                }
+            }
+    
+            let mut facet_vec = Vec::from_iter(facet_set);
+    
+            let mut ranks = Ranks::new();
+            ranks.push(vec![Element::new(vec![].into(), vec![].into())].into()); // nullitope
+            ranks.push(vec![Element::new(vec![0].into(), vec![].into()); self.vertices.len()].into()); // vertices
+    
+            for r in 2..rank-1 { // edges and up
+                let mut subs_to_idx = HashMap::new();
+                let mut idx_to_subs = Vec::new();
+                let mut idx = 0;
+    
+                for facet in &facet_vec {
+                    let els = &facet[r];
+                    for el in els {
+                        if subs_to_idx.get(&el.subs).is_none() {
+                            subs_to_idx.insert(el.subs.clone(), idx);
+                            idx_to_subs.push(el.subs.clone());
+                            idx += 1;
+                        }
+                    }
+                }
+                for i in 0..facet_vec.len() {
+                    let mut new_list = ElementList::new();
+                    for j in 0..facet_vec[i][r+1].len() {
+                        let mut new = Element::new(Subelements::new(), Superelements::new());
+                        for sub in &facet_vec[i][r+1][j].subs {
+                            let sub_subs = &facet_vec[i][r][*sub].subs;
+                            new.subs.push(*subs_to_idx.get(sub_subs).unwrap())
+                        }
+                        new_list.push(new);
+                    }
+                    facet_vec[i][r+1] = new_list;
+                }
+                let mut new_rank = ElementList::new();
+                for el in idx_to_subs {
+                    new_rank.push(Element::new(el, vec![].into()));
+                }
+                ranks.push(new_rank);
+            }
+    
+            let mut new_rank = ElementList::new();
+            let mut set = HashSet::new();
+    
+            for f_i in 0..facet_vec.len() {
+                facet_vec[f_i][rank-1][0].subs.sort();
+                let subs = facet_vec[f_i][rank-1][0].subs.clone();
+                if !set.contains(&subs) {
+                    new_rank.push(Element::new(subs.clone(), Superelements::new()));
+                    set.insert(subs);
+                }
+            }
+            let n_r_len = new_rank.len();
+            ranks.push(new_rank); // facets
+    
+            ranks.push(vec![Element::new(Subelements::from_iter(0..n_r_len), Superelements::new())].into()); // body
+    
+            unsafe {
+                let mut builder = AbstractBuilder::new();
+                for rank in ranks {
+                    builder.push_empty();
+                    for el in rank {
+                        builder.push_subs(el.subs);
+                    }
+                }
+    
+                if builder.ranks().is_dyadic().is_ok() {
+                    let abs = builder.build();
+                    let mut poly = Concrete {
+                        vertices: self.vertices.clone(),
+                        abs,
+                    };
+
+                    poly.untangle_faces();
+
+                    let mut facets_fmt = String::new();
+                    for facet in &facets {
+                        facets_fmt.push_str(&format!("({},{}) ", facet.0, facet.1));
+                    }
+                    println!("Faceting {}: {}", output.len(), facets_fmt);
+
+                    output.push(poly);
+                }
+            }
+        }
+
+        println!("\n");
         return output
     }
 }
