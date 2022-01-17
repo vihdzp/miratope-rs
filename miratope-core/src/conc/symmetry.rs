@@ -89,6 +89,24 @@ impl Concrete {
         }
     }
 
+    /// Computes the rotation subgroup of a polytope, along with a list of vertex mappings.
+    pub fn get_rotation_group(&mut self) -> (Group<vec::IntoIter<Matrix<f64>>>, Vec<Vec<usize>>) {
+        let (full_group, full_vertex_map) = self.get_symmetry_group();
+        let mut rotation_group = Vec::new();
+        let mut vertex_map = Vec::new();
+
+        for (idx, el) in full_group.enumerate() {
+            if el.determinant() > 0.0 {
+                rotation_group.push(el);
+                vertex_map.push(full_vertex_map[idx].clone());
+            }
+        }
+
+        unsafe {
+            (Group::new(&self.rank()-1, rotation_group.into_iter()), vertex_map)
+        }
+    }
+
     /// Fills in the vertex map.
     /// A vertex map is an array of (group element, vertex index) with values being the index of the vertex after applying the transformation.
     pub fn get_vertex_map(&mut self, group: Group<GenIter<Matrix<f64>>>) -> Vec<Vec<usize>> {

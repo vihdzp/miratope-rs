@@ -51,7 +51,8 @@ impl Plugin for OperationsPlugin {
             .add_plugin(DuotegumWindow::plugin())
             .add_plugin(DuocombWindow::plugin())
             .add_plugin(CompoundWindow::plugin())
-            .add_plugin(ScaleWindow::plugin());
+            .add_plugin(ScaleWindow::plugin())
+            .add_plugin(FacetingSettings::plugin());
     }
 }
 
@@ -1090,6 +1091,60 @@ impl PlainWindow for ScaleWindow {
             ui.add(
                 egui::DragValue::new(&mut self.scale)
                     .speed(0.01)
+            );
+        });
+    }
+}
+
+/// A window that lets the user set settings for faceting.
+#[derive(Default)]
+pub struct FacetingSettings {
+    /// Whether the window is open.
+    open: bool,
+
+    /// The maximum number of facet types considered. 1 for isotopic, 0 for no limit.
+    pub max_facet_types: usize,
+
+    /// Whether to take the rotation subgroup.
+    pub chiral: bool,
+
+    /// Whether to use unit edges only (superregiment).
+    pub unit_edges: bool,
+}
+
+impl Window for FacetingSettings {
+    const NAME: &'static str = "Faceting settings";
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.open
+    }
+}
+
+impl PlainWindow for FacetingSettings {
+    fn action(&self, _polytope: &mut Concrete) {
+    }
+
+    fn build(&mut self, ui: &mut Ui) {
+        ui.horizontal(|ui| {
+            ui.label("Max facet types");
+            ui.add(
+                egui::DragValue::new(&mut self.max_facet_types)
+                    .speed(0.05)
+                    .clamp_range(0..=usize::MAX)
+            );
+        });
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::Checkbox::new(&mut self.unit_edges, "Unit edges only")
+            );
+        });
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::Checkbox::new(&mut self.chiral, "Chiral subgroup")
             );
         });
     }

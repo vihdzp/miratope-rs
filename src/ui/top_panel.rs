@@ -232,6 +232,7 @@ pub type EguiWindows<'a> = (
     ResMut<'a, DuocombWindow>,
     ResMut<'a, CompoundWindow>,
     ResMut<'a, ScaleWindow>,
+    ResMut<'a, FacetingSettings>,
 );
 
 macro_rules! element_sort {
@@ -274,6 +275,7 @@ pub fn show_top_panel(
         mut duocomb_window,
         mut compound_window,
         mut scale_window,
+        mut faceting_settings,
     ): EguiWindows<'_>,
 ) {
     // The top bar.
@@ -670,29 +672,23 @@ pub fn show_top_panel(
             });
 
             menu::menu(ui, "Faceting", |ui| {
-                if ui.button("Full faceting").clicked() {
+                if ui.button("Enumerate facetings").clicked() {
                     if let Some(mut p) = query.iter_mut().next() {
-                        let facetings = p.faceting(GroupEnum::None, None, None);
+                        let facetings = p.faceting(
+                            GroupEnum::Chiral(faceting_settings.chiral), 
+                            if faceting_settings.unit_edges {Some(1.0)} else {None}, 
+                            if faceting_settings.max_facet_types == 0 {None} else {Some(faceting_settings.max_facet_types)}
+                        );
                         for faceting in facetings {
                             memory.push(faceting);
                         }
                     }
                 }
-                if ui.button("Superregiment faceting").clicked() {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        let facetings = p.faceting(GroupEnum::None, Some(1.0), None);
-                        for faceting in facetings {
-                            memory.push(faceting);
-                        }
-                    }
-                }
-                if ui.button("Isotopic faceting").clicked() {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        let facetings = p.faceting(GroupEnum::None, None, Some(1));
-                        for faceting in facetings {
-                            memory.push(faceting);
-                        }
-                    }
+                
+                ui.separator();
+
+                if ui.button("Settings...").clicked() {
+                    faceting_settings.open();
                 }
             });
 

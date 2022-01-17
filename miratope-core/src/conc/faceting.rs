@@ -17,8 +17,9 @@ pub enum GroupEnum {
     ConcGroup(Group<GenIter<Matrix<f64>>>),
     /// Group of vertex mappings
     VertexMap(Vec<Vec<usize>>),
-    /// Null
-    None,
+    /// True: take chiral group
+    /// False: take full group
+    Chiral(bool),
 }
 
 fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>, vertex_map: Vec<Vec<usize>>, edge_length: Option<f64>) ->
@@ -566,11 +567,19 @@ impl Concrete {
                 self.get_vertex_map(group)
             },
             GroupEnum::VertexMap(a) => a,
-            GroupEnum::None => {
-                println!("Computing symmetry group...");
-                let g = self.get_symmetry_group();
-                println!("Symmetry order {}", g.0.count());
-                g.1
+            GroupEnum::Chiral(chiral) => {
+                if chiral {
+                    println!("Computing rotation symmetry group...");
+                    let g = self.get_rotation_group();
+                    println!("Rotation symmetry order {}", g.0.count());
+                    g.1
+                }
+                else {
+                    println!("Computing symmetry group...");
+                    let g = self.get_symmetry_group();
+                    println!("Symmetry order {}", g.0.count());
+                    g.1
+                }
             },
         };
 
