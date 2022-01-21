@@ -879,7 +879,10 @@ type OffSaveResult<T> = Result<T, OffSaveError>;
 impl Concrete {
     /// Converts a polytope into an OFF file.
     pub fn to_off(&self, options: OffOptions) -> OffWriteResult<String> {
-        OffWriter::new(self, options).build()
+        let mut fixed = self.clone();
+        fixed.untangle_faces();
+
+        OffWriter::new(&fixed, options).build()
     }
 
     /// Writes a polytope's OFF file in a specified file path.

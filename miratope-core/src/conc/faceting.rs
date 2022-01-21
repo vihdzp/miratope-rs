@@ -22,11 +22,15 @@ pub enum GroupEnum {
     Chiral(bool),
 }
 
+/// For each faceting, checks if it is a compound of other facetings, and removes it if so.
 fn filter_irc(vec: &mut Vec<Vec<(usize,usize)>>) -> Vec<usize> {
     let mut out = Vec::new();
     'a: for a in 0..vec.len() {
         for b in a+1..vec.len() {
-            if vec[b][0].0 > vec[a][0].0 || vec[b][0].1 > vec[a][0].1 {
+            if vec[b].len() > vec[a].len() {
+                continue
+            }
+            if vec[b][0] > vec[a][0] {
                 break
             }
             let mut i = 0;
@@ -954,11 +958,6 @@ impl Concrete {
             }
             match valid {
                 0 => {
-                    let mut facets_fmt = String::new();
-                    for facet in &facets {
-                        facets_fmt.push_str(&format!("({},{}) ", facet.0, facet.1));
-                    }
-                    println!("Faceting found: {}", facets_fmt);
                     output_facets.push(facets.clone());
 
                     if let Some(max_facets) = noble {
@@ -1125,12 +1124,10 @@ impl Concrete {
     
                 if builder.ranks().is_dyadic().is_ok() {
                     let abs = builder.build();
-                    let mut poly = Concrete {
+                    let poly = Concrete {
                         vertices: self.vertices.clone(),
                         abs,
                     };
-
-                    poly.untangle_faces();
 
                     let mut facets_fmt = String::new();
                     for facet in &facets {

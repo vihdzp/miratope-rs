@@ -10,7 +10,7 @@ use bevy_egui::{
     egui::{self, menu, Ui},
     EguiContext,
 };
-use miratope_core::{conc::{ConcretePolytope, faceting::GroupEnum}, file::FromFile, Polytope};
+use miratope_core::{conc::{ConcretePolytope, faceting::GroupEnum}, file::FromFile, float::Float as Float2, Polytope};
 
 /// The plugin in charge of everything on the top panel.
 pub struct TopPanelPlugin;
@@ -851,6 +851,7 @@ fn show_views(
                         .minmax(section_direction.0.clone())
                         .unwrap_or((-1.0, 1.0));
 
+                    minmax.0 += f64::EPS;
                     let mut slice = r.cross_section(&hyperplane);
 
                     if *flatten {
