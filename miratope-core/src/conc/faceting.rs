@@ -1061,8 +1061,34 @@ impl Concrete {
     
             let mut ranks = Ranks::new();
             ranks.push(vec![Element::new(vec![].into(), vec![].into())].into()); // nullitope
-            ranks.push(vec![Element::new(vec![0].into(), vec![].into()); self.vertices.len()].into()); // vertices
-    
+
+            // vertices
+            let mut to_new_idx = HashMap::new();
+            let mut to_old_idx = Vec::new();
+            let mut idx = 0;
+
+            for i in 0..facet_vec.len() {
+                let mut new_list = ElementList::new();
+                for j in 0..facet_vec[i][2].len() {
+                    let mut new = Element::new(Subelements::new(), Superelements::new());
+                    for sub in facet_vec[i][2][j].subs.clone() {
+                        if to_new_idx.get(&sub).is_none() {
+                            to_new_idx.insert(sub, idx);
+                            to_old_idx.push(sub);
+                            idx += 1;
+                        }
+                        new.subs.push(*to_new_idx.get(&sub).unwrap())
+                    }
+                    new_list.push(new);
+                }
+                facet_vec[i][2] = new_list;
+            }
+            let mut new_rank = ElementList::new();
+            for _i in 0..idx {
+                new_rank.push(Element::new(vec![0].into(), vec![].into()));
+            }
+            ranks.push(new_rank);
+
             for r in 2..rank-1 { // edges and up
                 let mut subs_to_idx = HashMap::new();
                 let mut idx_to_subs = Vec::new();
@@ -1124,8 +1150,13 @@ impl Concrete {
     
                 if builder.ranks().is_dyadic().is_ok() {
                     let abs = builder.build();
+                    let mut new_vertices = Vec::new();
+                    for i in to_old_idx {
+                        new_vertices.push(self.vertices[i].clone());
+                    }
+
                     let poly = Concrete {
-                        vertices: self.vertices.clone(),
+                        vertices: new_vertices,
                         abs,
                     };
 
