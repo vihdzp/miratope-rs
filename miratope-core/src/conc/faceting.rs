@@ -4,7 +4,7 @@ use std::{collections::{BTreeMap, HashMap, HashSet}, vec, iter::FromIterator};
 
 use crate::{
     abs::{Abstract, Element, ElementList, Ranked, Ranks, Subelements, Superelements, AbstractBuilder},
-    conc::Concrete,
+    conc::{Concrete, ConcretePolytope},
     float::Float,
     group::{Group, GenIter}, geometry::{Matrix, PointOrd, Subspace}, Polytope,
 };
@@ -52,7 +52,14 @@ fn filter_irc(vec: &mut Vec<Vec<(usize,usize)>>) -> Vec<usize> {
     out
 }
 
-fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>, vertex_map: Vec<Vec<usize>>, edge_length: Option<f64>, irc: bool) ->
+fn faceting_subdim(
+    rank: usize,
+    plane: Subspace<f64>,
+    points: Vec<PointOrd<f64>>,
+    vertex_map: Vec<Vec<usize>>,
+    edge_length: Option<f64>,
+    include_compounds: bool
+) ->
     (Vec<(Ranks, Vec<(usize, usize)>)>, // Vec of facetings, along with the facet types of each of them
     Vec<usize>, // Counts of each hyperplane orbit
     Vec<Vec<Ranks>> // Possible facets, these will be the possible ridges one dimension up
@@ -306,7 +313,7 @@ fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>
         }
 
         let (possible_facets_row, ff_counts_row, ridges_row) =
-            faceting_subdim(rank-1, hp, points, new_stabilizer.clone(), edge_length, irc);
+            faceting_subdim(rank-1, hp, points, new_stabilizer.clone(), edge_length, include_compounds);
 
         let mut possible_facets_global_row = Vec::new();
         for f in &possible_facets_row {
@@ -584,7 +591,15 @@ fn faceting_subdim(rank: usize, plane: Subspace<f64>, points: Vec<PointOrd<f64>>
 impl Concrete {
     /// Enumerates the facetings of a polytope under a provided symmetry group or vertex map.
     /// If the symmetry group is not provided, it uses the full symmetry of the polytope.
-    pub fn faceting(&mut self, symmetry: GroupEnum, edge_length: Option<f64>, noble: Option<usize>, irc: bool) -> Vec<Concrete> {
+    pub fn faceting(
+        &mut self,
+        symmetry: GroupEnum,
+        edge_length: Option<f64>,
+        noble: Option<usize>,
+        include_compounds: bool,
+        save: bool,
+        save_facets: bool,
+    ) -> Vec<(Concrete, Option<String>)> {
         let rank = self.rank();
 
         let mut vertices_ord = Vec::<PointOrd<f64>>::new();
@@ -798,7 +813,7 @@ impl Concrete {
             }
 
             let (possible_facets_row, ff_counts_row, ridges_row) =
-                faceting_subdim(rank-1, hp, points, new_stabilizer, edge_length, irc);
+                faceting_subdim(rank-1, hp, points, new_stabilizer, edge_length, include_compounds);
             let mut possible_facets_global_row = Vec::new();
             for f in &possible_facets_row {
                 let mut new_f = f.clone();
@@ -973,7 +988,7 @@ impl Concrete {
                             continue
                         }
                     }
-                    if irc {
+                    if include_compounds {
                         let t = facets.last().unwrap().clone();
                         facets.push((t.0 + 1, 0));
                     } else {
@@ -1018,7 +1033,7 @@ impl Concrete {
             }
         }
 
-        if !irc {
+        if !include_compounds {
             println!("\nFiltering mixed compounds...");
             let output_idxs = filter_irc(&mut output_facets);
             let mut output_new = Vec::new();
@@ -1028,15 +1043,57 @@ impl Concrete {
             output_facets = output_new;
         }
 
-        // Output the faceted polytope. We will build it from the set of its facets.
+        // Output the faceted polytopes. We will build them from their sets of facet orbits.
 
         println!("Found {} facetings", output_facets.len());
         println!("\nBuilding...");
         let mut output = Vec::new();
+        let mut used_facets = HashMap::new(); // used for outputting the facets at the end if `save_facets` is `true`.
+        let mut faceting_idx = 0; // We used to use `output.len()` but this doesn't work if you skip outputting the polytopes.
 
         for facets in output_facets {
+            if !save && !save_facets {
+                let mut facets_fmt = String::new();
+                for facet in &facets {
+                    facets_fmt.push_str(&format!(" ({},{})", facet.0, facet.1));
+                }
+                println!("Faceting {}:{}", faceting_idx, facets_fmt);
+
+                faceting_idx += 1;
+                continue
+            }
+
             let mut facet_set = HashSet::new();
-            for facet_orbit in &facets {
+            let mut used_facets_current = Vec::new();
+            let mut facet_vec = Vec::new();
+
+            if !save {
+                let mut already_found_all = true;
+                for facet in &facets {
+                    if used_facets.get(facet).is_none() {
+                        already_found_all = false;
+                        break
+                    }
+                }
+
+                if already_found_all { 
+                    let mut facets_fmt = String::new();
+                    for facet in &facets {
+                        facets_fmt.push_str(&format!(" ({},{})", facet.0, facet.1));
+                    }
+                    println!("Faceting {}:{}", faceting_idx, facets_fmt);
+
+                    faceting_idx += 1;
+                    continue
+                }
+            }
+
+            for facet_orbit in facets.clone() {
+                if save_facets {
+                    if used_facets.get(&facet_orbit).is_none() {
+                        used_facets_current.push((facet_orbit, facet_set.len()));
+                    }
+                }
                 let facet = &possible_facets_global[facet_orbit.0][facet_orbit.1].0;
                 let facet_local = &possible_facets[facet_orbit.0][facet_orbit.1].0;
                 for row in &vertex_map {
@@ -1053,12 +1110,16 @@ impl Concrete {
                     new_facet[2] = new_list;
     
                     new_facet.element_sort_strong_with_local(facet_local);
-                    facet_set.insert(new_facet);
+                    facet_set.insert(new_facet.clone());
+                    if save_facets {
+                        facet_vec.push(new_facet); // have to do this so you can predict the facet index
+                    }
                 }
             }
-    
-            let mut facet_vec = Vec::from_iter(facet_set);
-    
+            if !save_facets {
+                facet_vec = Vec::from_iter(facet_set);
+            }
+
             let mut ranks = Ranks::new();
             ranks.push(vec![Element::new(vec![].into(), vec![].into())].into()); // nullitope
 
@@ -1162,16 +1223,48 @@ impl Concrete {
 
                     let mut facets_fmt = String::new();
                     for facet in &facets {
-                        facets_fmt.push_str(&format!("({},{}) ", facet.0, facet.1));
+                        facets_fmt.push_str(&format!(" ({},{})", facet.0, facet.1));
                     }
-                    println!("Faceting {}: {}", output.len(), facets_fmt);
+                    println!("Faceting {}:{}", faceting_idx, facets_fmt);
 
-                    output.push(poly);
+                    if save {
+                        output.push((poly.clone(), Some(
+                            if save_facets {
+                                format!("faceting {} -{}", faceting_idx, facets_fmt)
+                            } else {
+                                format!("faceting {}", faceting_idx)
+                            }
+                        )));
+                    }
+
+                    if save_facets {
+                        for (orbit, idx) in used_facets_current {
+                            used_facets.insert(orbit, poly.facet(idx).unwrap());
+                        }
+                    }
+
+                    faceting_idx += 1;
                 }
             }
         }
 
-        println!("\n");
+        if save_facets {
+            let mut used_facets_vec: Vec<(&(usize, usize), &Concrete)> = used_facets.iter().collect();
+            used_facets_vec.sort_by(|a,b| a.0.cmp(b.0));
+
+            for i in used_facets_vec {
+                let mut poly = i.1.clone();
+                poly.flatten();
+                if let Some(sphere) = poly.circumsphere() {
+                    poly.recenter_with(&sphere.center);
+                } else {
+                    poly.recenter();
+                }
+                output.push((poly, Some(format!("facet ({},{})", i.0.0, i.0.1))));
+            }
+        }
+
+        println!("\nFaceting complete\n");
         return output
     }
 }

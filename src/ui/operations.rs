@@ -277,7 +277,7 @@ impl Slot {
     pub fn to_poly<'a>(self, memory: &'a Memory, loaded: &'a Concrete) -> Option<&'a Concrete> {
         match self {
             Self::None => None,
-            Self::Memory(idx) => memory[idx].as_ref(),
+            Self::Memory(idx) => Some(&memory[idx].as_ref().unwrap().0),
             Self::Loaded => Some(loaded),
         }
     }
@@ -1113,6 +1113,13 @@ pub struct FacetingSettings {
 
     /// Whether to look for mixed compounds. `false` doesn't exclude them yet.
     pub irc: bool,
+
+    /// Whether to not save the facetings in memory.
+    /// yeah, this will be inverted like this until we figure out how to set a checkbox on by default
+    pub skip_saving: bool,
+
+    /// Whether to save the facets in memory.
+    pub save_facets: bool,
 }
 
 impl Window for FacetingSettings {
@@ -1153,6 +1160,16 @@ impl PlainWindow for FacetingSettings {
         ui.horizontal(|ui| {
             ui.add(
                 egui::Checkbox::new(&mut self.irc, "Include mixed compounds")
+            );
+        });
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::Checkbox::new(&mut self.skip_saving, "Skip saving facetings")
+            );
+        });
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::Checkbox::new(&mut self.save_facets, "Save facets")
             );
         });
     }

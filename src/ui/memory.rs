@@ -7,10 +7,10 @@ use crate::Concrete;
 
 /// Represents the memory slots to store polytopes.
 #[derive(Default)]
-pub struct Memory(Vec<Option<Concrete>>);
+pub struct Memory(Vec<Option<(Concrete, Option<String>)>>);
 
 impl std::ops::Index<usize> for Memory {
-    type Output = Option<Concrete>;
+    type Output = Option<(Concrete, Option<String>)>;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.0[index]
@@ -29,12 +29,12 @@ impl Memory {
     }
 
     /// Returns an iterator over the memory slots.
-    pub fn iter(&self) -> std::slice::Iter<'_, Option<Concrete>> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Option<(Concrete, Option<String>)>> {
         self.0.iter()
     }
 
     /// Appends an element.
-    pub fn push(&mut self, a: Concrete) {
+    pub fn push(&mut self, a: (Concrete, Option<String>)) {
         self.0.push(Some(a));
     }
 
@@ -61,15 +61,25 @@ impl Memory {
                             .show(ui, |ui| {
                                 if ui.button("Save").clicked() {
                                     if let Some(p) = query.iter_mut().next() {
-                                        *slot = Some(p.clone());
+                                        *slot = Some((p.clone(), None));
                                     }
                                 }
                             });
                     }
 
                     // Shows a slot with a polytope on it.
-                    Some(poly) => {
-                        let clear = egui::CollapsingHeader::new(slot_label(idx))
+                    Some((poly, label)) => {
+                        let clear = egui::CollapsingHeader::new(
+                            match label {
+                                None => {
+                                    slot_label(idx)
+                                }
+                                
+                                Some(name) => {
+                                    name.to_string()
+                                }
+                            }
+                        )
                             .id_source(idx)
                             .show(ui, |ui| {
                                 // Clones a polytope from memory.

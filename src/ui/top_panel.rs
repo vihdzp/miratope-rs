@@ -314,12 +314,16 @@ pub fn show_top_panel(
                     export_memory.0 = false;
                 }
                 else {
-                    if let Some(poly) = &memory[idx] {
+                    if let Some((poly, label)) = &memory[idx] {
                         if let Some(mut p) = query.iter_mut().next() {
                             *p = poly.clone();
-                            let mut name = "polytope ".to_owned();
-                            name.push_str(&idx.to_string());
-                            file_dialog_state.save(name.to_string());
+                            let name = match label {
+                                None => {
+                                    format!("polytope {}", idx)
+                                }
+                                Some(a) => a.to_string()
+                            };
+                            file_dialog_state.save(name);
                         }
                     }
                     export_memory.1 += 1;
@@ -678,7 +682,9 @@ pub fn show_top_panel(
                             GroupEnum::Chiral(faceting_settings.chiral), 
                             if faceting_settings.unit_edges {Some(1.0)} else {None}, 
                             if faceting_settings.max_facet_types == 0 {None} else {Some(faceting_settings.max_facet_types)},
-                            faceting_settings.irc
+                            faceting_settings.irc,
+                            !faceting_settings.skip_saving,
+                            faceting_settings.save_facets
                         );
                         for faceting in facetings {
                             memory.push(faceting);
