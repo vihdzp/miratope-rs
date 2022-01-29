@@ -2170,7 +2170,7 @@ dependencies = [
 
 [[package]]
 name = "miratope"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "approx",
  "bevy",
@@ -2188,7 +2188,7 @@ dependencies = [
 
 [[package]]
 name = "miratope-core"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "approx",
  "dyn-clone",

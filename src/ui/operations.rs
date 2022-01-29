@@ -1105,14 +1105,20 @@ pub struct FacetingSettings {
     /// The maximum number of facet types considered. 1 for isotopic, 0 for no limit.
     pub max_facet_types: usize,
 
+    /// The maximum number of facets generated in each hyperplane, to prevent combinatorial explosion. 0 for no limit.
+    pub max_per_hyperplane: usize,
+
     /// Whether to take the rotation subgroup.
     pub chiral: bool,
 
     /// Whether to use unit edges only (superregiment).
     pub unit_edges: bool,
 
-    /// Whether to look for mixed compounds. `false` doesn't exclude them yet.
-    pub irc: bool,
+    /// Whether to include trivial compounds (compounds of other full-symmetric facetings).
+    pub compounds: bool,
+
+    /// Whether to include trivial compounds in elements.
+    pub compound_elements: bool,
 
     /// Whether to not save the facetings in memory.
     /// yeah, this will be inverted like this until we figure out how to set a checkbox on by default
@@ -1143,7 +1149,15 @@ impl PlainWindow for FacetingSettings {
             ui.label("Max facet types");
             ui.add(
                 egui::DragValue::new(&mut self.max_facet_types)
-                    .speed(0.05)
+                    .speed(0.02)
+                    .clamp_range(0..=usize::MAX)
+            );
+        });
+        ui.horizontal(|ui| {
+            ui.label("Max facetings per hyperplane");
+            ui.add(
+                egui::DragValue::new(&mut self.max_per_hyperplane)
+                    .speed(200)
                     .clamp_range(0..=usize::MAX)
             );
         });
@@ -1159,7 +1173,12 @@ impl PlainWindow for FacetingSettings {
         });
         ui.horizontal(|ui| {
             ui.add(
-                egui::Checkbox::new(&mut self.irc, "Include mixed compounds")
+                egui::Checkbox::new(&mut self.compounds, "Include trivial compounds")
+            );
+        });
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::Checkbox::new(&mut self.compound_elements, "Include trivial compound elements")
             );
         });
         ui.horizontal(|ui| {
