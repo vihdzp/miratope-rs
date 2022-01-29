@@ -881,6 +881,7 @@ impl Concrete {
     pub fn to_off(&self, options: OffOptions) -> OffWriteResult<String> {
         let mut fixed = self.clone();
         fixed.untangle_faces();
+        fixed.element_sort();
 
         OffWriter::new(&fixed, options).build()
     }
