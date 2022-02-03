@@ -632,6 +632,11 @@ impl Concrete {
     ) -> Vec<(Concrete, Option<String>)> {
         let rank = self.rank();
 
+        if rank < 4 {
+            println!("\nFaceting polytopes of rank less than 3 is not supported!\n");
+            return Vec::new()
+        }
+
         let mut vertices_ord = Vec::<PointOrd<f64>>::new();
         for v in &self.vertices {
             vertices_ord.push(PointOrd::new(v.clone()));
