@@ -781,7 +781,7 @@ fn show_views(
         let mut new_direction = section_direction.0.clone();
         ui.add(UnitPointWidget::new(
             &mut new_direction,
-            "Cross-section depth",
+            "Section direction",
         ));
 
         // Updates the slicing direction.
