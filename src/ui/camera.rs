@@ -164,19 +164,9 @@ impl CameraInputEvent {
             real_scale
         };
 
-        let fb = Self::Translate(Vec3::Z);
-        let lr = Self::Translate(Vec3::X);
-        let ud = Self::Translate(Vec3::Y);
-
         if !ctx.wants_keyboard_input() {
             for keycode in keyboard.get_pressed() {
                 cam_inputs.send(match keycode {
-                    KeyCode::W | KeyCode::Up => -scale * fb,
-                    KeyCode::S | KeyCode::Down => scale * fb,
-                    KeyCode::D | KeyCode::Right => scale * lr,
-                    KeyCode::A | KeyCode::Left => -scale * lr,
-                    KeyCode::Space => scale * ud,
-                    KeyCode::LShift | KeyCode::RShift => -scale * ud,
                     KeyCode::Q => real_scale * ROLL,
                     KeyCode::E => -real_scale * ROLL,
                     KeyCode::R => Self::Reset,
