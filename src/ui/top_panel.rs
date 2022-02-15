@@ -50,7 +50,7 @@ pub enum SectionState {
         /// Whether the cross-section is flattened into a dimension lower.
         flatten: bool,
 
-        /// Whether we're updating the cross-section.
+        /// Whether we're not updating the cross-section.
         lock: bool,
     },
 
@@ -762,7 +762,7 @@ fn show_views(
         ui.add(
             egui::Slider::new(
                 &mut new_hyperplane_pos,
-                (minmax.0 + 0.0000001)..=(minmax.1 - 0.0000001), // We do this to avoid nullitopes.
+                (minmax.0 + 0.0000001)..=(minmax.1 - 0.0000001), // We do this to avoid empty slices.
             )
             .text("Slice depth")
             .prefix("pos: "),
@@ -779,10 +779,18 @@ fn show_views(
         }
 
         let mut new_direction = section_direction.0.clone();
-        ui.add(UnitPointWidget::new(
-            &mut new_direction,
-            "Section direction",
-        ));
+
+        ui.horizontal(|ui| {
+
+            ui.add(UnitPointWidget::new(
+                &mut new_direction,
+                "Slice direction",
+            ));
+
+            if ui.button("Diagonal").clicked() {
+                new_direction = Point::from_element(new_direction.len(), 1.0/(new_direction.len() as f64).sqrt());
+            }
+        });
 
         // Updates the slicing direction.
         #[allow(clippy::float_cmp)]
