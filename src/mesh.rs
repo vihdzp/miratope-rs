@@ -96,7 +96,7 @@ struct Triangulation {
     extra_vertices: Vec<Point>,
 
     /// Indices of the vertices that make up the triangles.
-    triangles: Vec<u16>,
+    triangles: Vec<u32>,
 }
 
 impl Triangulation {
@@ -113,14 +113,14 @@ impl Triangulation {
         let edges = elements_or(2);
         let faces = elements_or(3);
 
-        let concrete_vertex_len = polytope.vertices.len() as u16;
+        let concrete_vertex_len = polytope.vertices.len() as u32;
 
         // We render each face separately.
         for face in faces {
             // We tesselate this path.
             let cycles = CycleList::from_edges(face.subs.iter().map(|&i| &edges[i].subs));
             if let Some(path) = path(&cycles, &polytope.vertices) {
-                let mut geometry: VertexBuffers<_, u16> = VertexBuffers::new();
+                let mut geometry: VertexBuffers<_, u32> = VertexBuffers::new();
 
                 // Configures all of the options of the tessellator.
                 FillTessellator::new()
@@ -149,12 +149,12 @@ impl Triangulation {
                 let mut vertex_hash = HashMap::new();
 
                 for (new_id, vertex_source) in geometry.vertices.into_iter().enumerate() {
-                    let new_id = new_id as u16;
+                    let new_id = new_id as u32;
 
                     match vertex_source {
                         // This is one of the concrete vertices of the polytope.
                         VertexSource::Endpoint { id } => {
-                            vertex_hash.insert(new_id, id_to_idx[id.to_usize()] as u16);
+                            vertex_hash.insert(new_id, id_to_idx[id.to_usize()] as u32);
                         }
 
                         // This is a new vertex that has been added to the tesselation.
@@ -166,7 +166,7 @@ impl Triangulation {
                             let p = from * (1.0 - t) + to * t;
 
                             vertex_hash
-                                .insert(new_id, concrete_vertex_len + extra_vertices.len() as u16);
+                                .insert(new_id, concrete_vertex_len + extra_vertices.len() as u32);
 
                             extra_vertices.push(p);
                         }
@@ -278,7 +278,7 @@ pub trait Renderable: ConcretePolytope {
         mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 1.0]; vertices.len()]);
         mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals(&vertices));
         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
-        mesh.set_indices(Some(Indices::U16(triangulation.triangles)));
+        mesh.set_indices(Some(Indices::U32(triangulation.triangles)));
 
         mesh
     }
