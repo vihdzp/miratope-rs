@@ -204,7 +204,7 @@ impl<'a> TokenIter<'a> {
                 idx = new_idx;
                 c = new_c;
             } else {
-                // We do this so that it seems ilke we read something at the end.
+                // We do this so that it seems like we read something at the end.
                 idx += 1;
                 break;
             }
@@ -374,6 +374,11 @@ impl<'a> OffReader<'a> {
             if rank != 3 {
                 faces.push(face);
             }
+
+            // Goes to the end of the line in order to ignore things like colour info.
+            if self.iter.position.column != 0 {
+                self.iter.comment = true;
+            }
         }
 
         // If this is a polygon, we add a single maximal element as a face.
@@ -405,6 +410,11 @@ impl<'a> OffReader<'a> {
             }
 
             els_subs.push(subs);
+
+            // Goes to the end of the line in order to ignore things like colour info.
+            if self.iter.position.column != 0 {
+                self.iter.comment = true;
+            }
         }
 
         Ok(els_subs)
