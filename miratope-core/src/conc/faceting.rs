@@ -1,4 +1,4 @@
-//! The code used to get the symmetry of a polytope and do operations based on that.
+//! The faceting algorithm.
 
 use std::{collections::{BTreeMap, HashMap, HashSet}, vec, iter::FromIterator};
 
@@ -20,6 +20,90 @@ pub enum GroupEnum {
     /// True: take chiral group
     /// False: take full group
     Chiral(bool),
+}
+
+impl Ranks {
+    /// Sorts some stuff in a way that's useful for the faceting algorithm.
+    pub fn element_sort_strong(&mut self) {
+        for el in 0..self[2].len() {
+            self[2][el].subs.sort();
+        }
+
+        for rank in 2..self.len()-1 {
+            let mut all_subs = Vec::new();
+            for el in &self[rank] {
+                all_subs.push(el.subs.clone());
+            }
+            let mut sorted = all_subs.clone();
+            sorted.sort();
+
+            let mut perm = Vec::new();
+            for i in &all_subs {
+                perm.push(sorted.iter().position(|x| x == i).unwrap());
+            }
+
+            for i in 0..self[rank].len() {
+                self[rank][i].subs = sorted[i].clone();
+                self[rank][i].subs.sort();
+            }
+
+            let mut new_list = ElementList::new();
+            for i in 0..self[rank+1].len() {
+                let mut new = Element::new(Subelements::new(), Superelements::new());
+                for sub in &self[rank+1][i].subs {
+                    new.subs.push(perm[*sub]);
+                }
+                new.sort();
+                new_list.push(new);
+            }
+            self[rank+1] = new_list;
+        }
+    }
+
+    /// Sorts some stuff in a way that's useful for the faceting algorithm.
+    pub fn element_sort_strong_with_local(&mut self, local: &Ranks) {
+        for el in 0..self[2].len() {
+            self[2][el].subs.sort();
+        }
+
+        for rank in 2..self.len()-1 {
+            let mut all_subs = Vec::new();
+            for el in &self[rank] {
+                all_subs.push(el.subs.clone());
+            }
+            let mut sorted = all_subs.clone();
+            sorted.sort();
+
+            let mut perm = Vec::new();
+            for i in &all_subs {
+                perm.push(sorted.iter().position(|x| x == i).unwrap());
+            }
+
+            for i in 0..self[rank].len() {
+                self[rank][i].subs = sorted[i].clone();
+                self[rank][i].subs.sort();
+            }
+
+            let mut map_to_local = HashMap::new();
+
+            for i in 0..self[rank+1].len() {
+                for j in 0..self[rank+1][i].subs.len() {
+                    map_to_local.insert(self[rank+1][i].subs[j], local[rank+1][i].subs[j]);
+                }
+            }
+
+            let mut new_list = ElementList::new();
+            for i in 0..self[rank+1].len() {
+                let mut new = Element::new(Subelements::new(), Superelements::new());
+                for sub in &self[rank+1][i].subs {
+                    new.subs.push(perm[*map_to_local.get(sub).unwrap()]);
+                }
+                new.sort();
+                new_list.push(new);
+            }
+            self[rank+1] = new_list;
+        }
+    }
 }
 
 /// For each faceting, checks if it is a compound of other facetings, and removes it if so.
@@ -1147,13 +1231,9 @@ impl Concrete {
     
                     new_facet.element_sort_strong_with_local(facet_local);
                     facet_set.insert(new_facet.clone());
-                    if save_facets {
-                        facet_vec.push(new_facet); // have to do this so you can predict the facet index
-                    }
+                    facet_vec.push(new_facet); // have to do this so you can predict the facet index
+                                               // also it makes the facets sorted by type so that's cool
                 }
-            }
-            if !save_facets {
-                facet_vec = Vec::from_iter(facet_set);
             }
 
             let mut ranks = Ranks::new();
