@@ -187,7 +187,7 @@ impl CameraInputEvent {
         real_scale: f32,
         cam_inputs: &mut EventWriter<'_, '_, Self>,
     ) {
-        if mouse_button.pressed(MouseButton::Right) {
+        if mouse_button.pressed(MouseButton::Left) || mouse_button.pressed(MouseButton::Right) {
             for MouseMotion { mut delta } in mouse_move.iter() {
                 delta.x /= width;
                 delta.y /= height;

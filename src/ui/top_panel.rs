@@ -378,10 +378,12 @@ pub fn show_top_panel(
             // Operations on polytopes.
             menu::menu(ui, "Operations", |ui| {
                 // Converts the active polytope into its dual.
-                if ui.button("Dual").clicked() {
-                    if advanced(&keyboard) {
+                if advanced(&keyboard) {
+                    if ui.button("Dual...").clicked() {
                         dual_window.open();
-                    } else if let Some(mut p) = query.iter_mut().next() {
+                    }
+                } else if let Some(mut p) = query.iter_mut().next() {
+                    if ui.button("Dual").clicked() {
                         match p.try_dual_mut() {
                             Ok(_) => println!("Dual succeeded."),
                             Err(err) => eprintln!("Dual failed: {}", err),
@@ -419,37 +421,45 @@ pub fn show_top_panel(
                 ui.separator();
 
                 // Makes a pyramid out of the current polytope.
-                if ui.button("Pyramid").clicked() {
-                    if advanced(&keyboard) {
+                if advanced(&keyboard) {
+                    if ui.button("Pyramid...").clicked() {
                         pyramid_window.open();
-                    } else if let Some(mut p) = query.iter_mut().next() {
+                    }
+                } else if let Some(mut p) = query.iter_mut().next() {
+                    if ui.button("Pyramid").clicked() {
                         *p = p.pyramid();
                     }
                 }
 
                 // Makes a prism out of the current polytope.
-                if ui.button("Prism").clicked() {
-                    if advanced(&keyboard) {
+                if advanced(&keyboard) {
+                    if ui.button("Prism...").clicked() {
                         prism_window.open();
-                    } else if let Some(mut p) = query.iter_mut().next() {
+                    }
+                } else if let Some(mut p) = query.iter_mut().next() {
+                    if ui.button("Prism").clicked() {
                         *p = p.prism();
                     }
                 }
 
                 // Makes a tegum out of the current polytope.
-                if ui.button("Tegum").clicked() {
-                    if advanced(&keyboard) {
+                if advanced(&keyboard) {
+                    if ui.button("Tegum...").clicked() {
                         tegum_window.open();
-                    } else if let Some(mut p) = query.iter_mut().next() {
+                    }
+                } else if let Some(mut p) = query.iter_mut().next() {
+                    if ui.button("Tegum").clicked() {
                         *p = p.tegum();
                     }
                 }
 
                 // Converts the active polytope into its antiprism.
-                if ui.button("Antiprism").clicked() {
-                    if advanced(&keyboard) {
+                if advanced(&keyboard) {
+                    if ui.button("Antiprism...").clicked() {
                         antiprism_window.open();
-                    } else if let Some(mut p) = query.iter_mut().next() {
+                    }
+                } else if let Some(mut p) = query.iter_mut().next() {
+                    if ui.button("Antiprism").clicked() {
                         match p.try_antiprism() {
                             Ok(q) => *p = q,
                             Err(err) => eprintln!("Antiprism failed: {}", err),
@@ -476,27 +486,27 @@ pub fn show_top_panel(
                 ui.separator();
 
                 // Opens the window to make duopyramids.
-                if ui.button("Duopyramid").clicked() {
+                if ui.button("Duopyramid...").clicked() {
                     duopyramid_window.open();
                 }
 
                 // Opens the window to make duoprisms.
-                if ui.button("Duoprism").clicked() {
+                if ui.button("Duoprism...").clicked() {
                     duoprism_window.open();
                 }
 
                 // Opens the window to make duotegums.
-                if ui.button("Duotegum").clicked() {
+                if ui.button("Duotegum...").clicked() {
                     duotegum_window.open();
                 }
 
                 // Opens the window to make duocombs.
-                if ui.button("Duocomb").clicked() {
+                if ui.button("Duocomb...").clicked() {
                     duocomb_window.open();
                 }
 
                 // Opens the window to make compounds.
-                if ui.button("Compound").clicked() {
+                if ui.button("Compound...").clicked() {
                     compound_window.open();
                 }
 
