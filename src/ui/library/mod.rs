@@ -260,8 +260,8 @@ fn show_library(
 ) {
     // Shows the polytope library.
     if let Some(library) = library.as_mut() {
-        egui::SidePanel::left("side_panel")
-            .default_width(350.0)
+        egui::SidePanel::left("left_panel")
+            .default_width(300.0)
             .max_width(450.0)
             .show(egui_ctx.ctx(), |ui| {
                 egui::containers::ScrollArea::auto_sized().show(ui, |ui| {

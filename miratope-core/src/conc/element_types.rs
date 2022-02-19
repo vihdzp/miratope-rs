@@ -17,10 +17,10 @@ use vec_like::*;
 #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub struct ElementType {
     /// The index of the representative for this element type.
-    example: usize,
+    pub example: usize,
 
     /// The number of elements of this type.
-    count: usize,
+    pub count: usize,
 }
 
 /// Stores the metadata associated with an element type.
@@ -38,13 +38,15 @@ struct TypeData {
     heuristics: usize,
 }
 
-const EL_NAMES: [&str; 25] = [
+/// Names of elements of each rank.
+pub const EL_NAMES: [&str; 25] = [
     "", "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta", "Xenna",
     "Daka", "Henda", "Doka", "Tradaka", "Tedaka", "Pedaka", "Exdaka", "Zedaka", "Yodaka", "Nedaka",
     "Ika", "Ikena", "Ikoda", "Iktra",
 ];
 
-const EL_SUFFIXES: [&str; 25] = [
+/// Suffixes of elements of each rank.
+pub const EL_SUFFIXES: [&str; 25] = [
     "", "", "telon", "gon", "hedron", "choron", "teron", "peton", "exon", "zetton", "yotton",
     "xennon", "dakon", "hendon", "dokon", "tradakon", "tedakon", "pedakon", "exdakon", "zedakon",
     "yodakon", "nedakon", "ikon", "ikenon", "ikodon",
@@ -71,12 +73,17 @@ impl Concrete {
     ///         - if not, add a new entry in hashmap and increment index
     /// - iterate over ranks backwards, use superelements instead of subelements
     /// - get number of types in total, if it's the same as previous loop, stop
-    fn element_types_common(&self) -> (ElementMap<ElementType>, ElementMap<usize>) {
+    fn element_types_common(&self) -> (Vec<Vec<ElementType>>, ElementMap<usize>) {
         let rank = self.rank();
+
+        // A nullitope has no proper elements.
+        if rank < 1 {
+            return (Vec::new(), ElementMap::new());
+        }
 
         // Stores the different types, the counts of each, and the indices of
         // the types associated to each element.
-        let mut types = ElementMap::new();
+        let mut types = Vec::new();
         let mut type_counts = Vec::new();
         let mut type_of_element = ElementMap::new();
 
@@ -191,7 +198,7 @@ impl Concrete {
     }
 
     /// Returns a list of types of elements.
-    pub fn element_types(&self) -> ElementMap<ElementType> {
+    pub fn element_types(&self) -> Vec<Vec<ElementType>> {
         self.element_types_common().0
     }
 

@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use super::{camera::ProjectionType, memory::Memory, operations::*, UnitPointWidget};
+use super::{camera::ProjectionType, memory::Memory, window::*, UnitPointWidget};
 use crate::{Concrete, Float, Hyperplane, Point, Vector};
 
 use bevy::prelude::*;
@@ -580,52 +580,6 @@ pub fn show_top_panel(
                     }
                 };
             }
-
-            // Operates on the elements of the loaded polytope.
-            menu::menu(ui, "Elements", |ui| {
-                // Converts the active polytope into any of its facets.
-                if ui.button("Facet").clicked() {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        println!("Facet");
-
-                        if let Some(mut facet) = p.facet(0) {
-                            facet.flatten();
-                            facet.recenter();
-                            *p = facet;
-
-                            println!("Facet succeeded.")
-                        } else {
-                            eprintln!("Facet failed: no facets.")
-                        }
-                    }
-                }
-
-                // Converts the active polytope into any of its verfs.
-                if ui.button("Verf").clicked() {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        println!("Verf");
-
-                        match p.verf(0) {
-                            Ok(Some(mut verf)) => {
-                                verf.flatten();
-                                verf.recenter();
-                                *p = verf;
-
-                                println!("Verf succeeded.")
-                            }
-                            Ok(None) => eprintln!("Verf failed: no vertices."),
-                            Err(err) => eprintln!("Verf failed: {}", err),
-                        }
-                    }
-                }
-
-                // Outputs the element types, currently just prints to console.
-                if ui.button("Counts").clicked() {
-                    if let Some(p) = query.iter_mut().next() {
-                        p.con().print_element_types();
-                    }
-                }
-            });
 
             // Prints out properties about the loaded polytope.
             menu::menu(ui, "Properties", |ui| {

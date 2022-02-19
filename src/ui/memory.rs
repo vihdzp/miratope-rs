@@ -41,72 +41,74 @@ impl Memory {
     /// Shows the memory menu in a specified Ui.
     pub fn show(&mut self, ui: &mut egui::Ui, query: &mut Query<'_, '_, &mut Concrete>) {
         egui::menu::menu(ui, "Memory", |ui| {
+            egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
+                
+                if ui.button("Clear memory").clicked() {
+                    self.0.clear();
+                }
+    
+                if ui.button("Add slot").clicked() {
+                    self.0.push(None);
+                }
+    
+                ui.separator();
+    
+                for (idx, slot) in self.0.iter_mut().enumerate() {
+                    match slot {
+                        // Shows an empty slot.
+                        None => {
+                            egui::CollapsingHeader::new("Empty")
+                                .id_source(idx)
+                                .show(ui, |ui| {
+                                    if ui.button("Save").clicked() {
+                                        if let Some(p) = query.iter_mut().next() {
+                                            *slot = Some((p.clone(), None));
+                                        }
+                                    }
+                                });
+                        }
 
-            if ui.button("Clear memory").clicked() {
-                self.0.clear();
-            }
-
-            if ui.button("Add slot").clicked() {
-                self.0.push(None);
-            }
-
-            ui.separator();
-
-            for (idx, slot) in self.0.iter_mut().enumerate() {
-                match slot {
-                    // Shows an empty slot.
-                    None => {
-                        egui::CollapsingHeader::new("Empty")
-                            .id_source(idx)
-                            .show(ui, |ui| {
-                                if ui.button("Save").clicked() {
-                                    if let Some(p) = query.iter_mut().next() {
-                                        *slot = Some((p.clone(), None));
+                        // Shows a slot with a polytope on it.
+                        Some((poly, label)) => {
+                            let clear = egui::CollapsingHeader::new(
+                                match label {
+                                    None => {
+                                        slot_label(idx)
+                                    }
+                                    
+                                    Some(name) => {
+                                        name.to_string()
                                     }
                                 }
-                            });
-                    }
+                            )
+                                .id_source(idx)
+                                .show(ui, |ui| {
+                                    // Clones a polytope from memory.
+                                    if ui.button("Load").clicked() {
+                                        *query.iter_mut().next().unwrap() = poly.clone();
+                                    }
 
-                    // Shows a slot with a polytope on it.
-                    Some((poly, label)) => {
-                        let clear = egui::CollapsingHeader::new(
-                            match label {
-                                None => {
-                                    slot_label(idx)
-                                }
-                                
-                                Some(name) => {
-                                    name.to_string()
-                                }
+                                    // Swaps the current polytope with the one on memory.
+                                    if ui.button("Swap").clicked() {
+                                        std::mem::swap(query.iter_mut().next().unwrap().as_mut(), poly);
+                                    }
+
+                                    // Clones a polytope into memory.
+                                    if ui.button("Save").clicked() {
+                                        *poly = query.iter_mut().next().unwrap().clone();
+                                    }
+
+                                    // Clears a polytope from memory.
+                                    ui.button("Clear").clicked()
+                                });
+
+                            if clear.body_returned == Some(true) {
+                                *slot = None;
                             }
-                        )
-                            .id_source(idx)
-                            .show(ui, |ui| {
-                                // Clones a polytope from memory.
-                                if ui.button("Load").clicked() {
-                                    *query.iter_mut().next().unwrap() = poly.clone();
-                                }
-
-                                // Swaps the current polytope with the one on memory.
-                                if ui.button("Swap").clicked() {
-                                    std::mem::swap(query.iter_mut().next().unwrap().as_mut(), poly);
-                                }
-
-                                // Clones a polytope into memory.
-                                if ui.button("Save").clicked() {
-                                    *poly = query.iter_mut().next().unwrap().clone();
-                                }
-
-                                // Clears a polytope from memory.
-                                ui.button("Clear").clicked()
-                            });
-
-                        if clear.body_returned == Some(true) {
-                            *slot = None;
                         }
                     }
                 }
-            }
+            });
         });
     }
 }

@@ -9,8 +9,9 @@ pub mod config;
 pub mod library;
 pub mod main_window;
 pub mod memory;
-pub mod operations;
+pub mod window;
 pub mod top_panel;
+pub mod right_panel;
 
 /// All of the plugins specific to Miratope.
 pub struct MiratopePlugins;
@@ -20,10 +21,11 @@ impl bevy::prelude::PluginGroup for MiratopePlugins {
         group
             .add(camera::InputPlugin)
             .add(config::ConfigPlugin)
-            .add(operations::OperationsPlugin)
+            .add(window::OperationsPlugin)
             .add(library::LibraryPlugin)
             .add(main_window::MainWindowPlugin)
-            .add(top_panel::TopPanelPlugin);
+            .add(top_panel::TopPanelPlugin)
+            .add(right_panel::RightPanelPlugin);
     }
 }
 
