@@ -6,6 +6,7 @@ use crate::Concrete;
 
 use bevy::prelude::*;
 use bevy_egui::EguiSettings;
+use miratope_core::Polytope;
 use miratope_core::abs::Ranked;
 
 /// The plugin in charge of the Miratope main window, and of drawing the
@@ -50,13 +51,14 @@ pub fn update_scale_factor(mut egui_settings: ResMut<'_, EguiSettings>, windows:
 /// Updates polytopes after an operation.
 pub fn update_changed_polytopes(
     mut meshes: ResMut<'_, Assets<Mesh>>,
-    polies: Query<'_, '_, (&Concrete, &Handle<Mesh>, &Children), Changed<Concrete>>,
+    mut polies: Query<'_, '_, (&mut Concrete, &Handle<Mesh>, &Children), Changed<Concrete>>,
     wfs: Query<'_, '_, &Handle<Mesh>, Without<Concrete>>,
     mut section_state: ResMut<'_, SectionState>,
 
     orthogonal: Res<'_, ProjectionType>,
 ) {
-    for (poly, mesh_handle, children) in polies.iter() {
+    for (mut poly, mesh_handle, children) in polies.iter_mut() {
+        poly.untangle_faces();
         if cfg!(debug_assertions) {
             poly.assert_valid();
         }
