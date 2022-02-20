@@ -124,20 +124,22 @@ pub fn show_right_panel(
         .max_width(450.0)
         .show(egui_ctx.ctx(), |ui| {
             
-            if ui.add(egui::Button::new("Generate").enabled(!element_types.main)).clicked() {
-                if let Some(p) = query.iter_mut().next() {
-                    element_types.main = true;
-                    *element_types = element_types.from_poly(p);
+            ui.horizontal(|ui| {
+                if ui.add(egui::Button::new("Generate").enabled(!element_types.main)).clicked() {
+                    if let Some(p) = query.iter_mut().next() {
+                        element_types.main = true;
+                        *element_types = element_types.from_poly(p);
+                    }
                 }
-            }
-
-            if ui.add(egui::Button::new("Load").enabled(!element_types.main)).clicked() {
-                if let Some(mut p) = query.iter_mut().next() {
-                    element_types.main = true;
-                    element_types.main_updating = true;
-                    *p = element_types.poly.clone();
+    
+                if ui.add(egui::Button::new("Load").enabled(!element_types.main)).clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        element_types.main = true;
+                        element_types.main_updating = true;
+                        *p = element_types.poly.clone();
+                    }
                 }
-            }
+            });
 
             ui.separator();
 
