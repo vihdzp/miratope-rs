@@ -344,15 +344,73 @@ pub fn show_top_panel(
                 }
             });
 
-            menu::menu(ui, "Scale", |ui| {
+            // Prints out properties about the loaded polytope.
+            menu::menu(ui, "Properties", |ui| {
+                // Determines the circumsphere of the polytope.
+                if ui.button("Circumsphere").clicked() {
+                    if let Some(p) = query.iter_mut().next() {
+                        match p.circumsphere() {
+                            Some(sphere) => println!(
+                                "The circumradius is {} and the circumcenter is {}.",
+                                sphere.radius(),
+                                sphere.center
+                            ),
+                            None => println!("The polytope has no circumsphere."),
+                        }
+                    }
+                }
+
+                // Determines whether the polytope is orientable.
+                if ui.button("Orientability").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        element_sort!(p);
+
+                        if p.orientable() {
+                            println!("The polytope is orientable.");
+                        } else {
+                            println!("The polytope is not orientable.");
+                        }
+                    }
+                }
+
+                // Gets the volume of the polytope.
+                if ui.button("Volume").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        element_sort!(p);
+
+                        if let Some(vol) = p.volume() {
+                            println!("The volume is {}.", vol);
+                        } else {
+                            println!("The polytope has no volume.");
+                        }
+                    }
+                }
+
+                // Gets the number of flags of the polytope.
+                if ui.button("Flag count").clicked() {
+                    if let Some(p) = query.iter_mut().next() {
+                        println!("The polytope has {} flags.", p.flags().count())
+                    }
+                }
+
+                // Gets the order of the symmetry group of the polytope
+                if ui.button("Symmetry group").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        let group = p.get_symmetry_group().0;
+                        println!("Symmetry order {}", group.count());
+                    }
+                }
+            });
+
+            menu::menu(ui, "Transform", |ui| {
             
-                if ui.button("Unit edge length").clicked() {
+                if ui.button("Scale to unit edge length").clicked() {
                     let mut p = query.iter_mut().next().unwrap();
                     let e_l = (&p.vertices[p.abs[2][0].subs[0]] - &p.vertices[p.abs[2][0].subs[1]]).norm();
                     p.scale(1.0/e_l);
                 }
 
-                if ui.button("Unit circumradius").clicked() {
+                if ui.button("Scale to unit circumradius").clicked() {
                     let mut p = query.iter_mut().next().unwrap();
                     match p.circumsphere() {
                         Some(sphere) => {
@@ -369,8 +427,19 @@ pub fn show_top_panel(
                 
                 ui.separator();
 
-                // Recenters a polytope.
-                if ui.button("Recenter").clicked() {
+                // Moves a polytope so that the circumcenter is at the origin.
+                if ui.button("Recenter by circumcenter").clicked() {
+                    let mut p = query.iter_mut().next().unwrap();
+                    match p.circumsphere() {
+                        Some(sphere) => {
+                            p.recenter_with(&sphere.center);
+                        }
+                        None => println!("The polytope has no circumsphere."),
+                    }
+                }
+                
+                // Moves a polytope so that the gravicenter is at the origin.
+                if ui.button("Recenter by gravicenter").clicked() {
                     query.iter_mut().next().unwrap().recenter();
                 }
             });
@@ -407,6 +476,7 @@ pub fn show_top_panel(
                 // Converts the active polytope into its Petrie polygon.
                 if ui.button("Petrie polygon").clicked() {
                     if let Some(mut p) = query.iter_mut().next() {
+                        p.element_sort();
                         let flag = p.first_flag();
                         match p.petrie_polygon_with(flag) {
                             Some(q) => {
@@ -580,64 +650,6 @@ pub fn show_top_panel(
                     }
                 };
             }
-
-            // Prints out properties about the loaded polytope.
-            menu::menu(ui, "Properties", |ui| {
-                // Determines the circumsphere of the polytope.
-                if ui.button("Circumsphere").clicked() {
-                    if let Some(p) = query.iter_mut().next() {
-                        match p.circumsphere() {
-                            Some(sphere) => println!(
-                                "The circumradius is {} and the circumcenter is {}.",
-                                sphere.radius(),
-                                sphere.center
-                            ),
-                            None => println!("The polytope has no circumsphere."),
-                        }
-                    }
-                }
-
-                // Determines whether the polytope is orientable.
-                if ui.button("Orientability").clicked() {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        element_sort!(p);
-
-                        if p.orientable() {
-                            println!("The polytope is orientable.");
-                        } else {
-                            println!("The polytope is not orientable.");
-                        }
-                    }
-                }
-
-                // Gets the volume of the polytope.
-                if ui.button("Volume").clicked() {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        element_sort!(p);
-
-                        if let Some(vol) = p.volume() {
-                            println!("The volume is {}.", vol);
-                        } else {
-                            println!("The polytope has no volume.");
-                        }
-                    }
-                }
-
-                // Gets the number of flags of the polytope.
-                if ui.button("Flag count").clicked() {
-                    if let Some(p) = query.iter_mut().next() {
-                        println!("The polytope has {} flags.", p.flags().count())
-                    }
-                }
-
-                // Gets the order of the symmetry group of the polytope
-                if ui.button("Symmetry group").clicked() {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        let group = p.get_symmetry_group().0;
-                        println!("Symmetry order {}", group.count());
-                    }
-                }
-            });
 
             menu::menu(ui, "Faceting", |ui| {
                 if ui.button("Enumerate facetings").clicked() {
