@@ -13,7 +13,7 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
 /// The default path in which we look for the Miratope library.
-const DEFAULT_PATH: &str = "./lib/Library";
+const DEFAULT_PATH: &str = "./lib";
 
 /// The default name for the configuration file.
 const CONF_FILE: &str = "miratope.conf";

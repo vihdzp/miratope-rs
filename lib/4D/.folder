@@ -1,7 +1,7 @@
 [
 Special(Duoprism(3,1,3,1)),
 Special(AntiprismPrism(4,1)),
-UnloadedFolder(name:"Regular"),
-UnloadedFolder(name:"Convex uniform"),
-UnloadedFolder(name:"Nonconvex uniform")
+UnloadedFolder(name:"regular"),
+UnloadedFolder(name:"convex uniform"),
+UnloadedFolder(name:"nonconvex uniform")
 ]
