@@ -1,5 +1,6 @@
 //! The systems that update the main window.
 
+use super::right_panel::ElementTypesRes;
 use super::{camera::ProjectionType, top_panel::SectionState};
 use crate::mesh::Renderable;
 use crate::Concrete;
@@ -54,6 +55,7 @@ pub fn update_changed_polytopes(
     mut polies: Query<'_, '_, (&mut Concrete, &Handle<Mesh>, &Children), Changed<Concrete>>,
     wfs: Query<'_, '_, &Handle<Mesh>, Without<Concrete>>,
     mut section_state: ResMut<'_, SectionState>,
+    mut element_types: ResMut<'_, ElementTypesRes>,
 
     orthogonal: Res<'_, ProjectionType>,
 ) {
@@ -61,6 +63,12 @@ pub fn update_changed_polytopes(
         poly.untangle_faces();
         if cfg!(debug_assertions) {
             poly.assert_valid();
+        }
+
+        if !element_types.main_updating {
+            element_types.main = false;
+        } else {
+            element_types.main_updating = false;
         }
 
         *meshes.get_mut(mesh_handle).unwrap() = poly.mesh(*orthogonal);

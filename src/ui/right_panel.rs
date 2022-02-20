@@ -27,8 +27,17 @@ struct ElementTypeWithData {
 
 #[derive(Clone)]
 pub struct ElementTypesRes {
+    /// The polytope whose data we're getting.
     poly: Concrete,
+
+    /// The element types.
     types: Vec<Vec<ElementTypeWithData>>,
+
+    /// Whether the loaded polytope matches `poly` and the buttons should be greyed out.
+    pub main: bool,
+
+    /// Whether we're updating `main`.
+    pub main_updating: bool,
 }
 
 impl Default for ElementTypesRes {
@@ -36,43 +45,49 @@ impl Default for ElementTypesRes {
         ElementTypesRes {
             poly: Concrete::nullitope(),
             types: Vec::new(),
+            main: true,
+            main_updating: false,
         }
     }
 }
 
-fn types_from_poly(poly: Mut<'_, Concrete>) -> ElementTypesRes {
-    let plain_types = poly.element_types();
-    let mut types_with_data = Vec::new();
-
-    for (r, types) in plain_types.clone().into_iter().enumerate() {
-        let rank = poly.rank();
-        if r == rank {
-            break;
+impl ElementTypesRes {
+    fn from_poly(&self, poly: Mut<'_, Concrete>) -> ElementTypesRes {
+        let plain_types = poly.element_types();
+        let mut types_with_data = Vec::new();
+    
+        for (r, types) in plain_types.clone().into_iter().enumerate() {
+            let rank = poly.rank();
+            if r == rank {
+                break;
+            }
+    
+            let abs = &poly.abs;
+            let dual_abs = &abs.dual();
+            let mut types_with_data_this_rank = Vec::new();
+            
+            for t in types {
+                let idx = t.example;
+    
+                let facets = abs[(r, idx)].subs.len();
+                let fig_facets = dual_abs.element_vertices(rank-r, idx).unwrap().len();
+    
+                types_with_data_this_rank.push(ElementTypeWithData {
+                    example: idx,
+                    count: t.count,
+                    facets,
+                    fig_facets,
+                });
+            }
+            types_with_data.push(types_with_data_this_rank);
         }
-
-        let abs = &poly.abs;
-        let dual_abs = &abs.dual();
-        let mut types_with_data_this_rank = Vec::new();
-        
-        for t in types {
-            let idx = t.example;
-
-            let facets = abs[(r, idx)].subs.len();
-            let fig_facets = dual_abs.element_vertices(rank-r, idx).unwrap().len();
-
-            types_with_data_this_rank.push(ElementTypeWithData {
-                example: idx,
-                count: t.count,
-                facets,
-                fig_facets,
-            });
+    
+        ElementTypesRes {
+            poly: poly.clone(),
+            types: types_with_data,
+            main: true,
+            main_updating: false,
         }
-        types_with_data.push(types_with_data_this_rank);
-    }
-
-    ElementTypesRes {
-        poly: poly.clone(),
-        types: types_with_data,
     }
 }
 
@@ -109,14 +124,17 @@ pub fn show_right_panel(
         .max_width(450.0)
         .show(egui_ctx.ctx(), |ui| {
             
-            if ui.button("Generate").clicked() {
+            if ui.add(egui::Button::new("Generate").enabled(!element_types.main)).clicked() {
                 if let Some(p) = query.iter_mut().next() {
-                    *element_types = types_from_poly(p);
+                    element_types.main = true;
+                    *element_types = element_types.from_poly(p);
                 }
             }
 
-            if ui.button("Load").clicked() {
+            if ui.add(egui::Button::new("Load").enabled(!element_types.main)).clicked() {
                 if let Some(mut p) = query.iter_mut().next() {
+                    element_types.main = true;
+                    element_types.main_updating = true;
                     *p = element_types.poly.clone();
                 }
             }
