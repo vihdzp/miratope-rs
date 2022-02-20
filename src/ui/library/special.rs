@@ -121,7 +121,7 @@ impl SpecialLibrary {
                 }
             }
 
-            // An step prism based on two uniform polygons..
+            // A uniform duoprism based on two polygons.
             Self::Duoprism(n1, d1, n2, d2) => {
                 let clicked = ui.horizontal_wrapped(|ui| {
                     let clicked = ui.button(text).clicked();
@@ -186,7 +186,7 @@ impl SpecialLibrary {
     pub fn load(&self) -> Concrete {
         match *self {
             // Loads a regular star polygon.
-            Self::Polygon(n, d) => Concrete::star_polygon(n, d),
+            Self::Polygon(n, d) => Concrete::star_polygon_with_edge(n, d, 1.0),
 
             // Loads a uniform polygonal prism.
             Self::Prism(n, d) => Concrete::uniform_prism(n, d),

@@ -658,7 +658,7 @@ pub trait ConcretePolytope: Polytope {
 
     /// Builds a uniform prism from an {n/d} polygon.
     fn uniform_prism(n: usize, d: usize) -> Self {
-        Self::star_polygon(n, d).prism_with(2.0 * (f64::PI * f64::usize(d) / f64::usize(n)).fsin())
+        Self::star_polygon_with_edge(n, d, 1.0).prism()
     }
 
     /// Builds a tegum with two specified apices.
@@ -712,10 +712,13 @@ pub trait ConcretePolytope: Polytope {
             let cos = angle.fcos();
             let height = ((cos - (2.0 * angle).fcos()) * 2.0).fsqrt();
 
-            polygon.antiprism_with(
+            let mut antiprism = polygon.antiprism_with(
                 &Hypersphere::with_squared_radius(Point::zeros(2), cos),
                 height,
-            )
+            );
+            antiprism.scale(0.5 / (f64::PI * d as f64 / n as f64).fsin());
+
+            antiprism
         }
         // Digon compounds are a special case.
         else {
@@ -726,7 +729,10 @@ pub trait ConcretePolytope: Polytope {
                 .iter()
                 .map(|v| vec![v[1], -v[0], half_height].into());
 
-            polygon.antiprism_with_vertices(vertices, dual_vertices)
+            let mut antiprism = polygon.antiprism_with_vertices(vertices, dual_vertices);
+            antiprism.scale(0.5);
+
+            antiprism
         }
     }
 
