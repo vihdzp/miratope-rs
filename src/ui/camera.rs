@@ -182,16 +182,15 @@ impl CameraInputEvent {
     fn cam_events_from_mouse(
         mouse_button: &Input<MouseButton>,
         mut mouse_move: EventReader<'_, '_, MouseMotion>,
-        width: f32,
         height: f32,
         real_scale: f32,
         cam_inputs: &mut EventWriter<'_, '_, Self>,
     ) {
         if mouse_button.pressed(MouseButton::Left) || mouse_button.pressed(MouseButton::Right) {
             for MouseMotion { mut delta } in mouse_move.iter() {
-                delta.x /= width;
+                delta.x /= height;
                 delta.y /= height;
-                cam_inputs.send(Self::RotateAnchor(-400.0 * real_scale * delta))
+                cam_inputs.send(Self::RotateAnchor(-800.0 * real_scale * delta))
             }
         }
     }
@@ -225,12 +224,9 @@ fn add_cam_input_events(
     mut cam_inputs: EventWriter<'_, '_, CameraInputEvent>,
     egui_ctx: Res<'_, EguiContext>,
 ) {
-    let (width, height) = {
+    let height = {
         let primary_win = windows.get_primary().expect("There is no primary window");
-        (
-            primary_win.physical_width() as f32,
-            primary_win.physical_height() as f32,
-        )
+        primary_win.physical_height() as f32
     };
 
     let ctx = egui_ctx.ctx();
@@ -243,7 +239,6 @@ fn add_cam_input_events(
         CameraInputEvent::cam_events_from_mouse(
             &mouse_button,
             mouse_move,
-            width,
             height,
             real_scale,
             cam_inputs,
