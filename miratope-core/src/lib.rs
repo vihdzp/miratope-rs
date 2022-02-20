@@ -339,7 +339,7 @@ pub trait Polytope:
         clone.petrial_mut().then(|| clone)
     }
 
-    /// Returns the indices of the vertices of a Petrial polygon in cyclic
+    /// Returns the indices of the vertices of a Petrie polygon in cyclic
     /// order, or `None` if it self-intersects.
     ///
     /// # Panics
@@ -347,20 +347,20 @@ pub trait Polytope:
     fn petrie_polygon_vertices(&self, flag: Flag) -> Option<Vec<usize>> {
         let rank = self.rank();
         let mut new_flag = flag.clone();
-        let first_vertex = flag[0];
+        let first_vertex = flag[1];
         let mut vertices = Vec::new();
         let mut vertex_hash = HashSet::new();
 
         assert!(self.abs().sorted());
 
         loop {
-            // Applies 0-changes up to (rank-1)-changes in order.
-            for idx in 0..rank {
+            // Applies 1-changes up to (rank-1)-changes in order.
+            for idx in 1..rank {
                 new_flag.change_mut(self.abs(), idx);
             }
 
             // If we just hit a previous vertex, we return.
-            let new_vertex = new_flag[0];
+            let new_vertex = new_flag[1];
             if vertex_hash.contains(&new_vertex) {
                 return None;
             }
