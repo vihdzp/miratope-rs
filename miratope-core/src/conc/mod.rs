@@ -194,6 +194,25 @@ impl Polytope for Concrete {
         ))
     }
 
+    /// Gets the element figure with a given rank and index as a polytope.
+    fn element_fig(&self, rank: usize, idx: usize) -> Result<Option<Self>, Self::DualError> {
+        if rank <= self.rank() {
+            // todo: this is quite inefficient for a small element figure since
+            // we take the dual of the entire thing.
+            if let Some(mut element_fig) = self.try_dual()?.element(self.rank() - rank, idx) {
+                let subspace = Subspace::from_points(element_fig.vertices.iter());
+                element_fig.flatten();
+                element_fig.recenter_with(
+                    &subspace.flatten(&subspace.project(&Point::zeros(self.dim().unwrap()))),
+                );
+                element_fig.try_dual_mut()?;
+                return Ok(Some(element_fig));
+            }
+        }
+
+        Ok(None)
+    }
+
     // TODO: A method that builds an omnitruncate together with a map from flags
     // to vertices? We got some math details to figure out.
     fn omnitruncate(&self) -> Self {

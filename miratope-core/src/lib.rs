@@ -275,18 +275,7 @@ pub trait Polytope:
     fn element(&self, rank: usize, idx: usize) -> Option<Self>;
 
     /// Gets the element figure with a given rank and index as a polytope.
-    fn element_fig(&self, rank: usize, idx: usize) -> Result<Option<Self>, Self::DualError> {
-        if rank <= self.rank() {
-            // todo: this is quite inefficient for a small element figure since
-            // we take the dual of the entire thing.
-            if let Some(mut element_fig) = self.try_dual()?.element(self.rank() - rank, idx) {
-                element_fig.try_dual_mut()?;
-                return Ok(Some(element_fig));
-            }
-        }
-
-        Ok(None)
-    }
+    fn element_fig(&self, rank: usize, idx: usize) -> Result<Option<Self>, Self::DualError>;
 
     /// Gets the section defined by two elements with given ranks and indices as
     /// a polytope, or returns `None` in case no section is defined by these
