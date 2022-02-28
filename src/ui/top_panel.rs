@@ -18,9 +18,10 @@ pub struct TopPanelPlugin;
 impl Plugin for TopPanelPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<FileDialogState>()
-            .init_resource::<Memory>()
-            .init_resource::<SectionDirection>()
             .init_resource::<SectionState>()
+            .init_resource::<SectionDirection>()
+            .init_resource::<Memory>()
+            .init_resource::<ShowMemory>()
             .init_resource::<ExportMemory>()
             .init_non_send_resource::<FileDialogToken>()
             .add_system(file_dialog.system())
@@ -87,6 +88,15 @@ pub struct SectionDirection(Vector);
 impl Default for SectionDirection {
     fn default() -> Self {
         Self(Vector::zeros(0))
+    }
+}
+
+/// Stores whether the memory window is shown.
+pub struct ShowMemory(bool);
+
+impl Default for ShowMemory {
+    fn default() -> Self {
+        Self(false)
     }
 }
 
@@ -231,6 +241,7 @@ pub type EguiWindows<'a> = (
     ResMut<'a, DuotegumWindow>,
     ResMut<'a, DuocombWindow>,
     ResMut<'a, CompoundWindow>,
+    ResMut<'a, TruncateWindow>,
     ResMut<'a, ScaleWindow>,
     ResMut<'a, FacetingSettings>,
 );
@@ -257,6 +268,7 @@ pub fn show_top_panel(
     mut file_dialog_state: ResMut<'_, FileDialogState>,
     mut projection_type: ResMut<'_, ProjectionType>,
     mut memory: ResMut<'_, Memory>,
+    mut show_memory: ResMut<'_, ShowMemory>,
     mut export_memory: ResMut<'_, ExportMemory>,
     mut background_color: ResMut<'_, ClearColor>,
 
@@ -274,6 +286,7 @@ pub fn show_top_panel(
         mut duotegum_window,
         mut duocomb_window,
         mut compound_window,
+        mut truncate_window,
         mut scale_window,
         mut faceting_settings,
     ): EguiWindows<'_>,
@@ -582,40 +595,8 @@ pub fn show_top_panel(
 
                 ui.separator();
 
-                if ui.button("Rectate").clicked() {
-                    let mut p = query.iter_mut().next().unwrap();
-                    element_sort!(p);
-                    *p = p.truncate_with(vec![1], vec![1.0]);
-                }
-
-                if ui.button("Truncate").clicked() {
-                    let mut p = query.iter_mut().next().unwrap();
-                    element_sort!(p);
-                    *p = p.truncate_with(vec![0, 1], vec![0.5, 0.5]);
-                }
-
-                if ui.button("Bitruncate").clicked() {
-                    let mut p = query.iter_mut().next().unwrap();
-                    element_sort!(p);
-                    *p = p.truncate_with(vec![1, 2], vec![0.5, 0.5]);
-                }
-
-                if ui.button("Cantellate").clicked() {
-                    let mut p = query.iter_mut().next().unwrap();
-                    element_sort!(p);
-                    *p = p.truncate_with(vec![0, 2], vec![0.5, 0.5]);
-                }
-
-                if ui.button("Runcinate").clicked() {
-                    let mut p = query.iter_mut().next().unwrap();
-                    element_sort!(p);
-                    *p = p.truncate_with(vec![0, 3], vec![0.5, 0.5]);
-                }
-
-                if ui.button("Omnitruncate").clicked() {
-                    let mut p = query.iter_mut().next().unwrap();
-                    element_sort!(p);
-                    *p = p.omnitruncate();
+                if ui.button("Truncate...").clicked() {
+                    truncate_window.open();
                 }
             });
 
@@ -677,7 +658,10 @@ pub fn show_top_panel(
                 }
             });
 
-            memory.show(ui, &mut query);
+            if ui.button("Memory").clicked() {
+                show_memory.0 = !show_memory.0;
+            }
+            memory.show(&mut query, &egui_ctx, &mut show_memory.0);
 
             // Background color picker.
 

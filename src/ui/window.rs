@@ -37,9 +37,9 @@ pub enum ShowResult {
 }
 
 /// The plugin controlling all of these windows.
-pub struct OperationsPlugin;
+pub struct WindowPlugin;
 
-impl Plugin for OperationsPlugin {
+impl Plugin for WindowPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(DualWindow::plugin())
             .add_plugin(PyramidWindow::plugin())
@@ -51,6 +51,7 @@ impl Plugin for OperationsPlugin {
             .add_plugin(DuotegumWindow::plugin())
             .add_plugin(DuocombWindow::plugin())
             .add_plugin(CompoundWindow::plugin())
+            .add_plugin(TruncateWindow::plugin())
             .add_plugin(ScaleWindow::plugin())
             .add_plugin(FacetingSettings::plugin());
     }
@@ -1056,6 +1057,75 @@ impl DuoWindow for CompoundWindow {
 
     fn slots_mut(&mut self) -> &mut [Slot; 2] {
         &mut self.slots
+    }
+}
+
+/// A window to configure a truncation of the polytope.
+#[derive(Default)]
+pub struct TruncateWindow {
+    /// Whether the window is open.
+    open: bool,
+
+    /// The rank of the polytope.
+    rank: usize,
+
+    /// Which nodes are ringed.
+    truncate_type: Vec<bool>,
+
+    /// The weights applied to the coordinates. Intuitively, the truncation depths.
+    depth: Vec<f64>,
+}
+
+impl Window for TruncateWindow {
+    const NAME: &'static str = "Truncate";
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.open
+    }
+}
+
+impl UpdateWindow for TruncateWindow {
+    fn action(&self, polytope: &mut Concrete) {
+        let mut rings = Vec::new();
+        for (rank, ringed) in self.truncate_type.iter().enumerate() {
+            if *ringed {
+                rings.push(rank);
+            }
+        }
+        polytope.element_sort();
+        *polytope = polytope.truncate_with(rings, self.depth.clone());
+    }
+
+    fn build(&mut self, ui: &mut Ui) {
+        for r in 0..self.rank {
+            ui.horizontal(|ui| {
+                ui.add(egui::Checkbox::new(&mut self.truncate_type[r], ""));
+                ui.add(egui::DragValue::new(&mut self.depth[r]).speed(0.01));
+            });
+        }
+    }
+
+    fn dim(&self) -> usize {
+        self.rank
+    }
+
+    fn default_with(dim: usize) -> Self {
+        Self {
+            rank: dim,
+            truncate_type: vec![false; dim],
+            depth: vec![1.0; dim],
+            ..Default::default()
+        }
+    }
+
+    fn update(&mut self, dim: usize) {
+        self.rank = dim;
+        self.truncate_type = vec![false; dim];
+        self.depth = vec![1.0; dim];
     }
 }
 

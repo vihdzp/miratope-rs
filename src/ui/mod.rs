@@ -21,7 +21,7 @@ impl bevy::prelude::PluginGroup for MiratopePlugins {
         group
             .add(camera::InputPlugin)
             .add(config::ConfigPlugin)
-            .add(window::OperationsPlugin)
+            .add(window::WindowPlugin)
             .add(library::LibraryPlugin)
             .add(main_window::MainWindowPlugin)
             .add(top_panel::TopPanelPlugin)

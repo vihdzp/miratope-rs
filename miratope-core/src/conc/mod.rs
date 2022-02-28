@@ -1208,7 +1208,7 @@ impl ConcretePolytope for Concrete {
         for subflag in subflags {
             let mut vector = Point::<f64>::from_vec(vec![0.0; self.rank() - 1]);
             for (r, i) in subflag.iter().enumerate() {
-                vector += element_vertices[truncate_type[r] + 1][*i].clone() * depth[r];
+                vector += element_vertices[truncate_type[r] + 1][*i].clone() * depth[truncate_type[r]];
             }
             vertex_coords.push(vector);
         }
