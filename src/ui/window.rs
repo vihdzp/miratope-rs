@@ -1167,7 +1167,6 @@ impl PlainWindow for ScaleWindow {
 }
 
 /// A window that lets the user set settings for faceting.
-#[derive(Default)]
 pub struct FacetingSettings {
     /// Whether the window is open.
     open: bool,
@@ -1187,15 +1186,26 @@ pub struct FacetingSettings {
     /// Whether to include trivial compounds (compounds of other full-symmetric facetings).
     pub compounds: bool,
 
-    /// Whether to include trivial compounds in elements.
-    pub compound_elements: bool,
-
-    /// Whether to not save the facetings in memory.
-    /// yeah, this will be inverted like this until we figure out how to set a checkbox on by default
-    pub skip_saving: bool,
+    /// Whether to save the facetings in memory.
+    pub save: bool,
 
     /// Whether to save the facets in memory.
     pub save_facets: bool,
+}
+
+impl Default for FacetingSettings {
+    fn default() -> Self {
+        Self {
+            open: false,
+            max_facet_types: 0,
+            max_per_hyperplane: 0,
+            chiral: false,
+            unit_edges: true,
+            compounds: false,
+            save: true,
+            save_facets: false,
+        }
+    }
 }
 
 impl Window for FacetingSettings {
@@ -1248,12 +1258,7 @@ impl PlainWindow for FacetingSettings {
         });
         ui.horizontal(|ui| {
             ui.add(
-                egui::Checkbox::new(&mut self.compound_elements, "Include trivial compound elements")
-            );
-        });
-        ui.horizontal(|ui| {
-            ui.add(
-                egui::Checkbox::new(&mut self.skip_saving, "Skip saving facetings")
+                egui::Checkbox::new(&mut self.save, "Save facetings")
             );
         });
         ui.horizontal(|ui| {

@@ -641,8 +641,7 @@ pub fn show_top_panel(
                             if faceting_settings.max_facet_types == 0 {None} else {Some(faceting_settings.max_facet_types)},
                             if faceting_settings.max_per_hyperplane == 0 {None} else {Some(faceting_settings.max_per_hyperplane)},
                             faceting_settings.compounds,
-                            faceting_settings.compound_elements,
-                            !faceting_settings.skip_saving,
+                            faceting_settings.save,
                             faceting_settings.save_facets
                         );
                         for faceting in facetings {

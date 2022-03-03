@@ -142,8 +142,7 @@ fn faceting_subdim(
     points: Vec<PointOrd<f64>>,
     vertex_map: Vec<Vec<usize>>,
     edge_length: Option<f64>,
-    max_per_hyperplane: Option<usize>,
-    include_compounds: bool
+    max_per_hyperplane: Option<usize>
 ) ->
     (Vec<(Ranks, Vec<(usize, usize)>)>, // Vec of facetings, along with the facet types of each of them
     Vec<usize>, // Counts of each hyperplane orbit
@@ -398,7 +397,7 @@ fn faceting_subdim(
         }
 
         let (possible_facets_row, ff_counts_row, ridges_row) =
-            faceting_subdim(rank-1, hp, points, new_stabilizer.clone(), edge_length, max_per_hyperplane, include_compounds);
+            faceting_subdim(rank-1, hp, points, new_stabilizer.clone(), edge_length, max_per_hyperplane);
 
         let mut possible_facets_global_row = Vec::new();
         for f in &possible_facets_row {
@@ -647,19 +646,8 @@ fn faceting_subdim(
                     }
                 }
 
-                if include_compounds {
-                    let t = facets.last().unwrap().clone();
-                    facets.push((t.0 + 1, 0));
-                } else {
-                    let t = facets.last_mut().unwrap();
-                    if t.1 == possible_facets[t.0].len() - 1 {
-                        t.0 += 1;
-                        t.1 = 0;
-                    }
-                    else {
-                        t.1 += 1;
-                    }
-                }
+                let t = facets.last().unwrap().clone();
+                facets.push((t.0 + 1, 0));
             }
             1 => {
                 let t = facets.last_mut().unwrap();
@@ -677,15 +665,6 @@ fn faceting_subdim(
             }
             _ => {}
         }
-    }
-    
-    if !include_compounds {
-        let output_idxs = filter_irc(&mut output_facets);
-        let mut output_new = Vec::new();
-        for idx in output_idxs {
-            output_new.push(output[idx].clone());
-        }
-        output = output_new;
     }
 
     let mut output_ridges = Vec::new();
@@ -710,7 +689,6 @@ impl Concrete {
         noble: Option<usize>,
         max_per_hyperplane: Option<usize>,
         include_compounds: bool,
-        include_compound_elements: bool,
         save: bool,
         save_facets: bool,
     ) -> Vec<(Concrete, Option<String>)> {
@@ -932,7 +910,7 @@ impl Concrete {
             }
 
             let (possible_facets_row, ff_counts_row, ridges_row) =
-                faceting_subdim(rank-1, hp, points, new_stabilizer, edge_length, max_per_hyperplane, include_compound_elements);
+                faceting_subdim(rank-1, hp, points, new_stabilizer, edge_length, max_per_hyperplane);
 
             let mut possible_facets_global_row = Vec::new();
             for f in &possible_facets_row {
@@ -1216,6 +1194,8 @@ impl Concrete {
                 }
                 let facet = &possible_facets_global[facet_orbit.0][facet_orbit.1].0;
                 let facet_local = &possible_facets[facet_orbit.0][facet_orbit.1].0;
+
+                let mut of_this_orbit = HashSet::new();
                 for row in &vertex_map {
                     let mut new_facet = facet.clone();
     
@@ -1227,8 +1207,17 @@ impl Concrete {
                         }
                         new_list.push(new);
                     }
+                    let mut edges = new_list.clone();
+                    for edge in &mut edges {
+                        edge.subs.sort();
+                    }
+                    edges.0.sort_by(|a, b| a.subs.cmp(&b.subs));
+                    if let Some(_) = of_this_orbit.get(&edges) {
+                        continue;
+                    }
+                    of_this_orbit.insert(edges);
                     new_facet[2] = new_list;
-    
+
                     new_facet.element_sort_strong_with_local(facet_local);
                     facet_set.insert(new_facet.clone());
                     facet_vec.push(new_facet); // have to do this so you can predict the facet index

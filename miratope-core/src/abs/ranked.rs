@@ -139,7 +139,7 @@ impl Element {
 /// Internally, this is just a wrapper around a `Vec<Element>`.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct ElementList(Vec<Element>);
+pub struct ElementList(pub Vec<Element>);
 impl_veclike!(ElementList, Item = Element);
 
 impl<'a> rayon::iter::IntoParallelIterator for &'a mut ElementList {
