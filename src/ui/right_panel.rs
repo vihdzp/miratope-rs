@@ -10,7 +10,7 @@ use bevy_egui::{
 use miratope_core::{conc::{element_types::{EL_NAMES, EL_SUFFIXES}, ConcretePolytope}, Polytope, abs::Ranked};
 use vec_like::VecLike;
 
-#[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug)]
 struct ElementTypeWithData {
     /// The index of the representative for this element type.
     example: usize,
@@ -23,6 +23,9 @@ struct ElementTypeWithData {
 
     /// The number of facets of the figure.
     fig_facets: usize,
+
+    /// The circumradius of the element, or distance from the origin if it's a vertex.
+    radius: Option<f64>,
 }
 
 #[derive(Clone)]
@@ -71,12 +74,24 @@ impl ElementTypesRes {
     
                 let facets = abs[(r, idx)].subs.len();
                 let fig_facets = dual_abs.element_vertices(rank-r, idx).unwrap().len();
+                let radius = 
+                    if r == 1 {
+                        Some(poly.vertices[idx].norm())
+                    }
+                    else {
+                        if let Some(sphere) = poly.element(r, idx).unwrap().circumsphere() {
+                        Some(sphere.radius())
+                        } else {
+                            None
+                        }
+                    };
     
                 types_with_data_this_rank.push(ElementTypeWithData {
                     example: idx,
                     count: t.count,
                     facets,
                     fig_facets,
+                    radius,
                 });
             }
             types_with_data.push(types_with_data_this_rank);
@@ -193,6 +208,14 @@ pub fn show_right_panel(
                                         Err(err) => eprintln!("Figure failed: {}", err),
                                     }
                                 }
+                            }
+
+                            if let Some(radius) = t.radius {
+                                ui.label(
+                                    if r == 1 {format!("norm {:.10}", radius)}
+                                    else if r == 2 {format!("length {:.10}", radius*2.0)}
+                                    else {format!("radius {:.10}", radius)}
+                                );
                             }
                         });
                     }
