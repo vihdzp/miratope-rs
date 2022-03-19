@@ -179,8 +179,8 @@ impl CameraInputEvent {
                     KeyCode::D => scale * lr,
                     KeyCode::R => -scale * fb,
                     KeyCode::F => scale * fb,
-                    KeyCode::Q => real_scale * ROLL,
-                    KeyCode::E => -real_scale * ROLL,
+                    KeyCode::Q => scale * -1.2 * ROLL,
+                    KeyCode::E => scale * 1.2 * ROLL,
                     KeyCode::X => Self::Reset,
                     _ => continue,
                 })
