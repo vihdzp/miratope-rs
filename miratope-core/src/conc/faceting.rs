@@ -936,6 +936,8 @@ impl Concrete {
             println!("{}: {} facets", idx, possible_facets_row.len());
         }
 
+        println!("\nComputing ridges...");
+
         let mut ridge_idx_orbits = Vec::new();
         let mut ridge_orbits = HashMap::new();
         let mut ridge_counts = Vec::new(); // Counts the number of ridges in each orbit
