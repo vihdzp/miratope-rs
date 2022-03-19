@@ -62,6 +62,10 @@ const EPS: Float = <Float as miratope_core::float::Float>::EPS;
 /// Loads all of the necessary systems for the application to run.
 fn main() {
     App::new()
+        .insert_resource(WindowDescriptor {
+            title: concat!("miratope v", env!("CARGO_PKG_VERSION")).to_string(),
+            ..Default::default()
+        })
         .insert_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
