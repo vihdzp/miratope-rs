@@ -7,7 +7,7 @@ pub mod symmetry;
 
 use std::{
     collections::{HashMap, HashSet},
-    ops::{Index, IndexMut},
+    ops::{Index, IndexMut}, iter,
 };
 
 use super::{
@@ -333,6 +333,16 @@ impl Polytope for Concrete {
             let mut simplex = Concrete::new(vertices, Abstract::simplex(rank));
             simplex.recenter();
             simplex
+        }
+    }
+
+    /// Builds an [orthoplex](https://polytope.miraheze.org/wiki/Orthoplex) with
+    /// a given rank.
+    fn orthoplex(rank: usize) -> Self {
+        if rank == 0 {
+            Self::nullitope()
+        } else {
+            Self::multitegum(iter::repeat(&Self::dyad_with(f64::SQRT_2)).take(rank - 1))
         }
     }
 

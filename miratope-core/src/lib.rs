@@ -238,13 +238,7 @@ pub trait Polytope:
 
     /// Builds an [orthoplex](https://polytope.miraheze.org/wiki/Orthoplex) with
     /// a given rank.
-    fn orthoplex(rank: usize) -> Self {
-        if rank == 0 {
-            Self::nullitope()
-        } else {
-            Self::multitegum(iter::repeat(&Self::dyad()).take(rank - 1))
-        }
-    }
+    fn orthoplex(rank: usize) -> Self;
 
     /// Builds a regular [octahedron](https://polytope.miraheze.org/wiki/Octahedron).
     fn octahedron() -> Self {

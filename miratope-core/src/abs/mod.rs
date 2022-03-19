@@ -10,7 +10,7 @@ use std::{
     collections::{BTreeSet, HashMap},
     convert::Infallible,
     ops::{Index, IndexMut},
-    slice, vec,
+    slice, vec, iter,
 };
 
 use self::flag::{Flag, FlagSet};
@@ -541,6 +541,16 @@ impl Polytope for Abstract {
             let mut poly = builder.build();
             poly.set_sorted(true);
             poly
+        }
+    }
+
+    /// Builds an [orthoplex](https://polytope.miraheze.org/wiki/Orthoplex) with
+    /// a given rank.
+    fn orthoplex(rank: usize) -> Self {
+        if rank == 0 {
+            Self::nullitope()
+        } else {
+            Self::multitegum(iter::repeat(&Self::dyad()).take(rank - 1))
         }
     }
 
