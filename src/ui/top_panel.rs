@@ -19,7 +19,7 @@ impl Plugin for TopPanelPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<FileDialogState>()
             .init_resource::<SectionState>()
-            .init_resource::<SectionDirection>()
+            .init_resource::<Vec<SectionDirection>>()
             .init_resource::<Memory>()
             .init_resource::<ShowMemory>()
             .init_resource::<ExportMemory>()
@@ -43,10 +43,10 @@ pub enum SectionState {
         original_polytope: Concrete,
 
         /// The range of the slider.
-        minmax: (Float, Float),
+        minmax: Vec<(Float, Float)>,
 
         /// The position of the slicing hyperplane.
-        hyperplane_pos: Float,
+        hyperplane_pos: Vec<Float>,
 
         /// Whether the cross-section is flattened into a dimension lower.
         flatten: bool,
@@ -65,17 +65,62 @@ impl SectionState {
         *self = Self::Inactive;
     }
 
-    pub fn open(&mut self, original_polytope: Concrete, minmax: (f64, f64)) {
+	pub fn add(&mut self) {
+		if let SectionState::Active {
+            hyperplane_pos,
+            minmax,
+            ..
+        } = self {
+			minmax.push((0.0,0.0));
+			hyperplane_pos.push(0.0);
+		}
+    }
+	pub fn remove(&mut self) {
+		if let SectionState::Active {
+            hyperplane_pos,
+            minmax,
+            ..
+        } = self {
+			minmax.pop();
+			hyperplane_pos.pop();
+		}
+    }
+
+    pub fn open(&mut self, original_polytope: Concrete, minmax: Vec<(f64, f64)>) {
         *self = SectionState::Active {
             original_polytope,
-            minmax,
-            hyperplane_pos: (minmax.0 + minmax.1) / 2.0,
+            minmax: minmax.clone(),
+            hyperplane_pos: minmax.clone().into_iter().map(|m| (m.0 + m.1) / 2.0).collect(),
             flatten: true,
             lock: false,
         }
     }
 }
 
+impl Clone for SectionState {
+    fn clone(&self) -> Self {
+		if let SectionState::Active{
+				original_polytope,
+				minmax,
+				hyperplane_pos,
+				flatten,
+				lock,
+			} = self{
+				
+			SectionState::Active{
+				original_polytope: original_polytope.clone(),
+				minmax: minmax.clone(),
+				hyperplane_pos: hyperplane_pos.clone(),
+				flatten: *flatten,
+				lock: *lock,
+			}
+		}
+		else
+		{
+			SectionState::Inactive
+		}
+	}
+}
 impl Default for SectionState {
     fn default() -> Self {
         Self::Inactive
@@ -264,7 +309,7 @@ pub fn show_top_panel(
 
     // The Miratope resources controlled by the top panel.
     mut section_state: ResMut<'_, SectionState>,
-    mut section_direction: ResMut<'_, SectionDirection>,
+    mut section_direction: ResMut<'_, Vec<SectionDirection>>,
     mut file_dialog_state: ResMut<'_, FileDialogState>,
     mut projection_type: ResMut<'_, ProjectionType>,
     mut memory: ResMut<'_, Memory>,
@@ -626,8 +671,8 @@ pub fn show_top_panel(
                         let minmax = p.minmax(direction.clone()).unwrap_or((-1.0, 1.0));
                         let original_polytope = p.clone();
 
-                        section_state.open(original_polytope, minmax);
-                        section_direction.0 = direction;
+                        section_state.open(original_polytope, vec![minmax]);
+                        section_direction.push(SectionDirection{0:direction});
                     }
                 };
             }
@@ -702,7 +747,7 @@ fn show_views(
     ui: &mut Ui,
     mut query: Query<'_, '_, &mut Concrete>,
     mut section_state: ResMut<'_, SectionState>,
-    mut section_direction: ResMut<'_, SectionDirection>,
+    mut section_direction: ResMut<'_, Vec<SectionDirection>>,
 ) {
     // The cross-section settings.
     if let SectionState::Active {
@@ -711,56 +756,79 @@ fn show_views(
         flatten,
         lock,
         ..
-    } = *section_state
+    } = (*section_state).clone()
     {
         ui.label("Cross section settings:");
         ui.spacing_mut().slider_width = ui.available_width() / 3.0;
 
         // Sets the slider range to the range of x coordinates in the polytope.
-        let mut new_hyperplane_pos = hyperplane_pos;
-        ui.add(
-            egui::Slider::new(
-                &mut new_hyperplane_pos,
-                (minmax.0 + 0.0000001)..=(minmax.1 - 0.0000001), // We do this to avoid empty slices.
-            )
-            .text("Slice depth")
-            .prefix("pos: "),
-        );
+        let mut i = 0;
 
-        // Updates the slicing depth.
-        #[allow(clippy::float_cmp)]
-        if hyperplane_pos != new_hyperplane_pos {
-            if let SectionState::Active { hyperplane_pos, .. } = section_state.as_mut() {
-                *hyperplane_pos = new_hyperplane_pos;
-            } else {
-                unreachable!()
-            }
-        }
+		while i < hyperplane_pos.len() {
+			
+			let mut new_hyperplane_pos = hyperplane_pos[i];
+			ui.add(
+				egui::Slider::new(
+					&mut new_hyperplane_pos,
+					(minmax[i].0 + 0.0000001)..=(minmax[i].1 - 0.0000001), // We do this to avoid empty slices.
+				)
+				.text("Slice depth")
+				.prefix("pos: "),
+			);
 
-        let mut new_direction = section_direction.0.clone();
+			// Updates the slicing depth.
+			#[allow(clippy::float_cmp)]
+			if hyperplane_pos[i] != new_hyperplane_pos {
+				if let SectionState::Active { hyperplane_pos, .. } = section_state.as_mut() {
+					hyperplane_pos[i] = new_hyperplane_pos;
+				} else {
+					unreachable!()
+				}
+			}
 
-        ui.horizontal(|ui| {
+			let mut new_direction = section_direction[i].0.clone();
 
-            ui.add(UnitPointWidget::new(
-                &mut new_direction,
-                "Slice direction",
-            ));
+			ui.horizontal(|ui| {
 
-            if ui.button("Diagonal").clicked() {
-                new_direction = Point::from_element(new_direction.len(), 1.0/(new_direction.len() as f64).sqrt());
-            }
-        });
+				ui.add(UnitPointWidget::new(
+					&mut new_direction,
+					"Slice direction",
+				));
 
-        // Updates the slicing direction.
-        #[allow(clippy::float_cmp)]
-        if section_direction.0 != new_direction {
-            section_direction.0 = new_direction;
-        }
+				if ui.button("Diagonal").clicked() {
+					new_direction = Point::from_element(new_direction.len(), 1.0/(new_direction.len() as f64).sqrt());
+				}
+			});
+			
+			// Updates the slicing direction.
+			#[allow(clippy::float_cmp)]
+			if section_direction[i].0 != new_direction {
+				section_direction[i].0 = new_direction;
+			}
+
+			i = i + 1;
+		}
 
         ui.horizontal(|ui| {
             // Makes the current cross-section into the main polytope.
             if ui.button("Make main").clicked() {
                 section_state.close();
+            }
+            // Cross sections on a lower dimension
+			if ui.button("Section lower dimension").clicked() {
+				let p = query.iter_mut().next().unwrap();
+				let dim = p.dim_or();
+				let mut direction = Vector::zeros(dim);
+				if dim > 0 {
+					direction[dim - 1] = 1.0;
+				}
+                section_state.add();
+				section_direction.push(SectionDirection{0:direction});
+            }
+			// Cross sections on a higher dimension
+			if ui.button("Section higher dimension").clicked() {
+                section_state.remove();
+				section_direction.pop();
             }
 
             let mut new_flatten = flatten;
@@ -796,8 +864,8 @@ fn show_views(
             ..
         } = section_state.as_mut()
         {
-            *minmax = original_polytope
-                .minmax(section_direction.0.clone())
+            minmax[0] = original_polytope
+                .minmax(section_direction[0].0.clone())
                 .unwrap_or((-1.0, 1.0));
         }
     }
@@ -817,27 +885,32 @@ fn show_views(
             }
 
             if let Some(mut p) = query.iter_mut().next() {
-                let r = original_polytope.clone();
-                let hyp_pos = *hyperplane_pos;
+                let mut r = original_polytope.clone();
+				let mut i = 0;
+                while i < hyperplane_pos.len() {
+					let hyp_pos = hyperplane_pos[i];
 
-                if let Some(dim) = r.dim() {
-                    let hyperplane = Hyperplane::new(section_direction.0.clone(), hyp_pos);
-                    *minmax = original_polytope
-                        .minmax(section_direction.0.clone())
-                        .unwrap_or((-1.0, 1.0));
+					if let Some(dim) = r.dim() {
+						let hyperplane = Hyperplane::new(section_direction[i].0.clone(), hyp_pos);
+						minmax[i] = r
+							.minmax(section_direction[i].0.clone())
+							.unwrap_or((-1.0, 1.0));
 
-                    minmax.0 += f64::EPS;
-                    let mut slice = r.cross_section(&hyperplane);
+						minmax[i].0 += f64::EPS;
+						let mut slice = r.cross_section(&hyperplane);
 
-                    if *flatten {
-                        slice.flatten_into(&hyperplane.subspace);
-                        slice.recenter_with(
-                            &hyperplane.flatten(&hyperplane.project(&Point::zeros(dim))),
-                        );
-                    }
+						if *flatten {
+							slice.flatten_into(&hyperplane.subspace);
+							slice.recenter_with(
+								&hyperplane.flatten(&hyperplane.project(&Point::zeros(dim))),
+							);
+						}
 
-                    *p = slice;
-                }
+						r = slice;
+					}
+					i = i + 1;
+				}
+				*p = r;
             }
         }
     }
