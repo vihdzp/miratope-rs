@@ -1,6 +1,6 @@
 [package]
 name = "miratope-core"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2018"
 
 [dependencies]
@@ -21,4 +21,3 @@ strum_macros = "0.21"
 unchecked_unwrap = "3"
 xml-rs = "0.8"
 zip = "0.5"
-
