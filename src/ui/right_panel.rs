@@ -7,8 +7,10 @@ use bevy_egui::{
     egui,
     EguiContext,
 };
-use miratope_core::{conc::{element_types::{EL_NAMES, EL_SUFFIXES}, ConcretePolytope}, Polytope, abs::Ranked};
+use miratope_core::{conc::{element_types::{EL_NAMES, EL_SUFFIXES}, ConcretePolytope}, Polytope, abs::Ranked, geometry::{Subspace, Point, Vector}};
 use vec_like::VecLike;
+
+use super::top_panel::{SectionDirection, SectionState};
 
 #[derive(Clone, Copy, Debug)]
 struct ElementTypeWithData {
@@ -132,6 +134,8 @@ pub fn show_right_panel(
 
     // The Miratope resources controlled by the right panel.
     mut element_types: ResMut<'_, ElementTypesRes>,
+    mut section_direction: ResMut<'_, Vec<SectionDirection>>,
+    section_state: Res<'_, SectionState>
 ) {
     // The right panel.
     egui::SidePanel::right("right_panel")
@@ -206,6 +210,20 @@ pub fn show_right_panel(
                                         }
                                         Ok(None) => eprintln!("Figure failed: no element at rank {}, index {}", r, i),
                                         Err(err) => eprintln!("Figure failed: {}", err),
+                                    }
+                                }
+                            }
+
+                            if let SectionState::Active{..} = section_state.clone() {
+                                if section_direction[0].0.len() == rank-1 { // Checks if the sliced polytope and the polytope the types are of have the same rank.
+                                    if ui.button("Align slice").clicked() {
+                                        if let Some(element) = poly.element(r,i) {
+                                            section_direction[0] = SectionDirection(Vector::from(Point::from(
+                                                Subspace::from_points(element.vertices.iter())
+                                                    .project(&Point::zeros(rank-1))
+                                                    .normalize()
+                                            )));
+                                        }
                                     }
                                 }
                             }

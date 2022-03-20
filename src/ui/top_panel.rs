@@ -2,14 +2,11 @@
 
 use std::path::PathBuf;
 
-use super::{camera::ProjectionType, memory::Memory, window::*, UnitPointWidget};
+use super::{camera::ProjectionType, memory::Memory, window::{Window, *}, UnitPointWidget};
 use crate::{Concrete, Float, Hyperplane, Point, Vector};
 
 use bevy::prelude::*;
-use bevy_egui::{
-    egui::{self, menu, Ui},
-    EguiContext,
-};
+use bevy_egui::{egui::{self, menu, Ui}, EguiContext};
 use miratope_core::{conc::{ConcretePolytope, faceting::GroupEnum}, file::FromFile, float::Float as Float2, Polytope, abs::Ranked};
 
 /// The plugin in charge of everything on the top panel.
@@ -134,7 +131,7 @@ impl Default for SectionState {
 }
 
 /// Stores the direction in which the cross-sections are taken.
-pub struct SectionDirection(Vector);
+pub struct SectionDirection(pub Vector);
 
 impl Default for SectionDirection {
     fn default() -> Self {
@@ -665,21 +662,26 @@ pub fn show_top_panel(
                     // The view is inactive, but will be activated.
                     SectionState::Inactive => {
                         let mut p = query.iter_mut().next().unwrap();
-                        p.flatten();
 
-                        // The default direction is in the last coordinate axis.
-                        let dim = p.dim_or();
-                        let mut direction = Vector::zeros(dim);
-                        if dim > 0 {
-                            direction[dim - 1] = 1.0;
+                        if p.rank() < 4 { // Cannot slice a polygon or lower.
+                            println!("Slicing polytopes of rank less than 3 is not supported!");
+                        } else {
+                            p.flatten();
+
+                            // The default direction is in the last coordinate axis.
+                            let dim = p.dim_or();
+                            let mut direction = Vector::zeros(dim);
+                            if dim > 0 {
+                                direction[dim - 1] = 1.0;
+                            }
+    
+                            let minmax = p.minmax(direction.clone()).unwrap_or((-1.0, 1.0));
+                            let original_polytope = p.clone();
+    
+                            section_state.open(original_polytope, vec![minmax]);
+                            section_direction.clear();
+                            section_direction.push(SectionDirection{0:direction});
                         }
-
-                        let minmax = p.minmax(direction.clone()).unwrap_or((-1.0, 1.0));
-                        let original_polytope = p.clone();
-
-                        section_state.open(original_polytope, vec![minmax]);
-                        section_direction.clear();
-                        section_direction.push(SectionDirection{0:direction});
                     }
                 };
             }
@@ -754,7 +756,7 @@ fn show_views(
     ui: &mut Ui,
     mut query: Query<'_, '_, &mut Concrete>,
     mut section_state: ResMut<'_, SectionState>,
-    mut section_direction: ResMut<'_, Vec<SectionDirection>>,
+    mut section_direction: ResMut<'_, Vec<SectionDirection>>
 ) {
     // The cross-section settings.
     if let SectionState::Active {

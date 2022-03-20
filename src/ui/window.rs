@@ -10,7 +10,7 @@ use super::{
     PointWidget,
 };
 use crate::{Concrete, Float, Hypersphere, Point};
-use miratope_core::{conc::{ConcretePolytope}, Polytope};
+use miratope_core::{conc::ConcretePolytope, Polytope};
 
 use bevy::prelude::*;
 use bevy_egui::{

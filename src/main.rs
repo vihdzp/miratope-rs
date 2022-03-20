@@ -40,19 +40,19 @@ type Float = f64;
 /// type for the application.
 type Concrete = miratope_core::conc::Concrete;
 
-/// A [`Point`](miratope_core::geometry::Point) polytope with the floating type
+/// A [`Point`](miratope_core::geometry::Point) with the floating type
 /// for the application.
 type Point = miratope_core::geometry::Point<f64>;
 
-/// A [`Vector`](miratope_core::geometry::Vector) polytope with the floating
+/// A [`Vector`](miratope_core::geometry::Vector) with the floating
 /// type for the application.
 type Vector = miratope_core::geometry::Vector<f64>;
 
-/// A [`Hypersphere`](miratope_core::geometry::Hypersphere) polytope with the
+/// A [`Hypersphere`](miratope_core::geometry::Hypersphere) with the
 /// floating type for the application.
 type Hypersphere = miratope_core::geometry::Hypersphere<f64>;
 
-/// A [`Hyperplane`](miratope_core::geometry::Hyperplane) polytope with the
+/// A [`Hyperplane`](miratope_core::geometry::Hyperplane) with the
 /// floating type for the application.
 type Hyperplane = miratope_core::geometry::Hyperplane<f64>;
 
