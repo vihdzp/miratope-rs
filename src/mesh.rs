@@ -262,9 +262,16 @@ pub trait Renderable: ConcretePolytope {
             return empty_mesh();
         }
 
+        let mut poly = self.clone();
+        
+        if poly.rank() == 3 {
+            poly = poly.ditope();
+            poly.untangle_faces();
+        }
+
         // Triangulates the polytope's faces, projects the vertices of both the
         // polytope and the triangulation.
-        let triangulation = Triangulation::new(self.con());
+        let triangulation = Triangulation::new(poly.con());
         let vertices = vertex_coords(
             self.con(),
             self.vertices()

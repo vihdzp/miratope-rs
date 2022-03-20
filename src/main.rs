@@ -61,6 +61,7 @@ const EPS: Float = <Float as miratope_core::float::Float>::EPS;
 
 /// Loads all of the necessary systems for the application to run.
 fn main() {
+    std::env::set_var("RUST_BACKTRACE", "1");
     App::new()
         .insert_resource(WindowDescriptor {
             title: concat!("miratope v", env!("CARGO_PKG_VERSION")).to_string(),

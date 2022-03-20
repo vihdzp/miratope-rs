@@ -10,7 +10,7 @@ use bevy_egui::{
     egui::{self, menu, Ui},
     EguiContext,
 };
-use miratope_core::{conc::{ConcretePolytope, faceting::GroupEnum}, file::FromFile, float::Float as Float2, Polytope};
+use miratope_core::{conc::{ConcretePolytope, faceting::GroupEnum}, file::FromFile, float::Float as Float2, Polytope, abs::Ranked};
 
 /// The plugin in charge of everything on the top panel.
 pub struct TopPanelPlugin;
@@ -672,6 +672,7 @@ pub fn show_top_panel(
                         let original_polytope = p.clone();
 
                         section_state.open(original_polytope, vec![minmax]);
+                        section_direction.clear();
                         section_direction.push(SectionDirection{0:direction});
                     }
                 };
@@ -814,8 +815,16 @@ fn show_views(
             if ui.button("Make main").clicked() {
                 section_state.close();
             }
+
             // Cross sections on a lower dimension
-			if ui.button("Section lower dimension").clicked() {
+			if ui.add(egui::Button::new("+").enabled(
+                section_direction.len() <
+                    if let SectionState::Active {original_polytope, ..} = section_state.clone() {
+                        original_polytope.rank()-3
+                    } else {
+                        0
+                    }
+                )).clicked() {
 				let p = query.iter_mut().next().unwrap();
 				let dim = p.dim_or();
 				let mut direction = Vector::zeros(dim);
@@ -826,9 +835,9 @@ fn show_views(
 				section_direction.push(SectionDirection{0:direction});
             }
 			// Cross sections on a higher dimension
-			if ui.button("Section higher dimension").clicked() {
+			if ui.add(egui::Button::new("-").enabled(section_direction.len() > 1)).clicked() {
                 section_state.remove();
-				section_direction.pop();
+                section_direction.pop();
             }
 
             let mut new_flatten = flatten;
@@ -855,19 +864,6 @@ fn show_views(
                 }
             }
         });
-    }
-
-    if section_direction.is_changed() {
-        if let SectionState::Active {
-            original_polytope,
-            minmax,
-            ..
-        } = section_state.as_mut()
-        {
-            minmax[0] = original_polytope
-                .minmax(section_direction[0].0.clone())
-                .unwrap_or((-1.0, 1.0));
-        }
     }
 
     if section_state.is_changed() {
@@ -908,7 +904,7 @@ fn show_views(
 
 						r = slice;
 					}
-					i = i + 1;
+					i += 1;
 				}
 				*p = r;
             }

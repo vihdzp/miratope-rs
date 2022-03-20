@@ -1084,6 +1084,10 @@ impl ConcretePolytope for Concrete {
     /// # Todo
     /// We should make this function take a general [`Subspace`] instead.
     fn cross_section(&self, slice: &Hyperplane<f64>) -> Self {
+        if self.rank() < 4 {
+            unreachable!();
+        }
+
         let mut vertices = Vec::new();
         let mut ranks = Vec::with_capacity(self.rank());
 
@@ -1202,9 +1206,6 @@ impl ConcretePolytope for Concrete {
         // Safety: TODO shit, this one's complicated... I'll come back to it.
         unsafe {
             let mut abs = builder.build();
-            if abs.rank() == 3 {
-                abs = abs.ditope();
-            }
             abs.untangle_faces();
             Self::new(vertices, abs)
         }
