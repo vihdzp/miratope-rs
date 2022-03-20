@@ -844,6 +844,10 @@ impl Polytope for Abstract {
             
             for edge_idx in edge_idxs {
                 let edge = &self[2][*edge_idx];
+
+                if edge.subs.len() != 2 { // This shouldn't happen, but apparently it does sometimes when doing cross-sections
+                    return
+                }
                 for i in 0..=1 {
                     if map.get(&edge.subs[i]).is_none() {
                         map.insert(edge.subs[i], map.len());
