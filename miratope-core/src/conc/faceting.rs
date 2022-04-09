@@ -1318,28 +1318,36 @@ impl Concrete {
     
                 if builder.ranks().is_dyadic().is_ok() {
                     let abs = builder.build();
+					let mut abs2 = abs.clone(); 
                     let mut new_vertices = Vec::new();
                     for i in to_old_idx {
                         new_vertices.push(self.vertices[i].clone());
                     }
 
-                    let poly = Concrete {
+                    let mut poly = Concrete {
                         vertices: new_vertices,
                         abs,
                     };
-
+					let mut fissary_status = "";
+					abs2.element_sort();
+					if abs2.is_compound() {
+						fissary_status = "(C)";
+					} else if poly.is_fissary() {
+						fissary_status = "(F)";
+					}
+					
                     let mut facets_fmt = String::new();
                     for facet in &facets {
                         facets_fmt.push_str(&format!(" ({},{})", facet.0, facet.1));
                     }
-                    println!("Faceting {}:{}", faceting_idx, facets_fmt);
+                    println!("Faceting {}:{} {}", faceting_idx, facets_fmt, fissary_status);
 
                     if save {
                         output.push((poly.clone(), Some(
                             if save_facets {
-                                format!("faceting {} -{}", faceting_idx, facets_fmt)
+                                format!("faceting {} -{} {}", faceting_idx, facets_fmt, fissary_status)
                             } else {
-                                format!("faceting {}", faceting_idx)
+                                format!("faceting {} {}", faceting_idx, fissary_status)
                             }
                         )));
                     }
