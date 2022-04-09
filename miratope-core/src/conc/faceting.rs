@@ -727,8 +727,8 @@ impl Concrete {
             },
         };
 
-        println!("\nEnumerating hyperplanes...");
-        
+        println!("\nMatching vertices...");
+
         // Checking every r-tuple of vertices would take too long, so we put pairs into orbits first to reduce the number.
         // I don't think we need to store the whole orbits at this point, but they might be useful if we want to improve the algorithm.
         let mut vertex_orbits = Vec::new(); // Vec of orbits which are vecs of vertices.
@@ -753,6 +753,10 @@ impl Concrete {
                 orbit_idx += 1;
             }
         }
+
+        println!("{} vertices in {} orbit{}", vertices.len(), orbit_idx, if orbit_idx == 1 {""} else {"s"});
+
+        println!("\nEnumerating hyperplanes...");
 
         let mut pair_orbits = Vec::new();
         let mut checked = vec![vec![false; vertices.len()]; vertices.len()];
@@ -866,7 +870,8 @@ impl Concrete {
             }
         }
 
-        println!("Found {} hyperplanes in {} orbits", checked.len(), hyperplane_orbits.len());
+        println!("{} hyperplanes in {} orbit{}", checked.len(), hyperplane_orbits.len(), if hyperplane_orbits.len() == 1 {""} else {"s"});
+
         println!("\nFaceting hyperplanes...");
 
         // Facet the hyperplanes
