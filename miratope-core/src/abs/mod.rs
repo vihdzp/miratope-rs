@@ -18,7 +18,7 @@ use super::Polytope;
 
 use vec_like::VecLike;
 
-use partitions::PartitionVec;
+use partitions::{PartitionVec, partition_vec};
 
 pub use ranked::*;
 pub use valid::*;
@@ -740,6 +740,89 @@ impl Polytope for Abstract {
         *self.ranks.max_mut() = Element::max(self.facet_count());
     }
 
+    /// Makes a polytope strongly connected. Splits compounds into their components.
+    fn defiss(&self) -> Vec<Abstract> {
+        let mut output = Vec::<Abstract>::new();
+
+        let flags: Vec<Flag> = self.flags().collect();
+        let mut flags_map_back = HashMap::new();
+        for (idx, flag) in flags.iter().enumerate() {
+            flags_map_back.insert(flag, idx);
+        }
+
+        let mut partitions: Vec<PartitionVec<()>> = vec![partition_vec![(); flags.len()]; self.rank()];
+
+        for (idx, flag) in flags.iter().enumerate() {
+            for change in 1..self.rank() {
+                let changed_flag = flag.change(self, change);
+                let changed_idx = flags_map_back.get(&changed_flag).unwrap();
+                
+                for rank in 0..self.rank() {
+                    if rank != change {
+                        partitions[rank].union(idx, *changed_idx);
+                    }
+                }
+            }
+        }
+
+        let components = partitions[0].all_sets();
+
+        for component in components {
+            let mut elements = Ranks::with_rank_capacity(self.rank());
+            elements.push(ElementList::from(vec![Element::new(Subelements::new(), Superelements::new())]));
+            for _ in 1..self.rank() {
+                elements.push(ElementList::new());
+            }
+
+            let mut idx_in_rank = vec![HashMap::<usize, usize>::new(); self.rank()];
+            let mut counts = vec![0; self.rank()];
+            for (flag_idx, _) in component {
+                let mut sub = 0;
+
+                for rank in 1..self.rank() {
+                    match idx_in_rank[rank].get(&flag_idx) {
+                        Some(idx) => {
+                            if !elements[rank][*idx].subs.contains(&sub) {
+                                elements[rank][*idx].subs.push(sub);
+                            }
+
+                            sub = *idx;
+                        }
+                        None => {
+                            let set = partitions[rank].set(flag_idx);
+
+                            for (el, _) in set {
+                                idx_in_rank[rank].insert(el, counts[rank]);
+                            }
+                            elements[rank].push(
+                                Element{
+                                    subs: Subelements::from(vec![sub]),
+                                    sups: Superelements::from(vec![]),
+                                });
+
+                            sub = counts[rank];
+                            counts[rank] += 1;
+                        }
+                    }
+                }
+            }
+            let mut builder = AbstractBuilder::new();
+            for rank in elements {
+                builder.push_empty();
+                for el in rank {
+                    builder.push_subs(el.subs);
+                }
+            }
+            builder.push_max();
+            unsafe {
+                let polytope = builder.build();
+                output.push(polytope);
+            }
+        }
+
+        output
+    }
+    
     /// Gets the element with a given rank and index as a polytope, if it exists.
     fn element(&self, rank: usize, idx: usize) -> Option<Self> {
         Some(ElementHash::new(self, rank, idx)?.to_polytope(self))

@@ -311,6 +311,9 @@ pub trait Polytope:
         }
     }
 
+    /// Makes a polytope strongly connected. Splits compounds into their components.
+    fn defiss(&self) -> Vec<Self>;
+
     /// Builds a Petrial in place. Returns `true` if successful. Does not modify
     /// the original polytope otherwise.
     fn petrial_mut(&mut self) -> bool;

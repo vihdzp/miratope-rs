@@ -101,7 +101,7 @@ impl From<Superelements> for Element {
 }
 
 impl Element {
-    /// Initializes a new element with no subelements and no superelements.
+    /// Initializes a new element.
     pub fn new(subs: Subelements, sups: Superelements) -> Self {
         Self { subs, sups }
     }

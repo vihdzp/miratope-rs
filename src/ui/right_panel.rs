@@ -38,6 +38,9 @@ pub struct ElementTypesRes {
     /// The element types.
     types: Vec<Vec<ElementTypeWithData>>,
 
+    /// The components.
+    components: Vec<Concrete>,
+
     /// Whether the loaded polytope matches `poly` and the buttons should be greyed out.
     pub main: bool,
 
@@ -50,6 +53,7 @@ impl Default for ElementTypesRes {
         ElementTypesRes {
             poly: Concrete::nullitope(),
             types: Vec::new(),
+            components: vec![Concrete::nullitope()],
             main: true,
             main_updating: false,
         }
@@ -58,6 +62,9 @@ impl Default for ElementTypesRes {
 
 impl ElementTypesRes {
     fn from_poly(&self, poly: Mut<'_, Concrete>) -> ElementTypesRes {
+        let mut poly = poly.clone();
+        poly.element_sort();
+
         let plain_types = poly.element_types();
         let mut types_with_data = Vec::new();
     
@@ -98,10 +105,13 @@ impl ElementTypesRes {
             }
             types_with_data.push(types_with_data_this_rank);
         }
+
+        let components = poly.defiss();
     
         ElementTypesRes {
             poly: poly.clone(),
             types: types_with_data,
+            components,
             main: true,
             main_updating: false,
         }
@@ -240,6 +250,29 @@ pub fn show_right_panel(
 
                     ui.separator();
                 }
-        });
+
+                ui.heading("Components");
+                ui.label(format!("{} component{}",
+                    element_types.components.len(),
+                    if element_types.components.len() == 1 {""} else {"s"}
+                ));
+
+                for component in &element_types.components {
+                    if ui.button(format!("{}-{}", 
+                        if component.rank() < 1 {
+                            0
+                        } else {
+                            component.abs[component.rank()-1].len()
+                        },
+                        EL_SUFFIXES[element_types.poly.rank()],
+                    )).clicked() {
+                        if let Some(mut p) = query.iter_mut().next() {
+                            *p = component.clone();
+                        }
+                    }
+                }
+
+                ui.separator();
+            });
     });
 }
