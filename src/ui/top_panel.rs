@@ -461,6 +461,31 @@ pub fn show_top_panel(
                         println!("Symmetry order {}", group.count());
                     }
                 }
+				
+                // Gets if it is a compound
+                if ui.button("Is compound").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+						p.abs.element_sort();
+                        if p.abs.is_compound() {
+							println!("The polytope is a compound.")
+						} else {
+							println!("The polytope is not a compound.")
+						}
+                    }
+                }
+				
+				
+                // Gets if it is a compound
+                if ui.button("Is fissary").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        if p.is_fissary() {
+							println!("The polytope is fissary.")
+						} else {
+							println!("The polytope is not fissary.")
+						}
+                    }
+                }
+				
             });
 
             menu::menu(ui, "Transform", |ui| {

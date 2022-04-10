@@ -978,6 +978,10 @@ pub trait ConcretePolytope: Polytope {
 
     /// Slices the polytope through a given plane.
     fn cross_section(&self, slice: &Hyperplane<f64>) -> Self;
+	
+	/// Checks if is fissary.
+    fn is_fissary(&mut self) -> bool;
+	
 }
 
 impl ConcretePolytope for Concrete {
@@ -1316,6 +1320,41 @@ impl ConcretePolytope for Concrete {
         //dbg!(abs.clone());
 
         Self::new(vertex_coords, abs)
+    }
+	
+	
+	/// Checks if is fissary.
+    fn is_fissary(&mut self) -> bool {
+        let types = self.element_types();
+		
+		self.abs.element_sort();
+		
+        let mut i = 1;
+		while i < types.len() {
+			if i == self.rank() {
+				break;
+			}
+			let mut j = 0;
+			while j < types[i].len() {
+				let example = types[i][j].example;
+				
+				let mut element = self.abs.element(i, example).unwrap();
+				
+				element.element_sort();
+				if self.element(i, example).unwrap().is_fissary() && !element.is_compound() {
+					return true;
+				}
+				
+				let mut figure = self.abs.element_fig(i, example).unwrap().unwrap();
+				figure.element_sort();
+				if figure.is_compound() {
+					return true;
+				}
+				j = j+1;
+			}
+			i = i+1;
+		}
+		return false;
     }
 }
 
