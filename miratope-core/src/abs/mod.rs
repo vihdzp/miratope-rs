@@ -742,6 +742,10 @@ impl Polytope for Abstract {
 
     /// Makes a polytope strongly connected. Splits compounds into their components.
     fn defiss(&self) -> Vec<Abstract> {
+        if self.rank() < 1 {
+            return vec![Abstract::nullitope()];
+        }
+
         let mut output = Vec::<Abstract>::new();
 
         let flags: Vec<Flag> = self.flags().collect();

@@ -216,6 +216,9 @@ impl Polytope for Concrete {
 
     /// Makes a polytope strongly connected. Splits compounds into their components.
     fn defiss(&self) -> Vec<Concrete> {
+        if self.rank() < 1 {
+            return vec![Concrete::nullitope()];
+        }
         let mut output = Vec::<Concrete>::new();
 
         let flags: Vec<Flag> = self.flags().collect();

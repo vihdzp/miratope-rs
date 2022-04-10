@@ -32,6 +32,10 @@ struct ElementTypeWithData {
 
 #[derive(Clone)]
 pub struct ElementTypesRes {
+    /// Whether the panel has been activated. Should be `false` on startup and `true`
+    /// once `Generate` is clicked.
+    active: bool,
+
     /// The polytope whose data we're getting.
     poly: Concrete,
 
@@ -39,7 +43,7 @@ pub struct ElementTypesRes {
     types: Vec<Vec<ElementTypeWithData>>,
 
     /// The components.
-    components: Vec<Concrete>,
+    components: Option<Vec<Concrete>>,
 
     /// Whether the loaded polytope matches `poly` and the buttons should be greyed out.
     pub main: bool,
@@ -51,9 +55,10 @@ pub struct ElementTypesRes {
 impl Default for ElementTypesRes {
     fn default() -> ElementTypesRes {
         ElementTypesRes {
+            active: false,
             poly: Concrete::nullitope(),
             types: Vec::new(),
-            components: vec![Concrete::nullitope()],
+            components: None,
             main: true,
             main_updating: false,
         }
@@ -105,16 +110,19 @@ impl ElementTypesRes {
             }
             types_with_data.push(types_with_data_this_rank);
         }
-
-        let components = poly.defiss();
     
         ElementTypesRes {
+            active: true,
             poly: poly.clone(),
             types: types_with_data,
-            components,
+            components: None,
             main: true,
             main_updating: false,
         }
+    }
+
+    fn generate_components(&mut self) {
+        self.components = Some(self.poly.defiss());
     }
 }
 
@@ -133,7 +141,6 @@ impl Plugin for RightPanelPlugin {
             );
     }
 }
-
 
 /// The system that shows the right panel.
 #[allow(clippy::too_many_arguments)]
@@ -172,107 +179,120 @@ pub fn show_right_panel(
 
             ui.separator();
 
-            egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
-                for (r, types) in element_types.types.clone().into_iter().enumerate().skip(1) {
-                    let poly = &element_types.poly;
-                    let rank = element_types.poly.rank();
+            if element_types.active {
+                egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
+                    for (r, types) in element_types.types.clone().into_iter().enumerate().skip(1) {
+                        let poly = &element_types.poly;
+                        let rank = element_types.poly.rank();
 
-                    if r == rank {
-                        break;
+                        if r == rank {
+                            break;
+                        }
+
+                        ui.heading(format!("{}", EL_NAMES[r]));
+                        for t in types {
+                            let i = t.example;
+
+                            ui.horizontal(|ui| {
+
+                                // The number of elements in this orbit
+                                ui.label(format!("{} ×",t.count));
+
+                                // Button to get the element
+                                if ui.button(format!("{}-{}", 
+                                    t.facets,
+                                    EL_SUFFIXES[r],
+                                )).clicked() {
+                                    if let Some(mut p) = query.iter_mut().next() {
+                                        if let Some(mut element) = poly.element(r,i) {
+                                            element.flatten();
+                                            element.recenter();
+                                            *p = element;
+                                        } else {
+                                            eprintln!("Element failed: no element at rank {}, index {}", r, i);
+                                        }
+                                    }
+                                }
+
+                                // Button to get the element figure
+                                if ui.button(format!("{}-{}",
+                                    t.fig_facets,
+                                    EL_SUFFIXES[rank - r],
+                                )).clicked() {
+                                    if let Some(mut p) = query.iter_mut().next() {
+                                        match poly.element_fig(r, i) {
+                                            Ok(Some(mut figure)) => {
+                                                figure.flatten();
+                                                figure.recenter();
+                                                *p = figure;
+                                            }
+                                            Ok(None) => eprintln!("Figure failed: no element at rank {}, index {}", r, i),
+                                            Err(err) => eprintln!("Figure failed: {}", err),
+                                        }
+                                    }
+                                }
+
+                                if let SectionState::Active{..} = section_state.clone() {
+                                    if section_direction[0].0.len() == rank-1 { // Checks if the sliced polytope and the polytope the types are of have the same rank.
+                                        if ui.button("Align slice").clicked() {
+                                            if let Some(element) = poly.element(r,i) {
+                                                section_direction[0] = SectionDirection(Vector::from(Point::from(
+                                                    Subspace::from_points(element.vertices.iter())
+                                                        .project(&Point::zeros(rank-1))
+                                                        .normalize()
+                                                )));
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if let Some(radius) = t.radius {
+                                    ui.label(
+                                        if r == 1 {format!("norm {:.10}", radius)}
+                                        else if r == 2 {format!("length {:.10}", radius*2.0)}
+                                        else {format!("radius {:.10}", radius)}
+                                    );
+                                }
+                            });
+                        }
+
+                        ui.separator();
                     }
 
-                    ui.heading(format!("{}", EL_NAMES[r]));
-                    for t in types {
-                        let i = t.example;
+                    ui.horizontal(|ui| {
+                        ui.heading("Components");
 
-                        ui.horizontal(|ui| {
+                        if element_types.components.is_none() {
+                            if ui.button("Generate").clicked() {
+                                element_types.generate_components();
+                            }
+                        }
+                    });
 
-                            // The number of elements in this orbit
-                            ui.label(format!("{} ×",t.count));
+                    if let Some(components) = &element_types.components {
+                        ui.label(format!("{} component{}",
+                            components.len(),
+                            if components.len() == 1 {""} else {"s"}
+                        ));
 
-                            // Button to get the element
+                        for component in components {
                             if ui.button(format!("{}-{}", 
-                                t.facets,
-                                EL_SUFFIXES[r],
+                                if component.rank() < 1 {
+                                    0
+                                } else {
+                                    component.abs[component.rank()-1].len()
+                                },
+                                EL_SUFFIXES[element_types.poly.rank()],
                             )).clicked() {
                                 if let Some(mut p) = query.iter_mut().next() {
-                                    if let Some(mut element) = poly.element(r,i) {
-                                        element.flatten();
-                                        element.recenter();
-                                        *p = element;
-                                    } else {
-                                        eprintln!("Element failed: no element at rank {}, index {}", r, i);
-                                    }
+                                    *p = component.clone();
                                 }
                             }
-
-                            // Button to get the element figure
-                            if ui.button(format!("{}-{}",
-                                t.fig_facets,
-                                EL_SUFFIXES[rank - r],
-                            )).clicked() {
-                                if let Some(mut p) = query.iter_mut().next() {
-                                    match poly.element_fig(r, i) {
-                                        Ok(Some(mut figure)) => {
-                                            figure.flatten();
-                                            figure.recenter();
-                                            *p = figure;
-                                        }
-                                        Ok(None) => eprintln!("Figure failed: no element at rank {}, index {}", r, i),
-                                        Err(err) => eprintln!("Figure failed: {}", err),
-                                    }
-                                }
-                            }
-
-                            if let SectionState::Active{..} = section_state.clone() {
-                                if section_direction[0].0.len() == rank-1 { // Checks if the sliced polytope and the polytope the types are of have the same rank.
-                                    if ui.button("Align slice").clicked() {
-                                        if let Some(element) = poly.element(r,i) {
-                                            section_direction[0] = SectionDirection(Vector::from(Point::from(
-                                                Subspace::from_points(element.vertices.iter())
-                                                    .project(&Point::zeros(rank-1))
-                                                    .normalize()
-                                            )));
-                                        }
-                                    }
-                                }
-                            }
-
-                            if let Some(radius) = t.radius {
-                                ui.label(
-                                    if r == 1 {format!("norm {:.10}", radius)}
-                                    else if r == 2 {format!("length {:.10}", radius*2.0)}
-                                    else {format!("radius {:.10}", radius)}
-                                );
-                            }
-                        });
+                        }
                     }
 
                     ui.separator();
-                }
-
-                ui.heading("Components");
-                ui.label(format!("{} component{}",
-                    element_types.components.len(),
-                    if element_types.components.len() == 1 {""} else {"s"}
-                ));
-
-                for component in &element_types.components {
-                    if ui.button(format!("{}-{}", 
-                        if component.rank() < 1 {
-                            0
-                        } else {
-                            component.abs[component.rank()-1].len()
-                        },
-                        EL_SUFFIXES[element_types.poly.rank()],
-                    )).clicked() {
-                        if let Some(mut p) = query.iter_mut().next() {
-                            *p = component.clone();
-                        }
-                    }
-                }
-
-                ui.separator();
-            });
+                }); 
+            }
     });
 }
