@@ -1186,6 +1186,9 @@ pub struct FacetingSettings {
     /// Whether to include trivial compounds (compounds of other full-symmetric facetings).
     pub compounds: bool,
 
+    /// Whether to check if the faceting is compound or fissary and mark it.
+    pub mark_fissary: bool,
+
     /// Whether to save the facetings in memory.
     pub save: bool,
 
@@ -1202,6 +1205,7 @@ impl Default for FacetingSettings {
             chiral: false,
             unit_edges: true,
             compounds: false,
+            mark_fissary: true,
             save: true,
             save_facets: false,
         }
@@ -1254,6 +1258,11 @@ impl PlainWindow for FacetingSettings {
         ui.horizontal(|ui| {
             ui.add(
                 egui::Checkbox::new(&mut self.compounds, "Include trivial compounds")
+            );
+        });
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::Checkbox::new(&mut self.mark_fissary, "Mark compounds/fissaries")
             );
         });
         ui.horizontal(|ui| {

@@ -689,6 +689,7 @@ impl Concrete {
         noble: Option<usize>,
         max_per_hyperplane: Option<usize>,
         include_compounds: bool,
+        mark_fissary: bool,
         save: bool,
         save_facets: bool,
     ) -> Vec<(Concrete, Option<String>)> {
@@ -1322,8 +1323,7 @@ impl Concrete {
                 }
     
                 if builder.ranks().is_dyadic().is_ok() {
-                    let abs = builder.build();
-					let mut abs2 = abs.clone(); 
+                    let mut abs = builder.build();
                     let mut new_vertices = Vec::new();
                     for i in to_old_idx {
                         new_vertices.push(self.vertices[i].clone());
@@ -1331,28 +1331,32 @@ impl Concrete {
 
                     let mut poly = Concrete {
                         vertices: new_vertices,
-                        abs,
+                        abs: abs.clone(),
                     };
+
 					let mut fissary_status = "";
-					abs2.element_sort();
-					if abs2.is_compound() {
-						fissary_status = "(C)";
-					} else if poly.is_fissary() {
-						fissary_status = "(F)";
-					}
+                    if mark_fissary {
+                        abs.element_sort();
+                        
+                        if abs.is_compound() {
+                            fissary_status = " [C]";
+                        } else if poly.is_fissary() {
+                            fissary_status = " [F]";
+                        }
+                    }
 					
                     let mut facets_fmt = String::new();
                     for facet in &facets {
                         facets_fmt.push_str(&format!(" ({},{})", facet.0, facet.1));
                     }
-                    println!("Faceting {}:{} {}", faceting_idx, facets_fmt, fissary_status);
+                    println!("Faceting {}:{}{}", faceting_idx, facets_fmt, fissary_status);
 
                     if save {
                         output.push((poly.clone(), Some(
                             if save_facets {
-                                format!("faceting {} -{} {}", faceting_idx, facets_fmt, fissary_status)
+                                format!("faceting {} -{}{}", faceting_idx, facets_fmt, fissary_status)
                             } else {
-                                format!("faceting {} {}", faceting_idx, fissary_status)
+                                format!("faceting {}{}", faceting_idx, fissary_status)
                             }
                         )));
                     }
