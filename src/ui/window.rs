@@ -256,7 +256,7 @@ impl<T: UpdateWindow + 'static> Plugin for UpdateWindowPlugin<T> {
 }
 
 /// A slot in the dropdown for duo-operations.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Slot {
     /// No polytope in particular.
     None,
@@ -281,6 +281,81 @@ impl Slot {
             Self::Memory(idx) => Some(&memory[idx].as_ref().unwrap().0),
             Self::Loaded => Some(loaded),
         }
+    }
+}
+
+/// A window that depends on [`Memory`], and that
+/// doesn't need to be updated when the polytope is changed.
+pub trait MemoryWindow: Window {
+    /// Applies the action of the window to the polytope.
+    fn action(&self, polytope: &mut Concrete);
+
+    /// Builds the window to be shown on screen.
+    fn build(&mut self, ui: &mut Ui, memory: &Memory);
+
+    /// Resets a window to its default state.
+    fn reset(&mut self) {
+        *self = Default::default();
+        self.open();
+    }
+
+    /// Shows the window on screen.
+    fn show(&mut self, ctx: &CtxRef, memory: &Memory) -> ShowResult {
+        let mut open = self.is_open();
+        let mut result = ShowResult::None;
+
+        egui::Window::new(Self::NAME)
+            .open(&mut open)
+            .resizable(false)
+            .show(ctx, |ui| {
+                self.build(ui, memory);
+                ui.add(OkReset::new(&mut result));
+            });
+
+        if open {
+            self.open();
+            result
+        } else {
+            ShowResult::Close
+        }
+    }
+
+    /// The system that shows the window.
+    fn show_system(
+        mut self_: ResMut<'_, Self>,
+        egui_ctx: Res<'_, EguiContext>,
+        mut query: Query<'_, '_, &mut Concrete>,
+        memory: Res<'_, Memory>,
+    ) where
+        Self: 'static,
+    {
+        match self_.show(egui_ctx.ctx(), &memory) {
+            ShowResult::Ok => {
+                for mut polytope in query.iter_mut() {
+                    self_.action(polytope.as_mut());
+                }
+                self_.close()
+            }
+            ShowResult::Close => self_.close(),
+            ShowResult::Reset => self_.reset(),
+            ShowResult::None => {}
+        }
+    }
+
+    /// A plugin that adds a resource of type `Self` and the system to show it.
+    fn plugin() -> MemoryWindowPlugin<Self> {
+        Default::default()
+    }
+}
+
+/// A plugin that adds all of the necessary systems for a [`MemoryWindow`].
+#[derive(Default)]
+pub struct MemoryWindowPlugin<T: MemoryWindow>(PhantomData<T>);
+
+impl<T: MemoryWindow + 'static> Plugin for MemoryWindowPlugin<T> {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<T>()
+            .add_system(T::show_system.system().label("show_windows"));
     }
 }
 
@@ -1166,10 +1241,23 @@ impl PlainWindow for ScaleWindow {
     }
 }
 
+/// Where to get the symmetry group for faceting
+#[derive(PartialEq)]
+pub enum GroupEnum2 {
+    /// Group of matrices
+    FromSlot(Slot),
+    /// True: take chiral group
+    /// False: take full group
+    Chiral(bool),
+}
+
 /// A window that lets the user set settings for faceting.
 pub struct FacetingSettings {
     /// Whether the window is open.
     open: bool,
+
+    /// The slot for the dropdown menu.
+    slot: Slot,
 
     /// The maximum number of facet types considered. 1 for isotopic, 0 for no limit.
     pub max_facet_types: usize,
@@ -1177,8 +1265,8 @@ pub struct FacetingSettings {
     /// The maximum number of facets generated in each hyperplane, to prevent combinatorial explosion. 0 for no limit.
     pub max_per_hyperplane: usize,
 
-    /// Whether to take the rotation subgroup.
-    pub chiral: bool,
+    /// Where to get the symmetry group from.
+    pub group: GroupEnum2,
 
     /// Whether to use unit edges only (superregiment).
     pub unit_edges: bool,
@@ -1200,9 +1288,10 @@ impl Default for FacetingSettings {
     fn default() -> Self {
         Self {
             open: false,
+            slot: Slot::default(),
             max_facet_types: 0,
             max_per_hyperplane: 0,
-            chiral: false,
+            group: GroupEnum2::Chiral(false),
             unit_edges: true,
             compounds: false,
             mark_fissary: true,
@@ -1224,11 +1313,11 @@ impl Window for FacetingSettings {
     }
 }
 
-impl PlainWindow for FacetingSettings {
+impl MemoryWindow for FacetingSettings {
     fn action(&self, _polytope: &mut Concrete) {
     }
 
-    fn build(&mut self, ui: &mut Ui) {
+    fn build(&mut self, ui: &mut Ui, memory: &Memory) {
         ui.horizontal(|ui| {
             ui.label("Max facet types");
             ui.add(
@@ -1245,35 +1334,94 @@ impl PlainWindow for FacetingSettings {
                     .clamp_range(0..=usize::MAX)
             );
         });
+        ui.separator();
+
+        ui.label("Group:");
+
+        ui.radio_value(&mut self.group, GroupEnum2::Chiral(false), "Full group");
+        ui.radio_value(&mut self.group, GroupEnum2::Chiral(true), "Chiral subgroup");
+
         ui.horizontal(|ui| {
-            ui.add(
-                egui::Checkbox::new(&mut self.unit_edges, "Unit edges only")
-            );
+            ui.radio_value(&mut self.group, GroupEnum2::FromSlot(self.slot), "From other polytope:");
+                
+            const SELECT: &str = "Select";
+
+            // The text for the selected option.
+            let selected_text = match self.slot {
+                // Nothing has been selected.
+                Slot::None => SELECT.to_string(),
+
+                // The loaded polytope is selected.
+                Slot::Loaded => LOADED_LABEL.to_string(),
+
+                // Something is selected from the memory.
+                Slot::Memory(selected_idx) => match memory[selected_idx].as_ref() {
+                    // Whatever was previously selected got deleted off the memory.
+                    None => {
+                        self.slot = Slot::None;
+                        SELECT.to_string()
+                    }
+
+                    // Shows the name of the selected polytope.
+                    Some(_) => slot_label(selected_idx),
+                },
+            };
+
+            // The drop-down for selecting polytopes, either from memory or the
+            // currently loaded one.
+            egui::ComboBox::from_label("")
+                .selected_text(selected_text)
+                .width(200.0)
+                .show_ui(ui, |ui| {
+                    // The currently loaded polytope.
+                    let mut loaded_selected = false;
+
+                    ui.selectable_value(&mut loaded_selected, true, LOADED_LABEL);
+
+                    // If the value was changed, update it.
+                    if loaded_selected {
+                        self.slot = Slot::Loaded;
+                    }
+
+                    // The polytopes in memory.
+                    for (slot_idx, _) in memory
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(idx, s)| s.as_ref().map(|s| (idx, s)))
+                    {
+                        // This value couldn't be selected by the user.
+                        let mut slot_inner = None;
+
+                        ui.selectable_value(&mut slot_inner, Some(slot_idx), slot_label(slot_idx));
+
+                        // If the value was changed, update it.
+                        if let Some(idx) = slot_inner {
+                            self.slot = Slot::Memory(idx);
+                        }
+                    }
+            });
         });
-        ui.horizontal(|ui| {
-            ui.add(
-                egui::Checkbox::new(&mut self.chiral, "Chiral subgroup")
-            );
-        });
-        ui.horizontal(|ui| {
-            ui.add(
-                egui::Checkbox::new(&mut self.compounds, "Include trivial compounds")
-            );
-        });
-        ui.horizontal(|ui| {
-            ui.add(
-                egui::Checkbox::new(&mut self.mark_fissary, "Mark compounds/fissaries")
-            );
-        });
-        ui.horizontal(|ui| {
-            ui.add(
-                egui::Checkbox::new(&mut self.save, "Save facetings")
-            );
-        });
-        ui.horizontal(|ui| {
-            ui.add(
-                egui::Checkbox::new(&mut self.save_facets, "Save facets")
-            );
-        });
+
+        ui.separator();
+
+        ui.add(
+            egui::Checkbox::new(&mut self.unit_edges, "Unit edges only")
+        );
+
+        ui.add(
+            egui::Checkbox::new(&mut self.compounds, "Include trivial compounds")
+        );
+
+        ui.add(
+            egui::Checkbox::new(&mut self.mark_fissary, "Mark compounds/fissaries")
+        );
+
+        ui.add(
+            egui::Checkbox::new(&mut self.save, "Save facetings")
+        );
+
+        ui.add(
+            egui::Checkbox::new(&mut self.save_facets, "Save facets")
+        );
     }
 }

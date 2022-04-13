@@ -5,7 +5,9 @@ use std::{collections::BTreeMap, vec, iter::FromIterator};
 use crate::{
     abs::{Ranked, flag::{FlagIter, Flag}},
     conc::Concrete,
-    group::{Group, GenIter}, geometry::{Matrix, PointOrd}, Polytope,
+    group::Group,
+    geometry::{Matrix, Point, PointOrd},
+    Polytope,
 };
 
 use vec_like::*;
@@ -109,7 +111,7 @@ impl Concrete {
 
     /// Fills in the vertex map.
     /// A vertex map is an array of (group element, vertex index) with values being the index of the vertex after applying the transformation.
-    pub fn get_vertex_map(&mut self, group: Group<GenIter<Matrix<f64>>>) -> Vec<Vec<usize>> {
+    pub fn get_vertex_map(&mut self, group: Group<vec::IntoIter<Matrix<f64>>>) -> Vec<Vec<usize>> {
         let mut vertices = Vec::<PointOrd<f64>>::new();
         for v in &self.vertices {
             vertices.push(PointOrd::new(v.clone()));
@@ -118,7 +120,7 @@ impl Concrete {
 
         let mut vertex_map: Vec<Vec<usize>> = Vec::new();
 
-        'a: for isometry in group {
+        for isometry in group {
             let mut vertex_map_row = Vec::<usize>::new();
             for vertex in &vertices {
                 let new_vertex = PointOrd::new(isometry.clone() * vertex.0.matrix());
@@ -127,12 +129,60 @@ impl Concrete {
                         vertex_map_row.push(*idx);
                     }
                     None => {
-                        continue 'a;
+                        unreachable!();
                     }
                 }
             }
             vertex_map.push(vertex_map_row);
         }
         vertex_map
+    }
+}
+
+/// A set of vertices.
+pub struct Vertices(pub Vec<Point<f64>>);
+
+impl Vertices {
+    /// Uses the provided symmetry group on the vertices, also outputs the new vertex map.
+    pub fn copy_by_symmetry(&self, group: Group<vec::IntoIter<Matrix<f64>>>) -> (Self, Vec<Vec<usize>>) {
+        let mut vertices = BTreeMap::<PointOrd<f64>, usize>::new();
+        let mut vertices_vec = Vec::new();
+        let mut c = 0;
+
+        for vertex in self.0.clone() {
+            if vertices.get(&PointOrd::new(vertex.clone())).is_none() {
+                for isometry in group.clone() {
+                    let new_vertex = PointOrd::<f64>::new(isometry.clone() * vertex.clone());
+                    if vertices.get(&new_vertex).is_none() {
+                        vertices.insert(new_vertex.clone(), c);
+                        vertices_vec.push(new_vertex);
+                        c += 1;
+                    }
+                }
+            }
+        }
+
+        let mut vertex_map: Vec<Vec<usize>> = Vec::new();
+
+        for isometry in group {
+            let mut vertex_map_row = Vec::<usize>::new();
+            for vertex in &vertices_vec {
+                let new_vertex = PointOrd::new(isometry.clone() * vertex.matrix());
+                match vertices.get(&new_vertex) {
+                    Some(idx) => {
+                        vertex_map_row.push(*idx);
+                    }
+                    None => {
+                        unreachable!();
+                    }
+                }
+            }
+            vertex_map.push(vertex_map_row);
+        }
+        
+        (
+            Vertices(Vec::from_iter(vertices_vec.into_iter().map(|point| point.0))),
+            vertex_map,
+        )
     }
 }

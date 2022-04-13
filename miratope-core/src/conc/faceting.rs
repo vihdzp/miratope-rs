@@ -6,7 +6,7 @@ use crate::{
     abs::{Abstract, Element, ElementList, Ranked, Ranks, Subelements, Superelements, AbstractBuilder},
     conc::{Concrete, ConcretePolytope},
     float::Float,
-    group::{Group, GenIter}, geometry::{Matrix, PointOrd, Subspace}, Polytope,
+    group::{Group}, geometry::{Matrix, PointOrd, Subspace, Point}, Polytope,
 };
 
 use vec_like::*;
@@ -14,7 +14,7 @@ use vec_like::*;
 /// Input for the faceting function
 pub enum GroupEnum {
     /// Group of matrices
-    ConcGroup(Group<GenIter<Matrix<f64>>>),
+    ConcGroup(Group<vec::IntoIter<Matrix<f64>>>),
     /// Group of vertex mappings
     VertexMap(Vec<Vec<usize>>),
     /// True: take chiral group
@@ -684,6 +684,7 @@ impl Concrete {
     /// If the symmetry group is not provided, it uses the full symmetry of the polytope.
     pub fn faceting(
         &mut self,
+        vertices: Vec<Point<f64>>,
         symmetry: GroupEnum,
         edge_length: Option<f64>,
         noble: Option<usize>,
@@ -701,10 +702,9 @@ impl Concrete {
         }
 
         let mut vertices_ord = Vec::<PointOrd<f64>>::new();
-        for v in &self.vertices {
+        for v in &vertices {
             vertices_ord.push(PointOrd::new(v.clone()));
         }
-        let vertices = BTreeMap::from_iter((vertices_ord.clone()).into_iter().zip(0..));
 
         let vertex_map = match symmetry {
             GroupEnum::ConcGroup(group) => {
@@ -767,7 +767,7 @@ impl Concrete {
             for vertex in 0..vertices.len() {
                 if vertex != rep && !checked[rep][vertex] {
                     if let Some(e_l) = edge_length {
-                        if ((&self.vertices[vertex]-&self.vertices[rep]).norm() - e_l).abs() > f64::EPS {
+                        if ((&vertices[vertex]-&vertices[rep]).norm() - e_l).abs() > f64::EPS {
                             continue
                         }
                     }
@@ -799,7 +799,7 @@ impl Concrete {
                 'c: loop {
                     if let Some(e_l) = edge_length {
                         for v in &new_vertices {
-                            if ((&self.vertices[*v]-&self.vertices[rep[0]]).norm() - e_l).abs() > f64::EPS {
+                            if ((&vertices[*v]-&vertices[rep[0]]).norm() - e_l).abs() > f64::EPS {
                                 break 'c;
                             }
                         }
@@ -810,13 +810,13 @@ impl Concrete {
 
                     let mut points = Vec::new();
                     for v in tuple {
-                        points.push(self.vertices[v].clone());
+                        points.push(vertices[v].clone());
                     }
 
                     let hyperplane = Subspace::from_points(points.iter());
                     if hyperplane.is_hyperplane() {
                         let mut hyperplane_vertices = Vec::new();
-                        for (idx, v) in self.vertices.iter().enumerate() {
+                        for (idx, v) in vertices.iter().enumerate() {
                             if hyperplane.distance(&v) < f64::EPS {
                                 hyperplane_vertices.push(idx);
                             }
@@ -837,7 +837,7 @@ impl Concrete {
                                 sorted.sort_unstable();
 
                                 if !checked.contains(&sorted) {
-                                    let new_hp_points = new_hp_v.iter().map(|x| &self.vertices[*x]);
+                                    let new_hp_points = new_hp_v.iter().map(|x| &vertices[*x]);
                                     let new_hp = Subspace::from_points(new_hp_points);
                                     checked.insert(sorted);
                                     new_orbit.push(new_hp);
@@ -852,7 +852,7 @@ impl Concrete {
                     break
                 }
                 loop { // Increment new_vertices.
-                    if new_vertices[update] == self.vertices.len() + update - rank + 3 {
+                    if new_vertices[update] == vertices.len() + update - rank + 3 {
                         if update < 1 {
                             break 'b;
                         }
@@ -1326,7 +1326,7 @@ impl Concrete {
                     let mut abs = builder.build();
                     let mut new_vertices = Vec::new();
                     for i in to_old_idx {
-                        new_vertices.push(self.vertices[i].clone());
+                        new_vertices.push(vertices[i].clone());
                     }
 
                     let mut poly = Concrete {

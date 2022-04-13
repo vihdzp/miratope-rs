@@ -7,7 +7,7 @@ use crate::{Concrete, Float, Hyperplane, Point, Vector};
 
 use bevy::prelude::*;
 use bevy_egui::{egui::{self, menu, Ui}, EguiContext};
-use miratope_core::{conc::{ConcretePolytope, faceting::GroupEnum}, file::FromFile, float::Float as Float2, Polytope, abs::Ranked};
+use miratope_core::{conc::{ConcretePolytope, faceting::GroupEnum, symmetry::Vertices}, file::FromFile, float::Float as Float2, Polytope, abs::Ranked};
 
 /// The plugin in charge of everything on the top panel.
 pub struct TopPanelPlugin;
@@ -713,9 +713,20 @@ pub fn show_top_panel(
 
             menu::menu(ui, "Faceting", |ui| {
                 if ui.button("Enumerate facetings").clicked() {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        let facetings = p.faceting(
-                            GroupEnum::Chiral(faceting_settings.chiral), 
+                    if let Some(p) = query.iter_mut().next() {
+                        let mut vertices_thing = (Vertices(vec![]), vec![]);
+                        if let GroupEnum2::FromSlot(slot) = faceting_settings.group {
+                            vertices_thing = Vertices(p.vertices.clone()).copy_by_symmetry(slot.to_poly(&mut memory, &p).unwrap().clone().get_symmetry_group().0);
+                        }
+                        let facetings = p.clone().faceting(
+                            match faceting_settings.group {
+                                GroupEnum2::Chiral(_) => p.vertices.clone(),
+                                GroupEnum2::FromSlot(_) => vertices_thing.0.0
+                            },
+                            match faceting_settings.group {
+                                GroupEnum2::Chiral(chiral) => GroupEnum::Chiral(chiral),
+                                GroupEnum2::FromSlot(_) => GroupEnum::VertexMap(vertices_thing.1)
+                            },
                             if faceting_settings.unit_edges {Some(1.0)} else {None}, 
                             if faceting_settings.max_facet_types == 0 {None} else {Some(faceting_settings.max_facet_types)},
                             if faceting_settings.max_per_hyperplane == 0 {None} else {Some(faceting_settings.max_per_hyperplane)},
