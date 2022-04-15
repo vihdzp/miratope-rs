@@ -1381,6 +1381,7 @@ impl MemoryWindow for FacetingSettings {
                     // If the value was changed, update it.
                     if loaded_selected {
                         self.slot = Slot::Loaded;
+                        self.group = GroupEnum2::FromSlot(self.slot);
                     }
 
                     // The polytopes in memory.
@@ -1397,6 +1398,7 @@ impl MemoryWindow for FacetingSettings {
                         // If the value was changed, update it.
                         if let Some(idx) = slot_inner {
                             self.slot = Slot::Memory(idx);
+                            self.group = GroupEnum2::FromSlot(self.slot);
                         }
                     }
             });

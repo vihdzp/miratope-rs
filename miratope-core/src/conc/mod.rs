@@ -297,9 +297,11 @@ impl Polytope for Concrete {
             }
             builder.push_max();
             unsafe {
-                let abs = builder.build();
-                let conc = Concrete{abs, vertices};
-                output.push(conc);
+                if builder.ranks().is_dyadic().is_ok() {
+                    let abs = builder.build();
+                    let conc = Concrete{abs, vertices};
+                    output.push(conc);
+                }
             }
         }
 
@@ -983,7 +985,7 @@ pub trait ConcretePolytope: Polytope {
     fn cross_section(&self, slice: &Hyperplane<f64>) -> Self;
 	
 	/// Checks if is fissary.
-    fn is_fissary(&mut self) -> bool;
+    fn is_fissary(&self) -> bool;
 	
 }
 
@@ -1327,10 +1329,8 @@ impl ConcretePolytope for Concrete {
 	
 	
 	/// Checks if is fissary.
-    fn is_fissary(&mut self) -> bool {
+    fn is_fissary(&self) -> bool {
         let types = self.element_types();
-		
-		self.abs.element_sort();
 		
         let mut i = 1;
 		while i < types.len() {

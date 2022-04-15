@@ -1329,7 +1329,7 @@ impl Concrete {
                         new_vertices.push(vertices[i].clone());
                     }
 
-                    let mut poly = Concrete {
+                    let poly = Concrete {
                         vertices: new_vertices,
                         abs: abs.clone(),
                     };

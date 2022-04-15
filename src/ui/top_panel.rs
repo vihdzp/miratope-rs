@@ -465,7 +465,7 @@ pub fn show_top_panel(
                 // Gets if it is a compound
                 if ui.button("Is compound").clicked() {
                     if let Some(mut p) = query.iter_mut().next() {
-						p.abs.element_sort();
+						p.element_sort();
                         if p.abs.is_compound() {
 							println!("The polytope is a compound.")
 						} else {
@@ -474,10 +474,10 @@ pub fn show_top_panel(
                     }
                 }
 				
-				
-                // Gets if it is a compound
+                // Gets if it is fissary
                 if ui.button("Is fissary").clicked() {
                     if let Some(mut p) = query.iter_mut().next() {
+                        p.element_sort();
                         if p.is_fissary() {
 							println!("The polytope is fissary.")
 						} else {
@@ -485,7 +485,6 @@ pub fn show_top_panel(
 						}
                     }
                 }
-				
             });
 
             menu::menu(ui, "Transform", |ui| {
