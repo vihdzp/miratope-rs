@@ -19,7 +19,7 @@ impl std::ops::Index<usize> for Memory {
 
 /// The label for the `n`-th memory slot.
 pub fn slot_label(n: usize) -> String {
-    format!("polytope {}", n + 1)
+    format!("polytope {}", n)
 }
 
 impl Memory {
@@ -64,7 +64,7 @@ impl Memory {
                         // Shows an empty slot.
                         None => {
                             ui.horizontal(|ui| {
-                                ui.label(format!("{}:", idx+1));
+                                ui.label(format!("{}:", idx));
                                 ui.label("Empty");
 
                                 if ui.button("Save").clicked() {
@@ -80,7 +80,7 @@ impl Memory {
                             let mut clear = false;
 
                             ui.horizontal(|ui| {
-                                ui.label(format!("{}:", idx+1));
+                                ui.label(format!("{}:", idx));
                                 ui.label(
                                     match label {
                                     None => {
