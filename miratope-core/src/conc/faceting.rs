@@ -1,6 +1,6 @@
 //! The faceting algorithm.
 
-use std::{collections::{BTreeMap, HashMap, HashSet}, vec, iter::FromIterator};
+use std::{collections::{BTreeMap, HashMap, HashSet, VecDeque}, vec, iter::FromIterator};
 
 use crate::{
     abs::{Abstract, Element, ElementList, Ranked, Ranks, Subelements, Superelements, AbstractBuilder},
@@ -106,19 +106,20 @@ impl Ranks {
     }
 }
 
-/// For each faceting, checks if it is a compound of other facetings, and removes it if so.
-fn filter_irc(vec: &mut Vec<Vec<(usize,usize)>>) -> Vec<usize> {
-    let mut out = Vec::new();
-    'a: for a in 0..vec.len() {
-        for b in a+1..vec.len() {
-            if vec[b].len() > vec[a].len() {
+/// For each faceting, checks if it is a compound of other facetings, and labels it if so.
+fn label_irc(vec: &Vec<Vec<(usize,usize)>>) -> HashMap<usize, (usize,usize)> {
+    let mut out = HashMap::<usize, (usize,usize)>::new(); // Map of the index of the compound to the indices of the components.
+
+    'a: for a in 0..vec.len() { // `a` is the index of the base set
+        for b in 0..vec.len() { // `b` is the index of a potential subset of `a`
+            if vec[b].len() >= vec[a].len() { // A strict subset must be smaller than the base.
                 continue
             }
-            if vec[b][0] > vec[a][0] {
+            if vec[b][0] > vec[a][0] { // One of the subsets must contain the first facet.
                 break
             }
             let mut i = 0;
-            for f in &vec[a] {
+            for f in &vec[a] { // Searches through `b` to see if all elements are in `a`.
                 if &vec[b][i] > f {
                     continue
                 }
@@ -126,7 +127,59 @@ fn filter_irc(vec: &mut Vec<Vec<(usize,usize)>>) -> Vec<usize> {
                     break
                 }
                 i += 1;
-                if i >= vec[b].len() {
+
+                if i >= vec[b].len() { // We've found a subset.
+                    let mut complement = Vec::new();
+
+                    let mut j = 0;
+                    for g in &vec[a] {
+                        if j >= vec[b].len() {
+                            complement.push(*g);
+                            continue
+                        }
+                        if &vec[b][j] > g {
+                            complement.push(*g);
+                            continue
+                        }
+                        j += 1;
+                    }
+
+                    for c in b+1..vec.len() { // Look for its complement.
+                        if vec[c] == complement {
+                            out.insert(a,(b,c));
+                            break
+                        }
+                    }
+                    continue 'a;
+                }
+            }
+        }
+    }
+    out
+}
+
+/// For each faceting, checks if it is a compound of other facetings, and removes it if so.
+fn filter_irc(vec: &Vec<Vec<(usize,usize)>>) -> Vec<usize> {
+    let mut out = Vec::new(); // The indices of the facetings that aren't compounds.
+
+    'a: for a in 0..vec.len() { // `a` is the index of the base set
+        for b in a+1..vec.len() { // `b` is the index of a potential subset of `a`
+            if vec[b].len() > vec[a].len() { // A strict subset must be smaller than the base.
+                continue
+            }
+            if vec[b][0] > vec[a][0] { // One of the subsets must contain the first facet.
+                break
+            }
+            let mut i = 0;
+            for f in &vec[a] { // Searches through `b` to see if all elements are in `a`.
+                if &vec[b][i] > f {
+                    continue
+                }
+                if &vec[b][i] < f {
+                    break
+                }
+                i += 1;
+                if i >= vec[b].len() { // We've found a subset.
                     continue 'a;
                 }
             }
@@ -146,7 +199,8 @@ fn faceting_subdim(
 ) ->
     (Vec<(Ranks, Vec<(usize, usize)>)>, // Vec of facetings, along with the facet types of each of them
     Vec<usize>, // Counts of each hyperplane orbit
-    Vec<Vec<Ranks>> // Possible facets, these will be the possible ridges one dimension up
+    Vec<Vec<Ranks>>, // Possible facets, these will be the possible ridges one dimension up
+    HashMap<usize, (usize,usize)> // Map of compound facetings to their components.
 ) {
     let total_vert_count = points.len();
 
@@ -186,7 +240,8 @@ fn faceting_subdim(
                             Element::new(vec![1].into(), vec![].into())
                             ].into(),
                     ].into()]
-                    ]
+                    ],
+                    HashMap::new()
             )
         }
         else {
@@ -203,7 +258,8 @@ fn faceting_subdim(
                             Element::new(vec![0].into(), vec![].into())
                             ].into(),
                     ].into()]
-                    ]
+                    ],
+                    HashMap::new()
             )
         }
     }
@@ -358,6 +414,7 @@ fn faceting_subdim(
     // Facet the hyperplanes
     let mut possible_facets = Vec::new();
     let mut possible_facets_global: Vec<Vec<(Ranks, Vec<(usize,usize)>)>> = Vec::new(); // copy of above but with semi-global vertex indices
+    let mut compound_facets: Vec<HashMap<usize, (usize,usize)>> = Vec::new();
     let mut ridges: Vec<Vec<Vec<Ranks>>> = Vec::new();
     let mut ff_counts = Vec::new();
 
@@ -396,7 +453,7 @@ fn faceting_subdim(
             points.push(flat_points[*v].clone());
         }
 
-        let (possible_facets_row, ff_counts_row, ridges_row) =
+        let (possible_facets_row, ff_counts_row, ridges_row, compound_facets_row) =
             faceting_subdim(rank-1, hp, points, new_stabilizer.clone(), edge_length, max_per_hyperplane);
 
         let mut possible_facets_global_row = Vec::new();
@@ -417,6 +474,7 @@ fn faceting_subdim(
         }
         possible_facets.push(possible_facets_row);
         possible_facets_global.push(possible_facets_global_row);
+        compound_facets.push(compound_facets_row);
         ridges.push(ridges_row);
         ff_counts.push(ff_counts_row);
     }
@@ -557,10 +615,30 @@ fn faceting_subdim(
         }
         match valid {
             0 => {
+                // Split compound facets into their components.
+                let mut new_facets = Vec::new();
+
+                for (hp, idx) in &facets {
+                    let mut all_components = Vec::<usize>::new();
+                    let mut queue = VecDeque::new();
+                    queue.push_back(*idx);
+                    while let Some(next) = queue.pop_front() {
+                        if let Some(components) = compound_facets[*hp].get(&next) {
+                            queue.push_back(components.0);
+                            queue.push_back(components.1);
+                        } else {
+                            all_components.push(next);
+                        }
+                    }
+                    for component in all_components {
+                        new_facets.push((*hp, component));
+                    }
+                }
+
                 // Output the faceted polytope. We will build it from the set of its facets.
 
                 let mut facet_set = HashSet::new();
-                for facet_orbit in &facets {
+                for facet_orbit in &new_facets {
                     let facet = &possible_facets_global[facet_orbit.0][facet_orbit.1].0;
                     let facet_local = &possible_facets[facet_orbit.0][facet_orbit.1].0;
                     for row in &vertex_map {
@@ -637,8 +715,8 @@ fn faceting_subdim(
 
                 ranks.push(vec![Element::new(Subelements::from_iter(0..n_r_len), Superelements::new())].into()); // body
 
-                output.push((ranks, facets.clone()));
-                output_facets.push(facets.clone());
+                output.push((ranks, new_facets.clone()));
+                output_facets.push(new_facets.clone());
 
                 if let Some(max) = max_per_hyperplane {
                     if output.len() >= max {
@@ -676,7 +754,7 @@ fn faceting_subdim(
         output_ridges.push(a);
     }
 
-    return (output, f_counts, output_ridges)
+    return (output, f_counts, output_ridges, label_irc(&output_facets))
 }
 
 impl Concrete {
@@ -878,6 +956,7 @@ impl Concrete {
         // Facet the hyperplanes
         let mut possible_facets = Vec::new();
         let mut possible_facets_global: Vec<Vec<(Ranks, Vec<(usize,usize)>)>> = Vec::new(); // copy of above but with global vertex indices
+        let mut compound_facets: Vec<HashMap<usize, (usize,usize)>> = Vec::new();
         let mut ridges: Vec<Vec<Vec<Ranks>>> = Vec::new();
         let mut ff_counts = Vec::new();
 
@@ -915,7 +994,7 @@ impl Concrete {
                 points.push(vertices_ord[*v].clone());
             }
 
-            let (possible_facets_row, ff_counts_row, ridges_row) =
+            let (possible_facets_row, ff_counts_row, ridges_row, compound_facets_row) =
                 faceting_subdim(rank-1, hp, points, new_stabilizer, edge_length, max_per_hyperplane);
 
             let mut possible_facets_global_row = Vec::new();
@@ -936,6 +1015,7 @@ impl Concrete {
             }
             possible_facets.push(possible_facets_row.clone());
             possible_facets_global.push(possible_facets_global_row);
+            compound_facets.push(compound_facets_row);
             ridges.push(ridges_row);
             ff_counts.push(ff_counts_row);
 
@@ -1060,7 +1140,7 @@ impl Concrete {
                     let ridge_count = ff_counts[hp][ridge_idx.0];
                     let total_ridge_count = ridge_counts[ridge_orbit];
                     let mul = f_count * ridge_count / total_ridge_count;
-
+    
                     ridges[ridge_orbit] += mul;
                     if ridges[ridge_orbit] > 2 {
                         break 'a;
@@ -1079,7 +1159,28 @@ impl Concrete {
             }
             match valid {
                 0 => {
-                    output_facets.push(facets.clone());
+                    // Split compound facets into their components.
+                    let mut new_facets = Vec::new();
+    
+                    for (hp, idx) in &facets {
+                        let mut all_components = Vec::<usize>::new();
+                        let mut queue = VecDeque::new();
+                        queue.push_back(*idx);
+                        while let Some(next) = queue.pop_front() {
+                            if let Some(components) = compound_facets[*hp].get(&next) {
+                                queue.push_back(components.0);
+                                queue.push_back(components.1);
+                            } else {
+                                all_components.push(next);
+                            }
+                        }
+                        for component in all_components {
+                            new_facets.push((*hp, component));
+                        }
+                    }
+                    new_facets.sort_unstable();
+    
+                    output_facets.push(new_facets);
 
                     if let Some(max_facets) = noble {
                         if facets.len() == max_facets {
@@ -1141,13 +1242,14 @@ impl Concrete {
 
         if !include_compounds {
             println!("\nFiltering mixed compounds...");
-            let output_idxs = filter_irc(&mut output_facets);
+            let output_idxs = filter_irc(&output_facets);
             let mut output_new = Vec::new();
             for idx in output_idxs {
                 output_new.push(output_facets[idx].clone());
             }
             output_facets = output_new;
         }
+        output_facets.sort_unstable();
 
         // Output the faceted polytopes. We will build them from their sets of facet orbits.
 
