@@ -106,7 +106,7 @@ impl Mul<CameraInputEvent> for f32 {
 
 impl CameraInputEvent {
     fn rotate(vec: Vec2, anchor_tf: &mut Transform) {
-        anchor_tf.rotate(Quat::from_euler(EulerRot::YXZ, vec.x, vec.y, 0.0));
+        anchor_tf.rotate(Quat::from_euler(EulerRot::YXZ, vec.x, vec.y, 0.));
     }
 
     fn translate(vec: Vec3, anchor_tf: &mut Transform, cam_gtf: &GlobalTransform) {
@@ -114,18 +114,18 @@ impl CameraInputEvent {
     }
 
     fn roll(roll: f32, anchor_tf: &mut Transform) {
-        anchor_tf.rotate(Quat::from_euler(EulerRot::YXZ, 0.0, 0.0, roll));
+        anchor_tf.rotate(Quat::from_euler(EulerRot::YXZ, 0., 0., roll));
     }
 
     /// Zooms into the camera.
     fn zoom(zoom: f32, cam_tf: &mut Transform) {
         cam_tf.translation.z += zoom * cam_tf.translation.length();
-        cam_tf.translation.z = cam_tf.translation.z.max(0.2);
+        cam_tf.translation.z = cam_tf.translation.z.max(0.05).min(400.);
     }
 
     /// Resets the camera to the default position.
     pub fn reset(anchor_tf: &mut Transform, cam_tf: &mut Transform) {
-        *cam_tf = Transform::from_translation(Vec3::new(0.0, 0.0, 5.0));
+        *cam_tf = Transform::from_translation(Vec3::new(0., 0., 5.));
         *anchor_tf = Transform::from_translation(Vec3::new(0.02, -0.025, -0.05))
             * Transform::from_translation(Vec3::new(-0.02, 0.025, 0.05))
                 .looking_at(Vec3::default(), Vec3::Y);
@@ -154,14 +154,14 @@ impl CameraInputEvent {
         ctx: &CtxRef,
     ) -> (f32, f32) {
         // TODO: make the spin rate modifiable in preferences.
-        const SPIN_RATE: f32 = std::f32::consts::TAU / 5.0;
+        const SPIN_RATE: f32 = std::f32::consts::TAU / 5.;
         const ROLL: CameraInputEvent = CameraInputEvent::Roll(SPIN_RATE);
 
         let real_scale = time.delta_seconds();
         let scale = if keyboard.pressed(KeyCode::LControl) | keyboard.pressed(KeyCode::RControl) {
             real_scale * 1.5
         } else if keyboard.pressed(KeyCode::LShift) | keyboard.pressed(KeyCode::RShift) {
-            real_scale / 4.0
+            real_scale / 4.
         } else {
             real_scale / 1.5
         };
@@ -202,7 +202,7 @@ impl CameraInputEvent {
             for MouseMotion { mut delta } in mouse_move.iter() {
                 delta.x /= height;
                 delta.y /= height;
-                cam_inputs.send(Self::RotateAnchor(-800.0 * real_scale * delta))
+                cam_inputs.send(Self::RotateAnchor(-800. * real_scale * delta))
             }
         }
     }
@@ -215,8 +215,8 @@ impl CameraInputEvent {
     ) {
         for MouseWheel { unit, y, .. } in mouse_wheel.iter() {
             let unit_scale = match unit {
-                MouseScrollUnit::Line => 12.0,
-                MouseScrollUnit::Pixel => 1.0,
+                MouseScrollUnit::Line => 12.,
+                MouseScrollUnit::Pixel => 1.,
             };
 
             cam_inputs.send(Self::Zoom(unit_scale * -scale * y))

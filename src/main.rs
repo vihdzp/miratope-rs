@@ -141,15 +141,15 @@ fn setup(
             cb.spawn_bundle(PerspectiveCameraBundle {
                 transform: cam,
                 perspective_projection: PerspectiveProjection {
-                    near: 0.0001,
-                    far: 10000.0,
+                    near: 0.01,
+                    far: 500.,
                     ..Default::default()
                 },
                 ..Default::default()
             });
             // Light source
             cb.spawn_bundle(PointLightBundle {
-                transform: Transform::from_translation(Vec3::new(-50.0, 50.0, 50.0)),
+                transform: Transform::from_translation(Vec3::new(-50., 50., 50.)),
                 point_light: PointLight {
                     intensity: 10000.,
                     range: 100.,
