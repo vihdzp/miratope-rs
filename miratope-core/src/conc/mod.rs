@@ -1311,6 +1311,10 @@ impl ConcretePolytope for Concrete {
     }
 
     fn truncate_with(&self, truncate_type: Vec<usize>, depth: Vec<f64>) -> Self {
+        if truncate_type.is_empty() {
+            println!("Cannot truncate with no active nodes!");
+            return self.clone()
+        }
         let (abs, subflags) = self.abs().truncate_and_flags(truncate_type.clone());
         let element_vertices = self.avg_vertex_map();
 
@@ -1326,7 +1330,6 @@ impl ConcretePolytope for Concrete {
 
         Self::new(vertex_coords, abs)
     }
-	
 	
 	/// Checks if is fissary.
     fn is_fissary(&self) -> bool {
