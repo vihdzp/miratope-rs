@@ -190,13 +190,6 @@ impl Library {
                 }
             }
 
-            // We cache these contents for future use.
-            if fs::write(path.join(".folder"), ron::to_string(&contents).unwrap()).is_ok() {
-                println!(".folder file overwritten!");
-            } else {
-                println!(".folder file could not be overwritten!");
-            }
-
             Ok(contents)
         }
     }
