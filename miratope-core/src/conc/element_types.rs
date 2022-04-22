@@ -1,6 +1,6 @@
 //! The code used to tally up the "element types" in a polytope.
 
-use std::collections::HashMap;
+use std::{collections::BTreeMap, cmp::Ordering};
 
 use crate::{
     abs::{ElementMap, Ranked},
@@ -9,6 +9,7 @@ use crate::{
     geometry::{Point, Subspace},
 };
 
+use ordered_float::OrderedFloat;
 use vec_like::*;
 
 /// Every element in a polytope can be assigned a "type" depending on its
@@ -24,7 +25,7 @@ pub struct ElementType {
 }
 
 /// Stores the metadata associated with an element type.
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 struct TypeData {
     /// The index of the type that this element held in the last pass.
     prev_index: usize,
@@ -35,7 +36,7 @@ struct TypeData {
 
     /// Various heuristics that distinguish types of elements in concrete polytopes.
     /// Currently just distance from the origin
-    heuristics: usize,
+    heuristics: OrderedFloat<f64>,
 }
 
 /// Names of elements of each rank.
@@ -53,10 +54,25 @@ pub const EL_SUFFIXES: [&str; 25] = [
 ];
 
 impl Subspace<f64> {
-    // Huge botch. This should be rewritten.
-    fn distance_heuristic(&self) -> usize {
+    fn distance_heuristic(&self, list: &mut Vec<f64>) -> f64 {
         let dim = self.offset.len();
-        (self.distance(&Point::zeros(dim))/0.0001 + f64::PI) as usize
+        let mut dist = self.distance(&Point::zeros(dim));
+
+        match list.binary_search_by(|x| {
+            let diff = x-&dist;
+            if diff.abs() < f64::EPS {Ordering::Equal}
+            else if diff > 0. {Ordering::Greater}
+            else {Ordering::Less}
+        }) {
+            Ok(idx) => {
+                dist = list[idx];
+            }
+            Err(idx) => {
+                list.insert(idx, dist);
+            }
+        };
+
+        dist
     }
 }
 
@@ -97,6 +113,7 @@ impl Concrete {
         let mut type_count = rank-1;
 
         let subspaces = self.element_map_affine_hulls();
+        let mut distances = Vec::new();
 
         // To limit the number of passes, we can turn this into a `for` loop.
         loop {
@@ -104,7 +121,7 @@ impl Concrete {
             for r in 1..rank {
                 // All element types of this rank.
                 let mut types_rank: Vec<ElementType> = Vec::new();
-                let mut dict = HashMap::new();
+                let mut dict = BTreeMap::new();
 
                 for (i, el) in self[r].iter().enumerate() {
                     let mut sub_type_counts = vec![0; type_counts[r - 1]];
@@ -117,7 +134,7 @@ impl Concrete {
                     let type_data = TypeData {
                         prev_index: type_of_element[r][i],
                         type_counts: sub_type_counts,
-                        heuristics: subspaces[r-1][i].distance_heuristic(),
+                        heuristics: OrderedFloat(subspaces[r-1][i].distance_heuristic(&mut distances)),
                     };
 
                     match dict.get(&type_data) {
@@ -147,7 +164,7 @@ impl Concrete {
             for r in (1..rank).rev() {
                 // All element types of this rank.
                 let mut types_rank: Vec<ElementType> = Vec::new();
-                let mut dict = HashMap::new();
+                let mut dict = BTreeMap::new();
 
                 for (i, el) in self[r].iter().enumerate() {
                     let mut sup_type_counts = vec![0; type_counts[r + 1]];
@@ -160,7 +177,7 @@ impl Concrete {
                     let type_data = TypeData {
                         prev_index: type_of_element[r][i],
                         type_counts: sup_type_counts,
-                        heuristics: subspaces[r-1][i].distance_heuristic(),
+                        heuristics: OrderedFloat(subspaces[r-1][i].distance_heuristic(&mut distances)),
                     };
 
                     match dict.get(&type_data) {

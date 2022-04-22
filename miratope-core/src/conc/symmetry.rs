@@ -1,6 +1,6 @@
 //! The code used to get the symmetry of a polytope and do operations based on that.
 
-use std::{collections::BTreeMap, vec, iter::FromIterator};
+use std::{collections::{BTreeMap, HashSet}, vec, iter::FromIterator};
 
 use crate::{
     abs::{Ranked, flag::{FlagIter, Flag}},
@@ -48,6 +48,17 @@ impl Concrete {
         let vertices = BTreeMap::from_iter((vertices_pointord).into_iter().zip(0..));
         let mut vertex_map: Vec<Vec<usize>> = Vec::new();
 
+        // Sets of elements' vertex sets.
+        let elements = Vec::<HashSet<Vec<usize>>>::from_iter(
+            (0..self.rank()).map(|i| HashSet::from_iter(
+                (0..self.el_count(i)).map(|j| {
+                    let mut vec = self.abs.element_vertices(i, j).unwrap();
+                    vec.sort_unstable();
+                    vec
+                }))
+            )
+        );
+
         let base_flag = self.first_flag();
         let base_basis = base_flag.clone().vertex_sequence(&self);
         let base_basis_inverse = base_basis.clone().try_inverse().unwrap();
@@ -67,7 +78,6 @@ impl Concrete {
                 let isometry = basis * &base_basis_inverse;
 
                 // check if vertices match up
-                // Really, you should check if all the elements match up, but this should be enough in most cases.
                 let mut vertex_map_row = vec![0; self.vertices.len()];
                 for vertex in &vertices {
                     let new_vertex = PointOrd::new(isometry.clone() * vertex.0.matrix());
@@ -76,6 +86,17 @@ impl Concrete {
                             vertex_map_row[*vertex.1] = *idx;
                         }
                         None => {
+                            continue 'a;
+                        }
+                    }
+                }
+
+                // check if elements match up
+                for rank in 2..self.rank() {
+                    for idx in 0..self.abs[rank].len() {
+                        let mut new_element_vertices: Vec<usize> = self.abs.element_vertices(rank, idx).unwrap().iter().map(|x| vertex_map_row[*x]).collect();
+                        new_element_vertices.sort_unstable();
+                        if !elements[rank].contains(&new_element_vertices) {
                             continue 'a;
                         }
                     }
