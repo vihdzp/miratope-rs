@@ -26,7 +26,7 @@ impl Ranks {
     /// Sorts some stuff in a way that's useful for the faceting algorithm.
     pub fn element_sort_strong(&mut self) {
         for el in 0..self[2].len() {
-            self[2][el].subs.sort();
+            self[2][el].subs.sort_unstable();
         }
 
         for rank in 2..self.len()-1 {
@@ -35,7 +35,7 @@ impl Ranks {
                 all_subs.push(el.subs.clone());
             }
             let mut sorted = all_subs.clone();
-            sorted.sort();
+            sorted.sort_unstable();
 
             let mut perm = Vec::new();
             for i in &all_subs {
@@ -44,7 +44,7 @@ impl Ranks {
 
             for i in 0..self[rank].len() {
                 self[rank][i].subs = sorted[i].clone();
-                self[rank][i].subs.sort();
+                self[rank][i].subs.sort_unstable();
             }
 
             let mut new_list = ElementList::new();
@@ -63,7 +63,7 @@ impl Ranks {
     /// Sorts some stuff in a way that's useful for the faceting algorithm.
     pub fn element_sort_strong_with_local(&mut self, local: &Ranks) {
         for el in 0..self[2].len() {
-            self[2][el].subs.sort();
+            self[2][el].subs.sort_unstable();
         }
 
         for rank in 2..self.len()-1 {
@@ -72,7 +72,7 @@ impl Ranks {
                 all_subs.push(el.subs.clone());
             }
             let mut sorted = all_subs.clone();
-            sorted.sort();
+            sorted.sort_unstable();
 
             let mut perm = Vec::new();
             for i in &all_subs {
@@ -81,7 +81,7 @@ impl Ranks {
 
             for i in 0..self[rank].len() {
                 self[rank][i].subs = sorted[i].clone();
-                self[rank][i].subs.sort();
+                self[rank][i].subs.sort_unstable();
             }
 
             let mut map_to_local = HashMap::new();

@@ -89,7 +89,7 @@ impl Concrete {
     ///         - if not, add a new entry in hashmap and increment index
     /// - iterate over ranks backwards, use superelements instead of subelements
     /// - get number of types in total, if it's the same as previous loop, stop
-    fn element_types_common(&self) -> (Vec<Vec<ElementType>>, ElementMap<usize>) {
+    pub fn element_types_common(&self) -> (Vec<Vec<ElementType>>, ElementMap<usize>) {
         let rank = self.rank();
 
         // A nullitope has no proper elements.

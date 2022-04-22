@@ -39,7 +39,7 @@ impl Concrete {
     pub fn get_symmetry_group(&mut self) -> (Group<vec::IntoIter<Matrix<f64>>>, Vec<Vec<usize>>) {
         self.element_sort();
         let flag_iter = FlagIter::new(&self.abs);
-        let types = &self.types_of_elements();
+        let (types, types_map_back) = &self.element_types_common();
 
         let mut vertices_pointord = Vec::<PointOrd<f64>>::new();
         for v in &self.vertices {
@@ -69,7 +69,7 @@ impl Concrete {
             if flag
                 .iter()
                 .enumerate()
-                .map(|(r, x)| (types[r][*x] != types[r][base_flag[r]]) as usize)
+                .map(|(r, x)| (types_map_back[r][*x] != types_map_back[r][base_flag[r]]) as usize)
                 .sum::<usize>() == 0 // this checks if all the elements in the flag have the same types as the ones in the base flag, else it skips it
             {
 
@@ -93,8 +93,8 @@ impl Concrete {
 
                 // check if elements match up
                 for rank in 2..self.rank() {
-                    for idx in 0..self.abs[rank].len() {
-                        let mut new_element_vertices: Vec<usize> = self.abs.element_vertices(rank, idx).unwrap().iter().map(|x| vertex_map_row[*x]).collect();
+                    for idx in 0..types[rank].len() {
+                        let mut new_element_vertices: Vec<usize> = self.abs.element_vertices(rank, types[rank][idx].example).unwrap().iter().map(|x| vertex_map_row[*x]).collect();
                         new_element_vertices.sort_unstable();
                         if !elements[rank].contains(&new_element_vertices) {
                             continue 'a;
