@@ -149,7 +149,7 @@ fn setup(
             });
             // Light source
             cb.spawn_bundle(PointLightBundle {
-                transform: Transform::from_translation(Vec3::new(-50., 50., 50.)),
+                transform: Transform::from_translation(Vec3::new(-5., 5., 50.)),
                 point_light: PointLight {
                     intensity: 10000.,
                     range: 100.,

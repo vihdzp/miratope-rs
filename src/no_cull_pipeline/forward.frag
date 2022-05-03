@@ -281,6 +281,6 @@ void main() {
     // https://github.com/glslify/glsl-face-normal/blob/master/index.glsl
     vec3 fdx = dFdx(v_WorldPosition);
     vec3 fdy = dFdy(v_WorldPosition);
-    vec4 output_color = vec4(normalize(cross(fdx, fdy)) + vec3(0.5, 0.5, 0.5), 1.0);
+    vec4 output_color = vec4(abs(dot(normalize(cross(fdx, fdy)),normalize(PointLights[0].pos.xyz))) * base_color.xyz, 1.0);
     o_Target = output_color;
 }
