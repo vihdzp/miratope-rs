@@ -670,6 +670,15 @@ pub fn show_top_panel(
                 if ui.button("Truncate...").clicked() {
                     truncate_window.open();
                 }
+				
+                ui.separator();
+
+                if ui.button("Identify coplanar facets").clicked() {
+                    if let Some(mut p) = query.iter_mut().next() {
+                        *p = p.fuse_facets();
+                        println!("Fuse succeeded!");
+                    }
+                }
             });
 
             // Toggles cross-section mode.

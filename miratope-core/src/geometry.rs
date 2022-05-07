@@ -246,6 +246,11 @@ impl<T: Float> Subspace<T> {
     pub fn distance(&self, p: &Point<T>) -> T {
         (p - self.project(p)).norm()
     }
+	
+    /// Returns whether a point is contained on the subspace.
+    pub fn is_outer(&self, p: &Point<T>) -> bool {
+        abs_diff_eq!(self.distance(p), T::ZERO, epsilon = T::EPS)
+    }
 
     /// Computes a normal vector to the subspace, so that the specified point is
     /// left out of it. Returns `None` if the point given lies on the subspace.
