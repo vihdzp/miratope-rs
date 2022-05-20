@@ -1455,13 +1455,14 @@ impl Concrete {
 
                     if save {
 	            	if r {
-				if fissary_status = "" {
+				if fissary_status == "" {
                                     output.push((poly.clone(), Some(
                                     if save_facets {
                                         format!("faceting {} -{}{}", faceting_idx, facets_fmt, fissary_status)
                                     } else {
                                         format!("faceting {}{}", faceting_idx, fissary_status)
                                 }
+				)));
 		        } else {
 			    output.push((poly.clone(), Some(
                             if save_facets {
