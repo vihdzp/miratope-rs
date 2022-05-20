@@ -14,9 +14,9 @@ use vec_like::VecLike;
 
 /// The header for OFF files created with Miratope.
 const HEADER: &str = concat!(
-    "Generated using RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR v",
+    "Generated using Miratope v",
     env!("CARGO_PKG_VERSION"),
-    " (https://github.com/H-A-M-G-E-R/RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR)"
+    " (https://github.com/H-A-M-G-E-R/miratope-rs)"
 );
 
 /// A position in a file.
