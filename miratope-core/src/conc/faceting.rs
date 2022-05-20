@@ -1454,7 +1454,7 @@ impl Concrete {
                     println!("Faceting {}:{}{}", faceting_idx, facets_fmt, fissary_status);
 
                     if save {
-	            	if mark_fissary {
+	            	if r {
 				if fissary_status = "" {
                                     output.push((poly.clone(), Some(
                                     if save_facets {
