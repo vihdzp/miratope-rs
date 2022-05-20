@@ -1,7 +1,7 @@
 [package]
-name = "miratope-core"
-version = "0.3.5"
-edition = "2018"
+name = "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+version = "0.3.6"
+edition = "2022"
 
 [dependencies]
 vec-like = { path = "../vec-like" }
