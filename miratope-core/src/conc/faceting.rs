@@ -1464,6 +1464,7 @@ impl Concrete {
                                         format!("faceting {}{}", faceting_idx, fissary_status)
                                     }
 				)));
+			    }
 		        } else {
 			    output.push((poly.clone(), Some(
                                 if save_facets {
