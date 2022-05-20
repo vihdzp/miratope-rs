@@ -1297,6 +1297,7 @@ impl Default for FacetingSettings {
             mark_fissary: true,
             save: true,
             save_facets: false,
+            r: false,
         }
     }
 }
