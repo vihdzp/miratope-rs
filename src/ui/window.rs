@@ -1425,5 +1425,9 @@ impl MemoryWindow for FacetingSettings {
         ui.add(
             egui::Checkbox::new(&mut self.save_facets, "Save facets")
         );
+        
+        ui.add(
+            egui::Checkbox::new(&mut self.save_facets, "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
+        );
     }
 }
