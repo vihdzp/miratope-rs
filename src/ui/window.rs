@@ -1282,6 +1282,8 @@ pub struct FacetingSettings {
 
     /// Whether to save the facets in memory.
     pub save_facets: bool,
+    
+    pub r: bool,
 }
 
 impl Default for FacetingSettings {
