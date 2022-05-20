@@ -771,6 +771,7 @@ impl Concrete {
         mark_fissary: bool,
         save: bool,
         save_facets: bool,
+        r: bool,
     ) -> Vec<(Concrete, Option<String>)> {
         let rank = self.rank();
 
