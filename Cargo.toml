@@ -6,7 +6,7 @@ name = "miratope"
 description = "A polytope renderer and builder."
 license = "MIT"
 version = "0.3.6"
-repository = "https://github.com/H-A-M-G-E-R/RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+repository = "https://github.com/H-A-M-G-E-R/miratope-rs"
 keywords = ["polytope", "dimension", "geometry"]
 authors = [
     "Violeta Hernández <vi.hdz.p@gmail.com>",
