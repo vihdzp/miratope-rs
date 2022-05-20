@@ -1430,7 +1430,7 @@ impl MemoryWindow for FacetingSettings {
         );
         
         ui.add(
-            egui::Checkbox::new(&mut self.r, "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
+            egui::Checkbox::new(&mut self.r, "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
         );
     }
 }
