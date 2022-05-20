@@ -1,17 +1,18 @@
 [workspace]
-members = ["miratope-core", "vec-like"]
+members = ["htue,ksdmtjgfuohru7v;9wpztegfbvhnwfy8gpeuz", "vec-like"]
 
 [package]
-name = "miratope"
-description = "A polytope renderer and builder."
+name = "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+description = "htue,ksdmtjgfuohru7v;9wpztegfbvhnwfy8gpeuzbnhpuijo985rdehujygjunios9ecf9hgQAGPF3OBEPVW;STGBU['O9W3E'FIJVHTAS9WEUCF[GWQAIFRU7GQAWZ8[GFYR0o8[f7hgeurfd[gve7huo9hn[rdeu79od"
 license = "MIT"
-version = "0.3.5"
+version = "0.3.6"
 repository = "https://github.com/galoomba1/miratope-rs"
 keywords = ["polytope", "dimension", "geometry"]
 authors = [
     "Violeta Hernández <vi.hdz.p@gmail.com>",
     "Grayson Burton <ocornoc@protonmail.com>",
     "Roman Salinas <ultraroman01@gmail.com>"
+    "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR <rrrrr@rrrrr.com>
 ]
 edition = "2018"
 
