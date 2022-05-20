@@ -732,7 +732,7 @@ pub fn show_top_panel(
                             faceting_settings.compounds,
                             faceting_settings.mark_fissary,
                             faceting_settings.save,
-                            faceting_settings.save_facets
+                            faceting_settings.save_facets,
 			    faceting_settings.r
                         );
                         for faceting in facetings {
