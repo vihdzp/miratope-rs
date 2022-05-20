@@ -1,1 +1,1 @@
-htue,ksdmtjgfuohru7v;9wpztegfbvhnwfy8gpeuzbnhpuijo985rdehujygjunios9ecf9hgQAGPF3OBEPVW;STGBU['O9W3E'FIJVHTAS9WEUCF[GWQAIFRU7GQAWZ8[GFYR0o8[f7hgeurfd[gve7huo9hn[rdeu79od
+cargo build --release
