@@ -719,11 +719,11 @@ impl<'a> OffWriter<'a> {
         for v in &self.poly.vertices {
             for c in v {
                 // Preventing generation loss
-                if -0.0000000000000001 < c < 0.0000000000000001 {
+                if c > -0.0000000000000001 && c < 0.0000000000000001 {
                     self.push_to_str(0);
                 } else {
                     self.push_to_str(c);
-                {
+                }
                 self.push(' ');
             }
             self.push('\n');
