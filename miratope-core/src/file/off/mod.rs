@@ -718,7 +718,12 @@ impl<'a> OffWriter<'a> {
         // Adds the coordinates.
         for v in &self.poly.vertices {
             for c in v {
-                self.push_to_str(c);
+                // Preventing generation loss
+                if -0.0000000000000001 > c < 0.0000000000000001 {
+                    self.push_to_str(0);
+                } else {
+                    self.push_to_str(c);
+                {
                 self.push(' ');
             }
             self.push('\n');
