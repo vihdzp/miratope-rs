@@ -168,7 +168,7 @@ impl SpecialLibrary {
                     let clicked = ui.button(text).clicked();
 
                     ui.label("Rank:");
-                    ui.add(egui::DragValue::new(rank).speed(0.03).clamp_range(-1..=usize::MAX));
+                    ui.add(egui::DragValue::new(rank).speed(0.03).clamp_range(-1..=isize::MAX));
 
                     clicked
                 });
