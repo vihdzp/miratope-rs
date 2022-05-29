@@ -334,6 +334,7 @@ fn faceting_subdim(
         'b: loop {
             'c: loop {
                 if let Some(e_l) = edge_length {
+                    // WLOG checks if the vertices are all the right distance away from the first vertex.
                     for (v_i, v) in new_vertices.iter().enumerate() {
                         if ((&points[*v].0-&points[rep[0]].0).norm() - e_l).abs() > f64::EPS {
                             update = v_i;
@@ -879,6 +880,7 @@ impl Concrete {
             'b: loop {
                 'c: loop {
                     if let Some(e_l) = edge_length {
+                        // WLOG checks if the vertices are all the right distance away from the first vertex.
                         for (v_i, v) in new_vertices.iter().enumerate() {
                             if ((&vertices[*v]-&vertices[rep[0]]).norm() - e_l).abs() > f64::EPS {
                                 update = v_i;
@@ -1023,7 +1025,7 @@ impl Concrete {
             ridges.push(ridges_row);
             ff_counts.push(ff_counts_row);
 
-            println!("{}: {} facet types, {} facets", idx, possible_facets_row.len(), orbit.len());
+            println!("{}: {} facets, {} copies, {} verts", idx, possible_facets_row.len(), orbit.len(), hp_v.len());
         }
 
         println!("\nComputing ridges...");
