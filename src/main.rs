@@ -99,7 +99,7 @@ fn setup(
     );
 
     // Wireframe material.
-    let wf_material = materials.set(WIREFRAME_UNSELECTED_MATERIAL, Color::rgb_u8(0, 0, 0).into());
+    let wf_material = materials.set(WIREFRAME_UNSELECTED_MATERIAL, Color::rgb_u8(150, 150, 150).into());
 
     // Mesh material.
     let mesh_material = materials.add(StandardMaterial {
