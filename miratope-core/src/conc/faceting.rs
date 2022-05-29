@@ -1019,7 +1019,7 @@ impl Concrete {
             ridges.push(ridges_row);
             ff_counts.push(ff_counts_row);
 
-            println!("{}: {} facets", idx, possible_facets_row.len());
+            println!("{}: {} facet types, {} facets", idx, possible_facets_row.len(), orbit.len());
         }
 
         println!("\nComputing ridges...");
