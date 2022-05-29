@@ -1025,7 +1025,7 @@ impl Concrete {
             ridges.push(ridges_row);
             ff_counts.push(ff_counts_row);
 
-            println!("{}: {} facets, {} copies, {} verts", idx, possible_facets_row.len(), orbit.len(), hp_v.len());
+            println!("{}: {} facets, {} verts, {} copies", idx, possible_facets_row.len(), hp_v.len(), orbit.len());
         }
 
         println!("\nComputing ridges...");
