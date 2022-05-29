@@ -1282,6 +1282,8 @@ pub struct FacetingSettings {
 
     /// Whether to save the facets in memory.
     pub save_facets: bool,
+    
+    pub r: bool,
 }
 
 impl Default for FacetingSettings {
@@ -1297,6 +1299,7 @@ impl Default for FacetingSettings {
             mark_fissary: true,
             save: true,
             save_facets: false,
+            r: false,
         }
     }
 }
@@ -1424,6 +1427,10 @@ impl MemoryWindow for FacetingSettings {
 
         ui.add(
             egui::Checkbox::new(&mut self.save_facets, "Save facets")
+        );
+        
+        ui.add(
+            egui::Checkbox::new(&mut self.r, "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
         );
     }
 }
