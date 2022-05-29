@@ -1,6 +1,7 @@
-//! Contains the code that opens an OFF file and parses it into a polytope.
+//! The code that opens an OFF file and parses it into a polytope.
+//! Also the code that writes an OFF file of a polytope.
 
-use std::{collections::HashMap, fmt::Display, io::Error as IoError, path::Path, str::FromStr};
+use std::{collections::{HashMap, HashSet}, fmt::Display, io::Error as IoError, path::Path, str::FromStr};
 
 use crate::{
     abs::{AbstractBuilder, Ranked, SubelementList, Subelements},
@@ -539,18 +540,6 @@ pub enum OffWriteError {
     },
 }
 
-impl OffWriteError {
-    /// Returns the error in which two edges coincide. These must be ordered so
-    /// that we can run consistent tests on these.
-    fn coincident_edges(mut idx0: usize, mut idx1: usize) -> Self {
-        if idx0 > idx1 {
-            std::mem::swap(&mut idx0, &mut idx1);
-        }
-
-        Self::CoincidentEdges { idx0, idx1 }
-    }
-}
-
 impl Display for OffWriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
@@ -633,14 +622,15 @@ impl<'a> OffWriter<'a> {
         self.push_str("OFF\n");
     }
 
-    /// Checks that no two edges coincide.
+    /// Counts coincident edges.
     ///
     /// This should only be called for polytopes with rank at least 3.
-    fn check_edges(&self) -> OffWriteResult<()> {
-        use std::collections::hash_map::Entry::*;
-        let mut hash_edges = HashMap::new();
+    fn check_edges(&self) -> usize {
+        let mut hash_edges = HashSet::new();
 
-        for (idx0, edge) in self.poly[2].iter().enumerate() {
+        let mut coincident_edges = 0;
+
+        for edge in &self.poly[2] {
             let subs = &edge.subs;
             let mut edge = (subs[0], subs[1]);
 
@@ -649,16 +639,14 @@ impl<'a> OffWriter<'a> {
                 std::mem::swap(&mut edge.0, &mut edge.1);
             }
 
-            // We verify no other edge has the same vertices.
-            match hash_edges.entry(edge) {
-                Occupied(entry) => return Err(OffWriteError::coincident_edges(idx0, *entry.get())),
-                Vacant(entry) => {
-                    entry.insert(idx0);
-                }
+            // We check if another edge has the same vertices.
+            if hash_edges.contains(&edge) {
+                coincident_edges += 1;
+            } else {
+                hash_edges.insert(edge);
             }
         }
-
-        Ok(())
+        coincident_edges
     }
 
     /// Writes the polytope's element counts into an OFF file.
@@ -700,8 +688,13 @@ impl<'a> OffWriter<'a> {
                 // Swaps edges and faces because OFF format bad.
                 self.push(' ');
                 self.push_to_str(self.el_count(3));
+
+                let coincident_edges = self.check_edges();
                 self.push(' ');
-                self.push_to_str(self.el_count(2));
+                self.push_to_str(self.el_count(2) - coincident_edges);
+                if coincident_edges > 0 {
+                    println!("Warning: Polytope contains coincident edges. They will be merged in the OFF file.");
+                }
 
                 for r in 4..rank {
                     self.push(' ');
@@ -825,9 +818,6 @@ impl<'a> OffWriter<'a> {
         if rank < 2 {
             return Ok(self.off);
         }
-
-        // Checks that no two edges coincide.
-        self.check_edges()?;
 
         // Adds the element counts.
         self.write_el_counts();
