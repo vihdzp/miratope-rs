@@ -1,1 +1,1 @@
-cargo build --release
+A tool for building and visualizing polytopes. Still in alpha development. Fork of [vihdzp/miratope-rs](https://github.com/vihdzp/miratope-rs) focused on building concrete polytopes like uniforms and nobles.

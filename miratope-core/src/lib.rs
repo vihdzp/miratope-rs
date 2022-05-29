@@ -42,10 +42,9 @@ use abs::{
 use vec_like::VecLike;
 
 /// The names for 0-elements, 1-elements, 2-elements, and so on.
-const ELEMENT_NAMES: [&str; 25] = [
+const ELEMENT_NAMES: [&str; 12] = [
     "", "Vertices", "Edges", "Faces", "Cells", "Tera", "Peta", "Exa", "Zetta", "Yotta", "Xenna",
-    "Daka", "Henda", "Doka", "Tradaka", "Tedaka", "Pedaka", "Exdaka", "Zedaka", "Yodaka", "Nedaka",
-    "Ika", "Ikena", "Ikoda", "Iktra",
+    "Daka",
 ];
 
 /// The word "Components".

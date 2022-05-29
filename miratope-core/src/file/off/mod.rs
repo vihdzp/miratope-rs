@@ -16,7 +16,7 @@ use vec_like::VecLike;
 const HEADER: &str = concat!(
     "Generated using Miratope v",
     env!("CARGO_PKG_VERSION"),
-    " (https://github.com/H-A-M-G-E-R/miratope-rs)"
+    " (https://github.com/galoomba1/miratope-rs)"
 );
 
 /// A position in a file.
@@ -718,12 +718,7 @@ impl<'a> OffWriter<'a> {
         // Adds the coordinates.
         for v in &self.poly.vertices {
             for c in v {
-                // Preventing generation loss
-                if c > &-0.0000000000000001_f64 && c < &0.0000000000000001_f64 {
-                    self.push_to_str('0');
-                } else {
-                    self.push_to_str(c);
-                }
+                self.push_to_str(c);
                 self.push(' ');
             }
             self.push('\n');
