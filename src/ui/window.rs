@@ -1,6 +1,6 @@
 //! Sets up the windows for operations on a polytope.
 //!
-//! All windows are loaded in parallel, before the top panel and the library are
+//! All windows are l&mut &mut oaded in parallel, before the top panel and the library are
 //! shown on screen.
 
 use std::marker::PhantomData;
@@ -9,7 +9,7 @@ use super::{
     memory::{slot_label, Memory},
     PointWidget,
 };
-use crate::{Concrete, Float, Hypersphere, Point};
+use crate::{Concrete, Float, Hypersphere, Point, ui::main_window::PolyName};
 use miratope_core::{conc::ConcretePolytope, Polytope};
 
 use bevy::prelude::*;
@@ -145,6 +145,7 @@ macro_rules! impl_show {
             mut self_: ResMut<'_, Self>,
             egui_ctx: Res<'_, EguiContext>,
             mut query: Query<'_, '_, &mut Concrete>,
+            mut poly_name: ResMut<'_, PolyName>,
         ) where
             Self: 'static,
         {
@@ -153,6 +154,7 @@ macro_rules! impl_show {
                     for mut polytope in query.iter_mut() {
                         self_.action(polytope.as_mut());
                     }
+                    self_.name_action(&mut poly_name.0);
                     self_.close()
                 }
                 ShowResult::Close => self_.close(),
@@ -168,6 +170,9 @@ macro_rules! impl_show {
 pub trait PlainWindow: Window {
     /// Applies the action of the window to the polytope.
     fn action(&self, polytope: &mut Concrete);
+
+    /// Applies an action to the polytope name.
+    fn name_action(&self, name: &mut String);
 
     /// Builds the window to be shown on screen.
     fn build(&mut self, ui: &mut Ui);
@@ -202,6 +207,9 @@ impl<T: PlainWindow + 'static> Plugin for PlainWindowPlugin<T> {
 pub trait UpdateWindow: Window {
     /// Applies the action of the window to the polytope.
     fn action(&self, polytope: &mut Concrete);
+    
+    /// Applies an action to the polytope name.
+    fn name_action(&self, name: &mut String);
 
     /// Builds the window to be shown on screen.
     fn build(&mut self, ui: &mut Ui);
@@ -570,6 +578,10 @@ impl UpdateWindow for DualWindow {
         }
     }
 
+    fn name_action(&self, name: &mut String) {
+        *name = format!("Dual of {}", name);
+    }
+
     fn build(&mut self, ui: &mut Ui) {
         ui.add(PointWidget::new(&mut self.center, "Center"));
 
@@ -640,6 +652,10 @@ impl UpdateWindow for PyramidWindow {
         *polytope = polytope.pyramid_with(self.offset.push(self.height));
     }
 
+    fn name_action(&self, name: &mut String) {
+        *name = format!("Pyramid of {}", name);
+    }
+
     fn build(&mut self, ui: &mut Ui) {
         ui.add(PointWidget::new(&mut self.offset, "Offset"));
 
@@ -695,6 +711,10 @@ impl Window for PrismWindow {
 impl PlainWindow for PrismWindow {
     fn action(&self, polytope: &mut Concrete) {
         *polytope = polytope.prism_with(self.height);
+    }
+
+    fn name_action(&self, name: &mut String) {
+        *name = format!("Prism of {}", name);
     }
 
     fn build(&mut self, ui: &mut Ui) {
@@ -764,6 +784,10 @@ impl UpdateWindow for TegumWindow {
             self.offset.push(self.height_offset + half_height),
             self.offset.push(self.height_offset - half_height),
         );
+    }
+
+    fn name_action(&self, name: &mut String) {
+        *name = format!("Tegum of {}", name);
     }
 
     fn build(&mut self, ui: &mut Ui) {
@@ -850,6 +874,10 @@ impl UpdateWindow for AntiprismWindow {
             Ok(antiprism) => *polytope = antiprism,
             Err(err) => eprintln!("Antiprism failed: {}", err),
         }
+    }
+
+    fn name_action(&self, name: &mut String) {
+        *name = format!("Dual of {}", name);
     }
 
     fn build(&mut self, ui: &mut Ui) {
@@ -1175,6 +1203,10 @@ impl UpdateWindow for TruncateWindow {
         *polytope = polytope.truncate_with(rings, self.depth.clone());
     }
 
+    fn name_action(&self, name: &mut String) {
+        *name = format!("Truncated {}", name);
+    }
+
     fn build(&mut self, ui: &mut Ui) {
         for r in 0..self.rank {
             ui.horizontal(|ui| {
@@ -1230,6 +1262,8 @@ impl PlainWindow for ScaleWindow {
     fn action(&self, polytope: &mut Concrete) {
         polytope.scale(self.scale);
     }
+
+    fn name_action(&self, _name: &mut String) {}
 
     fn build(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {

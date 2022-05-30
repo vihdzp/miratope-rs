@@ -10,7 +10,7 @@ use bevy_egui::{
 use miratope_core::{conc::{element_types::{EL_NAMES, EL_SUFFIXES}, ConcretePolytope}, Polytope, abs::Ranked, geometry::{Subspace, Point, Vector}};
 use vec_like::VecLike;
 
-use super::top_panel::{SectionDirection, SectionState};
+use super::{top_panel::{SectionDirection, SectionState}, main_window::PolyName};
 
 #[derive(Clone, Copy, Debug)]
 struct ElementTypeWithData {
@@ -39,6 +39,9 @@ pub struct ElementTypesRes {
     /// The polytope whose data we're getting.
     poly: Concrete,
 
+    /// The name of the polytope.
+    poly_name: String,
+
     /// The element types.
     types: Vec<Vec<ElementTypeWithData>>,
 
@@ -57,6 +60,7 @@ impl Default for ElementTypesRes {
         ElementTypesRes {
             active: false,
             poly: Concrete::nullitope(),
+            poly_name: "nullitope".to_string(),
             types: Vec::new(),
             components: None,
             main: true,
@@ -66,7 +70,7 @@ impl Default for ElementTypesRes {
 }
 
 impl ElementTypesRes {
-    fn from_poly(&self, poly: Mut<'_, Concrete>) -> ElementTypesRes {
+    fn from_poly(&self, poly: Mut<'_, Concrete>, poly_name: String) -> ElementTypesRes {
         let mut poly = poly.clone();
         poly.element_sort();
 
@@ -114,6 +118,7 @@ impl ElementTypesRes {
         ElementTypesRes {
             active: true,
             poly: poly.clone(),
+            poly_name,
             types: types_with_data,
             components: None,
             main: true,
@@ -149,6 +154,7 @@ pub fn show_right_panel(
     // Info about the application state.
     egui_ctx: Res<'_, EguiContext>,
     mut query: Query<'_, '_, &mut Concrete>,
+    mut poly_name: ResMut<'_, PolyName>,
 
     // The Miratope resources controlled by the right panel.
     mut element_types: ResMut<'_, ElementTypesRes>,
@@ -165,7 +171,7 @@ pub fn show_right_panel(
                 if ui.add(egui::Button::new("Generate").enabled(!element_types.main)).clicked() {
                     if let Some(p) = query.iter_mut().next() {
                         element_types.main = true;
-                        *element_types = element_types.from_poly(p);
+                        *element_types = element_types.from_poly(p, poly_name.0.clone());
                     }
                 }
     
@@ -174,6 +180,7 @@ pub fn show_right_panel(
                         element_types.main = true;
                         element_types.main_updating = true;
                         *p = element_types.poly.clone();
+                        poly_name.0 = element_types.poly_name.clone();
                     }
                 }
             });
@@ -209,6 +216,7 @@ pub fn show_right_panel(
                                             element.flatten();
                                             element.recenter();
                                             *p = element;
+                                            poly_name.0 = format!("Element of {}",element_types.poly_name.clone());
                                         } else {
                                             eprintln!("Element failed: no element at rank {}, index {}", r, i);
                                         }
@@ -226,6 +234,7 @@ pub fn show_right_panel(
                                                 figure.flatten();
                                                 figure.recenter();
                                                 *p = figure;
+                                                poly_name.0 = format!("Figure of {}",element_types.poly_name.clone());
                                             }
                                             Ok(None) => eprintln!("Figure failed: no element at rank {}, index {}", r, i),
                                             Err(err) => eprintln!("Figure failed: {}", err),
@@ -287,6 +296,11 @@ pub fn show_right_panel(
                             )).clicked() {
                                 if let Some(mut p) = query.iter_mut().next() {
                                     *p = component.clone();
+                                    poly_name.0 = format!(
+                                        "{}{}",
+                                        if components.len() > 1 {"Component of "} else {""},
+                                        element_types.poly_name.clone()
+                                    );
                                 }
                             }
                         }

@@ -1,9 +1,11 @@
 //! Manages the memory tab.
 
-use bevy::prelude::{Query, Res};
+use bevy::prelude::{Query, Res, ResMut};
 use bevy_egui::{egui, EguiContext};
 
 use crate::Concrete;
+
+use super::main_window::PolyName;
 
 /// Represents the memory slots to store polytopes.
 #[derive(Default)]
@@ -39,7 +41,7 @@ impl Memory {
     }
 
     /// Shows the memory menu in a specified Ui.
-    pub fn show(&mut self, query: &mut Query<'_, '_, &mut Concrete>, egui_ctx: &Res<'_, EguiContext>, open: &mut bool) {
+    pub fn show(&mut self, query: &mut Query<'_, '_, &mut Concrete>, mut poly_name: ResMut<'_, PolyName>, egui_ctx: &Res<'_, EguiContext>, open: &mut bool) {
         egui::Window::new("Memory")
             .open(open)
             .scroll(true)
@@ -69,7 +71,7 @@ impl Memory {
 
                                 if ui.button("Save").clicked() {
                                     if let Some(p) = query.iter_mut().next() {
-                                        *slot = Some((p.clone(), None));
+                                        *slot = Some((p.clone(), Some(poly_name.0.clone())));
                                     }
                                 }
                              });
@@ -81,8 +83,7 @@ impl Memory {
 
                             ui.horizontal(|ui| {
                                 ui.label(format!("{}:", idx));
-                                ui.label(
-                                    match label {
+                                let name = match label {
                                     None => {
                                         slot_label(idx)
                                     }
@@ -90,21 +91,27 @@ impl Memory {
                                     Some(name) => {
                                         name.to_string()
                                     }
-                                });
+                                };
+
+                                ui.label(&name);
 
                                 // Clones a polytope from memory.
                                 if ui.button("Load").clicked() {
                                     *query.iter_mut().next().unwrap() = poly.clone();
+                                    poly_name.0 = name.clone();
                                 }
 
                                 // Swaps the current polytope with the one on memory.
                                 if ui.button("Swap").clicked() {
                                     std::mem::swap(query.iter_mut().next().unwrap().as_mut(), poly);
+                                    poly_name.0 = name;
+                                    *label = Some(poly_name.0.clone());
                                 }
 
                                 // Clones a polytope into memory.
                                 if ui.button("Save").clicked() {
                                     *poly = query.iter_mut().next().unwrap().clone();
+                                    *label = Some(poly_name.0.clone());
                                 }
 
                                 // Clears a polytope from memory.

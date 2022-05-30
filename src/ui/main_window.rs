@@ -18,7 +18,16 @@ impl Plugin for MainWindowPlugin {
     fn build(&self, app: &mut App) {
         app.add_system_to_stage(CoreStage::PreUpdate, update_visible.system())
             .add_system(update_scale_factor.system())
-            .add_system_to_stage(CoreStage::PostUpdate, update_changed_polytopes.system());
+            .add_system_to_stage(CoreStage::PostUpdate, update_changed_polytopes.system())
+            .init_resource::<PolyName>();
+    }
+}
+
+pub struct PolyName(pub String);
+
+impl Default for PolyName {
+    fn default() -> PolyName {
+        PolyName("default".to_string())
     }
 }
 
@@ -54,8 +63,10 @@ pub fn update_changed_polytopes(
     mut meshes: ResMut<'_, Assets<Mesh>>,
     mut polies: Query<'_, '_, (&mut Concrete, &Handle<Mesh>, &Children), Changed<Concrete>>,
     wfs: Query<'_, '_, &Handle<Mesh>, Without<Concrete>>,
+    mut windows: ResMut<'_, Windows>,
     mut section_state: ResMut<'_, SectionState>,
     mut element_types: ResMut<'_, ElementTypesRes>,
+    name: Res<'_, PolyName>,
 
     orthogonal: Res<'_, ProjectionType>,
 ) {
@@ -84,5 +95,11 @@ pub fn update_changed_polytopes(
         if !section_state.is_changed() {
             section_state.close();
         }
+
+        windows
+            .get_primary_mut()
+            .unwrap()
+            .set_title(format!("{} - miratope v{}", name.0, env!("CARGO_PKG_VERSION")));
+
     }
 }

@@ -6,7 +6,7 @@ use std::{
     path::PathBuf,
 };
 
-use super::config::LibPath;
+use super::{config::LibPath, main_window::PolyName};
 use crate::Concrete;
 use miratope_core::file::FromFile;
 use special::*;
@@ -248,6 +248,7 @@ impl Library {
 fn show_library(
     egui_ctx: Res<'_, EguiContext>,
     mut query: Query<'_, '_, &mut Concrete>,
+    mut poly_name: ResMut<'_, PolyName>,
     mut library: ResMut<'_, Option<Library>>,
     lib_path: Res<'_, LibPath>,
 ) {
@@ -264,13 +265,20 @@ fn show_library(
 
                         // Loads a selected file.
                         ShowResult::Load(file) => match Concrete::from_path(&file) {
-                            Ok(q) => *query.iter_mut().next().unwrap() = q,
+                            Ok(q) => {
+                                *query.iter_mut().next().unwrap() = q;
+                                let path_buf = PathBuf::from(file);
+                                let file_name = path_buf.file_name().unwrap().to_str().unwrap();
+                                poly_name.0 = file_name[..file_name.len()-4].into();
+                            },
                             Err(err) => eprintln!("File open failed: {}", err),
                         },
 
                         // Loads a special polytope.
                         ShowResult::Special(special) => {
-                            *query.iter_mut().next().unwrap() = special.load()
+                            let (a, b) = special.load();
+                            *query.iter_mut().next().unwrap() = a;
+                            poly_name.0 = b;
                         }
                     }
                 })

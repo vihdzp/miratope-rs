@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use super::{camera::ProjectionType, memory::Memory, window::{Window, *}, UnitPointWidget};
+use super::{camera::ProjectionType, memory::Memory, window::{Window, *}, UnitPointWidget, main_window::PolyName};
 use crate::{Concrete, Float, Hyperplane, Point, Vector};
 
 use bevy::prelude::*;
@@ -235,6 +235,7 @@ impl FileDialogState {
 /// The system in charge of showing the file dialog.
 pub fn file_dialog(
     mut query: Query<'_, '_, &mut Concrete>,
+    mut name: ResMut<'_, PolyName>,
     file_dialog_state: Res<'_, FileDialogState>,
     file_dialog: NonSend<'_, FileDialogToken>,
 ) {
@@ -258,7 +259,8 @@ pub fn file_dialog(
                         match Concrete::from_path(&path) {
                             Ok(q) => {
                                 *p = q;
-                                p.recenter();
+                                let file_name = path.file_name().unwrap().to_str().unwrap();
+                                name.0 = file_name[..file_name.len()-4].into();
                             }
                             Err(err) => eprintln!("File open failed: {}", err),
                         }
@@ -315,6 +317,7 @@ pub fn show_top_panel(
     mut section_direction: ResMut<'_, Vec<SectionDirection>>,
     mut file_dialog_state: ResMut<'_, FileDialogState>,
     mut projection_type: ResMut<'_, ProjectionType>,
+    mut poly_name: ResMut<'_, PolyName>,
     mut memory: ResMut<'_, Memory>,
     mut show_memory: ResMut<'_, ShowMemory>,
     mut export_memory: ResMut<'_, ExportMemory>,
@@ -384,6 +387,7 @@ pub fn show_top_panel(
                                 }
                                 Some(a) => a.to_string()
                             };
+                            poly_name.0 = name.clone();
                             file_dialog_state.save(name);
                         }
                     }
@@ -539,7 +543,10 @@ pub fn show_top_panel(
                 } else if let Some(mut p) = query.iter_mut().next() {
                     if ui.button("Dual").clicked() {
                         match p.try_dual_mut() {
-                            Ok(_) => println!("Dual succeeded."),
+                            Ok(_) => {
+                                poly_name.0 = format!("Dual of {}", poly_name.0);
+                                println!("Dual succeeded.")
+                            },
                             Err(err) => eprintln!("Dual failed: {}", err),
                         }
                     }
@@ -551,6 +558,7 @@ pub fn show_top_panel(
                 if ui.button("Petrial").clicked() {
                     if let Some(mut p) = query.iter_mut().next() {
                         if p.petrial_mut() {
+                            poly_name.0 = format!("Petrial of {}", poly_name.0);
                             println!("Petrial succeeded.");
                         } else {
                             eprintln!("Petrial failed.");
@@ -566,6 +574,7 @@ pub fn show_top_panel(
                         match p.petrie_polygon_with(flag) {
                             Some(q) => {
                                 *p = q;
+                                poly_name.0 = format!("Petrie polygon of {}", poly_name.0);
                                 println!("Petrie polygon succeeded.")
                             }
                             None => eprintln!("Petrie polygon failed."),
@@ -583,6 +592,7 @@ pub fn show_top_panel(
                 } else if let Some(mut p) = query.iter_mut().next() {
                     if ui.button("Pyramid").clicked() {
                         *p = p.pyramid();
+                        poly_name.0 = format!("Pyramid of {}", poly_name.0);
                     }
                 }
 
@@ -594,6 +604,7 @@ pub fn show_top_panel(
                 } else if let Some(mut p) = query.iter_mut().next() {
                     if ui.button("Prism").clicked() {
                         *p = p.prism();
+                        poly_name.0 = format!("Prism of {}", poly_name.0);
                     }
                 }
 
@@ -605,6 +616,7 @@ pub fn show_top_panel(
                 } else if let Some(mut p) = query.iter_mut().next() {
                     if ui.button("Tegum").clicked() {
                         *p = p.tegum();
+                        poly_name.0 = format!("Tegum of {}", poly_name.0);
                     }
                 }
 
@@ -616,7 +628,10 @@ pub fn show_top_panel(
                 } else if let Some(mut p) = query.iter_mut().next() {
                     if ui.button("Antiprism").clicked() {
                         match p.try_antiprism() {
-                            Ok(q) => *p = q,
+                            Ok(q) => {
+                                *p = q;
+                                poly_name.0 = format!("Antiprism of {}", poly_name.0);
+                            },
                             Err(err) => eprintln!("Antiprism failed: {}", err),
                         }
                     }
@@ -626,6 +641,7 @@ pub fn show_top_panel(
                 if ui.button("Ditope").clicked() {
                     if let Some(mut p) = query.iter_mut().next() {
                         p.ditope_mut();
+                        poly_name.0 = format!("Ditope of {}", poly_name.0);
                         println!("Ditope succeeded!");
                     }
                 }
@@ -634,6 +650,7 @@ pub fn show_top_panel(
                 if ui.button("Hosotope").clicked() {
                     if let Some(mut p) = query.iter_mut().next() {
                         p.hosotope_mut();
+                        poly_name.0 = format!("Hosotope of {}", poly_name.0);
                         println!("Hosotope succeeded!");
                     }
                 }
@@ -759,7 +776,7 @@ pub fn show_top_panel(
             if ui.button("Memory").clicked() {
                 show_memory.0 = !show_memory.0;
             }
-            memory.show(&mut query, &egui_ctx, &mut show_memory.0);
+            memory.show(&mut query, poly_name, &egui_ctx, &mut show_memory.0);
 
             // Background color picker.
 

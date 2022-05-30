@@ -183,41 +183,87 @@ impl SpecialLibrary {
     }
 
     /// Loads the given special polytope from the library.
-    pub fn load(&self) -> Concrete {
+    pub fn load(&self) -> (Concrete, String) {
         match *self {
             // Loads a regular star polygon.
-            Self::Polygon(n, d) => Concrete::star_polygon_with_edge(n, d, 1.0),
+            Self::Polygon(n, d) => (
+                Concrete::star_polygon_with_edge(n, d, 1.0),
+                format!(
+                    "{}{}-gon",
+                    n,
+                    if d > 1 {format!("/{}", d)} else {"".to_string()}
+                )
+            ),
 
             // Loads a uniform polygonal prism.
-            Self::Prism(n, d) => Concrete::uniform_prism(n, d),
+            Self::Prism(n, d) => (
+                Concrete::uniform_prism(n, d),
+                format!(
+                    "{}{}-gonal prism",
+                    n,
+                    if d > 1 {format!("/{}", d)} else {"".to_string()}
+                )
+            ),
 
             // Loads a uniform polygonal antiprism.
-            Self::Antiprism(n, d) => Concrete::uniform_antiprism(n, d),
+            Self::Antiprism(n, d) => (
+                Concrete::uniform_antiprism(n, d),
+                format!(
+                    "{}{}-gonal antiprism",
+                    n,
+                    if d > 1 {format!("/{}", d)} else {"".to_string()}
+                )
+            ),
 
             // Loads a uniform polygonal duoprism.
-            Self::Duoprism(n1, d1, n2, d2) => {
-                let p1 = Concrete::star_polygon_with_edge(n1, d1, 1.0);
+            Self::Duoprism(n1, d1, n2, d2) => (
+                {
+                    let p1 = Concrete::star_polygon_with_edge(n1, d1, 1.0);
 
-                // Avoids duplicate work if possible.
-                if n1 == n2 && d1 == d2 {
-                    Concrete::duoprism(&p1, &p1)
-                } else {
-                    let p2 = Concrete::star_polygon_with_edge(n2, d2, 1.0);
-                    Concrete::duoprism(&p1, &p2)
-                }
-            }
+                    // Avoids duplicate work if possible.
+                    if n1 == n2 && d1 == d2 {
+                        Concrete::duoprism(&p1, &p1)
+                    } else {
+                        let p2 = Concrete::star_polygon_with_edge(n2, d2, 1.0);
+                        Concrete::duoprism(&p1, &p2)
+                    }
+                },
+                format!(
+                    "{}{}-{}{} duoprism",
+                    n1,
+                    if d1 > 1 {format!("/{}", d1)} else {"".to_string()},
+                    n2,
+                    if d2 > 1 {format!("/{}", d2)} else {"".to_string()}
+                )
+            ),
 
             // Loads a uniform polygonal antiprism prism.
-            Self::AntiprismPrism(n, d) => Concrete::uniform_antiprism(n, d).prism(),
+            Self::AntiprismPrism(n, d) => (
+                Concrete::uniform_antiprism(n, d).prism(),
+                format!(
+                    "{}{}-gonal antiprism prism",
+                    n,
+                    if d > 1 {format!("/{}", d)} else {"".to_string()}
+                )
+            ),
 
             // Loads a simplex with a given rank.
-            Self::Simplex(rank) => Concrete::simplex((rank + 1) as usize),
+            Self::Simplex(rank) => (
+                Concrete::simplex((rank + 1) as usize),
+                format!("{}-simplex", rank)
+            ),
 
             // Loads a hypercube with a given rank.
-            Self::Hypercube(rank) => Concrete::hypercube((rank + 1) as usize),
+            Self::Hypercube(rank) => (
+                Concrete::hypercube((rank + 1) as usize),
+                format!("{}-cube", rank)
+            ),
 
             // Loads an orthoplex with a given rank.
-            Self::Orthoplex(rank) => Concrete::orthoplex((rank + 1) as usize),
+            Self::Orthoplex(rank) => (
+                Concrete::orthoplex((rank + 1) as usize),
+                format!("{}-orthoplex", rank)
+            ),
         }
     }
 }
