@@ -39,6 +39,9 @@ pub enum SectionState {
         /// The polytope from which the cross-section originates.
         original_polytope: Concrete,
 
+        /// The name of the polytope.
+        original_name: String,
+
         /// The range of the slider.
         minmax: Vec<(Float, Float)>,
 
@@ -86,9 +89,10 @@ impl SectionState {
 		}
     }
 
-    pub fn open(&mut self, original_polytope: Concrete, minmax: Vec<(f64, f64)>) {
+    pub fn open(&mut self, original_polytope: Concrete, name: String, minmax: Vec<(f64, f64)>) {
         *self = SectionState::Active {
             original_polytope,
+            original_name: name,
             minmax: minmax.clone(),
             hyperplane_pos: minmax.clone().into_iter().map(|m| (m.0 + m.1) / 2.0).collect(),
             flatten: true,
@@ -102,6 +106,7 @@ impl Clone for SectionState {
     fn clone(&self) -> Self {
 		if let SectionState::Active{
 				original_polytope,
+                original_name,
 				minmax,
 				hyperplane_pos,
 				flatten,
@@ -111,6 +116,7 @@ impl Clone for SectionState {
 				
 			SectionState::Active{
 				original_polytope: original_polytope.clone(),
+                original_name: original_name.clone(),
 				minmax: minmax.clone(),
 				hyperplane_pos: hyperplane_pos.clone(),
 				flatten: *flatten,
@@ -458,15 +464,24 @@ pub fn show_top_panel(
                     }
                 }
 
-                // Gets the order of the symmetry group of the polytope
-                if ui.button("Symmetry group").clicked() {
-                    if let Some(mut p) = query.iter_mut().next() {
-                        let group = p.get_symmetry_group().0;
-                        println!("Symmetry order {}", group.count());
+                // Gets the order of the symmetry group of the polytope.
+                if advanced(&keyboard) {
+                    if ui.button("Rotation symmetry group").clicked() {
+                        if let Some(mut p) = query.iter_mut().next() {
+                            let group = p.get_rotation_group().unwrap().0;
+                            println!("Rotation symmetry order {}", group.count());
+                        }
+                    }
+                } else {
+                    if ui.button("Symmetry group").clicked() {
+                        if let Some(mut p) = query.iter_mut().next() {
+                            let group = p.get_symmetry_group().unwrap().0;
+                            println!("Symmetry order {}", group.count());
+                        }
                     }
                 }
 				
-                // Gets if it is a compound
+                // Gets if it is a compound.
                 if ui.button("Is compound").clicked() {
                     if let Some(mut p) = query.iter_mut().next() {
 						p.element_sort();
@@ -478,7 +493,7 @@ pub fn show_top_panel(
                     }
                 }
 				
-                // Gets if it is fissary
+                // Gets if it is fissary.
                 if ui.button("Is fissary").clicked() {
                     if let Some(mut p) = query.iter_mut().next() {
                         p.element_sort();
@@ -703,9 +718,12 @@ pub fn show_top_panel(
                 match section_state.as_mut() {
                     // The view is active, but will be inactivated.
                     SectionState::Active {
-                        original_polytope, ..
+                        original_polytope,
+                        original_name,
+                        ..
                     } => {
                         *query.iter_mut().next().unwrap() = original_polytope.clone();
+                        poly_name.0 = original_name.clone();
                         section_state.close();
                     }
 
@@ -728,7 +746,7 @@ pub fn show_top_panel(
                             let minmax = p.minmax(direction.clone()).unwrap_or((-1.0, 1.0));
                             let original_polytope = p.clone();
     
-                            section_state.open(original_polytope, vec![minmax]);
+                            section_state.open(original_polytope, poly_name.0.clone(), vec![minmax]);
                             section_direction.clear();
                             section_direction.push(SectionDirection{0:direction});
                         }
@@ -741,7 +759,7 @@ pub fn show_top_panel(
                     if let Some(p) = query.iter_mut().next() {
                         let mut vertices_thing = (Vertices(vec![]), vec![]);
                         if let GroupEnum2::FromSlot(slot) = faceting_settings.group {
-                            vertices_thing = Vertices(p.vertices.clone()).copy_by_symmetry(slot.to_poly(&mut memory, &p).unwrap().clone().get_symmetry_group().0);
+                            vertices_thing = Vertices(p.vertices.clone()).copy_by_symmetry(slot.to_poly(&mut memory, &p).unwrap().clone().get_symmetry_group().unwrap().0);
                         }
                         let facetings = p.clone().faceting(
                             match faceting_settings.group {
@@ -776,7 +794,7 @@ pub fn show_top_panel(
             if ui.button("Memory").clicked() {
                 show_memory.0 = !show_memory.0;
             }
-            memory.show(&mut query, poly_name, &egui_ctx, &mut show_memory.0);
+            memory.show(&mut query, &mut poly_name, &egui_ctx, &mut show_memory.0);
 
             // Background color picker.
 
@@ -808,7 +826,7 @@ pub fn show_top_panel(
         });
 
         // Shows secondary views below the menu bar.
-        show_views(ui, query, section_state, section_direction);
+        show_views(ui, query, &mut poly_name, section_state, section_direction);
     });
 }
 
@@ -817,6 +835,7 @@ pub fn show_top_panel(
 fn show_views(
     ui: &mut Ui,
     mut query: Query<'_, '_, &mut Concrete>,
+    poly_name: &mut ResMut<'_, PolyName>,
     mut section_state: ResMut<'_, SectionState>,
     mut section_direction: ResMut<'_, Vec<SectionDirection>>
 ) {
@@ -948,6 +967,7 @@ fn show_views(
     if section_state.is_changed() {
         if let SectionState::Active {
             original_polytope,
+            original_name,
             hyperplane_pos,
             minmax,
             flatten,
@@ -989,6 +1009,8 @@ fn show_views(
 				}
 				*p = r;
             }
+
+            poly_name.0 = format!("Slice of {}", original_name);
         }
     }
 }

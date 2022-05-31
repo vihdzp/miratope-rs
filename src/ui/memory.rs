@@ -41,7 +41,7 @@ impl Memory {
     }
 
     /// Shows the memory menu in a specified Ui.
-    pub fn show(&mut self, query: &mut Query<'_, '_, &mut Concrete>, mut poly_name: ResMut<'_, PolyName>, egui_ctx: &Res<'_, EguiContext>, open: &mut bool) {
+    pub fn show(&mut self, query: &mut Query<'_, '_, &mut Concrete>, poly_name: &mut ResMut<'_, PolyName>, egui_ctx: &Res<'_, EguiContext>, open: &mut bool) {
         egui::Window::new("Memory")
             .open(open)
             .scroll(true)

@@ -1373,9 +1373,7 @@ impl ConcretePolytope for Concrete {
 		
 		let mut builder = AbstractBuilder::new();
 		
-		
 		while i < self.rank()-1 {
-			
 			builder.push_empty();
 			for el in &self.abs.ranks()[i] {
 				builder.push_subs(el.subs.clone());
