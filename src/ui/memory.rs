@@ -104,8 +104,8 @@ impl Memory {
                                 // Swaps the current polytope with the one on memory.
                                 if ui.button("Swap").clicked() {
                                     std::mem::swap(query.iter_mut().next().unwrap().as_mut(), poly);
-                                    poly_name.0 = name;
                                     *label = Some(poly_name.0.clone());
+                                    poly_name.0 = name;
                                 }
 
                                 // Clones a polytope into memory.
