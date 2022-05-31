@@ -795,13 +795,13 @@ impl Concrete {
             GroupEnum::Chiral(chiral) => {
                 if chiral {
                     println!("\nComputing rotation symmetry group...");
-                    let g = self.get_rotation_group();
+                    let g = self.get_rotation_group().unwrap();
                     println!("Rotation symmetry order {}", g.0.count());
                     g.1
                 }
                 else {
                     println!("\nComputing symmetry group...");
-                    let g = self.get_symmetry_group();
+                    let g = self.get_symmetry_group().unwrap();
                     println!("Symmetry order {}", g.0.count());
                     g.1
                 }
