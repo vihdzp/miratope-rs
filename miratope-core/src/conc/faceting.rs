@@ -1045,7 +1045,7 @@ impl Concrete {
             println!("{}: {} facets, {} verts, {} copies", idx, possible_facets_row.len(), hp_v.len(), orbit.len());
         }
 
-        println!("\nComputing ridges...\n");
+        println!("\nComputing ridges...");
 
         let mut ridge_idx_orbits = Vec::new();
         let mut ridge_orbits = HashMap::new();
@@ -1141,7 +1141,7 @@ impl Concrete {
         }
 
         // Actually do the faceting
-        println!("\n\nCombining...\n");
+        println!("\n\nCombining...");
         let mut output_facets = Vec::new();
 
         let mut facets = vec![(0, 0)];
