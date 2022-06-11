@@ -22,6 +22,8 @@ pub enum GroupEnum {
     Chiral(bool),
 }
 
+const CL: &str = "\r                                                                        \r";
+
 impl Ranks {
     /// Sorts some stuff in a way that's useful for the faceting algorithm.
     pub fn element_sort_strong(&mut self) {
@@ -767,6 +769,8 @@ impl Concrete {
         vertices: Vec<Point<f64>>,
         symmetry: GroupEnum,
         edge_length: Option<f64>,
+        max_inradius: Option<f64>,
+        exclude_hemis: bool,
         noble: Option<usize>,
         max_per_hyperplane: Option<usize>,
         include_compounds: bool,
@@ -898,7 +902,20 @@ impl Concrete {
                     }
 
                     let hyperplane = Subspace::from_points(points.iter());
+
                     if hyperplane.is_hyperplane() {
+                        let inradius = hyperplane.distance(&Point::zeros(self.dim().unwrap()));
+                        if let Some(mir) = max_inradius {
+                            if inradius > mir {
+                                break
+                            }
+                        }
+                        if exclude_hemis {
+                            if inradius.abs() < f64::EPS {
+                                break
+                            }
+                        }
+
                         let mut hyperplane_vertices = Vec::new();
                         for (idx, v) in vertices.iter().enumerate() {
                             if hyperplane.distance(&v) < f64::EPS {
@@ -1028,7 +1045,7 @@ impl Concrete {
             println!("{}: {} facets, {} verts, {} copies", idx, possible_facets_row.len(), hp_v.len(), orbit.len());
         }
 
-        println!("\nComputing ridges...");
+        println!("\nComputing ridges...\n");
 
         let mut ridge_idx_orbits = Vec::new();
         let mut ridge_orbits = HashMap::new();
@@ -1058,43 +1075,64 @@ impl Concrete {
 
                     ridge.element_sort_strong();
 
-                    match ridge_orbits.get(&ridge) {
-                        Some(idx) => {
+                    let mut found = false;
+
+                    for row in &vertex_map {
+                        let mut new_ridge = ridge.clone();
+                    
+                        let mut new_list = ElementList::new();
+                        for i in 0..new_ridge[2].len() {
+                            let mut new = Element::new(Subelements::new(), Superelements::new());
+                            for sub in &ridge[2][i].subs {
+                                new.subs.push(row[*sub])
+                            }
+                            new_list.push(new);
+                        }
+                        new_ridge[2] = new_list;
+
+                        new_ridge.element_sort_strong();
+                        if let Some((idx, _)) = ridge_orbits.get(&new_ridge) {
                             // writes the orbit index at the ridge index
                             r_i_o_row_row.push(*idx);
+                            found = true;
+                            break
                         }
-                        None => {
-                            // adds all ridges with the same orbit to the map
-                            let mut count = 0;
-                            for row in &vertex_map {
-                                let mut new_ridge = ridge.clone();
-                            
-                                let mut new_list = ElementList::new();
-                                for i in 0..new_ridge[2].len() {
-                                    let mut new = Element::new(Subelements::new(), Superelements::new());
-                                    for sub in &ridge[2][i].subs {
-                                        new.subs.push(row[*sub])
-                                    }
-                                    new_list.push(new);
-                                }
-                                new_ridge[2] = new_list;
+                    }
+                    if !found {
+                        // counts the ridges in the orbit
+                        let mut count = 0;
+                        let mut set = HashSet::new();
 
-                                new_ridge.element_sort_strong();
-                                if ridge_orbits.get(&new_ridge).is_none() {
-                                    ridge_orbits.insert(new_ridge, orbit_idx);
-                                    count += 1;
+                        for row in &vertex_map {
+                            let mut new_ridge = ridge.clone();
+                        
+                            let mut new_list = ElementList::new();
+                            for i in 0..new_ridge[2].len() {
+                                let mut new = Element::new(Subelements::new(), Superelements::new());
+                                for sub in &ridge[2][i].subs {
+                                    new.subs.push(row[*sub])
                                 }
+                                new_list.push(new);
                             }
-                            r_i_o_row_row.push(orbit_idx);
-                            ridge_counts.push(count);
-                            orbit_idx += 1;
+                            new_ridge[2] = new_list;
+
+                            new_ridge.element_sort_strong();
+                            if set.get(&new_ridge).is_none() {
+                                set.insert(new_ridge);
+                                count += 1;
+                            }
                         }
+                        ridge_orbits.insert(ridge, (orbit_idx, count));
+                        r_i_o_row_row.push(orbit_idx);
+                        ridge_counts.push(count);
+                        orbit_idx += 1;
                     }
                 }
                 r_i_o_row.push(r_i_o_row_row);
             }
             ridge_idx_orbits.push(r_i_o_row);
             hp_i += 1;
+            print!("{}{}/{} hp, {} ridges", CL, hp_i, hyperplane_orbits.len(), ridge_orbits.len());
         }
 
         let mut f_counts = Vec::new();
@@ -1103,7 +1141,7 @@ impl Concrete {
         }
 
         // Actually do the faceting
-        println!("\nCombining...");
+        println!("\n\nCombining...\n");
         let mut output_facets = Vec::new();
 
         let mut facets = vec![(0, 0)];
@@ -1201,6 +1239,7 @@ impl Concrete {
                             continue
                         }
                     }
+                    print!("{}{} facetings {:?}", CL, output_facets.len(), facets);
                     if include_compounds {
                         let t = facets.last().unwrap().clone();
                         facets.push((t.0 + 1, 0));
@@ -1245,6 +1284,8 @@ impl Concrete {
                 _ => {}
             }
         }
+
+        println!("{}{} facetings", CL, output_facets.len());
 
         if !include_compounds {
             println!("\nFiltering mixed compounds...");
