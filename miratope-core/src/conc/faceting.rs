@@ -24,6 +24,8 @@ pub enum GroupEnum {
 
 const CL: &str = "\r                                                                               \r";
 
+const DELAY: u128 = 200;
+
 impl Ranks {
     /// Sorts some stuff in a way that's useful for the faceting algorithm.
     pub fn element_sort_strong(&mut self) {
@@ -299,8 +301,8 @@ fn faceting_subdim(
     
     for orbit in vertex_orbits {
         let rep = orbit[0]; // We only need one representative per orbit.
-        for vertex in 0..total_vert_count {
-            if vertex != rep && !checked[rep][vertex] {
+        for vertex in rep+1..total_vert_count {
+            if !checked[rep][vertex] {
                 if let Some(e_l) = edge_length {
                     if ((&points[vertex].0-&points[rep].0).norm() - e_l).abs() > f64::EPS {
                         continue
@@ -308,11 +310,12 @@ fn faceting_subdim(
                 }
                 let mut new_orbit = Vec::new();
                 for row in &vertex_map {
-                    let (c1, c2) = (row[rep], row[vertex]);
+                    let (a1, a2) = (row[rep], row[vertex]);
+                    let c1 = a1.min(a2);
+                    let c2 = a1.max(a2);
                     if !checked[c1][c2] {
                         new_orbit.push(vec![c1, c2]);
                         checked[c1][c2] = true;
-                        checked[c2][c1] = true;
                     }
                 }
                 pair_orbits.push(new_orbit);
@@ -328,7 +331,10 @@ fn faceting_subdim(
     for pair_orbit in pair_orbits {
         let rep = &pair_orbit[0];
 
-        let mut new_vertices = vec![0; rank-3];
+        if rep[1]+rank-2 > points.len() {
+            continue;
+        }
+        let mut new_vertices: Vec<usize> = (rep[1]+1..rep[1]+rank-2).collect();
         let mut update = 0;
         if rank > 3 {
             update = rank-4;
@@ -883,11 +889,14 @@ impl Concrete {
         for (idx, pair_orbit) in pair_orbits.iter().enumerate() {
             let rep = &pair_orbit[0];
 
-            let mut new_vertices = vec![rep[1]+1; rank-3];
+            if rep[1]+rank-2 > vertices.len() {
+                continue;
+            }
+            let mut new_vertices: Vec<usize> = (rep[1]+1..rep[1]+rank-2).collect();
             let mut update = rank-4;
             'b: loop {
                 'c: loop {
-                    if now.elapsed().as_millis() > 500 {
+                    if now.elapsed().as_millis() > DELAY {
                         print!("{}loop {}, edge orbit {}, new verts {:?}", CL, dbg_count, idx, new_vertices);
                         std::io::stdout().flush().unwrap();
                         now = Instant::now();
@@ -1064,6 +1073,8 @@ impl Concrete {
         let mut orbit_idx = 0;
 
         let mut hp_i = 0; // idk why i have to do this, thanks rust
+
+        let mut now = Instant::now();
         for ridges_row in ridges {
             let mut r_i_o_row = Vec::new();
 
@@ -1143,7 +1154,11 @@ impl Concrete {
             }
             ridge_idx_orbits.push(r_i_o_row);
             hp_i += 1;
-            print!("{}{}/{} hp, {} ridges", CL, hp_i, hyperplane_orbits.len(), ridge_orbits.len());
+            if now.elapsed().as_millis() > DELAY {
+                print!("{}{}/{} hp, {} ridges", CL, hp_i, hyperplane_orbits.len(), ridge_orbits.len());
+                std::io::stdout().flush().unwrap();
+                now = Instant::now();
+            }
         }
 
         let mut f_counts = Vec::new();
