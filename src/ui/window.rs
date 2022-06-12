@@ -403,6 +403,9 @@ pub trait DuoWindow: Window {
         }
     }
 
+    /// Applies an action to the polytope name.
+    fn name_action(&self, name: &mut String, memory: &Memory);
+
     /// Builds the window to be shown on screen.
     fn build(&mut self, _: &mut Ui, _: &Concrete, _: &Memory) {}
 
@@ -502,6 +505,7 @@ pub trait DuoWindow: Window {
         egui_ctx: Res<'_, EguiContext>,
         mut query: Query<'_, '_, &mut Concrete>,
         memory: Res<'_, Memory>,
+        mut poly_name: ResMut<'_, PolyName>,
     ) where
         Self: 'static,
     {
@@ -509,6 +513,7 @@ pub trait DuoWindow: Window {
             match self_.show(egui_ctx.ctx(), &polytope, &memory) {
                 ShowResult::Ok => {
                     self_.action(polytope.as_mut(), &memory);
+                    self_.name_action(&mut poly_name.0, &memory);
                     self_.close()
                 }
                 ShowResult::Close => self_.close(),
@@ -966,6 +971,27 @@ impl DuoWindow for DuopyramidWindow {
         Concrete::duopyramid_with(p, q, p_offset, q_offset, self.height)
     }
 
+    fn name_action(&self, name: &mut String, memory: &Memory) {
+        let name_a = match self.slots[0] {
+            Slot::Loaded => name.clone(),
+            Slot::Memory(i) => match &memory[i].as_ref().unwrap().1 {
+                Some(label) => label.to_string(),
+                None => format!("polytope {}", i),
+            },
+            Slot::None => "".to_string(),
+        };
+        let name_b = match self.slots[1] {
+            Slot::Loaded => name.clone(),
+            Slot::Memory(i) => match &memory[i].as_ref().unwrap().1 {
+                Some(label) => label.to_string(),
+                None => format!("polytope {}", i),
+            },
+            Slot::None => "".to_string(),
+        };
+
+        *name = format!("Duopyramid of ({}, {})", name_a, name_b);
+    }
+
     fn slots(&self) -> [Slot; 2] {
         self.slots
     }
@@ -1018,6 +1044,27 @@ impl DuoWindow for DuoprismWindow {
         p.duoprism(q)
     }
 
+    fn name_action(&self, name: &mut String, memory: &Memory) {
+        let name_a = match self.slots[0] {
+            Slot::Loaded => name.clone(),
+            Slot::Memory(i) => match &memory[i].as_ref().unwrap().1 {
+                Some(label) => label.to_string(),
+                None => format!("polytope {}", i),
+            },
+            Slot::None => "".to_string(),
+        };
+        let name_b = match self.slots[1] {
+            Slot::Loaded => name.clone(),
+            Slot::Memory(i) => match &memory[i].as_ref().unwrap().1 {
+                Some(label) => label.to_string(),
+                None => format!("polytope {}", i),
+            },
+            Slot::None => "".to_string(),
+        };
+
+        *name = format!("Duoprism of ({}, {})", name_a, name_b);
+    }
+
     fn slots(&self) -> [Slot; 2] {
         self.slots
     }
@@ -1068,6 +1115,27 @@ impl DuoWindow for DuotegumWindow {
         Concrete::duotegum_with(p, q, p_offset, q_offset)
     }
 
+    fn name_action(&self, name: &mut String, memory: &Memory) {
+        let name_a = match self.slots[0] {
+            Slot::Loaded => name.clone(),
+            Slot::Memory(i) => match &memory[i].as_ref().unwrap().1 {
+                Some(label) => label.to_string(),
+                None => format!("polytope {}", i),
+            },
+            Slot::None => "".to_string(),
+        };
+        let name_b = match self.slots[1] {
+            Slot::Loaded => name.clone(),
+            Slot::Memory(i) => match &memory[i].as_ref().unwrap().1 {
+                Some(label) => label.to_string(),
+                None => format!("polytope {}", i),
+            },
+            Slot::None => "".to_string(),
+        };
+
+        *name = format!("Duotegum of ({}, {})", name_a, name_b);
+    }
+
     fn slots(&self) -> [Slot; 2] {
         self.slots
     }
@@ -1115,6 +1183,27 @@ impl DuoWindow for DuocombWindow {
         p.duocomb(q)
     }
 
+    fn name_action(&self, name: &mut String, memory: &Memory) {
+        let name_a = match self.slots[0] {
+            Slot::Loaded => name.clone(),
+            Slot::Memory(i) => match &memory[i].as_ref().unwrap().1 {
+                Some(label) => label.to_string(),
+                None => format!("polytope {}", i),
+            },
+            Slot::None => "".to_string(),
+        };
+        let name_b = match self.slots[1] {
+            Slot::Loaded => name.clone(),
+            Slot::Memory(i) => match &memory[i].as_ref().unwrap().1 {
+                Some(label) => label.to_string(),
+                None => format!("polytope {}", i),
+            },
+            Slot::None => "".to_string(),
+        };
+
+        *name = format!("Comb of ({}, {})", name_a, name_b);
+    }
+
     fn slots(&self) -> [Slot; 2] {
         self.slots
     }
@@ -1152,6 +1241,27 @@ impl DuoWindow for CompoundWindow {
         let mut p2 = p.clone();
         p2.comp_append(q.clone());
         p2
+    }
+
+    fn name_action(&self, name: &mut String, memory: &Memory) {
+        let name_a = match self.slots[0] {
+            Slot::Loaded => name.clone(),
+            Slot::Memory(i) => match &memory[i].as_ref().unwrap().1 {
+                Some(label) => label.to_string(),
+                None => format!("polytope {}", i),
+            },
+            Slot::None => "".to_string(),
+        };
+        let name_b = match self.slots[1] {
+            Slot::Loaded => name.clone(),
+            Slot::Memory(i) => match &memory[i].as_ref().unwrap().1 {
+                Some(label) => label.to_string(),
+                None => format!("polytope {}", i),
+            },
+            Slot::None => "".to_string(),
+        };
+
+        *name = format!("Compound of ({}, {})", name_a, name_b);
     }
 
     fn slots(&self) -> [Slot; 2] {
