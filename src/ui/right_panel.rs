@@ -197,7 +197,10 @@ pub fn show_right_panel(
                             break;
                         }
 
-                        ui.heading(format!("{}", EL_NAMES[r]));
+                        ui.heading(format!("{}",
+                            if rank > EL_NAMES.len() {format!("{}-elements", r-1)}
+                            else {EL_NAMES[r].to_string()})
+                        );
                         for t in types {
                             let i = t.example;
 
@@ -209,7 +212,8 @@ pub fn show_right_panel(
                                 // Button to get the element
                                 if ui.button(format!("{}-{}", 
                                     t.facets,
-                                    EL_SUFFIXES[r],
+                                    if r >= EL_SUFFIXES.len() {"".to_string()}
+                                    else {EL_SUFFIXES[r].to_string()}
                                 )).clicked() {
                                     if let Some(mut p) = query.iter_mut().next() {
                                         if let Some(mut element) = poly.element(r,i) {
@@ -226,7 +230,8 @@ pub fn show_right_panel(
                                 // Button to get the element figure
                                 if ui.button(format!("{}-{}",
                                     t.fig_facets,
-                                    EL_SUFFIXES[rank - r],
+                                    if rank - r >= EL_SUFFIXES.len() {"".to_string()}
+                                    else {EL_SUFFIXES[rank - r].to_string()}
                                 )).clicked() {
                                     if let Some(mut p) = query.iter_mut().next() {
                                         match poly.element_fig(r, i) {
@@ -292,7 +297,8 @@ pub fn show_right_panel(
                                 } else {
                                     component.abs[component.rank()-1].len()
                                 },
-                                EL_SUFFIXES[element_types.poly.rank()],
+                                if element_types.poly.rank() >= EL_SUFFIXES.len() {""}
+                                else {EL_SUFFIXES[element_types.poly.rank()]},
                             )).clicked() {
                                 if let Some(mut p) = query.iter_mut().next() {
                                     *p = component.clone();
