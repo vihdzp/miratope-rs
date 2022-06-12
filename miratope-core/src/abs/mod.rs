@@ -897,7 +897,7 @@ impl Polytope for Abstract {
         }
 
         let bottom_facet_count = self.el_count(self.rank()-1);
-        let top_vertex_count = self.el_count(1);
+        let top_vertex_count = other.el_count(1);
 
         for bottom_facet in &mut product[self.rank()-1] {
             bottom_facet.sups = (0..top_vertex_count).collect();
