@@ -22,7 +22,7 @@ pub enum GroupEnum {
     Chiral(bool),
 }
 
-const CL: &str = "\r                                                                                                                                                                                                                                                                                                                                                                       \r";
+const CL: &str = "\r                                                                               \r";
 
 impl Ranks {
     /// Sorts some stuff in a way that's useful for the faceting algorithm.
