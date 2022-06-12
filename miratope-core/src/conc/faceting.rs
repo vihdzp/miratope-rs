@@ -877,7 +877,7 @@ impl Concrete {
         let mut hyperplane_orbits = Vec::new();
         let mut checked = HashSet::new();
 
-        let mut dbg_count = 0;
+        let mut dbg_count: u64 = 0;
         let mut now = Instant::now();
 
         for (idx, pair_orbit) in pair_orbits.iter().enumerate() {
@@ -978,7 +978,12 @@ impl Concrete {
             }
         }
 
-        println!("{}{} hyperplanes in {} orbit{}", CL, checked.len(), hyperplane_orbits.len(), if hyperplane_orbits.len() == 1 {""} else {"s"});
+        let mut sum: u64 = 0;
+        for orbit in &hyperplane_orbits {
+            sum += orbit.2 as u64;
+        }
+
+        println!("{}{} hyperplanes in {} orbit{}", CL, sum, hyperplane_orbits.len(), if hyperplane_orbits.len() == 1 {""} else {"s"});
 
         println!("\nFaceting hyperplanes...");
 
