@@ -50,6 +50,7 @@ impl Plugin for WindowPlugin {
             .add_plugin(DuoprismWindow::plugin())
             .add_plugin(DuotegumWindow::plugin())
             .add_plugin(DuocombWindow::plugin())
+            .add_plugin(StarWindow::plugin())
             .add_plugin(CompoundWindow::plugin())
             .add_plugin(TruncateWindow::plugin())
             .add_plugin(ScaleWindow::plugin())
@@ -1202,6 +1203,64 @@ impl DuoWindow for DuocombWindow {
         };
 
         *name = format!("Comb of ({}, {})", name_a, name_b);
+    }
+
+    fn slots(&self) -> [Slot; 2] {
+        self.slots
+    }
+
+    fn slots_mut(&mut self) -> &mut [Slot; 2] {
+        &mut self.slots
+    }
+}
+
+/// A window that allows a user to build a star product, either using the polytopes
+/// in memory or the currently loaded one.
+#[derive(Default)]
+pub struct StarWindow {
+    /// Whether the window is open.
+    open: bool,
+
+    /// The slots that are currently selected.
+    slots: [Slot; 2],
+}
+
+impl Window for StarWindow {
+    const NAME: &'static str = "Star product";
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.open
+    }
+}
+
+impl DuoWindow for StarWindow {
+    fn operation(&self, p: &Concrete, q: &Concrete) -> Concrete {
+        p.star_product(q)
+    }
+
+    fn name_action(&self, name: &mut String, memory: &Memory) {
+        let name_a = match self.slots[0] {
+            Slot::Loaded => name.clone(),
+            Slot::Memory(i) => match &memory[i].as_ref().unwrap().1 {
+                Some(label) => label.to_string(),
+                None => format!("polytope {}", i),
+            },
+            Slot::None => "".to_string(),
+        };
+        let name_b = match self.slots[1] {
+            Slot::Loaded => name.clone(),
+            Slot::Memory(i) => match &memory[i].as_ref().unwrap().1 {
+                Some(label) => label.to_string(),
+                None => format!("polytope {}", i),
+            },
+            Slot::None => "".to_string(),
+        };
+
+        *name = format!("Star of ({}, {})", name_a, name_b);
     }
 
     fn slots(&self) -> [Slot; 2] {

@@ -296,6 +296,7 @@ pub type EguiWindows<'a> = (
     ResMut<'a, DuoprismWindow>,
     ResMut<'a, DuotegumWindow>,
     ResMut<'a, DuocombWindow>,
+    ResMut<'a, StarWindow>,
     ResMut<'a, CompoundWindow>,
     ResMut<'a, TruncateWindow>,
     ResMut<'a, ScaleWindow>,
@@ -342,6 +343,7 @@ pub fn show_top_panel(
         mut duoprism_window,
         mut duotegum_window,
         mut duocomb_window,
+        mut star_window,
         mut compound_window,
         mut truncate_window,
         mut scale_window,
@@ -690,6 +692,11 @@ pub fn show_top_panel(
                 // Opens the window to make duocombs.
                 if ui.button("Duocomb...").clicked() {
                     duocomb_window.open();
+                }
+
+                // Opens the window to make star products.
+                if ui.button("Star product...").clicked() {
+                    star_window.open();
                 }
 
                 // Opens the window to make compounds.

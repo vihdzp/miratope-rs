@@ -141,20 +141,24 @@ pub trait Polytope:
     fn polygon(n: usize) -> Self;
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
-    /// from two polytopes.
+    /// of two polytopes.
     fn duopyramid(&self, p: &Self) -> Self;
 
     /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
-    /// from two polytopes.
+    /// of two polytopes.
     fn duoprism(&self, p: &Self) -> Self;
 
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
-    /// from two polytopes.
+    /// of two polytopes.
     fn duotegum(&self, p: &Self) -> Self;
 
     /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
-    /// from two polytopes.
+    /// of two polytopes.
     fn duocomb(&self, p: &Self) -> Self;
+
+    /// Builds a [star product](https://en.wikipedia.org/wiki/Star_product)
+    /// of two polytopes.
+    fn star_product(&self, p: &Self) -> Self;
 
     /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
     /// given base.

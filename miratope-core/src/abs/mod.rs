@@ -887,6 +887,28 @@ impl Polytope for Abstract {
         product::duocomb(self, other)
     }
 
+    /// Builds a [star product](https://en.wikipedia.org/wiki/Star_product)
+    /// of two polytopes.
+    fn star_product(&self, other: &Self) -> Self {
+        let mut product = self.clone();
+        product.ranks.pop();
+        for r in 1..=other.rank() {
+            product.ranks.push(other[r].clone());
+        }
+
+        let bottom_facet_count = self.el_count(self.rank()-1);
+        let top_vertex_count = self.el_count(1);
+
+        for bottom_facet in &mut product[self.rank()-1] {
+            bottom_facet.sups = (0..top_vertex_count).collect();
+        }
+        for top_vertex in &mut product[self.rank()-0] {
+            top_vertex.subs = (0..bottom_facet_count).collect();
+        }
+
+        product
+    }
+
     /// Builds a [ditope](https://polytope.miraheze.org/wiki/Ditope) of a given
     /// polytope in place. Does nothing in the case of the nullitope.
     fn ditope_mut(&mut self) {

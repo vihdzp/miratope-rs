@@ -393,6 +393,15 @@ impl Polytope for Concrete {
         self.abs.hosotope_mut();
     }
 
+    /// Builds a [star product](https://en.wikipedia.org/wiki/Star_product)
+    /// of two polytopes.
+    fn star_product(&self, other: &Self) -> Self {
+        Self::new(
+            self.vertices.clone(),
+            self.abs.star_product(&other.abs),
+        )
+    }
+
     /// Attempts to build an antiprism based on a given polytope. Uses the unit
     /// hypersphere to take the dual, and places the bases at a distance of 1.
     /// If it fails, it returns the index of a facet through the inversion
