@@ -857,7 +857,10 @@ impl Concrete {
                     }
                     let mut new_orbit = Vec::new();
                     for row in &vertex_map {
-                        let (c1, c2) = (row[rep], row[vertex]);
+                        let (a1, a2) = (row[rep], row[vertex]);
+                        let c1 = a1.min(a2);
+                        let c2 = a1.max(a2);
+                        
                         if !checked[c1][c2] {
                             new_orbit.push(vec![c1, c2]);
                             checked[c1][c2] = true;
