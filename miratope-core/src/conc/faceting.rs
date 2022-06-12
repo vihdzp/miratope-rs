@@ -1,6 +1,6 @@
 //! The faceting algorithm.
 
-use std::{collections::{BTreeMap, HashMap, HashSet, VecDeque}, vec, iter::FromIterator};
+use std::{collections::{BTreeMap, HashMap, HashSet, VecDeque}, vec, iter::FromIterator, io::Write, time::Instant};
 
 use crate::{
     abs::{Abstract, Element, ElementList, Ranked, Ranks, Subelements, Superelements, AbstractBuilder},
@@ -876,13 +876,22 @@ impl Concrete {
         let mut checked = HashSet::new();
         let mut hyperplanes_vertices = Vec::new();
 
-        for pair_orbit in &pair_orbits {
+        let mut dbg_count = 0;
+        let mut now = Instant::now();
+
+        for (idx, pair_orbit) in pair_orbits.iter().enumerate() {
             let rep = &pair_orbit[0];
 
             let mut new_vertices = vec![0; rank-3];
             let mut update = rank-4;
             'b: loop {
                 'c: loop {
+                    if now.elapsed().as_millis() > 500 {
+                        print!("{}loop {}, edge orbit {}, new verts {:?}", CL, dbg_count, idx, new_vertices);
+                        std::io::stdout().flush().unwrap();
+                        now = Instant::now();
+                    }
+                    dbg_count += 1;
                     if let Some(e_l) = edge_length {
                         // WLOG checks if the vertices are all the right distance away from the first vertex.
                         for (v_i, v) in new_vertices.iter().enumerate() {
@@ -972,7 +981,7 @@ impl Concrete {
             }
         }
 
-        println!("{} hyperplanes in {} orbit{}", checked.len(), hyperplane_orbits.len(), if hyperplane_orbits.len() == 1 {""} else {"s"});
+        println!("{}{} hyperplanes in {} orbit{}", CL, checked.len(), hyperplane_orbits.len(), if hyperplane_orbits.len() == 1 {""} else {"s"});
 
         println!("\nFaceting hyperplanes...");
 
