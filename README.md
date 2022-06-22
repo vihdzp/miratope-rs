@@ -27,13 +27,13 @@ The library is customizable, you can add your own `.off` files. Sometimes you ma
   * It can display a list of all [elements](https://polytope.miraheze.org/wiki/Element) of a polytope, grouped by symmetry equivalence.
   * It can split [compounds](https://en.wikipedia.org/wiki/Polytope_compound) into their components.
 * Rendering polytopes
-  * Miratope can render wireframes and faces (both toggleable) of polytopes in arbitrary dimension. It can render in perspective and orthogonal projection. It can also interactively render cross-sections of polytopes.
+  * Miratope can render wireframes and faces (both toggleable) of polytopes in arbitrary dimension, though it can currently only rotate in 3 dimensions. It can render in perspective and orthogonal projection. It can also interactively render cross-sections of polytopes.
 * Importing and exporting polytopes in the [`.off` format](https://www.software3d.com/StellaManual.php?prod=stella4D#import)
 
 ## How to use
 
 ### If you're using 64-bit Windows
-Just download the latest release on the right side of the github page, unzip it, and run `miratope.exe`.
+Just download the latest release on the right side of the github page, extract the zip, and run `miratope.exe`.
 
 ### If you're using a different OS, or you want to modify the source code
 Miratope is written in Rust, so if you don't already have the latest version and its Visual Studio C++ Build tools downloaded then you should do that first. Instructions for downloading can be found here: https://www.rust-lang.org/tools/install. **You may have to restart your computer for Rust to fully install**.
