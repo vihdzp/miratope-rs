@@ -167,11 +167,11 @@ fn filter_irc(vec: &Vec<Vec<(usize,usize)>>) -> Vec<usize> {
     let mut out = Vec::new(); // The indices of the facetings that aren't compounds.
 
     'a: for a in 0..vec.len() { // `a` is the index of the base set
-        for b in a+1..vec.len() { // `b` is the index of a potential subset of `a`
+        for b in 0..vec.len() { // `b` is the index of a potential subset of `a`
             if vec[b].len() > vec[a].len() { // A strict subset must be smaller than the base.
                 continue
             }
-            if vec[b][0] > vec[a][0] { // One of the subsets must contain the first facet.
+            if vec[b][0] != vec[a][0] { // One of the subsets must contain the first facet.
                 break
             }
             let mut i = 0;
