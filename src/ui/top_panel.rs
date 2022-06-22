@@ -19,6 +19,7 @@ impl Plugin for TopPanelPlugin {
             .init_resource::<Vec<SectionDirection>>()
             .init_resource::<Memory>()
             .init_resource::<ShowMemory>()
+            .init_resource::<ShowHelp>()
             .init_resource::<ExportMemory>()
             .init_non_send_resource::<FileDialogToken>()
             .add_system(file_dialog.system())
@@ -149,6 +150,15 @@ impl Default for SectionDirection {
 pub struct ShowMemory(bool);
 
 impl Default for ShowMemory {
+    fn default() -> Self {
+        Self(false)
+    }
+}
+
+/// Stores whether the help window is shown.
+pub struct ShowHelp(bool);
+
+impl Default for ShowHelp {
     fn default() -> Self {
         Self(false)
     }
@@ -327,6 +337,7 @@ pub fn show_top_panel(
     mut poly_name: ResMut<'_, PolyName>,
     mut memory: ResMut<'_, Memory>,
     mut show_memory: ResMut<'_, ShowMemory>,
+    mut show_help: ResMut<'_, ShowHelp>,
     mut export_memory: ResMut<'_, ExportMemory>,
     mut background_color: ResMut<'_, ClearColor>,
 
@@ -804,6 +815,23 @@ pub fn show_top_panel(
                 show_memory.0 = !show_memory.0;
             }
             memory.show(&mut query, &mut poly_name, &egui_ctx, &mut show_memory.0);
+
+            if ui.button("Help").clicked() {
+                show_help.0 = !show_help.0;
+            }
+            egui::Window::new("Help")
+                .open(&mut show_help.0)
+                .resizable(false)
+                .show(egui_ctx.ctx(), |ui| {
+                    ui.heading("Hotkeys");
+                    ui.label("V: toggle faces\nB: toggle wireframe");
+                    ui.separator();
+                    ui.heading("Camera");
+                    ui.label("WSADRF: move\nQE: roll\nX: reset\nHold Ctrl: move faster\nHold Shift: move slower");
+                    ui.separator();
+                    ui.heading("UI");
+                    ui.label("Hold Ctrl: extra options in some menus\nHold Shift: move number sliders slower");
+                });
 
             // Background color picker.
 
