@@ -785,6 +785,7 @@ impl Concrete {
         save_facets: bool,
     ) -> Vec<(Concrete, Option<String>)> {
         let rank = self.rank();
+        let mut now = Instant::now();
 
         if rank < 4 {
             println!("\nFaceting polytopes of rank less than 3 is not supported!\n");
@@ -884,7 +885,6 @@ impl Concrete {
         let mut checked = HashSet::new();
 
         let mut dbg_count: u64 = 0;
-        let mut now = Instant::now();
 
         for (idx, pair_orbit) in pair_orbits.iter().enumerate() {
             let rep = &pair_orbit[0];
@@ -1074,7 +1074,6 @@ impl Concrete {
 
         let mut hp_i = 0; // idk why i have to do this, thanks rust
 
-        let mut now = Instant::now();
         for ridges_row in ridges {
             let mut r_i_o_row = Vec::new();
 
@@ -1161,6 +1160,9 @@ impl Concrete {
             }
         }
 
+        print!("{}{}/{} hp, {} ridges", CL, hp_i, hyperplane_orbits.len(), ridge_orbits.len());
+        std::io::stdout().flush().unwrap();
+
         let mut f_counts = Vec::new();
         for orbit in hyperplane_orbits {
             f_counts.push(orbit.2);
@@ -1173,6 +1175,11 @@ impl Concrete {
         let mut facets = vec![(0, 0)];
 
         'l: loop {
+            if now.elapsed().as_millis() > DELAY {
+                print!("{}{} facetings, {:?}", CL, output_facets.len(), facets);
+                std::io::stdout().flush().unwrap();
+                now = Instant::now();
+            }
             loop {
                 let t = facets.last_mut().unwrap();
                 if t.0 >= possible_facets.len() {
@@ -1265,7 +1272,6 @@ impl Concrete {
                             continue
                         }
                     }
-                    print!("{}{} facetings {:?}", CL, output_facets.len(), facets);
                     if include_compounds {
                         let t = facets.last().unwrap().clone();
                         facets.push((t.0 + 1, 0));
