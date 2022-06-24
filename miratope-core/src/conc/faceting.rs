@@ -1535,12 +1535,11 @@ impl Concrete {
                     for facet in &facets {
                         facets_fmt.push_str(&format!(" ({},{})", facet.0, facet.1));
                     }
-                    println!("Faceting {}:{}{}", faceting_idx, facets_fmt, fissary_status);
 
                     if save {
                         if save_to_file {
                             let mut path = PathBuf::from(&file_path);
-                            path.set_file_name(format!("{}.off",
+                            path.push(format!("{}.off",
                                 if save_facets {
                                     format!("faceting {} -{}{}", faceting_idx, facets_fmt, fissary_status)
                                 } else {
@@ -1571,6 +1570,8 @@ impl Concrete {
                             used_facets.insert(orbit, poly.facet(idx).unwrap());
                         }
                     }
+                    
+                    println!("Faceting {}:{}{}", faceting_idx, facets_fmt, fissary_status);
 
                     faceting_idx += 1;
                 }
