@@ -1,12 +1,12 @@
 //! The faceting algorithm.
 
-use std::{collections::{BTreeMap, HashMap, HashSet, VecDeque}, vec, iter::FromIterator, io::Write, time::Instant};
+use std::{collections::{BTreeMap, HashMap, HashSet, VecDeque}, vec, iter::FromIterator, io::Write, time::Instant, path::PathBuf, fs::File};
 
 use crate::{
     abs::{Abstract, Element, ElementList, Ranked, Ranks, Subelements, Superelements, AbstractBuilder},
     conc::{Concrete, ConcretePolytope},
     float::Float,
-    group::{Group}, geometry::{Matrix, PointOrd, Subspace, Point}, Polytope,
+    group::{Group}, geometry::{Matrix, PointOrd, Subspace, Point}, Polytope, file::off::{OffWriter, OffOptions},
 };
 
 use vec_like::*;
@@ -786,6 +786,8 @@ impl Concrete {
         mark_fissary: bool,
         save: bool,
         save_facets: bool,
+        save_to_file: bool,
+        file_path: String,
     ) -> Vec<(Concrete, Option<String>)> {
         let rank = self.rank();
         let mut now = Instant::now();
@@ -1536,13 +1538,32 @@ impl Concrete {
                     println!("Faceting {}:{}{}", faceting_idx, facets_fmt, fissary_status);
 
                     if save {
-                        output.push((poly.clone(), Some(
-                            if save_facets {
-                                format!("faceting {} -{}{}", faceting_idx, facets_fmt, fissary_status)
-                            } else {
-                                format!("faceting {}{}", faceting_idx, fissary_status)
+                        if save_to_file {
+                            let mut path = PathBuf::from(&file_path);
+                            path.set_file_name(format!("{}.off",
+                                if save_facets {
+                                    format!("faceting {} -{}{}", faceting_idx, facets_fmt, fissary_status)
+                                } else {
+                                    format!("faceting {}{}", faceting_idx, fissary_status)
+                                }
+                            ));
+                            let mut file = match File::create(&path) {
+                                Ok(file) => file,
+                                Err(why) => panic!("couldn't create {}: {}", path.display(), why),
+                            };
+                            match file.write_all(OffWriter::new(&poly, OffOptions::default()).build().unwrap().as_bytes()) {
+                                Err(why) => panic!("couldn't write to {}: {}", path.display(), why),
+                                Ok(_) => (),
                             }
-                        )));
+                        } else {
+                            output.push((poly.clone(), Some(
+                                if save_facets {
+                                    format!("faceting {} -{}{}", faceting_idx, facets_fmt, fissary_status)
+                                } else {
+                                    format!("faceting {}{}", faceting_idx, fissary_status)
+                                }
+                            )));
+                        }
                     }
 
                     if save_facets {

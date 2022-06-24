@@ -1494,6 +1494,12 @@ pub struct FacetingSettings {
 
     /// Whether to save the facets in memory.
     pub save_facets: bool,
+
+    /// Whether to save to file.
+    pub save_to_file: bool,
+
+    /// The path to save to, if saving to file.
+    pub file_path: String,
 }
 
 impl Default for FacetingSettings {
@@ -1512,6 +1518,8 @@ impl Default for FacetingSettings {
             mark_fissary: true,
             save: true,
             save_facets: false,
+            save_to_file: false,
+            file_path: "".to_string(),
         }
     }
 }
@@ -1647,6 +1655,8 @@ impl MemoryWindow for FacetingSettings {
             egui::Checkbox::new(&mut self.mark_fissary, "Mark compounds/fissaries")
         );
 
+        ui.separator();
+
         ui.add(
             egui::Checkbox::new(&mut self.save, "Save facetings")
         );
@@ -1654,5 +1664,14 @@ impl MemoryWindow for FacetingSettings {
         ui.add(
             egui::Checkbox::new(&mut self.save_facets, "Save facets")
         );
+
+        ui.radio_value(&mut self.save_to_file, false, "Save to memory");
+
+        ui.horizontal(|ui| {
+            ui.radio_value(&mut self.save_to_file, true, "Save to file");
+            ui.add(
+                egui::TextEdit::singleline(&mut self.file_path).enabled(self.save_to_file)
+            );
+        });
     }
 }
