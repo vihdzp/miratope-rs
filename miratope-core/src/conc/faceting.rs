@@ -174,7 +174,7 @@ fn filter_irc(vec: &Vec<Vec<(usize,usize)>>) -> Vec<usize> {
             if vec[b].len() > vec[a].len() { // A strict subset must be smaller than the base.
                 continue
             }
-            if vec[b][0] != vec[a][0] { // One of the subsets must contain the first facet.
+            if vec[b][0] > vec[a][0] { // One of the subsets must contain the first facet.
                 break
             }
             let mut i = 0;
