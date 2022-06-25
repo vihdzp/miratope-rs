@@ -1014,6 +1014,52 @@ impl DuoWindow for DuopyramidWindow {
             ui.add(egui::DragValue::new(&mut self.height).clamp_range(0.0..=Float::MAX));
             ui.label("Height");
         });
+
+        if ui.add(
+            egui::Button::new("Try to make orbiform")
+                .enabled(!matches!(self.slots[0], Slot::None) && !matches!(self.slots[1], Slot::None))
+            ).clicked() {
+                if let Some(circum0) = match self.slots[0] {
+                    Slot::Loaded => polytope,
+                    Slot::Memory(i) => &memory[i].as_ref().unwrap().0,
+                    Slot::None => unreachable!(),
+                }.circumsphere() {
+                    if let Some(circum1) = match self.slots[1] {
+                        Slot::Loaded => polytope,
+                        Slot::Memory(i) => &memory[i].as_ref().unwrap().0,
+                        Slot::None => unreachable!(),
+                    }.circumsphere() {
+
+                        let sq_height = 1. - circum0.squared_radius.powf(2.) - circum1.squared_radius.powf(2.); // `squared_radius` stores the unsquared radius for some reason
+                        if sq_height >= 0. {
+                            self.height = sq_height.sqrt();
+                            self.offsets[0] = -circum0.center;
+                            self.offsets[1] = -circum1.center;
+                        } else {
+                            println!("Orbiform failed: height is imaginary.");
+                        }
+
+                    } else {
+                        println!("Orbiform failed: {} has no circumsphere.", match self.slots[1] {
+                            Slot::Loaded => "Loaded polytope".to_string(),
+                            Slot::Memory(i) => match &memory[i].as_ref().unwrap().1 {
+                                Some(label) => label.to_string(),
+                                None => format!("polytope {}", i),
+                            },
+                            Slot::None => unreachable!(),
+                        });
+                    }
+                } else {
+                    println!("Orbiform failed: {} has no circumsphere.", match self.slots[0] {
+                        Slot::Loaded => "Loaded polytope".to_string(),
+                        Slot::Memory(i) => match &memory[i].as_ref().unwrap().1 {
+                            Some(label) => label.to_string(),
+                            None => format!("polytope {}", i),
+                        },
+                        Slot::None => unreachable!(),
+                    });
+                }
+        }
     }
 }
 
