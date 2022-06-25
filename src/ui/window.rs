@@ -1551,6 +1551,9 @@ pub struct FacetingSettings {
     /// Whether to check if the faceting is compound or fissary and mark it.
     pub mark_fissary: bool,
 
+    /// Whether to include the facet numbers in the name.
+    pub label_facets: bool,
+
     /// Whether to save the facetings in memory.
     pub save: bool,
 
@@ -1583,6 +1586,7 @@ impl Default for FacetingSettings {
             exclude_hemis: false,
             compounds: false,
             mark_fissary: true,
+            label_facets: true,
             save: true,
             save_facets: false,
             save_to_file: false,
@@ -1748,6 +1752,10 @@ impl MemoryWindow for FacetingSettings {
 
         ui.add(
             egui::Checkbox::new(&mut self.mark_fissary, "Mark compounds/fissaries")
+        );
+
+        ui.add(
+            egui::Checkbox::new(&mut self.label_facets, "Label facets")
         );
 
         ui.separator();
