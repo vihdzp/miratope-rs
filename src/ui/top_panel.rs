@@ -788,8 +788,10 @@ pub fn show_top_panel(
                                 GroupEnum2::Chiral(chiral) => GroupEnum::Chiral(chiral),
                                 GroupEnum2::FromSlot(_) => GroupEnum::VertexMap(vertices_thing.1)
                             },
-                            if faceting_settings.unit_edges {Some(1.0)} else {None}, 
-                            if faceting_settings.do_inradius {Some(faceting_settings.inradius)} else {None},
+                            if faceting_settings.do_min_edge_length {Some(faceting_settings.min_edge_length)} else {None}, 
+                            if faceting_settings.do_max_edge_length {Some(faceting_settings.max_edge_length)} else {None}, 
+                            if faceting_settings.do_min_inradius {Some(faceting_settings.min_inradius)} else {None}, 
+                            if faceting_settings.do_max_inradius {Some(faceting_settings.max_inradius)} else {None}, 
                             faceting_settings.exclude_hemis,
                             if faceting_settings.max_facet_types == 0 {None} else {Some(faceting_settings.max_facet_types)},
                             if faceting_settings.max_per_hyperplane == 0 {None} else {Some(faceting_settings.max_per_hyperplane)},

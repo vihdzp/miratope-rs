@@ -201,7 +201,8 @@ fn faceting_subdim(
     plane: Subspace<f64>,
     points: Vec<PointOrd<f64>>,
     vertex_map: Vec<Vec<usize>>,
-    edge_length: Option<f64>,
+    min_edge_length: Option<f64>,
+    max_edge_length: Option<f64>,
     max_per_hyperplane: Option<usize>
 ) ->
     (Vec<(Ranks, Vec<(usize, usize)>)>, // Vec of facetings, along with the facet types of each of them
@@ -306,8 +307,14 @@ fn faceting_subdim(
         let rep = orbit[0]; // We only need one representative per orbit.
         for vertex in rep+1..total_vert_count {
             if !checked[rep][vertex] {
-                if let Some(e_l) = edge_length {
-                    if ((&points[vertex].0-&points[rep].0).norm() - e_l).abs() > f64::EPS {
+                let edge_length = (&points[vertex].0-&points[rep].0).norm();
+                if let Some(min) = min_edge_length {
+                    if edge_length < min - f64::EPS {
+                        continue
+                    }
+                }
+                if let Some(max) = max_edge_length {
+                    if edge_length > max + f64::EPS {
                         continue
                     }
                 }
@@ -344,10 +351,17 @@ fn faceting_subdim(
         }
         'b: loop {
             'c: loop {
-                if let Some(e_l) = edge_length {
-                    // WLOG checks if the vertices are all the right distance away from the first vertex.
-                    for (v_i, v) in new_vertices.iter().enumerate() {
-                        if ((&points[*v].0-&points[rep[0]].0).norm() - e_l).abs() > f64::EPS {
+                // WLOG checks if the vertices are all the right distance away from the first vertex.
+                for (v_i, v) in new_vertices.iter().enumerate() {
+                    let edge_length = (&points[*v].0-&points[rep[0]].0).norm();
+                    if let Some(min) = min_edge_length {
+                        if edge_length < min - f64::EPS {
+                            update = v_i;
+                            break 'c;
+                        }
+                    }
+                    if let Some(max) = max_edge_length {
+                        if edge_length > max + f64::EPS {
                             update = v_i;
                             break 'c;
                         }
@@ -467,7 +481,7 @@ fn faceting_subdim(
         }
 
         let (possible_facets_row, ff_counts_row, ridges_row, compound_facets_row) =
-            faceting_subdim(rank-1, hp, points, new_stabilizer.clone(), edge_length, max_per_hyperplane);
+            faceting_subdim(rank-1, hp, points, new_stabilizer.clone(), min_edge_length, max_edge_length, max_per_hyperplane);
 
         let mut possible_facets_global_row = Vec::new();
         for f in &possible_facets_row {
@@ -777,7 +791,9 @@ impl Concrete {
         &mut self,
         vertices: Vec<Point<f64>>,
         symmetry: GroupEnum,
-        edge_length: Option<f64>,
+        min_edge_length: Option<f64>,
+        max_edge_length: Option<f64>,
+        min_inradius: Option<f64>,
         max_inradius: Option<f64>,
         exclude_hemis: bool,
         noble: Option<usize>,
@@ -862,8 +878,14 @@ impl Concrete {
             let rep = orbit[0]; // We only need one representative per orbit.
             for vertex in rep+1..vertices.len() {
                 if !checked[rep][vertex] {
-                    if let Some(e_l) = edge_length {
-                        if ((&vertices[vertex]-&vertices[rep]).norm() - e_l).abs() > f64::EPS {
+                    let edge_length = (&vertices[vertex]-&vertices[rep]).norm();
+                    if let Some(min) = min_edge_length {
+                        if edge_length < min - f64::EPS {
+                            continue
+                        }
+                    }
+                    if let Some(max) = max_edge_length {
+                        if edge_length > max + f64::EPS {
                             continue
                         }
                     }
@@ -907,15 +929,24 @@ impl Concrete {
                         now = Instant::now();
                     }
                     dbg_count += 1;
-                    if let Some(e_l) = edge_length {
-                        // WLOG checks if the vertices are all the right distance away from the first vertex.
-                        for (v_i, v) in new_vertices.iter().enumerate() {
-                            if ((&vertices[*v]-&vertices[rep[0]]).norm() - e_l).abs() > f64::EPS {
+
+                    // WLOG checks if the vertices are all the right distance away from the first vertex.
+                    for (v_i, v) in new_vertices.iter().enumerate() {
+                        let edge_length = (&vertices[*v]-&vertices[rep[0]]).norm();
+                        if let Some(min) = min_edge_length {
+                            if edge_length < min - f64::EPS {
+                                update = v_i;
+                                break 'c;
+                            }
+                        }
+                        if let Some(max) = max_edge_length {
+                            if edge_length > max + f64::EPS {
                                 update = v_i;
                                 break 'c;
                             }
                         }
                     }
+
                     // We start with a pair and add enough vertices to define a hyperplane.
                     let mut tuple = rep.clone();
                     tuple.append(&mut new_vertices.clone());
@@ -929,8 +960,13 @@ impl Concrete {
 
                     if hyperplane.is_hyperplane() {
                         let inradius = hyperplane.distance(&Point::zeros(self.dim().unwrap()));
-                        if let Some(mir) = max_inradius {
-                            if inradius > mir {
+                        if let Some(min) = min_inradius {
+                            if inradius < min - f64::EPS {
+                                break
+                            }
+                        }
+                        if let Some(max) = max_inradius {
+                            if inradius > max + f64::EPS {
                                 break
                             }
                         }
@@ -1043,7 +1079,7 @@ impl Concrete {
             }
 
             let (possible_facets_row, ff_counts_row, ridges_row, compound_facets_row) =
-                faceting_subdim(rank-1, hp, points, new_stabilizer, edge_length, max_per_hyperplane);
+                faceting_subdim(rank-1, hp, points, new_stabilizer, min_edge_length, max_edge_length, max_per_hyperplane);
 
             let mut possible_facets_global_row = Vec::new();
             for f in &possible_facets_row {
