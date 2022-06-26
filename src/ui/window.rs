@@ -1535,6 +1535,9 @@ pub struct FacetingSettings {
     /// Whether to check if the faceting is compound or fissary and mark it.
     pub mark_fissary: bool,
 
+    /// Only use uniform or semiuniform facets.
+    pub uniform: bool,
+
     /// Whether to save the facetings in memory.
     pub save: bool,
 
@@ -1562,6 +1565,7 @@ impl Default for FacetingSettings {
             exclude_hemis: false,
             compounds: false,
             mark_fissary: true,
+            uniform: false,
             save: true,
             save_facets: false,
             save_to_file: false,
@@ -1699,6 +1703,10 @@ impl MemoryWindow for FacetingSettings {
 
         ui.add(
             egui::Checkbox::new(&mut self.mark_fissary, "Mark compounds/fissaries")
+        );
+
+        ui.add(
+            egui::Checkbox::new(&mut self.uniform, "Only uniform/semiuniform facets")
         );
 
         ui.separator();

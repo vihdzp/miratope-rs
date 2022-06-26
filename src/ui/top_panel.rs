@@ -799,6 +799,7 @@ pub fn show_top_panel(
                             faceting_settings.save_facets,
                             faceting_settings.save_to_file,
                             faceting_settings.file_path.clone(),
+                            faceting_settings.uniform,
                         );
                         for faceting in facetings {
                             memory.push(faceting);
