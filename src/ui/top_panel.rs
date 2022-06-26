@@ -795,6 +795,7 @@ pub fn show_top_panel(
                             faceting_settings.exclude_hemis,
                             if faceting_settings.max_facet_types == 0 {None} else {Some(faceting_settings.max_facet_types)},
                             if faceting_settings.max_per_hyperplane == 0 {None} else {Some(faceting_settings.max_per_hyperplane)},
+                            faceting_settings.uniform,
                             faceting_settings.compounds,
                             faceting_settings.mark_fissary,
                             faceting_settings.label_facets,
@@ -802,7 +803,6 @@ pub fn show_top_panel(
                             faceting_settings.save_facets,
                             faceting_settings.save_to_file,
                             faceting_settings.file_path.clone(),
-                            faceting_settings.uniform,
                         );
                         for faceting in facetings {
                             memory.push(faceting);

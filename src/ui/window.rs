@@ -1551,7 +1551,7 @@ pub struct FacetingSettings {
     /// Whether to check if the faceting is compound or fissary and mark it.
     pub mark_fissary: bool,
 
-    /// Only use uniform or semiuniform facets.
+    /// Only use uniform or semiuniform elements.
     pub uniform: bool,
 
     /// Whether to include the facet numbers in the name.
@@ -1751,15 +1751,17 @@ impl MemoryWindow for FacetingSettings {
         ui.separator();
 
         ui.add(
+            egui::Checkbox::new(&mut self.uniform, "Only uniform/semiuniform facets")
+        );
+
+        ui.separator();
+        
+        ui.add(
             egui::Checkbox::new(&mut self.compounds, "Include trivial compounds")
         );
 
         ui.add(
             egui::Checkbox::new(&mut self.mark_fissary, "Mark compounds/fissaries")
-        );
-
-        ui.add(
-            egui::Checkbox::new(&mut self.uniform, "Only uniform/semiuniform facets")
         );
 
         ui.add(
