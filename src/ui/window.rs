@@ -1517,14 +1517,30 @@ pub struct FacetingSettings {
     /// Where to get the symmetry group from.
     pub group: GroupEnum2,
 
-    /// Whether to use unit edges only (superregiment).
-    pub unit_edges: bool,
+    // These can't just be `Option`s because you need checkboxes and stuff.
+    /// Whether to use a minimum edge length.
+    pub do_min_edge_length: bool,
+
+    /// The minimum edge length.
+    pub min_edge_length: f64,
+
+    /// Whether to use a maximum edge length.
+    pub do_max_edge_length: bool,
+
+    /// The maximum edge length.
+    pub max_edge_length: f64,
+
+    /// Whether to use a minimum inradius.
+    pub do_min_inradius: bool,
+
+    /// The minimum inradius.
+    pub min_inradius: f64,
 
     /// Whether to use a maximum inradius.
-    pub do_inradius: bool,
+    pub do_max_inradius: bool,
 
     /// The maximum inradius.
-    pub inradius: f64,
+    pub max_inradius: f64,
 
     /// Whether to exclude planes passing through the origin.
     pub exclude_hemis: bool,
@@ -1537,6 +1553,9 @@ pub struct FacetingSettings {
 
     /// Only use uniform or semiuniform facets.
     pub uniform: bool,
+
+    /// Whether to include the facet numbers in the name.
+    pub label_facets: bool,
 
     /// Whether to save the facetings in memory.
     pub save: bool,
@@ -1559,13 +1578,19 @@ impl Default for FacetingSettings {
             max_facet_types: 0,
             max_per_hyperplane: 0,
             group: GroupEnum2::Chiral(false),
-            unit_edges: true,
-            do_inradius: false,
-            inradius: 1.,
+            do_min_edge_length: true,
+            min_edge_length: 1.,
+            do_max_edge_length: true,
+            max_edge_length: 1.,
+            do_min_inradius: false,
+            min_inradius: 0.,
+            do_max_inradius: false,
+            max_inradius: 0.,
             exclude_hemis: false,
             compounds: false,
             mark_fissary: true,
             uniform: false,
+            label_facets: true,
             save: true,
             save_facets: false,
             save_to_file: false,
@@ -1679,16 +1704,42 @@ impl MemoryWindow for FacetingSettings {
 
         ui.separator();
 
-        ui.add(
-            egui::Checkbox::new(&mut self.unit_edges, "Unit edges only")
-        );
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::Checkbox::new(&mut self.do_min_edge_length, "")
+            );
+            ui.add(
+                egui::DragValue::new(&mut self.min_edge_length).clamp_range(0.0..=Float::MAX).speed(0.01)
+            );
+            ui.label("Min edge length");
+        });
 
         ui.horizontal(|ui| {
             ui.add(
-                egui::Checkbox::new(&mut self.do_inradius, "")
+                egui::Checkbox::new(&mut self.do_max_edge_length, "")
             );
             ui.add(
-                egui::DragValue::new(&mut self.inradius).clamp_range(0.0..=Float::MAX).speed(0.004)
+                egui::DragValue::new(&mut self.max_edge_length).clamp_range(0.0..=Float::MAX).speed(0.01)
+            );
+            ui.label("Max edge length");
+        });
+
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::Checkbox::new(&mut self.do_min_inradius, "")
+            );
+            ui.add(
+                egui::DragValue::new(&mut self.min_inradius).clamp_range(0.0..=Float::MAX).speed(0.001)
+            );
+            ui.label("Min inradius");
+        });
+
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::Checkbox::new(&mut self.do_max_inradius, "")
+            );
+            ui.add(
+                egui::DragValue::new(&mut self.max_inradius).clamp_range(0.0..=Float::MAX).speed(0.001)
             );
             ui.label("Max inradius");
         });
@@ -1696,6 +1747,8 @@ impl MemoryWindow for FacetingSettings {
         ui.add(
             egui::Checkbox::new(&mut self.exclude_hemis, "Exclude hemis")
         );
+
+        ui.separator();
 
         ui.add(
             egui::Checkbox::new(&mut self.compounds, "Include trivial compounds")
@@ -1707,6 +1760,10 @@ impl MemoryWindow for FacetingSettings {
 
         ui.add(
             egui::Checkbox::new(&mut self.uniform, "Only uniform/semiuniform facets")
+        );
+
+        ui.add(
+            egui::Checkbox::new(&mut self.label_facets, "Label facets")
         );
 
         ui.separator();
