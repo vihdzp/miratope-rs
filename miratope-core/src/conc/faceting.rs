@@ -880,7 +880,8 @@ fn faceting_subdim(
                         }
                     }
                     if now.elapsed().as_millis() > DELAY && print_faceting_count {
-                        print!("{}{} facets found, {} skipped", CL, output.len(), skipped);
+                        print!("{}", CL);
+                        print!("{:.79}", format!("{} facets found, {} skipped, {:?}", output.len(), skipped, facets));
                         std::io::stdout().flush().unwrap();
                         now = Instant::now();
                     }
@@ -889,7 +890,8 @@ fn faceting_subdim(
                     output_facets.push(new_facets.clone());
 
                     if now.elapsed().as_millis() > DELAY && print_faceting_count {
-                        print!("{}{} facets found", CL, output.len());
+                        print!("{}", CL);
+                        print!("{:.79}", format!("{} facets found, {:?}", output.len(), facets));
                         std::io::stdout().flush().unwrap();
                         now = Instant::now();
                     }
@@ -1371,7 +1373,8 @@ impl Concrete {
 
         'l: loop {
             if now.elapsed().as_millis() > DELAY {
-                print!("{}{} facetings, {:?}", CL, output_facets.len(), facets);
+                print!("{}", CL);
+                print!("{:.79}", format!("{} facetings, {:?}", output_facets.len(), facets));
                 std::io::stdout().flush().unwrap();
                 now = Instant::now();
             }
