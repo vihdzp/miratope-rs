@@ -861,7 +861,21 @@ fn faceting_subdim(
                                 output.push((ranks, new_facets.clone()));
                                 output_facets.push(new_facets.clone());
                             } else {
-                                skipped += 1;
+								poly.element_sort();
+								let components = poly.defiss();
+								let mut isogonal = true;
+								for component in components {
+									if component.element_types()[1].len() > 1 {
+										isogonal = false;
+										break;
+									}
+								}
+								if isogonal {
+									output.push((ranks, new_facets.clone()));
+									output_facets.push(new_facets.clone());
+								} else {
+									skipped += 1;
+								}
                             }
                         }
                     }
