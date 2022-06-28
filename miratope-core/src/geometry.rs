@@ -45,7 +45,7 @@ impl<T: Float> Hypersphere<T> {
     /// Returns the radius of the hypersphere, or `NaN` if its squared radius is
     /// negative.
     pub fn radius(&self) -> T {
-        self.squared_radius // ????
+        ordered_float::Float::sqrt(self.squared_radius)
     }
 
     /// Constructs a hypersphere with a given dimension and radius,
