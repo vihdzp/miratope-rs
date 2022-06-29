@@ -108,6 +108,30 @@ impl Ranks {
             self[rank+1] = new_list;
         }
     }
+
+    /// Combines two `Ranks`. Only meant to be used in the faceting algorithm.
+    fn append(&mut self, other: &Ranks) {
+        let counts: Vec<usize> = self.iter().map(|x| x.len()).collect();
+
+        for r in 1..=2 {
+            for el in &other[r] {
+                self[r].push(el.clone());
+            }
+        }
+
+        for r in 3..self.rank() {
+            for el in &other[r] {
+                let mut new_el = el.clone();
+                for sub in &mut new_el.subs {
+                    *sub += counts[r-1];
+                }
+                for sup in &mut new_el.sups {
+                    *sup += counts[r+1];
+                }
+                self[r].push(new_el.clone());
+            }
+        }
+    }
 }
 
 /// For each faceting, checks if it is a compound of other facetings, and labels it if so.
@@ -1290,6 +1314,67 @@ impl Concrete {
 
                     ridge.element_sort_strong();
 
+                    // look for possible disentanglement
+                    let mut disentangled = None;
+
+                    let mut ridge_vertices_idx = HashSet::new();
+                    
+                    for edge in &ridge[2] {
+                        for sub in &edge.subs {
+                            ridge_vertices_idx.insert(*sub);
+                        }
+                    }
+
+                    let mut ridge_vertices = Vec::new();
+
+                    for idx in &ridge_vertices_idx {
+                        ridge_vertices.push(vertices[*idx].clone());
+                    }
+
+                    let subspace = Subspace::from_points(ridge_vertices.iter());
+                    let mut all_vertices_idx = HashSet::new();
+
+                    for (i, vertex) in vertices.iter().enumerate() {
+                        if subspace.distance(&vertex) < f64::EPS {
+                            all_vertices_idx.insert(i);
+                        }
+                    }
+
+                    if all_vertices_idx.len() > ridge_vertices_idx.len() {
+                        'vmap: for row in vertex_map.iter().skip(1) {
+                            let mut different = false;
+                            for vertex in &ridge_vertices_idx {
+                                if !all_vertices_idx.contains(&row[*vertex]) {
+                                    continue 'vmap;
+                                }
+                                if !ridge_vertices_idx.contains(&row[*vertex]) {
+                                    different = true;
+                                }
+                            }
+                            if different {
+                                // We found a coplanar copy of the ridge, thus a disentanglement.
+                                let mut new_ridge = ridge.clone();
+    
+                                let mut new_list = ElementList::new();
+                                for i in 0..new_ridge[2].len() {
+                                    let mut new = Element::new(Subelements::new(), Superelements::new());
+                                    for sub in &ridge[2][i].subs {
+                                        new.subs.push(row[*sub])
+                                    }
+                                    new_list.push(new);
+                                }
+                                new_ridge[2] = new_list;
+    
+                                disentangled = Some(new_ridge);
+                                break;
+                            }
+                        }
+                        if let Some(copy) = &disentangled {
+                            let mut compound = ridge.clone();
+                            compound.append(copy);
+                        }
+                    }
+
                     let mut found = false;
 
                     for row in &vertex_map {
@@ -1308,11 +1393,12 @@ impl Concrete {
                         new_ridge.element_sort_strong();
                         if let Some((idx, _)) = ridge_orbits.get(&new_ridge) {
                             // writes the orbit index at the ridge index
-                            r_i_o_row_row.push(*idx);
+                            r_i_o_row_row.push((*idx, disentangled.is_some()));
                             found = true;
                             break
                         }
                     }
+
                     if !found {
                         // counts the ridges in the orbit
                         let mut count = 0;
@@ -1338,7 +1424,7 @@ impl Concrete {
                             }
                         }
                         ridge_orbits.insert(ridge, (orbit_idx, count));
-                        r_i_o_row_row.push(orbit_idx);
+                        r_i_o_row_row.push((orbit_idx, disentangled.is_some()));
                         ridge_counts.push(count);
                         orbit_idx += 1;
 						
@@ -1411,11 +1497,14 @@ impl Concrete {
                 for ridge_idx in ridge_idxs_local {
                     let ridge_orbit = ridge_idx_orbits[hp][ridge_idx.0][ridge_idx.1];
                     let ridge_count = ff_counts[hp][ridge_idx.0];
-                    let total_ridge_count = ridge_counts[ridge_orbit];
-                    let mul = f_count * ridge_count / total_ridge_count;
+                    let total_ridge_count = ridge_counts[ridge_orbit.0];
+                    let mut mul = f_count * ridge_count / total_ridge_count;
+                    if ridge_orbit.1 { // disentangled ridge
+                        mul /= 2;
+                    }
     
-                    ridges[ridge_orbit] += mul;
-                    if ridges[ridge_orbit] > 2 {
+                    ridges[ridge_orbit.0] += mul;
+                    if ridges[ridge_orbit.0] > 2 {
                         break 'a;
                     }
                 }
