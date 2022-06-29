@@ -1030,7 +1030,7 @@ impl DuoWindow for DuopyramidWindow {
                         Slot::None => unreachable!(),
                     }.circumsphere() {
 
-                        let sq_height = 1. - circum0.squared_radius.powf(2.) - circum1.squared_radius.powf(2.); // `squared_radius` stores the unsquared radius for some reason
+                        let sq_height = 1. - circum0.squared_radius - circum1.squared_radius;
                         if sq_height >= 0. {
                             self.height = sq_height.sqrt();
                             self.offsets[0] = -circum0.center;
