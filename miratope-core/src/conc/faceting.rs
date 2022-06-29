@@ -849,12 +849,8 @@ fn faceting_subdim(
                                 vertices: new_vertices,
                                 abs: abs.clone(),
                             };
-                            //poly.flatten();
-                            if let Some(sphere) = poly.circumsphere() {
-                                poly.recenter_with(&sphere.center);
-                            } else {
-                                poly.recenter();
-                            }
+                            poly.recenter();
+                            
                             let amount = poly.element_types()[1].len();
                             
                             if amount <= 1 {
@@ -877,6 +873,8 @@ fn faceting_subdim(
 									skipped += 1;
 								}
                             }
+                        } else {
+                            unreachable!();
                         }
                     }
                     if now.elapsed().as_millis() > DELAY && print_faceting_count {
