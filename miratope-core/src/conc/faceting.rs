@@ -22,7 +22,7 @@ pub enum GroupEnum {
     Chiral(bool),
 }
 
-const CL: &str = "          \r                                                                               \r";
+const CL: &str = "\r                                                                                                                   \r";
 
 const DELAY: u128 = 200;
 
@@ -903,7 +903,7 @@ fn faceting_subdim(
                     }
                     if now.elapsed().as_millis() > DELAY && print_faceting_count {
                         print!("{}", CL);
-                        print!("{:.79}", format!("{} facets found, {} skipped, {:?}", output.len(), skipped, facets));
+                        print!("{:.115}", format!("{} facets found, {} skipped, {:?}", output.len(), skipped, facets));
                         std::io::stdout().flush().unwrap();
                         now = Instant::now();
                     }
@@ -913,7 +913,7 @@ fn faceting_subdim(
 
                     if now.elapsed().as_millis() > DELAY && print_faceting_count {
                         print!("{}", CL);
-                        print!("{:.79}", format!("{} facets found, {:?}", output.len(), facets));
+                        print!("{:.115}", format!("{} facets found, {:?}", output.len(), facets));
                         std::io::stdout().flush().unwrap();
                         now = Instant::now();
                     }
@@ -1458,7 +1458,7 @@ impl Concrete {
         'l: loop {
             if now.elapsed().as_millis() > DELAY {
                 print!("{}", CL);
-                print!("{:.79}", format!("{} facetings, {:?}", output_facets.len(), facets));
+                print!("{:.115}", format!("{} facetings, {:?}", output_facets.len(), facets));
                 std::io::stdout().flush().unwrap();
                 now = Instant::now();
             }
