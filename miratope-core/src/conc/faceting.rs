@@ -1,12 +1,12 @@
 //! The faceting algorithm.
 
-use std::{collections::{BTreeMap, HashMap, HashSet, VecDeque}, vec, iter::FromIterator, io::Write, time::Instant, path::PathBuf, fs::File};
+use std::{collections::{BTreeMap, HashMap, HashSet, VecDeque}, vec, iter::FromIterator, io::Write, time::Instant, path::PathBuf};
 
 use crate::{
     abs::{Abstract, Element, ElementList, Ranked, Ranks, Subelements, Superelements, AbstractBuilder},
     conc::{Concrete, ConcretePolytope},
     float::Float,
-    group::{Group}, geometry::{Matrix, PointOrd, Subspace, Point}, Polytope, file::off::{OffWriter, OffOptions},
+    group::{Group}, geometry::{Matrix, PointOrd, Subspace, Point}, Polytope
 };
 
 use vec_like::*;
@@ -1826,11 +1826,7 @@ impl Concrete {
                                     format!("faceting {}{}", faceting_idx, fissary_status)
                                 }
                             ));
-                            let mut file = match File::create(&path) {
-                                Ok(file) => file,
-                                Err(why) => panic!("couldn't create {}: {}", path.display(), why),
-                            };
-                            match file.write_all(OffWriter::new(&poly, OffOptions::default()).build().unwrap().as_bytes()) {
+                            match poly.to_path(&path, Default::default()) {
                                 Err(why) => panic!("couldn't write to {}: {}", path.display(), why),
                                 Ok(_) => (),
                             }
@@ -1873,11 +1869,7 @@ impl Concrete {
                 if save_to_file {
                     let mut path = PathBuf::from(&file_path);
                     path.push(format!("facet ({},{}).off", i.0.0, i.0.1));
-                    let mut file = match File::create(&path) {
-                        Ok(file) => file,
-                        Err(why) => panic!("couldn't create {}: {}", path.display(), why),
-                    };
-                    match file.write_all(OffWriter::new(&poly, OffOptions::default()).build().unwrap().as_bytes()) {
+                    match poly.to_path(&path, Default::default()) {
                         Err(why) => panic!("couldn't write to {}: {}", path.display(), why),
                         Ok(_) => (),
                     }
