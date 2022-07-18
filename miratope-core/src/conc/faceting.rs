@@ -9,6 +9,8 @@ use crate::{
     group::{Group}, geometry::{Matrix, PointOrd, Subspace, Point}, Polytope, file::off::{OffWriter, OffOptions},
 };
 
+use ordered_float::OrderedFloat;
+
 use vec_like::*;
 
 /// Input for the faceting function
@@ -970,6 +972,7 @@ impl Concrete {
         min_inradius: Option<f64>,
         max_inradius: Option<f64>,
         exclude_hemis: bool,
+        only_below_vertex: bool,
         noble: Option<usize>,
         max_per_hyperplane: Option<usize>,
 		uniform: bool,
@@ -1047,108 +1050,75 @@ impl Concrete {
 
         println!("\nEnumerating hyperplanes...");
 
-        let mut pair_orbits = Vec::new();
-        let mut checked = vec![vec![false; vertices.len()]; vertices.len()];
-        
-        for orbit in vertex_orbits {
-            let rep = orbit[0]; // We only need one representative per orbit.
-            for vertex in rep+1..vertices.len() {
-                if !checked[rep][vertex] {
-                    let edge_length = (&vertices[vertex]-&vertices[rep]).norm();
-                    if let Some(min) = min_edge_length {
-                        if edge_length < min - f64::EPS {
-                            continue
-                        }
-                    }
-                    if let Some(max) = max_edge_length {
-                        if edge_length > max + f64::EPS {
-                            continue
-                        }
-                    }
-                    let mut new_orbit = Vec::new();
-                    for row in &vertex_map {
-                        let (a1, a2) = (row[rep], row[vertex]);
-                        let c1 = a1.min(a2);
-                        let c2 = a1.max(a2);
-                        
-                        if !checked[c1][c2] {
-                            new_orbit.push(vec![c1, c2]);
-                            checked[c1][c2] = true;
-                        }
-                    }
-                    pair_orbits.push(new_orbit);
-                }
-            }
-        }
-
-        println!("{} edge orbit{}", pair_orbits.len(), if pair_orbits.len() == 1 {""} else {"s"});
-
-        // Enumerate hyperplanes
         let mut hyperplane_orbits = Vec::new();
-        let mut checked = HashSet::new();
 
-        let mut dbg_count: u64 = 0;
+        if only_below_vertex {
+            for v_orbit in &vertex_orbits {
+                let mut map = BTreeMap::<OrderedFloat<f64>, Vec<usize>>::new();
+                let rep = v_orbit[0];
+                let point = &vertices[rep];
 
-        for (idx, pair_orbit) in pair_orbits.iter().enumerate() {
-            let rep = &pair_orbit[0];
+                for (idx, vertex) in vertices.iter().enumerate() {
+                    dbg!(idx, vertex);
+                    let dot = OrderedFloat(vertex.dot(point));
+                    if let Some(list) = map.get_mut(&dot) {
+                        list.push(idx);
+                    } else {
+                        map.insert(dot, vec![idx]);
+                    }
+                }
+                
+                let mut checked = HashSet::new();
 
-            if rep[1]+rank-2 > vertices.len() {
-                continue;
-            }
-            let mut new_vertices: Vec<usize> = (rep[1]+1..rep[1]+rank-2).collect();
-            let mut update = rank-4;
-            'b: loop {
-                'c: loop {
+                let mut dbg_count: u64 = 0;
+
+                'd: for (dot, l) in &map {
+                    dbg!(dot, l);
+                    let mut list = l.clone();
+                    list.sort_unstable();
+
                     if now.elapsed().as_millis() > DELAY {
-                        print!("{}loop {}, edge orbit {}, new verts {:?}", CL, dbg_count, idx, new_vertices);
+                        print!("{}loop {}, verts {:?}", CL, dbg_count, list);
                         std::io::stdout().flush().unwrap();
                         now = Instant::now();
                     }
                     dbg_count += 1;
 
                     // WLOG checks if the vertices are all the right distance away from the first vertex.
-                    for (v_i, v) in new_vertices.iter().enumerate() {
-                        let edge_length = (&vertices[*v]-&vertices[rep[0]]).norm();
+                    for v in &list[1..] {
+                        let edge_length = (&vertices[*v]-&vertices[list[0]]).norm();
                         if let Some(min) = min_edge_length {
                             if edge_length < min - f64::EPS {
-                                update = v_i;
-                                break 'c;
+                                continue 'd;
                             }
                         }
                         if let Some(max) = max_edge_length {
                             if edge_length > max + f64::EPS {
-                                update = v_i;
-                                break 'c;
+                                continue 'd;
                             }
                         }
                     }
 
-                    // We start with a pair and add enough vertices to define a hyperplane.
-                    let mut tuple = rep.clone();
-                    tuple.append(&mut new_vertices.clone());
+                    // We define a hyperplane from the list of vertices.
+                    let points = list.iter().map(|x| &vertices[*x]);
 
-                    let mut points = Vec::new();
-                    for v in tuple {
-                        points.push(vertices[v].clone());
-                    }
-
-                    let hyperplane = Subspace::from_points(points.iter());
+                    let hyperplane = Subspace::from_points(points);
 
                     if hyperplane.is_hyperplane() {
                         let inradius = hyperplane.distance(&Point::zeros(self.dim().unwrap()));
                         if let Some(min) = min_inradius {
                             if inradius < min - f64::EPS {
-                                break
+                                continue
                             }
                         }
                         if let Some(max) = max_inradius {
                             if inradius > max + f64::EPS {
-                                break
+                                continue
                             }
                         }
                         if exclude_hemis {
                             if inradius.abs() < f64::EPS {
-                                break
+                                continue
                             }
                         }
 
@@ -1182,23 +1152,162 @@ impl Concrete {
                             hyperplane_orbits.push((hyperplane, hyperplane_vertices, counting.len()));
                         }
                     }
-                    break
                 }
-                loop { // Increment new_vertices.
-                    if new_vertices[update] == vertices.len() + update - rank + 3 {
-                        if update < 1 {
-                            break 'b;
+            }
+        }
+        else {
+            let mut pair_orbits = Vec::new();
+            let mut checked = vec![vec![false; vertices.len()]; vertices.len()];
+            
+            for orbit in vertex_orbits {
+                let rep = orbit[0]; // We only need one representative per orbit.
+                for vertex in rep+1..vertices.len() {
+                    if !checked[rep][vertex] {
+                        let edge_length = (&vertices[vertex]-&vertices[rep]).norm();
+                        if let Some(min) = min_edge_length {
+                            if edge_length < min - f64::EPS {
+                                continue
+                            }
                         }
-                        else {
-                            update -= 1;
+                        if let Some(max) = max_edge_length {
+                            if edge_length > max + f64::EPS {
+                                continue
+                            }
                         }
-                    } else {
-                        new_vertices[update] += 1;
-                        for i in update+1..rank-3 {
-                            new_vertices[i] = new_vertices[i-1]+1;
+                        let mut new_orbit = Vec::new();
+                        for row in &vertex_map {
+                            let (a1, a2) = (row[rep], row[vertex]);
+                            let c1 = a1.min(a2);
+                            let c2 = a1.max(a2);
+                            
+                            if !checked[c1][c2] {
+                                new_orbit.push(vec![c1, c2]);
+                                checked[c1][c2] = true;
+                            }
                         }
-                        update = rank-4;
-                        break;
+                        pair_orbits.push(new_orbit);
+                    }
+                }
+            }
+
+            println!("{} edge orbit{}", pair_orbits.len(), if pair_orbits.len() == 1 {""} else {"s"});
+
+            // Enumerate hyperplanes
+            let mut checked = HashSet::new();
+
+            let mut dbg_count: u64 = 0;
+
+            for (idx, pair_orbit) in pair_orbits.iter().enumerate() {
+                let rep = &pair_orbit[0];
+
+                if rep[1]+rank-2 > vertices.len() {
+                    continue;
+                }
+                let mut new_vertices: Vec<usize> = (rep[1]+1..rep[1]+rank-2).collect();
+                let mut update = rank-4;
+                'b: loop {
+                    'c: loop {
+                        if now.elapsed().as_millis() > DELAY {
+                            print!("{}loop {}, edge orbit {}, new verts {:?}", CL, dbg_count, idx, new_vertices);
+                            std::io::stdout().flush().unwrap();
+                            now = Instant::now();
+                        }
+                        dbg_count += 1;
+
+                        // WLOG checks if the vertices are all the right distance away from the first vertex.
+                        for (v_i, v) in new_vertices.iter().enumerate() {
+                            let edge_length = (&vertices[*v]-&vertices[rep[0]]).norm();
+                            if let Some(min) = min_edge_length {
+                                if edge_length < min - f64::EPS {
+                                    update = v_i;
+                                    break 'c;
+                                }
+                            }
+                            if let Some(max) = max_edge_length {
+                                if edge_length > max + f64::EPS {
+                                    update = v_i;
+                                    break 'c;
+                                }
+                            }
+                        }
+
+                        // We start with a pair and add enough vertices to define a hyperplane.
+                        let mut tuple = rep.clone();
+                        tuple.append(&mut new_vertices.clone());
+
+                        let mut points = Vec::new();
+                        for v in tuple {
+                            points.push(vertices[v].clone());
+                        }
+
+                        let hyperplane = Subspace::from_points(points.iter());
+
+                        if hyperplane.is_hyperplane() {
+                            let inradius = hyperplane.distance(&Point::zeros(self.dim().unwrap()));
+                            if let Some(min) = min_inradius {
+                                if inradius < min - f64::EPS {
+                                    break
+                                }
+                            }
+                            if let Some(max) = max_inradius {
+                                if inradius > max + f64::EPS {
+                                    break
+                                }
+                            }
+                            if exclude_hemis {
+                                if inradius.abs() < f64::EPS {
+                                    break
+                                }
+                            }
+
+                            let mut hyperplane_vertices = Vec::new();
+                            for (idx, v) in vertices.iter().enumerate() {
+                                if hyperplane.distance(&v) < f64::EPS {
+                                    hyperplane_vertices.push(idx);
+                                }
+                            }
+                            hyperplane_vertices.sort_unstable();
+
+                            // Check if the hyperplane has been found already.
+                            let mut is_new = true;
+                            let mut counting = HashSet::<Vec<usize>>::new();
+                            for row in &vertex_map {
+                                let mut new_hp_v = Vec::new();
+                                for idx in &hyperplane_vertices {
+                                    new_hp_v.push(row[*idx]);
+                                }
+                                new_hp_v.sort_unstable();
+
+                                if checked.contains(&new_hp_v) {
+                                    is_new = false;
+                                    break
+                                }
+
+                                counting.insert(new_hp_v);
+                            }
+                            if is_new {
+                                checked.insert(hyperplane_vertices.clone());
+                                hyperplane_orbits.push((hyperplane, hyperplane_vertices, counting.len()));
+                            }
+                        }
+                        break
+                    }
+                    loop { // Increment new_vertices.
+                        if new_vertices[update] == vertices.len() + update - rank + 3 {
+                            if update < 1 {
+                                break 'b;
+                            }
+                            else {
+                                update -= 1;
+                            }
+                        } else {
+                            new_vertices[update] += 1;
+                            for i in update+1..rank-3 {
+                                new_vertices[i] = new_vertices[i-1]+1;
+                            }
+                            update = rank-4;
+                            break;
+                        }
                     }
                 }
             }

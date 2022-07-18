@@ -1505,6 +1505,9 @@ pub struct FacetingSettings {
     /// Whether the window is open.
     open: bool,
 
+    /// There's some niche settings that are hidden by default to reduce bloat.
+    show_advanced_settings: bool,
+
     /// The slot for the dropdown menu.
     slot: Slot,
 
@@ -1545,6 +1548,9 @@ pub struct FacetingSettings {
     /// Whether to exclude planes passing through the origin.
     pub exclude_hemis: bool,
 
+    /// Whether to only consider hyperplanes perpendicular to a vertex.
+    pub only_below_vertex: bool,
+
     /// Whether to include trivial compounds (compounds of other full-symmetric facetings).
     pub compounds: bool,
 
@@ -1574,6 +1580,7 @@ impl Default for FacetingSettings {
     fn default() -> Self {
         Self {
             open: false,
+            show_advanced_settings: false,
             slot: Slot::default(),
             max_facet_types: 0,
             max_per_hyperplane: 0,
@@ -1587,6 +1594,7 @@ impl Default for FacetingSettings {
             do_max_inradius: false,
             max_inradius: 0.,
             exclude_hemis: false,
+            only_below_vertex: false,
             compounds: false,
             mark_fissary: true,
             uniform: false,
@@ -1748,6 +1756,12 @@ impl MemoryWindow for FacetingSettings {
             egui::Checkbox::new(&mut self.exclude_hemis, "Exclude hemis")
         );
 
+        if self.show_advanced_settings {
+            ui.add(
+                egui::Checkbox::new(&mut self.only_below_vertex, "Only hyperplanes perpendicular to a vertex")
+            );
+        }
+
         ui.separator();
 
         ui.add(
@@ -1787,5 +1801,11 @@ impl MemoryWindow for FacetingSettings {
                 egui::TextEdit::singleline(&mut self.file_path).enabled(self.save_to_file)
             );
         });
+
+        ui.separator();
+
+        if ui.button(if self.show_advanced_settings {"Hide advanced settings"} else {"Show advanced settings"}).clicked() {
+            self.show_advanced_settings = !self.show_advanced_settings;
+        }
     }
 }
