@@ -615,6 +615,22 @@ fn faceting_subdim(
 
 	let mut skipped = 0;
     'l: loop {
+        if uniform {
+            if now.elapsed().as_millis() > DELAY && print_faceting_count {
+                print!("{}", CL);
+                print!("{:.115}", format!("{} facets found, {} skipped, {:?}", output.len(), skipped, facets));
+                std::io::stdout().flush().unwrap();
+                now = Instant::now();
+            }
+        } else {
+            if now.elapsed().as_millis() > DELAY && print_faceting_count {
+                print!("{}", CL);
+                print!("{:.115}", format!("{} facets found, {:?}", output.len(), facets));
+                std::io::stdout().flush().unwrap();
+                now = Instant::now();
+            }
+        }
+        
         loop {
             let t = facets.last_mut().unwrap();
             if t.0 >= possible_facets.len() {
@@ -903,22 +919,9 @@ fn faceting_subdim(
                             unreachable!();
                         }
                     }
-                    if now.elapsed().as_millis() > DELAY && print_faceting_count {
-                        print!("{}", CL);
-                        print!("{:.115}", format!("{} facets found, {} skipped, {:?}", output.len(), skipped, facets));
-                        std::io::stdout().flush().unwrap();
-                        now = Instant::now();
-                    }
                 } else {
                     output.push((ranks, new_facets.clone()));
                     output_facets.push(new_facets.clone());
-
-                    if now.elapsed().as_millis() > DELAY && print_faceting_count {
-                        print!("{}", CL);
-                        print!("{:.115}", format!("{} facets found, {:?}", output.len(), facets));
-                        std::io::stdout().flush().unwrap();
-                        now = Instant::now();
-                    }
                 }
 
                 if let Some(max) = max_per_hyperplane {
@@ -1059,7 +1062,6 @@ impl Concrete {
                 let point = &vertices[rep];
 
                 for (idx, vertex) in vertices.iter().enumerate() {
-                    dbg!(idx, vertex);
                     let dot = OrderedFloat(vertex.dot(point));
                     if let Some(list) = map.get_mut(&dot) {
                         list.push(idx);
@@ -1072,8 +1074,7 @@ impl Concrete {
 
                 let mut dbg_count: u64 = 0;
 
-                'd: for (dot, l) in &map {
-                    dbg!(dot, l);
+                'd: for (_dot, l) in &map {
                     let mut list = l.clone();
                     list.sort_unstable();
 
