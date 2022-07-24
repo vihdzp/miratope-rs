@@ -36,7 +36,7 @@ impl Plugin for ConfigPlugin {
         // Makes resources from the configuration, which may or may not
         // correspond to the actual stored values themselves.
         app.insert_resource(config_path)
-            .insert_resource(config.lib_path)
+            .insert_resource(LibPath::default())
             .insert_resource(config.background_color.clear_color())
             .insert_resource(config.light_mode.visuals())
             .add_system(update_visuals.system())
@@ -119,9 +119,6 @@ fn update_visuals(egui_ctx: Res<'_, EguiContext>, visuals: Res<'_, egui::Visuals
 /// of the application, each of its attributes represents a separate resource.
 #[derive(Default, Deserialize, Serialize)]
 pub struct Config {
-    /// The path to the Miratope library.
-    pub lib_path: LibPath,
-
     /// The background color of the application.
     pub background_color: BgColor,
 
@@ -144,7 +141,7 @@ impl Config {
         ron::from_str(&fs::read_to_string(config_path.as_ref()).ok()?).ok()
     }
 
-    /// Saves the configuration at a gievn location.
+    /// Saves the configuration at a given location.
     pub fn save<T: AsRef<OsStr>>(&self, config_path: T) {
         match fs::File::create(config_path.as_ref()) {
             // If the file could be created, we write to it.
@@ -195,7 +192,6 @@ impl Config {
 fn save_config(
     mut exit: EventReader<'_, '_, AppExit>,
     config_path: Res<'_, ConfigPath>,
-    lib_path: Res<'_, LibPath>,
 
     background_color: Res<'_, ClearColor>,
     visuals: Res<'_, egui::Visuals>,
@@ -203,8 +199,6 @@ fn save_config(
     // If the application is being exited:
     if exit.iter().next().is_some() {
         let config = Config {
-            lib_path: lib_path.clone(),
-
             background_color: BgColor::new(background_color.as_ref()),
             light_mode: LightMode(!visuals.dark_mode),
         };

@@ -23,8 +23,7 @@ pub struct LibraryPlugin;
 impl Plugin for LibraryPlugin {
     fn build(&self, app: &mut App) {
         // This must run after the Config resource has been added.
-        let lib_path = app.world.get_resource::<LibPath>().unwrap();
-        let library = Library::new_folder(lib_path);
+        let library = Library::new_folder(&LibPath::default());
 
         // The library must be shown after the top panel, to avoid incorrect
         // positioning.
