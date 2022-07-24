@@ -228,14 +228,14 @@ impl Polytope for Concrete {
             flags_map_back.insert(flag, idx);
         }
 
-        let mut partitions: Vec<PartitionVec<()>> = vec![partition_vec![(); flags.len()]; self.rank()];
+        let mut partitions: Vec<PartitionVec<()>> = vec![partition_vec![(); flags.len()]; self.rank()+1];
 
         for (idx, flag) in flags.iter().enumerate() {
             for change in 1..self.rank() {
                 let changed_flag = flag.change(&self.abs, change);
                 let changed_idx = flags_map_back.get(&changed_flag).unwrap();
                 
-                for rank in 0..self.rank() {
+                for rank in 0..=self.rank() {
                     if rank != change {
                         partitions[rank].union(idx, *changed_idx);
                     }
@@ -246,20 +246,20 @@ impl Polytope for Concrete {
         let components = partitions[0].all_sets();
 
         for component in components {
-            let mut elements = Ranks::with_rank_capacity(self.rank());
+            let mut elements = Ranks::with_rank_capacity(self.rank()+1);
             elements.push(ElementList::from(vec![Element::new(Subelements::new(), Superelements::new())]));
-            for _ in 1..self.rank() {
+            for _ in 1..=self.rank() {
                 elements.push(ElementList::new());
             }
 
             let mut vertices = Vec::new();
 
-            let mut idx_in_rank = vec![HashMap::<usize, usize>::new(); self.rank()];
-            let mut counts = vec![0; self.rank()];
+            let mut idx_in_rank = vec![HashMap::<usize, usize>::new(); self.rank()+1];
+            let mut counts = vec![0; self.rank()+1];
             for (flag_idx, _) in component {
                 let mut sub = 0;
 
-                for rank in 1..self.rank() {
+                for rank in 1..=self.rank() {
                     match idx_in_rank[rank].get(&flag_idx) {
                         Some(idx) => {
                             if !elements[rank][*idx].subs.contains(&sub) {
@@ -296,7 +296,6 @@ impl Polytope for Concrete {
                     builder.push_subs(el.subs);
                 }
             }
-            builder.push_max();
             unsafe {
                 if builder.ranks().is_dyadic().is_ok() {
                     let abs = builder.build();
