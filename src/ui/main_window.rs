@@ -99,7 +99,7 @@ pub fn update_changed_polytopes(
         windows
             .get_primary_mut()
             .unwrap()
-            .set_title(format!("{} - miratope v{}", name.0, env!("CARGO_PKG_VERSION")));
+            .set_title(format!("{} - Miratope v{}", name.0, env!("CARGO_PKG_VERSION")));
 
     }
 }
