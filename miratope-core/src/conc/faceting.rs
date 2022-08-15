@@ -516,7 +516,7 @@ fn faceting_subdim(
         for (idx, orbit) in hyperplanes_vertices.iter().enumerate() {
             let mut global_hp_v: Vec<usize> = orbit[0].clone().iter().map(|x| global_v[*x]).collect();
             global_hp_v.sort_unstable();
-            if noble_muls[*noble_map.get(&global_hp_v).unwrap()] == 2 {
+            if noble_muls[*noble_map.get(&global_hp_v).unwrap()] >= 2 {
                 new_hyperplane_orbits.push(hyperplane_orbits[idx].clone());
                 new_hyperplanes_vertices.push(orbit.clone());
             }
