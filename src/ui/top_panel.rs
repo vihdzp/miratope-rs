@@ -310,6 +310,7 @@ pub type EguiWindows<'a> = (
     ResMut<'a, TruncateWindow>,
     ResMut<'a, ScaleWindow>,
     ResMut<'a, FacetingSettings>,
+	ResMut<'a, RotateWindow>,
 );
 
 macro_rules! element_sort {
@@ -358,6 +359,7 @@ pub fn show_top_panel(
         mut truncate_window,
         mut scale_window,
         mut faceting_settings,
+		mut rotate_window,
     ): EguiWindows<'_>,
 ) {
     // The top bar.
@@ -558,6 +560,14 @@ pub fn show_top_panel(
                 if ui.button("Recenter by gravicenter").clicked() {
                     query.iter_mut().next().unwrap().recenter();
                 }
+				
+				ui.separator();
+				
+				// Rotates a polytope around the origin.
+				if ui.button("Rotate...").clicked() {
+					rotate_window.open();
+				}
+				
             });
 
             // Operations on polytopes.

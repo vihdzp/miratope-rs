@@ -54,7 +54,8 @@ impl Plugin for WindowPlugin {
             .add_plugin(CompoundWindow::plugin())
             .add_plugin(TruncateWindow::plugin())
             .add_plugin(ScaleWindow::plugin())
-            .add_plugin(FacetingSettings::plugin());
+            .add_plugin(FacetingSettings::plugin())
+			.add_plugin(RotateWindow::plugin());
     }
 }
 
@@ -1811,5 +1812,108 @@ impl MemoryWindow for FacetingSettings {
         if ui.button(if self.show_advanced_settings {"Hide advanced settings"} else {"Show advanced settings"}).clicked() {
             self.show_advanced_settings = !self.show_advanced_settings;
         }
+    }
+}
+
+
+/// Rotation window
+#[derive(Default)]
+pub struct RotateWindow {
+    /// Whether the window is open.
+    open: bool,
+
+    /// The rank of the polytope.
+    rank: usize,
+
+    /// List of rotations (in radians). Rotates around xy plane, then yz plane, then zw plane, etc.
+    rots: Vec<f64>,
+	
+	/// Determines if radians or degrees are used.
+	degcheck: bool,
+}
+
+impl Window for RotateWindow {
+    const NAME: &'static str = "Rotate";
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.open
+    }
+}
+
+impl UpdateWindow for RotateWindow {
+    fn action(&self, polytope: &mut Concrete) {
+		if self.rank > 1 {
+			polytope.element_sort();
+			
+			if self.degcheck { //Degrees
+				for ind in 0..self.rank-1 {
+					for v in polytope.vertices_mut() {
+						let theta = self.rots[ind]*0.017453292519943295;
+						
+						let x = v[ind]*theta.cos() - v[ind+1]*theta.sin();
+						let y = v[ind]*theta.sin() + v[ind+1]*theta.cos();
+						v[ind] = x;
+						v[(ind+1)%self.rank] = y;
+					}
+				}
+			}
+			else { //Radians
+				for ind in 0..self.rank-1 {
+					for v in polytope.vertices_mut() {
+						let theta = self.rots[ind];
+						
+						let x = v[ind]*theta.cos() - v[ind+1]*theta.sin();
+						let y = v[ind]*theta.sin() + v[ind+1]*theta.cos();
+						v[ind] = x;
+						v[(ind+1)%self.rank] = y;
+					}
+				}	
+			}
+
+			
+			println!("Object rotated!");
+		}
+        else {
+			println!("Objects with rank less than 2 cannot be rotated.")
+		}
+    }
+
+    fn name_action(&self, name: &mut String) {
+        *name = format!("Rotated {}", name);
+    }
+
+    fn build(&mut self, ui: &mut Ui) {
+        ui.add(egui::Checkbox::new(&mut self.degcheck, "Use degrees instead of radians"));
+		for r in 0..self.rank-1 {
+            ui.horizontal(|ui| {
+				if self.degcheck {
+					ui.add(egui::DragValue::new(&mut self.rots[r]).speed(1.0).clamp_range(0.0..=360.0));
+				}
+                else{
+					ui.add(egui::DragValue::new(&mut self.rots[r]).speed(0.01).clamp_range(0.0..=6.283185307179586));
+				}
+            });
+        }
+    }
+	
+    fn dim(&self) -> usize {
+        self.rank
+    }
+
+    fn default_with(dim: usize) -> Self {
+        Self {
+            rank: dim,
+            rots: vec![1.0; dim],
+            ..Default::default()
+        }
+    }
+
+    fn update(&mut self, dim: usize) {
+        self.rank = dim;
+        self.rots = vec![1.0; dim];
     }
 }
