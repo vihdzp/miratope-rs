@@ -1256,8 +1256,6 @@ impl Concrete {
             // Enumerate hyperplanes
             let mut checked = HashSet::new();
 
-            let mut dbg_count: u64 = 0;
-
             for (idx, pair_orbit) in pair_orbits.iter().enumerate() {
                 let rep = &pair_orbit[0];
 
@@ -1268,12 +1266,15 @@ impl Concrete {
                 let mut update = rank-4;
                 'b: loop {
                     'c: loop {
+                        // We start with a pair and add enough vertices to define a hyperplane.
+                        let mut tuple = rep.clone();
+                        tuple.append(&mut new_vertices.clone());
+
                         if now.elapsed().as_millis() > DELAY {
-                            print!("{}loop {}, edge orbit {}, new verts {:?}", CL, dbg_count, idx, new_vertices);
+                            print!("{}{} hyperplane orbits, edge orbit {}/{}, verts {:?}", CL, hyperplane_orbits.len(), idx+1, pair_orbits.len(), tuple);
                             std::io::stdout().flush().unwrap();
                             now = Instant::now();
                         }
-                        dbg_count += 1;
 
                         // WLOG checks if the vertices are all the right distance away from the first vertex.
                         for (v_i, v) in new_vertices.iter().enumerate() {
@@ -1291,10 +1292,6 @@ impl Concrete {
                                 }
                             }
                         }
-
-                        // We start with a pair and add enough vertices to define a hyperplane.
-                        let mut tuple = rep.clone();
-                        tuple.append(&mut new_vertices.clone());
 
                         let mut points = Vec::new();
                         for v in tuple {
@@ -1618,7 +1615,7 @@ impl Concrete {
             }
             ridge_idx_orbits.push(r_i_o_row);
 
-            print!("{}{}/{} hp, {} ridges", CL, hp_i, hyperplane_orbits.len(), ridge_orbits.len());
+            print!("{}{}/{} hp, {} ridges", CL, hp_i+1, hyperplane_orbits.len(), ridge_orbits.len());
             std::io::stdout().flush().unwrap();
         }
 
