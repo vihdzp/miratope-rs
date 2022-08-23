@@ -311,6 +311,7 @@ pub type EguiWindows<'a> = (
     ResMut<'a, ScaleWindow>,
     ResMut<'a, FacetingSettings>,
 	ResMut<'a, RotateWindow>,
+	ResMut<'a, PlaneWindow>,
 );
 
 macro_rules! element_sort {
@@ -360,6 +361,7 @@ pub fn show_top_panel(
         mut scale_window,
         mut faceting_settings,
 		mut rotate_window,
+		mut plane_window,
     ): EguiWindows<'_>,
 ) {
     // The top bar.
@@ -566,6 +568,11 @@ pub fn show_top_panel(
 				// Rotates a polytope around the origin.
 				if ui.button("Rotate...").clicked() {
 					rotate_window.open();
+				}
+				
+				//Rotates a polytope around the origin along a given plane intersecting the origin.
+				if ui.button("Rotate with plane...").clicked() {
+					plane_window.open();
 				}
 				
             });

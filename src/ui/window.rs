@@ -10,7 +10,8 @@ use super::{
     PointWidget,
 };
 use crate::{Concrete, Float, Hypersphere, Point, ui::main_window::PolyName};
-use miratope_core::{conc::ConcretePolytope, Polytope};
+
+use miratope_core::{conc::ConcretePolytope, Polytope, geometry::Subspace};
 
 use bevy::prelude::*;
 use bevy_egui::{
@@ -55,7 +56,8 @@ impl Plugin for WindowPlugin {
             .add_plugin(TruncateWindow::plugin())
             .add_plugin(ScaleWindow::plugin())
             .add_plugin(FacetingSettings::plugin())
-			.add_plugin(RotateWindow::plugin());
+			.add_plugin(RotateWindow::plugin())
+			.add_plugin(PlaneWindow::plugin());
     }
 }
 
@@ -1816,7 +1818,7 @@ impl MemoryWindow for FacetingSettings {
 }
 
 
-/// Rotation window
+/// Rotation window for Transform tab
 #[derive(Default)]
 pub struct RotateWindow {
     /// Whether the window is open.
@@ -1907,13 +1909,189 @@ impl UpdateWindow for RotateWindow {
     fn default_with(dim: usize) -> Self {
         Self {
             rank: dim,
-            rots: vec![1.0; dim],
+            rots: vec![0.0001; dim], // if this is set to 0 the whole window becomes dark for some reason
             ..Default::default()
         }
     }
 
     fn update(&mut self, dim: usize) {
         self.rank = dim;
-        self.rots = vec![1.0; dim];
+        self.rots = vec![0.0; dim];
+    }
+}
+
+/// Plane rotation window (Rotate with plane... window)
+
+pub struct PlaneWindow {
+    /// Whether the window is open.
+    open: bool,
+
+    /// The rank of the polytope.
+    rank: usize,
+
+    /// Rotation amount (radians).
+    rot: f64,
+	
+	/// Coordinates of points.
+	p1: Point,
+	p2: Point,
+	
+	/// Determines if radians or degrees are used.
+	degcheck: bool,
+}
+
+impl Default for PlaneWindow {
+    fn default() -> Self {
+        Self {
+            open: false,
+			rank: Default::default(),
+			
+			rot: 0.0,
+			
+            p1: Point::zeros(0),
+			p2: Point::zeros(0),
+			
+            degcheck: false,
+        }
+    }
+}
+ 
+impl Window for PlaneWindow {
+    const NAME: &'static str = "Rotate with plane";
+
+    fn is_open(&self) -> bool {
+        self.open
+    }
+
+    fn is_open_mut(&mut self) -> &mut bool {
+        &mut self.open
+    }
+}
+
+fn dot(u: &Vec<f64>, v: &Vec<f64>) -> f64 {
+	let mut sum = 0.0;
+	for i in 0..u.len() {
+		sum += u[i]*v[i];
+	}
+	return sum
+}
+
+impl UpdateWindow for PlaneWindow {
+    fn action(&self, polytope: &mut Concrete) {
+		if self.p1 == Point::zeros(self.rank) || self.p2 == Point::zeros(self.rank) {
+			println!("Points within plane cannot be located at the origin.");
+		}
+		else if self.rot == 0.0 {
+			println!("Rotated, but the rotation amount was set to 0 so there was no change.");
+		}
+		else {
+			//Step 0: Make plane of orthonormal basis based on input
+			//Make points p1 and p2 into unit Vec<f64> objects.
+			let ss1: f64 = self.p1.iter().map(|&x| x*x).sum();
+			let ss2: f64 = self.p2.iter().map(|&x| x*x).sum();
+			
+			let mut v1: Vec<f64> = Vec::new();
+			let mut v2: Vec<f64> = Vec::new();
+			
+			for i in &self.p1 {
+				v1.push(*i/ss1.sqrt());
+			}
+			for i in &self.p2 {
+				v2.push(*i/ss2.sqrt());
+			}
+			
+			//Implement Gram-Schmidt process to make vectors orthonormal
+			let prod = dot(&v1,&v2)/dot(&v2,&v2);
+			let mut u2: Vec<f64> = Vec::new();
+			for i in 0..v1.len() {
+				u2.push(v2[i] - v1[i] * prod)
+			}
+			v2 = u2;
+			
+			//Transform v1 and v2 back into points
+			let mut p1 = Point::zeros(self.rank);
+			let mut p2 = Point::zeros(self.rank);
+			for i in 0..v1.len() {
+				p1[i] = v1[i];
+				p2[i] = v2[i];
+			}
+
+			let rplane = Subspace::from_points( vec![Point::zeros(self.rank),p1,p2].iter() ); //Create subspace with basis v1 and v2
+			
+			for v in polytope.vertices_mut() {
+				
+				let vf = rplane.flatten(v); //Step 1: Find perpendicular intersection of point and plane, in orthonormal basis
+				
+				//Step 2: Rotate point around plane in basis
+				let mut vr = Point::zeros(2);
+				vr[0] = vf[0]*self.rot.cos() - vf[1]*self.rot.sin();
+				vr[1] = vf[0]*self.rot.sin() + vf[1]*self.rot.cos();
+				
+				//Step 3: Determine non-basis coordinates of rotated point and intersection point
+				let mut vc = Point::zeros(self.rank); //Intersection point
+				let mut vrc = Point::zeros(self.rank); //Rotated point
+				for i in 0..self.rank {
+					vrc[i] = vr[0]*v1[i]+vr[1]*v2[i];
+					vc[i] = vf[0]*v1[i]+vf[1]*v2[i];
+				}
+				
+				//Step 4: Reverse vector transformation between original point and intersection point onto rotated point. This is our new point.
+				//new v = vrc + v - vc
+				for i in 0..self.rank {
+					v[i] = vrc[i] + v[i] - vc[i];
+				}
+			}	
+			
+			println!("Rotated!");
+		
+		}
+	
+    }
+
+    fn name_action(&self, name: &mut String) {
+        *name = format!("Rotated {}", name);
+    }
+
+    fn build(&mut self, ui: &mut Ui) {
+        ui.add(egui::Checkbox::new(&mut self.degcheck, "Use degrees instead of radians"));
+		
+		ui.horizontal(|ui| {
+			
+			if self.degcheck {
+			   ui.add(egui::DragValue::new(&mut self.rot).speed(1.0).clamp_range::<f64>(0.0..=360.0));
+			}
+			else{
+				ui.add(egui::DragValue::new(&mut self.rot).speed(0.01).clamp_range::<f64>(0.0..=6.283185307179586));
+			}
+			
+			ui.label("Rotation"); 
+        });
+		
+		
+		ui.separator();
+		
+		ui.add(PointWidget::new(&mut self.p1, "First point"));
+		ui.add(PointWidget::new(&mut self.p2, "Second point"));
+		
+    }
+	
+    fn dim(&self) -> usize {
+        self.rank
+    }
+
+    fn default_with(dim: usize) -> Self {
+        Self {
+            rank: dim,
+			rot: 0.0,
+            p1: Point::zeros(dim),
+			p2: Point::zeros(dim),
+            ..Default::default()
+        }
+    }
+
+    fn update(&mut self, dim: usize) {
+        self.rank = dim;
+        self.p1 = Point::zeros(dim);
+		self.p2 = Point::zeros(dim);
     }
 }
