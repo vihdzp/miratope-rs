@@ -13,7 +13,7 @@ use off::OffParseError;
 use zip::result::ZipError;
 
 pub use std::io::Error as IoError;
-use std::{fs::File, string::FromUtf8Error};
+use std::{fs::File, string::FromUtf8Error, fmt::Display};
 
 /// Any error encountered while trying to load a polytope.
 #[derive(Debug)]
@@ -38,7 +38,7 @@ pub enum FileError<'a> {
     InvalidExtension(&'a str),
 }
 
-impl<'a> std::fmt::Display for FileError<'a> {
+impl<'a> Display for FileError<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::OffError(err) => write!(f, "OFF error: {}", err),
@@ -150,5 +150,34 @@ impl FromFile for Concrete {
         } else {
             Err(GgbError::InvalidGgb)
         }
+    }
+}
+
+/// A position in a file.
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Position {
+    /// The row index.
+    row: u32,
+
+    /// The column index.
+    column: u32,
+}
+
+impl Position {
+    /// Increments the column number by 1.
+    pub fn next(&mut self) {
+        self.column += 1;
+    }
+
+    /// Increments the row number by 1, resets the column number.
+    pub fn next_line(&mut self) {
+        self.row += 1;
+        self.column = 0;
+    }
+}
+
+impl Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "row {}, column {}", self.row + 1, self.column + 1)
     }
 }
