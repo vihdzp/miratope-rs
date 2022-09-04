@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{Concrete, Float, Hypersphere, Point, ui::main_window::PolyName};
 
-use miratope_core::{conc::ConcretePolytope, Polytope, geometry::Subspace};
+use miratope_core::{conc::ConcretePolytope, Polytope};
 
 use bevy::prelude::*;
 use bevy_egui::{
@@ -1938,6 +1938,10 @@ pub struct PlaneWindow {
 	
 	/// Determines if radians or degrees are used.
 	degcheck: bool,
+	
+	//Determines if a custom origin point should be used.
+	origincheck: bool,
+	po: Point,
 
 }
 
@@ -1954,6 +1958,8 @@ impl Default for PlaneWindow {
 			
             degcheck: false,
 			
+			origincheck: false,
+			po: Point::zeros(0),
         }
     }
 }
@@ -1986,9 +1992,10 @@ impl UpdateWindow for PlaneWindow {
 		else if self.rot == 0.0 {
 			println!("Rotated, but the rotation amount was set to 0 so there was no change.");
 		}
-		else {
+		else {			
 			//Step 0: Make plane of orthonormal basis based on input
 			//Make points p1 and p2 into unit Vec<f64> objects.
+			//Also subtract po from p1 and p2
 			let ss1: f64 = self.p1.iter().map(|&x| x*x).sum();
 			let ss2: f64 = self.p2.iter().map(|&x| x*x).sum();
 			
@@ -1996,8 +2003,8 @@ impl UpdateWindow for PlaneWindow {
 			let mut v2: Vec<f64> = Vec::new();
 			
 			for i in 0..self.rank {
-				v1.push(self.p1[i]/ss1.sqrt());
-				v2.push(self.p2[i]/ss2.sqrt());
+				v1.push( (self.p1[i]-self.po[i])/ss1.sqrt() );
+				v2.push( (self.p2[i]-self.po[i])/ss2.sqrt() );
 			}
 			
 			//Implement Gram-Schmidt process to make vectors orthonormal
@@ -2012,26 +2019,13 @@ impl UpdateWindow for PlaneWindow {
 				v2[i] = u2[i]/ss3.sqrt();
 			}
 			
-			//Transform v1 and v2 back into points
-			let mut p1 = Point::zeros(self.rank);
-			let mut p2 = Point::zeros(self.rank);
-			for i in 0..v1.len() {
-				p1[i] = v1[i];
-				p2[i] = v2[i];
-			}
-
-			let rplane = Subspace::from_points( vec![Point::zeros(self.rank),p1.clone(),p2.clone()].iter() ); //Create subspace with basis v1 and v2
-			
-			let mut theta = 0.0;
+			let theta: f64;
 			if self.degcheck { //theta is the rotation amount in radians, which may or may not need conversion
 				theta = self.rot * 0.017453292519943295;
 			}
 			else {
 				theta = self.rot;
 			}
-			
-			println!("{p1}");
-			println!("{p2}");
 			
 			for v in polytope.vertices_mut() {
 				
@@ -2091,9 +2085,14 @@ impl UpdateWindow for PlaneWindow {
 		
 		
 		ui.separator();
-
+		
+		ui.add(egui::Checkbox::new(&mut self.origincheck, "Use a third origin point"));
+		
 		ui.add(PointWidget::new(&mut self.p1, "First point"));
 		ui.add(PointWidget::new(&mut self.p2, "Second point"));
+		if self.origincheck {
+			ui.add(PointWidget::new(&mut self.po, "Origin point"));
+		}
 		
     }
 	
@@ -2107,6 +2106,7 @@ impl UpdateWindow for PlaneWindow {
 			rot: 0.0,
             p1: Point::zeros(dim),
 			p2: Point::zeros(dim),
+			po: Point::zeros(dim),
             ..Default::default()
         }
     }
@@ -2115,5 +2115,6 @@ impl UpdateWindow for PlaneWindow {
         self.rank = dim;
         self.p1 = Point::zeros(dim);
 		self.p2 = Point::zeros(dim);
+		self.po = Point::zeros(dim);
     }
 }
