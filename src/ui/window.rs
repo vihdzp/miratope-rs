@@ -2003,10 +2003,14 @@ impl UpdateWindow for PlaneWindow {
 			//Implement Gram-Schmidt process to make vectors orthonormal
 			let prod = dot(&v1,&v2)/dot(&v2,&v2);
 			let mut u2: Vec<f64> = Vec::new();
-			for i in 0..v1.len() {
-				u2.push(v2[i] - v1[i] * prod)
+			for i in 0..self.rank {
+				u2.push(v2[i] - v1[i] * prod);
 			}
-			v2 = u2;
+			let ss3: f64 = u2.iter().map(|&x| x*x).sum();
+			
+			for i in 0..self.rank {
+				v2[i] = u2[i]/ss3.sqrt();
+			}
 			
 			//Transform v1 and v2 back into points
 			let mut p1 = Point::zeros(self.rank);
@@ -2016,15 +2020,18 @@ impl UpdateWindow for PlaneWindow {
 				p2[i] = v2[i];
 			}
 
-			let rplane = Subspace::from_points( vec![Point::zeros(self.rank),p1,p2].iter() ); //Create subspace with basis v1 and v2
+			let rplane = Subspace::from_points( vec![Point::zeros(self.rank),p1.clone(),p2.clone()].iter() ); //Create subspace with basis v1 and v2
 			
 			let mut theta = 0.0;
 			if self.degcheck { //theta is the rotation amount in radians, which may or may not need conversion
-				theta = self.rot;
-			}
-			else {
 				theta = self.rot * 0.017453292519943295;
 			}
+			else {
+				theta = self.rot;
+			}
+			
+			println!("{p1}");
+			println!("{p2}");
 			
 			for v in polytope.vertices_mut() {
 				
