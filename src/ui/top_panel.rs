@@ -850,7 +850,7 @@ pub fn show_top_panel(
                     ui.label("V: toggle faces\nB: toggle wireframe");
                     ui.separator();
                     ui.heading("Camera");
-                    ui.label("WSADRF: move\nQE: roll\nX: reset\nHold Ctrl: move faster\nHold Shift: move slower");
+                    ui.label("WSADRF: move\nQE: roll\nX: reset\nMouse wheel: zoom\nHold Ctrl: move faster\nHold Shift: move slower");
                     ui.separator();
                     ui.heading("UI");
                     ui.label("Hold Ctrl: extra options in some menus\nHold Shift: move number sliders slower");
