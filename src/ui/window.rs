@@ -1523,6 +1523,10 @@ pub struct FacetingSettings {
     /// Where to get the symmetry group from.
     pub group: GroupEnum2,
 
+    /// Whether to check for all possible edge lengths and facet with each of them.
+    /// If `false`, allows picking a range of edge lengths.
+    pub any_single_edge_length: bool,
+
     // These can't just be `Option`s because you need checkboxes and stuff.
     /// Whether to use a minimum edge length.
     pub do_min_edge_length: bool,
@@ -1588,6 +1592,7 @@ impl Default for FacetingSettings {
             max_facet_types: 0,
             max_per_hyperplane: 0,
             group: GroupEnum2::Chiral(false),
+            any_single_edge_length: false,
             do_min_edge_length: true,
             min_edge_length: 1.,
             do_max_edge_length: true,
@@ -1716,6 +1721,9 @@ impl MemoryWindow for FacetingSettings {
         });
 
         ui.separator();
+
+        ui.radio_value(&mut self.any_single_edge_length, true, "Any single edge length");
+        ui.radio_value(&mut self.any_single_edge_length, false, "Edge length range");
 
         ui.horizontal(|ui| {
             ui.add(
