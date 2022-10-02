@@ -377,7 +377,7 @@ pub fn show_top_panel(
 
                 // Saves a file.
                 if ui.button("Save").clicked() {
-                    file_dialog_state.save("polytope".to_string());
+                    file_dialog_state.save(poly_name.0.clone());
                 }
 
                 if ui.button("Export all memory slots").clicked() {
