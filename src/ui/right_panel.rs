@@ -10,15 +10,15 @@ use bevy_egui::{
 use miratope_core::{conc::{element_types::{EL_NAMES, EL_SUFFIXES}, ConcretePolytope}, Polytope, abs::Ranked, geometry::{Subspace, Point, Vector}};
 use vec_like::VecLike;
 
-use super::{top_panel::{SectionDirection, SectionState}, main_window::PolyName};
+use super::{top_panel::{SectionDirection, SectionState}, main_window::PolyName, window::{WikiWindow, Window}};
 
 #[derive(Clone, Copy, Debug)]
-struct ElementTypeWithData {
+pub struct ElementTypeWithData {
     /// The index of the representative for this element type.
     example: usize,
 
     /// The number of elements of this type.
-    count: usize,
+    pub count: usize,
 
     /// The number of facets.
     facets: usize,
@@ -37,13 +37,13 @@ pub struct ElementTypesRes {
     active: bool,
 
     /// The polytope whose data we're getting.
-    poly: Concrete,
+    pub poly: Concrete,
 
     /// The name of the polytope.
-    poly_name: String,
+    pub poly_name: String,
 
     /// The element types.
-    types: Vec<Vec<ElementTypeWithData>>,
+    pub types: Vec<Vec<ElementTypeWithData>>,
 
     /// The components.
     components: Option<Vec<Concrete>>,
@@ -159,7 +159,9 @@ pub fn show_right_panel(
     // The Miratope resources controlled by the right panel.
     mut element_types: ResMut<'_, ElementTypesRes>,
     mut section_direction: ResMut<'_, Vec<SectionDirection>>,
-    section_state: Res<'_, SectionState>
+    section_state: Res<'_, SectionState>,
+
+    mut wiki_window: ResMut<'_, WikiWindow>,
 ) {
     // The right panel.
     egui::SidePanel::right("right_panel")
@@ -182,6 +184,10 @@ pub fn show_right_panel(
                         *p = element_types.poly.clone();
                         poly_name.0 = element_types.poly_name.clone();
                     }
+                }
+
+                if ui.add(egui::Button::new("Wiki").enabled(element_types.active)).clicked() {
+                    wiki_window.open();
                 }
             });
 

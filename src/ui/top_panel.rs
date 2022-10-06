@@ -377,7 +377,7 @@ pub fn show_top_panel(
 
                 // Saves a file.
                 if ui.button("Save").clicked() {
-                    file_dialog_state.save("polytope".to_string());
+                    file_dialog_state.save(poly_name.0.clone());
                 }
 
                 if ui.button("Export all memory slots").clicked() {
@@ -804,6 +804,7 @@ pub fn show_top_panel(
                                 GroupEnum2::Chiral(chiral) => GroupEnum::Chiral(chiral),
                                 GroupEnum2::FromSlot(_) => GroupEnum::VertexMap(vertices_thing.1)
                             },
+                            faceting_settings.any_single_edge_length,
                             if faceting_settings.do_min_edge_length {Some(faceting_settings.min_edge_length)} else {None}, 
                             if faceting_settings.do_max_edge_length {Some(faceting_settings.max_edge_length)} else {None}, 
                             if faceting_settings.do_min_inradius {Some(faceting_settings.min_inradius)} else {None}, 
@@ -850,7 +851,7 @@ pub fn show_top_panel(
                     ui.label("V: toggle faces\nB: toggle wireframe");
                     ui.separator();
                     ui.heading("Camera");
-                    ui.label("WSADRF: move\nQE: roll\nX: reset\nHold Ctrl: move faster\nHold Shift: move slower");
+                    ui.label("WSADRF: move\nQE: roll\nX: reset\nMouse wheel: zoom\nHold Ctrl: move faster\nHold Shift: move slower");
                     ui.separator();
                     ui.heading("UI");
                     ui.label("Hold Ctrl: extra options in some menus\nHold Shift: move number sliders slower");
