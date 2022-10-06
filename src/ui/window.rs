@@ -1994,21 +1994,30 @@ impl UpdateWindow for PlaneWindow {
 		}
 		else {			
 			//Step 0: Make plane of orthonormal basis based on input
-			//Make points p1 and p2 into unit Vec<f64> objects.
-			//Also subtract po from p1 and p2
-			let ss1: f64 = self.p1.iter().map(|&x| x*x).sum();
-			let ss2: f64 = self.p2.iter().map(|&x| x*x).sum();
+			//Subtract po from p1 and p2
+			let mut sub1: Vec<f64> = Vec::new();
+			let mut sub2: Vec<f64> = Vec::new();
+			
+			for i in 0..self.rank {
+				sub1.push( self.p1[i]-self.po[i] );
+				sub2.push( self.p2[i]-self.po[i] );
+			}
+			
+			//Make points sub1 and sub2 into unit Vec<f64> objects.
+			let ss1: f64 = sub1.iter().map(|&x| x*x).sum();
+			let ss2: f64 = sub2.iter().map(|&x| x*x).sum();
 			
 			let mut v1: Vec<f64> = Vec::new();
 			let mut v2: Vec<f64> = Vec::new();
 			
 			for i in 0..self.rank {
-				v1.push( (self.p1[i]-self.po[i])/ss1.sqrt() );
-				v2.push( (self.p2[i]-self.po[i])/ss2.sqrt() );
+				v1.push( (sub1[i])/ss1.sqrt() );
+				v2.push( (sub2[i]-self.po[i])/ss2.sqrt() );
 			}
 			
 			//Implement Gram-Schmidt process to make vectors orthonormal
-			let prod = dot(&v1,&v2)/dot(&v2,&v2);
+			let prod = dot(&v1,&v2);
+			
 			let mut u2: Vec<f64> = Vec::new();
 			for i in 0..self.rank {
 				u2.push(v2[i] - v1[i] * prod);
@@ -2032,11 +2041,12 @@ impl UpdateWindow for PlaneWindow {
 				//Step 1: Find perpendicular intersection of point and plane, in orthonormal basis
 				//Equivalent to solving for the vector Q where (v-Q)·v1 = (v-Q)·v2 = 0, and Q is in the v1v2 plane.
 				//From this we find Q in the v1v2 basis. It turns out to equal [v·v1/v1·v1,v·v2/v2·v2].
+				//Because x·x = 1 for unit vectors x, we can simplify this to [v·v1,v·v2].
 				let mut vvec = Vec::new();
 				for i in 0..self.rank {
 					vvec.push( v[i] );
 				}
-				let vf = vec![ dot(&vvec,&v1)/dot(&v1,&v1) , dot(&vvec,&v2)/dot(&v2,&v2) ];
+				let vf = vec![ dot(&vvec,&v1) , dot(&vvec,&v2) ];
 				
 				//Step 2: Rotate point around plane in basis
 				let mut vr = Point::zeros(2);
@@ -2056,7 +2066,7 @@ impl UpdateWindow for PlaneWindow {
 				for i in 0..self.rank {
 					v[i] = vrc[i] + v[i] - vc[i];
 				}
-			}	
+			}
 			
 			println!("Rotated!");
 		
