@@ -2170,7 +2170,7 @@ dependencies = [
 
 [[package]]
 name = "miratope"
-version = "0.4.11"
+version = "0.4.12"
 dependencies = [
  "approx",
  "bevy",
@@ -2179,6 +2179,7 @@ dependencies = [
  "egui",
  "lyon",
  "miratope-core",
+ "ordered-float",
  "rfd",
  "ron",
  "serde",
@@ -2188,7 +2189,7 @@ dependencies = [
 
 [[package]]
 name = "miratope-core"
-version = "0.4.11"
+version = "0.4.12"
 dependencies = [
  "approx",
  "dyn-clone",
