@@ -27,7 +27,7 @@ pub struct PolyName(pub String);
 
 impl Default for PolyName {
     fn default() -> PolyName {
-        PolyName("Great icosahedron".to_string())
+        PolyName("default".to_string())
     }
 }
 
