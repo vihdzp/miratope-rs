@@ -1069,6 +1069,9 @@ fn faceting_subdim(
         }
     }
 
+    output.sort_by(|a,b| a.1.cmp(&b.1));
+    output_facets.sort_unstable();
+
     let mut output_ridges = Vec::new();
     for i in possible_facets_global {
         let mut a = Vec::new();
@@ -1927,6 +1930,8 @@ impl Concrete {
 
             println!("{}{} facetings", CL, output_facets.len());
 
+            output_facets.sort_unstable();
+
             if !include_compounds {
                 println!("\nFiltering mixed compounds...");
                 let output_idxs = filter_irc(&output_facets);
@@ -1936,7 +1941,6 @@ impl Concrete {
                 }
                 output_facets = output_new;
             }
-            output_facets.sort_unstable();
 
             // Output the faceted polytopes. We will build them from their sets of facet orbits.
 
