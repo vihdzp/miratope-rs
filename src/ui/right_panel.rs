@@ -13,12 +13,12 @@ use vec_like::VecLike;
 use super::{top_panel::{SectionDirection, SectionState}, main_window::PolyName};
 
 #[derive(Clone, Copy, Debug)]
-struct ElementTypeWithData {
+pub struct ElementTypeWithData {
     /// The index of the representative for this element type.
     example: usize,
 
     /// The number of elements of this type.
-    count: usize,
+    pub count: usize,
 
     /// The number of facets.
     facets: usize,
@@ -37,13 +37,13 @@ pub struct ElementTypesRes {
     active: bool,
 
     /// The polytope whose data we're getting.
-    poly: Concrete,
+    pub poly: Concrete,
 
     /// The name of the polytope.
-    poly_name: String,
+    pub poly_name: String,
 
     /// The element types.
-    types: Vec<Vec<ElementTypeWithData>>,
+    pub types: Vec<Vec<ElementTypeWithData>>,
 
     /// The components.
     components: Option<Vec<Concrete>>,

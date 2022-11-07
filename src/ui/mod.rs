@@ -9,6 +9,7 @@ pub mod config;
 pub mod library;
 pub mod main_window;
 pub mod memory;
+pub mod wiki;
 pub mod window;
 pub mod top_panel;
 pub mod right_panel;
