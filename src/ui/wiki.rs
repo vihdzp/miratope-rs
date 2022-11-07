@@ -40,7 +40,6 @@ pub struct Infobox {
 }
 
 pub struct WikiArticle {
-    pub title: String,
     pub infobox: Infobox,
     pub body: String,
     pub categories: Vec<String>,
@@ -49,7 +48,6 @@ pub struct WikiArticle {
 impl Default for WikiArticle {
     fn default() -> Self {
         Self {
-            title: String::default(),
             infobox: Infobox {
                 before_elements: vec![
                     InfoboxField::new("rank", ""),
