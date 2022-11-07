@@ -296,7 +296,7 @@ pub fn advanced(keyboard: &Input<KeyCode>) -> bool {
 
 /// All of the windows that can be shown on screen, as mutable resources.
 pub type EguiWindows<'a> = (
-    ResMut<'a, DualWindow>,
+    (ResMut<'a, DualWindow>,
     ResMut<'a, PyramidWindow>,
     ResMut<'a, PrismWindow>,
     ResMut<'a, TegumWindow>,
@@ -306,12 +306,13 @@ pub type EguiWindows<'a> = (
     ResMut<'a, DuotegumWindow>,
     ResMut<'a, DuocombWindow>,
     ResMut<'a, StarWindow>,
-    ResMut<'a, CompoundWindow>,
+    ResMut<'a, CompoundWindow>), // Workaround for an argument count limit
     ResMut<'a, TruncateWindow>,
     ResMut<'a, ScaleWindow>,
     ResMut<'a, FacetingSettings>,
 	ResMut<'a, RotateWindow>,
 	ResMut<'a, PlaneWindow>,
+    ResMut<'a, WikiWindow>,
 );
 
 macro_rules! element_sort {
@@ -346,7 +347,7 @@ pub fn show_top_panel(
 
     // The different windows that can be shown.
     (
-        mut dual_window,
+        (mut dual_window,
         mut pyramid_window,
         mut prism_window,
         mut tegum_window,
@@ -356,12 +357,13 @@ pub fn show_top_panel(
         mut duotegum_window,
         mut duocomb_window,
         mut star_window,
-        mut compound_window,
+        mut compound_window),
         mut truncate_window,
         mut scale_window,
         mut faceting_settings,
 		mut rotate_window,
 		mut plane_window,
+        mut wiki_window,
     ): EguiWindows<'_>,
 ) {
     // The top bar.
@@ -839,6 +841,11 @@ pub fn show_top_panel(
                 show_memory.0 = !show_memory.0;
             }
             memory.show(&mut query, &mut poly_name, &egui_ctx, &mut show_memory.0);
+
+            
+            if ui.add(egui::Button::new("Wiki")).clicked() {
+                wiki_window.open();
+            }
 
             if ui.button("Help").clicked() {
                 show_help.0 = !show_help.0;

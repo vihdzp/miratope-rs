@@ -159,7 +159,8 @@ pub fn show_right_panel(
     // The Miratope resources controlled by the right panel.
     mut element_types: ResMut<'_, ElementTypesRes>,
     mut section_direction: ResMut<'_, Vec<SectionDirection>>,
-    section_state: Res<'_, SectionState>
+    section_state: Res<'_, SectionState>,
+
 ) {
     // The right panel.
     egui::SidePanel::right("right_panel")
