@@ -862,6 +862,12 @@ pub fn show_top_panel(
                     ui.separator();
                     ui.heading("UI");
                     ui.label("Hold Ctrl: extra options in some menus\nHold Shift: move number sliders slower");
+                    ui.separator();
+                    ui.heading("Right panel");
+                    ui.label("Generate: computes the element types of the loaded polytope\nLoad: loads the polytope whose element types are being listed");
+                    ui.separator();
+                    ui.heading("Wiki");
+                    ui.label("Use the checkboxes to choose which fields to generate\nPress Generate to fill in the fields\nPress Ok to generate a copyable page");
                 });
 
             // Background color picker.
