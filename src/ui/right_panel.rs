@@ -10,7 +10,7 @@ use bevy_egui::{
 use miratope_core::{conc::{element_types::{EL_NAMES, EL_SUFFIXES}, ConcretePolytope}, Polytope, abs::Ranked, geometry::{Subspace, Point, Vector}};
 use vec_like::VecLike;
 
-use super::{top_panel::{SectionDirection, SectionState}, main_window::PolyName, window::{WikiWindow, Window}};
+use super::{top_panel::{SectionDirection, SectionState}, main_window::PolyName};
 
 #[derive(Clone, Copy, Debug)]
 pub struct ElementTypeWithData {
@@ -161,7 +161,6 @@ pub fn show_right_panel(
     mut section_direction: ResMut<'_, Vec<SectionDirection>>,
     section_state: Res<'_, SectionState>,
 
-    mut wiki_window: ResMut<'_, WikiWindow>,
 ) {
     // The right panel.
     egui::SidePanel::right("right_panel")
@@ -184,10 +183,6 @@ pub fn show_right_panel(
                         *p = element_types.poly.clone();
                         poly_name.0 = element_types.poly_name.clone();
                     }
-                }
-
-                if ui.add(egui::Button::new("Wiki").enabled(element_types.active)).clicked() {
-                    wiki_window.open();
                 }
             });
 

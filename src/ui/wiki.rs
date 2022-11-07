@@ -39,10 +39,41 @@ pub struct Infobox {
     pub after_elements: Vec<InfoboxField>,
 }
 
-#[derive(Default)]
 pub struct WikiArticle {
     pub title: String,
     pub infobox: Infobox,
     pub body: String,
     pub categories: Vec<String>,
+}
+
+impl Default for WikiArticle {
+    fn default() -> Self {
+        Self {
+            title: String::default(),
+            infobox: Infobox {
+                before_elements: vec![
+                    InfoboxField::new("rank", ""),
+                    InfoboxField::new("type", ""),
+                    InfoboxField::new("bsa", ""),
+                ],
+
+                elements: Vec::new(),
+
+                after_elements: vec![
+                        InfoboxField::new("verf", ""),
+                        InfoboxField::new("army", ""),
+                        InfoboxField::new("reg", ""),
+                        InfoboxField::new("symmetry", ""),
+                        InfoboxField::new("flags", ""),
+                        InfoboxField::new("circum", ""),
+                        InfoboxField::new("volume", ""),
+                        InfoboxField::new("convex", ""),
+                        InfoboxField::new("orient", ""),
+                        InfoboxField::new("nature", ""),
+                ]
+                },
+            body: String::default(),
+            categories: Vec::new(),
+        }
+    }
 }

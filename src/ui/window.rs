@@ -3,12 +3,12 @@
 //! All windows are l&mut &mut oaded in parallel, before the top panel and the library are
 //! shown on screen.
 
-use std::{marker::PhantomData, cmp::min};
+use std::{marker::PhantomData, cmp::min, collections::HashMap};
 
 use super::{
     memory::{slot_label, Memory},
     PointWidget,
-    wiki::{WikiArticle, LinkType, Infobox, InfoboxField}, right_panel::ElementTypesRes,
+    wiki::{WikiArticle, LinkType, InfoboxField}, right_panel::ElementTypesRes,
 };
 use crate::{Concrete, Float, Hypersphere, Point, ui::{main_window::PolyName, wiki::WikiElement}};
 
@@ -2152,6 +2152,9 @@ pub struct WikiWindow {
 
     /// The wiki article.
     article: WikiArticle,
+
+    /// Which fields to generate.
+    generate_fields: HashMap<String,bool>,
 }
 
 impl Default for WikiWindow {
@@ -2159,6 +2162,14 @@ impl Default for WikiWindow {
         Self {
             open: false,
             article: WikiArticle::default(),
+            generate_fields: vec![
+                ("rank".to_string(), true),
+                ("symmetry".to_string(), true),
+                ("flags".to_string(), true),
+                ("circum".to_string(), true),
+                ("volume".to_string(), true),
+                ("orient".to_string(), true),
+            ].into_iter().collect(),
         }
     }
 }
@@ -2232,211 +2243,226 @@ impl WikiWindow {
         &mut self,
         ui: &mut Ui,
         keyboard: Res<'_, Input<KeyCode>>,
+        element_types: &Res<'_, ElementTypesRes>,
     ) {
-        ui.horizontal(|ui| {
-            ui.label("Title:");
-            ui.add(
-                egui::TextEdit::singleline(&mut self.article.title)
-            );
-        });
+        if !element_types.main {
+            ui.label("WARNING: Element types and loaded polytope do not match. The generator gets the info from the polytope whose element types are being shown.");
+            ui.separator();
+        }
 
-        ui.separator();
-
-        let infobox = &mut self.article.infobox;
-
-        ui.label("{{Infobox polytope");
-
-        for idx in 0..infobox.before_elements.len() {
+        egui::containers::ScrollArea::from_max_height(512.).show(ui, |ui| {
             ui.horizontal(|ui| {
-                if advanced(&keyboard) {
-                    if ui.button("+").clicked() {
-                        infobox.before_elements.insert(idx, InfoboxField::default());
-                    } 
-                    if ui.button("-").clicked() {
-                        infobox.before_elements.remove(idx);
-                    }
-                    if ui.add(Button::new("^").enabled(idx > 0)).clicked() {
-                        infobox.before_elements.swap(idx-1, idx);
-                    }
-                    if ui.add(Button::new("v").enabled(idx+1 < infobox.before_elements.len())).clicked() {
-                        infobox.before_elements.swap(idx, idx+1);
-                    }
-                }
-                if idx < infobox.before_elements.len() {
-                    let field = &mut infobox.before_elements[idx];
-                    ui.label("|");
-                    ui.add(TextEdit::singleline(&mut field.name).desired_width(60.));
-                    ui.label("=");
-                    ui.add(TextEdit::singleline(&mut field.value));
-                }
+                ui.label("Title:");
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.article.title)
+                );
             });
-        }
-        if advanced(&keyboard) {
-            if ui.button("+").clicked() {
-                infobox.before_elements.push(InfoboxField::default());
-            } 
-        }
 
-        for (r, types) in infobox.elements.iter_mut().enumerate().rev() {
-            if r == 0 {break;}
+            ui.separator();
 
-            ui.label(format!("|  {} =", EL_NAMES[r].to_string().to_lowercase()));
+            let infobox = &mut self.article.infobox;
 
-            for t in types {
+            ui.label("{{Infobox polytope");
+
+            for idx in 0..infobox.before_elements.len() {
                 ui.horizontal(|ui| {
-                    ui.label("     ");
-                    ui.label(&t.count.to_string());
-                    match &t.link_type {
-                        LinkType::Link => {ui.label("[[");},
-                        LinkType::PTemp => {ui.label("{{p|");},
-                        LinkType::Custom => (),
+                    if advanced(&keyboard) {
+                        if ui.button("+").clicked() {
+                            infobox.before_elements.insert(idx, InfoboxField::default());
+                        } 
+                        if ui.button("-").clicked() {
+                            infobox.before_elements.remove(idx);
+                        }
+                        if ui.add(Button::new("^").enabled(idx > 0)).clicked() {
+                            infobox.before_elements.swap(idx-1, idx);
+                        }
+                        if ui.add(Button::new("v").enabled(idx+1 < infobox.before_elements.len())).clicked() {
+                            infobox.before_elements.swap(idx, idx+1);
+                        }
                     }
-                    ui.add(TextEdit::singleline(&mut t.name).desired_width(150.));
-                    match &t.link_type {
-                        LinkType::Link => {
-                            ui.label("]]");
-                            if advanced(&keyboard) {
-                                if ui.button("Link").clicked() {
-                                    t.link_type = LinkType::PTemp;
-                                }
-                            }
-                        },
-                        LinkType::PTemp => {
-                            ui.label("}}");
-                            if advanced(&keyboard) {
-                                if ui.button("PTemp").clicked() {
-                                    t.link_type = LinkType::Custom;
-                                }
-                            }
-                        },
-                        LinkType::Custom => {
-                            if advanced(&keyboard) {
-                                if ui.button("Custom").clicked() {
-                                    t.link_type = LinkType::Link;
-                                }
-                            }
-                        },
+                    if idx < infobox.before_elements.len() {
+                        let field = &mut infobox.before_elements[idx];
+                        ui.label("|");
+                        ui.add(TextEdit::singleline(&mut field.name).desired_width(60.));
+                        ui.label("=");
+                        ui.add(TextEdit::singleline(&mut field.value));
                     }
                 });
             }
-        }
+            if advanced(&keyboard) {
+                if ui.button("+").clicked() {
+                    infobox.before_elements.push(InfoboxField::default());
+                } 
+            }
 
-        for idx in 0..infobox.after_elements.len() {
-            ui.horizontal(|ui| {
-                if advanced(&keyboard) {
-                    if ui.button("+").clicked() {
-                        infobox.after_elements.insert(idx, InfoboxField::default());
-                    } 
-                    if ui.button("-").clicked() {
-                        infobox.after_elements.remove(idx);
-                    }
-                    if ui.add(Button::new("^").enabled(idx > 0)).clicked() {
-                        infobox.after_elements.swap(idx-1, idx);
-                    }
-                    if ui.add(Button::new("v").enabled(idx+1 < infobox.after_elements.len())).clicked() {
-                        infobox.after_elements.swap(idx, idx+1);
-                    }
+            for (r, types) in infobox.elements.iter_mut().enumerate().rev() {
+                if r == 0 {break;}
+
+                ui.label(format!("|  {} =", EL_NAMES[r].to_string().to_lowercase()));
+
+                for t in types {
+                    ui.horizontal(|ui| {
+                        ui.label("     ");
+                        ui.label(&t.count.to_string());
+                        match &t.link_type {
+                            LinkType::Link => {ui.label("[[");},
+                            LinkType::PTemp => {ui.label("{{p|");},
+                            LinkType::Custom => (),
+                        }
+                        ui.add(TextEdit::singleline(&mut t.name).desired_width(150.));
+                        match &t.link_type {
+                            LinkType::Link => {
+                                ui.label("]]");
+                                if advanced(&keyboard) {
+                                    if ui.button("Link").clicked() {
+                                        t.link_type = LinkType::PTemp;
+                                    }
+                                }
+                            },
+                            LinkType::PTemp => {
+                                ui.label("}}");
+                                if advanced(&keyboard) {
+                                    if ui.button("PTemp").clicked() {
+                                        t.link_type = LinkType::Custom;
+                                    }
+                                }
+                            },
+                            LinkType::Custom => {
+                                if advanced(&keyboard) {
+                                    if ui.button("Custom").clicked() {
+                                        t.link_type = LinkType::Link;
+                                    }
+                                }
+                            },
+                        }
+                    });
                 }
-                if idx < infobox.after_elements.len() {
-                    let field = &mut infobox.after_elements[idx];
-                    ui.label("|");
-                    ui.add(TextEdit::singleline(&mut field.name).desired_width(60.));
-                    ui.label("=");
-                    ui.add(TextEdit::singleline(&mut field.value));
+            }
+
+            for idx in 0..infobox.after_elements.len() {
+                ui.horizontal(|ui| {
+                    if advanced(&keyboard) {
+                        if ui.button("+").clicked() {
+                            infobox.after_elements.insert(idx, InfoboxField::default());
+                        } 
+                        if ui.button("-").clicked() {
+                            infobox.after_elements.remove(idx);
+                        }
+                        if ui.add(Button::new("^").enabled(idx > 0)).clicked() {
+                            infobox.after_elements.swap(idx-1, idx);
+                        }
+                        if ui.add(Button::new("v").enabled(idx+1 < infobox.after_elements.len())).clicked() {
+                            infobox.after_elements.swap(idx, idx+1);
+                        }
+                    }
+                    if idx < infobox.after_elements.len() {
+                        let field = &mut infobox.after_elements[idx];
+                        ui.label("|");
+                        ui.add(TextEdit::singleline(&mut field.name).desired_width(60.));
+                        ui.label("=");
+                        ui.add(TextEdit::singleline(&mut field.value));
+                    }
+                });
+            }
+            if advanced(&keyboard) {
+                if ui.button("+").clicked() {
+                    infobox.after_elements.push(InfoboxField::default());
+                } 
+            }
+
+            ui.label("}}");
+
+            ui.text_edit_multiline(&mut self.article.body);
+
+            let categories = &mut self.article.categories;
+
+            ui.label("Categories:");
+            for idx in 0..categories.len() {
+                ui.horizontal(|ui| {
+                    if advanced(&keyboard) {
+                        if ui.button("+").clicked() {
+                            categories.insert(idx, "".to_string());
+                        } 
+                        if ui.button("-").clicked() {
+                            categories.remove(idx);
+                        }
+                        if ui.add(Button::new("^").enabled(idx > 0)).clicked() {
+                            categories.swap(idx-1, idx);
+                        }
+                        if ui.add(Button::new("v").enabled(idx+1 < categories.len())).clicked() {
+                            categories.swap(idx, idx+1);
+                        }
+                    }
+                    ui.add(TextEdit::singleline(&mut categories[idx]).desired_width(300.));
+                });
+            }
+            if advanced(&keyboard) {
+                if ui.button("+").clicked() {
+                    categories.push("".to_string());
+                } 
+            }
+        });
+
+        let size = egui::Vec2::new(ui.min_size().x, 30.0);
+        ui.allocate_ui_with_layout(size, Layout::right_to_left(), |ui| {
+            if ui.button("Generate").clicked() {
+                if element_types.poly.rank() < 2 {
+                    println!("Error: Rank must be at least 1.");
                 }
-            });
-        }
-        if advanced(&keyboard) {
-            if ui.button("+").clicked() {
-                infobox.after_elements.push(InfoboxField::default());
-            } 
-        }
+                else {
+                    self.article.title = element_types.poly_name.clone();
 
-        ui.label("}}");
-
-        ui.text_edit_multiline(&mut self.article.body);
-
-        let categories = &mut self.article.categories;
-
-        ui.label("Categories:");
-        for idx in 0..categories.len() {
-            ui.horizontal(|ui| {
-                if advanced(&keyboard) {
-                    if ui.button("+").clicked() {
-                        categories.insert(idx, "".to_string());
-                    } 
-                    if ui.button("-").clicked() {
-                        categories.remove(idx);
-                    }
-                    if ui.add(Button::new("^").enabled(idx > 0)).clicked() {
-                        categories.swap(idx-1, idx);
-                    }
-                    if ui.add(Button::new("v").enabled(idx+1 < categories.len())).clicked() {
-                        categories.swap(idx, idx+1);
-                    }
-                }
-                ui.add(TextEdit::singleline(&mut categories[idx]).desired_width(300.));
-            });
-        }
-        if advanced(&keyboard) {
-            if ui.button("+").clicked() {
-                categories.push("".to_string());
-            } 
-        }
-    }
-
-    /// Resets the window, generates much of it from the element types.
-    fn reset(&mut self, element_types: &Res<'_, ElementTypesRes>) {
-        *self = Self {
-            open: true,
-            article: WikiArticle {
-                title: element_types.poly_name.clone(),
-                infobox: Infobox {
-                    before_elements: vec![
-                        InfoboxField::new("rank", &(element_types.poly.rank()-1).to_string()),
-                        InfoboxField::new("type", ""),
-                        InfoboxField::new("bsa", ""),
-                    ],
-
-                    elements: element_types.types.iter().enumerate().map(|(rank, list)| {
+                    self.article.infobox.elements = element_types.types.iter().enumerate().map(|(rank, list)| {
                         list.iter().map(|el_type| WikiElement{
                             count: el_type.count,
                             link_type: if rank < 4 {LinkType::Custom} else {LinkType::Link},
                             ..Default::default()
                         }).collect()
-                    }).collect(),
+                    }).collect();
 
-                    after_elements: {
-                        let mut vec = vec![
-                            InfoboxField::new("verf", ""),
-                            InfoboxField::new("army", ""),
-                            InfoboxField::new("reg", ""),
-                            InfoboxField::new("symmetry", &("[[]], order ".to_owned() + &element_types.poly.clone().get_symmetry_group().unwrap().0.count().to_string())),
-                            InfoboxField::new("flags", &element_types.poly.flags().count().to_string()),
-                        ];
-                        if let Some(sphere) = element_types.poly.circumsphere() {
-                            vec.push(InfoboxField::new("circum", &format!("<math>\\approx {}</math>", n_decimals(sphere.radius(), 5))));
+                    for set in vec![&mut self.article.infobox.before_elements, &mut self.article.infobox.after_elements] {
+                        for mut entry in set {
+                            if entry.name == "rank" && *self.generate_fields.get("rank").unwrap_or(&false) {
+                                entry.value = (element_types.poly.rank() as isize-1).to_string();
+                            }
+                            else if entry.name == "symmetry" && *self.generate_fields.get("symmetry").unwrap_or(&false) {
+                                entry.value = "[[]], order ".to_owned() + &element_types.poly.clone().get_symmetry_group().unwrap().0.count().to_string();
+                            }
+                            else if entry.name == "flags" && *self.generate_fields.get("flags").unwrap_or(&false) {
+                                entry.value = element_types.poly.flags().count().to_string();
+                            }
+                            else if entry.name == "circum" && *self.generate_fields.get("circum").unwrap_or(&false) {
+                                if let Some(sphere) = element_types.poly.circumsphere() {
+                                    entry.value = format!("<math>\\approx {}</math>", n_decimals(sphere.radius(), 5));
+                                }
+                            }
+                            else if entry.name == "volume" && *self.generate_fields.get("volume").unwrap_or(&false) {
+                                if let Some(volume) = element_types.poly.volume() {
+                                    entry.value = format!("<math>\\approx {}</math>", n_decimals(volume, 5));
+                                }
+                            }
+                            else if entry.name == "orient" && *self.generate_fields.get("orient").unwrap_or(&false) {
+                                entry.value = if element_types.poly.orientable() {"Yes".to_string()} else {"No".to_string()};
+                            }
                         }
-                        if let Some(volume) = element_types.poly.volume() {
-                            vec.push(InfoboxField::new("volume", &format!("<math>\\approx {}</math>", n_decimals(volume, 5))));
-                        }
-                        vec.push(InfoboxField::new("convex", ""));
-                        vec.push(InfoboxField::new("orient", if element_types.poly.orientable() {"Yes"} else {"No"}));
-                        vec.push(InfoboxField::new("nature", ""));
-                        vec
                     }
-                },
-                body: Default::default(),
-                categories: Default::default(),
+                }
             }
-        }
+        });
+    }
+
+    /// Resets the window.
+    fn reset(&mut self) {
+        *self = Self::default();
+        self.open = true;
     }
 
     /// Shows the window on screen.
     fn show(
         &mut self,
         ctx: &CtxRef,
-        keyboard: Res<'_, Input<KeyCode>>
+        keyboard: Res<'_, Input<KeyCode>>,
+        element_types: &Res<'_, ElementTypesRes>,
     ) -> ShowResult
     {
         let mut open = self.is_open();
@@ -2446,7 +2472,7 @@ impl WikiWindow {
             .open(&mut open)
             .resizable(false)
             .show(ctx, |ui| {
-                self.build(ui, keyboard);
+                self.build(ui, keyboard, element_types);
                 ui.add(OkReset::new(&mut result));
             });
 
@@ -2467,13 +2493,13 @@ impl WikiWindow {
     ) where
         Self: 'static,
     {
-        match self_.show(egui_ctx.ctx(), keyboard) {
+        match self_.show(egui_ctx.ctx(), keyboard, &element_types) {
             ShowResult::Ok => {
                 self_.action();
                 self_.close()
             }
             ShowResult::Close => self_.close(),
-            ShowResult::Reset => self_.reset(&element_types),
+            ShowResult::Reset => self_.reset(),
             ShowResult::None => {}
         }
     }
