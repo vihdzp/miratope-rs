@@ -96,7 +96,7 @@ struct Triangulation {
     extra_vertices: Vec<Point>,
 
     /// Indices of the vertices that make up the triangles.
-    triangles: Vec<u16>,
+    triangles: Vec<u32>,
 }
 
 impl Triangulation {
@@ -113,14 +113,14 @@ impl Triangulation {
         let edges = elements_or(2);
         let faces = elements_or(3);
 
-        let concrete_vertex_len = polytope.vertices.len() as u16;
+        let concrete_vertex_len = polytope.vertices.len() as u32;
 
         // We render each face separately.
         for face in faces {
             // We tesselate this path.
             let cycles = CycleList::from_edges(face.subs.iter().map(|&i| &edges[i].subs));
             if let Some(path) = path(&cycles, &polytope.vertices) {
-                let mut geometry: VertexBuffers<_, u16> = VertexBuffers::new();
+                let mut geometry: VertexBuffers<_, u32> = VertexBuffers::new();
 
                 // Configures all of the options of the tessellator.
                 FillTessellator::new()
@@ -128,8 +128,8 @@ impl Triangulation {
                         path.id_iter(),
                         &path,
                         None,
-                        &FillOptions::with_fill_rule(Default::default(), FillRule::EvenOdd)
-                            .with_tolerance(EPS),
+                        &FillOptions::with_fill_rule(Default::default(), FillRule::NonZero)
+                            .with_tolerance(EPS as f32),
                         &mut BuffersBuilder::new(&mut geometry, |vertex: FillVertex<'_>| {
                             vertex.sources().next().unwrap()
                         }),
@@ -149,12 +149,12 @@ impl Triangulation {
                 let mut vertex_hash = HashMap::new();
 
                 for (new_id, vertex_source) in geometry.vertices.into_iter().enumerate() {
-                    let new_id = new_id as u16;
+                    let new_id = new_id as u32;
 
                     match vertex_source {
                         // This is one of the concrete vertices of the polytope.
                         VertexSource::Endpoint { id } => {
-                            vertex_hash.insert(new_id, id_to_idx[id.to_usize()] as u16);
+                            vertex_hash.insert(new_id, id_to_idx[id.to_usize()] as u32);
                         }
 
                         // This is a new vertex that has been added to the tesselation.
@@ -166,7 +166,7 @@ impl Triangulation {
                             let p = from * (1.0 - t) + to * t;
 
                             vertex_hash
-                                .insert(new_id, concrete_vertex_len + extra_vertices.len() as u16);
+                                .insert(new_id, concrete_vertex_len + extra_vertices.len() as u32);
 
                             extra_vertices.push(p);
                         }
@@ -198,7 +198,7 @@ fn normals(vertices: &[[f32; 3]]) -> Vec<[f32; 3]> {
         .iter()
         .map(|n| {
             let sq_norm = n[0] * n[0] + n[1] * n[1] + n[2] * n[2];
-            if sq_norm < EPS {
+            if sq_norm < EPS as f32 {
                 [0.0, 0.0, 0.0]
             } else {
                 let norm = sq_norm.sqrt();
@@ -232,7 +232,7 @@ fn vertex_coords<'a, I: Iterator<Item = &'a Point>>(
 
     // If the polytope is at most 3D, we just embed it into 3D space.
     if projection_type.is_orthogonal() || dim <= 3 {
-        vertices.map(|p| [0, 1, 2].map(|i| coord(p, i))).collect()
+        vertices.map(|p| [0, 1, 2].map(|i| coord(p, i) as f32)).collect()
     }
     // Else, we project it down.
     else {
@@ -247,14 +247,14 @@ fn vertex_coords<'a, I: Iterator<Item = &'a Point>>(
             .map(|p| {
                 // We scale the first three coordinates accordingly.
                 let factor: f32 = p.iter().skip(3).map(|&x| x as f32 + dist).product();
-                [0, 1, 2].map(|i| coord(p, i) / factor)
+                [0, 1, 2].map(|i| coord(p, i) as f32 / factor)
             })
             .collect()
     }
 }
 
 /// A trait for a polytope for which we can build a mesh.
-pub trait Renderable: ConcretePolytope<Float> {
+pub trait Renderable: ConcretePolytope {
     /// Builds the mesh of a polytope.
     fn mesh(&self, projection_type: ProjectionType) -> Mesh {
         // If there's no vertices, returns an empty mesh.
@@ -262,9 +262,16 @@ pub trait Renderable: ConcretePolytope<Float> {
             return empty_mesh();
         }
 
+        let mut poly = self.clone();
+        
+        if poly.rank() == 3 {
+            poly = poly.ditope();
+            poly.untangle_faces();
+        }
+
         // Triangulates the polytope's faces, projects the vertices of both the
         // polytope and the triangulation.
-        let triangulation = Triangulation::new(self.con());
+        let triangulation = Triangulation::new(poly.con());
         let vertices = vertex_coords(
             self.con(),
             self.vertices()
@@ -278,7 +285,7 @@ pub trait Renderable: ConcretePolytope<Float> {
         mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 1.0]; vertices.len()]);
         mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals(&vertices));
         mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
-        mesh.set_indices(Some(Indices::U16(triangulation.triangles)));
+        mesh.set_indices(Some(Indices::U32(triangulation.triangles)));
 
         mesh
     }
@@ -324,4 +331,4 @@ pub trait Renderable: ConcretePolytope<Float> {
     }
 }
 
-impl<U: ConcretePolytope<Float>> Renderable for U {}
+impl<U: ConcretePolytope> Renderable for U {}

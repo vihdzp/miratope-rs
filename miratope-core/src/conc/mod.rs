@@ -2,10 +2,12 @@
 
 pub mod cycle;
 pub mod element_types;
+pub mod faceting;
+pub mod symmetry;
 
 use std::{
     collections::{HashMap, HashSet},
-    ops::{Index, IndexMut},
+    ops::{Index, IndexMut}, iter,
 };
 
 use super::{
@@ -16,29 +18,30 @@ use super::{
     DualError, Polytope,
 };
 use crate::{
-    abs::{AbstractBuilder, Element, ElementMap, Subelements, Superelements},
+    abs::{AbstractBuilder, Element, ElementMap, Subelements, Superelements, Ranks},
     float::Float,
     geometry::*,
 };
 
 use approx::{abs_diff_eq, abs_diff_ne};
+use partitions::{PartitionVec, partition_vec};
 use rayon::prelude::*;
 use vec_like::*;
 
 /// Represents a [concrete polytope](https://polytope.miraheze.org/wiki/Polytope),
 /// which is an [`Abstract`] together with its corresponding vertices.
 #[derive(Debug, Clone)]
-pub struct Concrete<T: Float> {
+pub struct Concrete {
     /// The list of vertices as points in Euclidean space.
     // todo: come up with a more compact representation, making use of the fact
     // all points have the same length?
-    pub vertices: Vec<Point<T>>,
+    pub vertices: Vec<Point<f64>>,
 
     /// The underlying abstract polytope.
     pub abs: Abstract,
 }
 
-impl<T: Float> Index<usize> for Concrete<T> {
+impl Index<usize> for Concrete {
     type Output = ElementList;
 
     /// Gets the list of elements with a given rank.
@@ -47,14 +50,14 @@ impl<T: Float> Index<usize> for Concrete<T> {
     }
 }
 
-impl<T: Float> IndexMut<usize> for Concrete<T> {
+impl IndexMut<usize> for Concrete {
     /// Gets the list of elements with a given rank.
     fn index_mut(&mut self, rank: usize) -> &mut Self::Output {
         &mut self.abs[rank]
     }
 }
 
-impl<T: Float> Index<(usize, usize)> for Concrete<T> {
+impl Index<(usize, usize)> for Concrete {
     type Output = Element;
 
     /// Gets the list of elements with a given rank.
@@ -63,17 +66,17 @@ impl<T: Float> Index<(usize, usize)> for Concrete<T> {
     }
 }
 
-impl<T: Float> IndexMut<(usize, usize)> for Concrete<T> {
+impl IndexMut<(usize, usize)> for Concrete {
     /// Gets the list of elements with a given rank.
     fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
         &mut self.abs[index]
     }
 }
 
-impl<T: Float> Concrete<T> {
+impl Concrete {
     /// Initializes a new concrete polytope from a set of vertices and an
     /// underlying abstract polytope. Does some debug assertions on the input.
-    pub fn new(vertices: Vec<Point<T>>, abs: Abstract) -> Self {
+    pub fn new(vertices: Vec<Point<f64>>, abs: Abstract) -> Self {
         // There must be as many abstract vertices as concrete ones.
         debug_assert_eq!(
             abs.vertex_count(),
@@ -95,7 +98,7 @@ impl<T: Float> Concrete<T> {
     }
 }
 
-impl<T: Float> Polytope for Concrete<T> {
+impl Polytope for Concrete {
     type DualError = DualError;
 
     fn abs(&self) -> &Abstract {
@@ -122,7 +125,7 @@ impl<T: Float> Polytope for Concrete<T> {
 
     /// Builds a dyad with unit edge length, centered at the origin.
     fn dyad() -> Self {
-        Self::dyad_with(T::ONE)
+        Self::dyad_with(1.0)
     }
 
     /// Builds a convex regular polygon with `n` sides and unit edge length,
@@ -192,6 +195,119 @@ impl<T: Float> Polytope for Concrete<T> {
         ))
     }
 
+    /// Gets the element figure with a given rank and index as a polytope.
+    fn element_fig(&self, rank: usize, idx: usize) -> Result<Option<Self>, Self::DualError> {
+        if rank <= self.rank() {
+            // todo: this is quite inefficient for a small element figure since
+            // we take the dual of the entire thing.
+            if let Some(mut element_fig) = self.try_dual()?.element(self.rank() - rank, idx) {
+                let subspace = Subspace::from_points(element_fig.vertices.iter());
+                element_fig.flatten();
+                element_fig.recenter_with(
+                    &subspace.flatten(&subspace.project(&Point::zeros(self.dim().unwrap()))),
+                );
+                element_fig.try_dual_mut()?;
+                return Ok(Some(element_fig));
+            }
+        }
+
+        Ok(None)
+    }
+	
+	
+    /// Makes a polytope strongly connected. Splits compounds into their components.
+    fn defiss(&self) -> Vec<Concrete> {
+        if self.rank() < 1 {
+            return vec![Concrete::nullitope()];
+        }
+        let mut output = Vec::<Concrete>::new();
+
+        let flags: Vec<Flag> = self.flags().collect();
+        let mut flags_map_back = HashMap::new();
+        for (idx, flag) in flags.iter().enumerate() {
+            flags_map_back.insert(flag, idx);
+        }
+
+        let mut partitions: Vec<PartitionVec<()>> = vec![partition_vec![(); flags.len()]; self.rank()+1];
+
+        for (idx, flag) in flags.iter().enumerate() {
+            for change in 1..self.rank() {
+                let changed_flag = flag.change(&self.abs, change);
+                let changed_idx = flags_map_back.get(&changed_flag).unwrap();
+                
+                for rank in 0..=self.rank() {
+                    if rank != change {
+                        partitions[rank].union(idx, *changed_idx);
+                    }
+                }
+            }
+        }
+
+        let components = partitions[0].all_sets();
+
+        for component in components {
+            let mut elements = Ranks::with_rank_capacity(self.rank()+1);
+            elements.push(ElementList::from(vec![Element::new(Subelements::new(), Superelements::new())]));
+            for _ in 1..=self.rank() {
+                elements.push(ElementList::new());
+            }
+
+            let mut vertices = Vec::new();
+
+            let mut idx_in_rank = vec![HashMap::<usize, usize>::new(); self.rank()+1];
+            let mut counts = vec![0; self.rank()+1];
+            for (flag_idx, _) in component {
+                let mut sub = 0;
+
+                for rank in 1..=self.rank() {
+                    match idx_in_rank[rank].get(&flag_idx) {
+                        Some(idx) => {
+                            if !elements[rank][*idx].subs.contains(&sub) {
+                                elements[rank][*idx].subs.push(sub);
+                            }
+
+                            sub = *idx;
+                        }
+                        None => {
+                            let set = partitions[rank].set(flag_idx);
+
+                            for (el, _) in set {
+                                idx_in_rank[rank].insert(el, counts[rank]);
+                            }
+                            elements[rank].push(
+                                Element{
+                                    subs: Subelements::from(vec![sub]),
+                                    sups: Superelements::from(vec![]),
+                                });
+
+                            sub = counts[rank];
+                            if rank == 1 {
+                                vertices.push(self.vertices[flags[flag_idx][1]].clone());
+                            }
+                            counts[rank] += 1;
+                        }
+                    }
+                }
+            }
+            let mut builder = AbstractBuilder::new();
+            for rank in elements {
+                builder.push_empty();
+                for el in rank {
+                    builder.push_subs(el.subs);
+                }
+            }
+            unsafe {
+                if builder.ranks().is_dyadic().is_ok() {
+                    let abs = builder.build();
+                    let conc = Concrete{abs, vertices};
+                    output.push(conc);
+                }
+            }
+        }
+
+        output
+    }
+    
     // TODO: A method that builds an omnitruncate together with a map from flags
     // to vertices? We got some math details to figure out.
     fn omnitruncate(&self) -> Self {
@@ -221,7 +337,7 @@ impl<T: Float> Polytope for Concrete<T> {
             other,
             &Point::zeros(self.dim_or()),
             &Point::zeros(other.dim_or()),
-            T::ONE,
+            1.0,
         )
     }
 
@@ -264,7 +380,7 @@ impl<T: Float> Polytope for Concrete<T> {
     /// given polytope.
     fn hosotope(&self) -> Self {
         Self::new(
-            vec![vec![T::f64(-0.5)].into(), vec![T::f64(0.5)].into()],
+            vec![vec![-0.5].into(), vec![0.5].into()],
             self.abs.hosotope(),
         )
     }
@@ -272,8 +388,17 @@ impl<T: Float> Polytope for Concrete<T> {
     /// Builds a [hosotope](https://polytope.miraheze.org/wiki/hosotope) of a
     /// given polytope in place.
     fn hosotope_mut(&mut self) {
-        self.vertices = vec![vec![T::f64(-0.5)].into(), vec![T::f64(0.5)].into()];
+        self.vertices = vec![vec![-0.5].into(), vec![0.5].into()];
         self.abs.hosotope_mut();
+    }
+
+    /// Builds a [star product](https://en.wikipedia.org/wiki/Star_product)
+    /// of two polytopes.
+    fn star_product(&self, other: &Self) -> Self {
+        Self::new(
+            self.vertices.clone(),
+            self.abs.star_product(&other.abs),
+        )
     }
 
     /// Attempts to build an antiprism based on a given polytope. Uses the unit
@@ -284,7 +409,7 @@ impl<T: Float> Polytope for Concrete<T> {
     /// If you want more control over the arguments, you can use
     /// [`Self::try_antiprism_with`].
     fn try_antiprism(&self) -> Result<Self, Self::DualError> {
-        Self::try_antiprism_with(self, &Hypersphere::unit(self.dim().unwrap_or(1)), T::ONE)
+        Self::try_antiprism_with(self, &Hypersphere::unit(self.dim().unwrap_or(1)), 1.0)
     }
 
     /// Builds a [simplex](https://polytope.miraheze.org/wiki/Simplex) with a
@@ -300,19 +425,34 @@ impl<T: Float> Polytope for Concrete<T> {
             // equal to 0.
             for i in 0..dim {
                 let mut v = Point::zeros(dim);
-                v[i] = T::HALF_SQRT_2;
+                v[i] = f64::HALF_SQRT_2;
                 vertices.push(v);
             }
 
             // Adds the remaining vertex, all of whose coordinates are equal.
-            let dim_f = T::from_subset(&(dim as f64));
-            let a = (T::ONE - (dim_f + T::ONE).fsqrt()) * T::HALF_SQRT_2 / dim_f;
+            let dim_f = dim as f64;
+            let a = (1.0 - (dim_f + 1.0).fsqrt()) * f64::HALF_SQRT_2 / dim_f;
             vertices.push(vec![a; dim].into());
 
             let mut simplex = Concrete::new(vertices, Abstract::simplex(rank));
             simplex.recenter();
             simplex
         }
+    }
+
+    /// Builds an [orthoplex](https://polytope.miraheze.org/wiki/Orthoplex) with
+    /// a given rank.
+    fn orthoplex(rank: usize) -> Self {
+        if rank == 0 {
+            Self::nullitope()
+        } else {
+            Self::multitegum(iter::repeat(&Self::dyad_with(f64::SQRT_2)).take(rank - 1))
+        }
+    }
+
+    /// Splits compound faces into their components.
+    fn untangle_faces(&mut self) {
+        self.abs.untangle_faces();
     }
 }
 
@@ -321,14 +461,14 @@ impl<T: Float> Polytope for Concrete<T> {
 ///
 /// The vertices are the padded vertices of `p`, followed by the padded
 /// vertices of `q`.
-fn duopyramid_vertices<T: Float>(
-    p: &[Point<T>],
-    q: &[Point<T>],
-    p_pad: &Point<T>,
-    q_pad: &Point<T>,
-    height: T,
+fn duopyramid_vertices(
+    p: &[Point<f64>],
+    q: &[Point<f64>],
+    p_pad: &Point<f64>,
+    q_pad: &Point<f64>,
+    height: f64,
     tegum: bool,
-) -> Vec<Point<T>> {
+) -> Vec<Point<f64>> {
     // Duotegums with points should just return the original polytopes.
     if tegum {
         if p.get(0).map(|vp| vp.len()) == Some(0) {
@@ -338,7 +478,7 @@ fn duopyramid_vertices<T: Float>(
         }
     }
 
-    let half_height = height / T::f64(2.0);
+    let half_height = height / 2.0;
 
     // To every point in p, we append zeros to the right.
     p.iter()
@@ -361,7 +501,7 @@ fn duopyramid_vertices<T: Float>(
 }
 
 /// Generates the vertices for a duoprism with two given vertex sets.
-fn duoprism_vertices<T: Float>(p: &[Point<T>], q: &[Point<T>]) -> Vec<Point<T>> {
+fn duoprism_vertices(p: &[Point<f64>], q: &[Point<f64>]) -> Vec<Point<f64>> {
     // The dimension of the points in p.
     let p_dim = if let Some(vp) = p.get(0) {
         vp.len()
@@ -391,20 +531,20 @@ fn duoprism_vertices<T: Float>(p: &[Point<T>], q: &[Point<T>]) -> Vec<Point<T>> 
 /// This trait exists so that we can reuse this code for `miratope_lang`. The
 /// traits that are not auto-implemented require us to manually set names over
 /// there.
-pub trait ConcretePolytope<T: Float>: Polytope {
+pub trait ConcretePolytope: Polytope {
     /// Returns a reference to the underlying [`Concrete`] polytope.
-    fn con(&self) -> &Concrete<T>;
+    fn con(&self) -> &Concrete;
 
     /// Returns a mutable reference to the underlying [`Concrete`] polytope.
-    fn con_mut(&mut self) -> &mut Concrete<T>;
+    fn con_mut(&mut self) -> &mut Concrete;
 
     /// Returns a reference to the concrete vertices of the polytope.
-    fn vertices(&self) -> &Vec<Point<T>> {
+    fn vertices(&self) -> &Vec<Point<f64>> {
         &self.con().vertices
     }
 
     /// Returns a mutable reference to the concrete vertices of the polytope.
-    fn vertices_mut(&mut self) -> &mut Vec<Point<T>> {
+    fn vertices_mut(&mut self) -> &mut Vec<Point<f64>> {
         &mut self.con_mut().vertices
     }
 
@@ -421,17 +561,17 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     }
 
     /// Builds a dyad with a specified height.
-    fn dyad_with(height: T) -> Self;
+    fn dyad_with(height: f64) -> Self;
 
     /// Builds the Grünbaumian star polygon `{n / d}` with unit circumradius,
     /// rotated by an angle.
-    fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: T) -> Self;
+    fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: f64) -> Self;
 
     /// Builds the Grünbaumian star polygon `{n / d}` with unit circumradius. If
     /// `n` and `d` have a common factor, the result is a multiply-wound
     /// polygon.
     fn grunbaum_star_polygon(n: usize, d: usize) -> Self {
-        Self::grunbaum_star_polygon_with_rot(n, d, T::ZERO)
+        Self::grunbaum_star_polygon_with_rot(n, d, 0.0)
     }
 
     /// Builds the star polygon `{n / d}` with unit circumradius. If `n` and `d`
@@ -447,11 +587,11 @@ pub trait ConcretePolytope<T: Float>: Polytope {
         use gcd::Gcd;
 
         let gcd = n.gcd(d);
-        let angle = T::TAU / T::usize(n);
+        let angle = f64::TAU / f64::usize(n);
 
         Self::compound(
             (0..gcd).into_iter().map(|k| {
-                Self::grunbaum_star_polygon_with_rot(n / gcd, d / gcd, T::usize(k) * angle)
+                Self::grunbaum_star_polygon_with_rot(n / gcd, d / gcd, f64::usize(k) * angle)
             }),
         )
     }
@@ -464,12 +604,12 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// nothing sensible to do.
     fn star_polygon_with_edge(n: usize, d: usize, a: f64) -> Self {
         let mut p = Self::star_polygon(n, d);
-        p.scale(T::f64(a) / T::usize(2) / (T::PI * T::usize(d) / T::usize(n)).fsin());
+        p.scale(a / 2.0 / (f64::PI * d as f64 / n as f64).fsin());
         p
     }
 
     /// Scales a polytope by a given factor.
-    fn scale(&mut self, k: T) {
+    fn scale(&mut self, k: f64) {
         for v in self.vertices_mut() {
             *v *= k;
         }
@@ -483,14 +623,14 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     }
 
     /// Recenters a polytope so that a certain point is at the origin.
-    fn recenter_with(&mut self, p: &Point<T>) {
+    fn recenter_with(&mut self, p: &Point<f64>) {
         for v in self.vertices_mut() {
             *v -= p;
         }
     }
 
     /// Applies a linear transformation to all vertices of a polytope.
-    fn apply(mut self, m: &Matrix<T>) -> Self {
+    fn apply(mut self, m: &Matrix<f64>) -> Self {
         for v in self.vertices_mut() {
             *v = m * v as &_;
         }
@@ -499,11 +639,11 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     }
 
     /// Returns an arbitrary truncate of a polytope.
-    fn truncate_with(&self, truncate_type: Vec<usize>, depth: Vec<T>) -> Self;
+    fn truncate_with(&self, truncate_type: Vec<usize>, depth: Vec<f64>) -> Self;
 
     /// Calculates the circumsphere of a polytope. Returns `None` if the
     /// polytope isn't circumscribable.
-    fn circumsphere(&self) -> Option<Hypersphere<T>> {
+    fn circumsphere(&self) -> Option<Hypersphere<f64>> {
         let mut vertices = self.vertices().iter();
 
         let first_vertex = vertices.next()?.clone();
@@ -514,9 +654,9 @@ pub trait ConcretePolytope<T: Float>: Polytope {
             // If the new vertex does not lie on the hyperplane of the others:
             if let Some(basis_vector) = subspace.add(vertex) {
                 // Calculates the new circumcenter.
-                let distance: T = ((&center - vertex).norm_squared()
+                let distance: f64 = ((&center - vertex).norm_squared()
                     - (&center - &first_vertex).norm_squared())
-                    / (T::TWO * (vertex - &first_vertex).dot(basis_vector));
+                    / (2.0 * (vertex - &first_vertex).dot(basis_vector));
 
                 center += basis_vector * distance;
             }
@@ -525,32 +665,32 @@ pub trait ConcretePolytope<T: Float>: Polytope {
             else if abs_diff_ne!(
                 (&center - &first_vertex).norm(),
                 (&center - vertex).norm(),
-                epsilon = T::EPS
+                epsilon = f64::EPS
             ) {
                 return None;
             }
         }
 
         Some(Hypersphere {
-            squared_radius: (&center - first_vertex).norm(),
+            squared_radius: (&center - first_vertex).norm_squared(),
             center,
         })
     }
 
     /// Calculates the gravicenter of a polytope, or returns `None` in the case
     /// of the nullitope.
-    fn gravicenter(&self) -> Option<Point<T>> {
+    fn gravicenter(&self) -> Option<Point<f64>> {
         (!self.is_nullitope())
-            .then(|| self.vertices().iter().sum::<Point<T>>() / (T::usize(self.vertex_count())))
+            .then(|| self.vertices().iter().sum::<Point<f64>>() / (self.vertex_count()) as f64)
     }
 
     /// Gets the least and greatest distance of a vertex of the polytope,
     /// measuring from a specified direction, or returns `None` in the case of
     /// the nullitope.
-    fn minmax(&self, direction: Vector<T>) -> Option<(T, T)> {
+    fn minmax(&self, direction: Vector<f64>) -> Option<(f64, f64)> {
         use itertools::{Itertools, MinMaxResult::*};
 
-        let hyperplane = Hyperplane::new(direction, T::ZERO);
+        let hyperplane = Hyperplane::new(direction, 0.0);
 
         match self
             .vertices()
@@ -573,7 +713,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// their vertices. Specifically, every vertex is mapped to itself, and
     /// every other element is mapped to the average of the images of its
     /// subelements.
-    fn avg_vertex_map(&self) -> ElementMap<Point<T>> {
+    fn avg_vertex_map(&self) -> ElementMap<Point<f64>> {
         // Maps every element of the polytope to one of its vertices.
         let mut map = ElementMap::new();
         map.push(Vec::new());
@@ -593,8 +733,8 @@ pub trait ConcretePolytope<T: Float>: Polytope {
                         el.subs
                             .iter()
                             .map(|&idx| &map[(r - 1, idx)])
-                            .sum::<Point<T>>()
-                            / T::usize(el.subs.len())
+                            .sum::<Point<f64>>()
+                            / f64::usize(el.subs.len())
                     })
                     .collect(),
             );
@@ -604,16 +744,16 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     }
 
     /// Returns the length of a given edge.
-    fn edge_len(&self, idx: usize) -> Option<T> {
+    fn edge_len(&self, idx: usize) -> Option<f64> {
         let edge = self.get_element(2, idx)?;
         Some((&self.vertices()[edge.subs[0]] - &self.vertices()[edge.subs[1]]).norm())
     }
 
     /// Checks whether a polytope is equilateral to a fixed precision, and with
     /// a specified edge length.
-    fn is_equilateral_with(&self, len: T) -> bool {
+    fn is_equilateral_with(&self, len: f64) -> bool {
         (0..self.edge_count())
-            .all(|idx| abs_diff_eq!(self.edge_len(idx).unwrap(), len, epsilon = T::EPS))
+            .all(|idx| abs_diff_eq!(self.edge_len(idx).unwrap(), len, epsilon = f64::EPS))
     }
 
     /// Checks whether a polytope is equilateral to a fixed precision.
@@ -625,37 +765,37 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     ///
     /// # Todo
     /// Maybe make this work in the general case?
-    fn midradius(&self) -> T {
+    fn midradius(&self) -> f64 {
         let edge_subs = &self[(2, 0)].subs;
-        (&self.vertices()[edge_subs[0]] + &self.vertices()[edge_subs[1]]).norm() / T::TWO
+        (&self.vertices()[edge_subs[0]] + &self.vertices()[edge_subs[1]]).norm() / 2.0
     }
 
     /// Builds the dual of a polytope with a given reciprocation sphere in
     /// place, or does nothing in case any facets go through the reciprocation
     /// center. In case of failure, returns the index of the facet through the
     /// projection center.
-    fn try_dual_mut_with(&mut self, sphere: &Hypersphere<T>) -> Result<(), Self::DualError>;
+    fn try_dual_mut_with(&mut self, sphere: &Hypersphere<f64>) -> Result<(), Self::DualError>;
 
     /// Returns the dual of a polytope with a given reciprocation sphere, or
     /// `None` if any facets pass through the reciprocation center.
-    fn try_dual_with(&self, sphere: &Hypersphere<T>) -> Result<Self, Self::DualError> {
+    fn try_dual_with(&self, sphere: &Hypersphere<f64>) -> Result<Self, Self::DualError> {
         let mut clone = self.clone();
         clone.try_dual_mut_with(sphere).map(|_| clone)
     }
 
     /// Builds a pyramid with a specified apex.
-    fn pyramid_with(&self, apex: Point<T>) -> Self;
+    fn pyramid_with(&self, apex: Point<f64>) -> Self;
 
     /// Builds a prism with a specified height.
-    fn prism_with(&self, height: T) -> Self;
+    fn prism_with(&self, height: f64) -> Self;
 
     /// Builds a uniform prism from an {n/d} polygon.
     fn uniform_prism(n: usize, d: usize) -> Self {
-        Self::star_polygon(n, d).prism_with(T::TWO * (T::PI * T::usize(d) / T::usize(n)).fsin())
+        Self::star_polygon_with_edge(n, d, 1.0).prism()
     }
 
     /// Builds a tegum with two specified apices.
-    fn tegum_with(&self, apex1: Point<T>, apex2: Point<T>) -> Self;
+    fn tegum_with(&self, apex1: Point<f64>, apex2: Point<f64>) -> Self;
 
     /// Builds an [antiprism](https://polytope.miraheze.org/wiki/Antiprism),
     /// using the specified sets of vertices for the base and the dual base.
@@ -663,7 +803,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// The vertices of the base should be specified in the same order as those
     /// of the original polytope. The vertices of the dual face should be
     /// specified in the same order as the facets of the original polytope.
-    fn antiprism_with_vertices<I: Iterator<Item = Point<T>>, J: Iterator<Item = Point<T>>>(
+    fn antiprism_with_vertices<I: Iterator<Item = Point<f64>>, J: Iterator<Item = Point<f64>>>(
         &self,
         vertices: I,
         dual_vertices: J,
@@ -674,10 +814,10 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// the dual base, and separates the bases by the given height.
     fn try_antiprism_with(
         &self,
-        sphere: &Hypersphere<T>,
-        height: T,
+        sphere: &Hypersphere<f64>,
+        height: f64,
     ) -> Result<Self, Self::DualError> {
-        let half_height = height / T::TWO;
+        let half_height = height / 2.0;
         let vertices = self.vertices().iter().map(|v| v.push(-half_height));
         let dual = self.try_dual_with(sphere)?;
         let dual_vertices = dual.vertices().iter().map(|v| v.push(half_height));
@@ -691,7 +831,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     /// # Panics
     /// Panics if any facets pass through the inversion center. If you want to
     /// handle this possibility, use [`Self::try_antiprism_with`] instead.
-    fn antiprism_with(&self, sphere: &Hypersphere<T>, height: T) -> Self {
+    fn antiprism_with(&self, sphere: &Hypersphere<f64>, height: f64) -> Self {
         self.try_antiprism_with(sphere, height).unwrap()
     }
 
@@ -701,31 +841,37 @@ pub trait ConcretePolytope<T: Float>: Polytope {
 
         // Appropriately scaled antiprism.
         if n != 2 * d {
-            let angle = T::PI * T::usize(d) / T::usize(n);
+            let angle = f64::PI * f64::usize(d) / f64::usize(n);
             let cos = angle.fcos();
-            let height = ((cos - (T::TWO * angle).fcos()) * T::TWO).fsqrt();
+            let height = ((cos - (2.0 * angle).fcos()) * 2.0).fsqrt();
 
-            polygon.antiprism_with(
+            let mut antiprism = polygon.antiprism_with(
                 &Hypersphere::with_squared_radius(Point::zeros(2), cos),
                 height,
-            )
+            );
+            antiprism.scale(0.5 / (f64::PI * d as f64 / n as f64).fsin());
+
+            antiprism
         }
         // Digon compounds are a special case.
         else {
-            let half_height = T::HALF_SQRT_2;
+            let half_height = f64::HALF_SQRT_2;
             let vertices = polygon.vertices().iter().map(|v| v.push(-half_height));
             let dual_vertices = polygon
                 .vertices()
                 .iter()
                 .map(|v| vec![v[1], -v[0], half_height].into());
 
-            polygon.antiprism_with_vertices(vertices, dual_vertices)
+            let mut antiprism = polygon.antiprism_with_vertices(vertices, dual_vertices);
+            antiprism.scale(0.5);
+
+            antiprism
         }
     }
 
     /// Gets the references to the (geometric) vertices of an element on the
     /// polytope.
-    fn element_vertices_ref(&self, rank: usize, idx: usize) -> Option<Vec<&Point<T>>> {
+    fn element_vertices_ref(&self, rank: usize, idx: usize) -> Option<Vec<&Point<f64>>> {
         Some(
             self.abs()
                 .element_vertices(rank, idx)?
@@ -740,20 +886,20 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     fn duopyramid_with(
         &self,
         other: &Self,
-        self_offset: &Point<T>,
-        other_offset: &Point<T>,
-        height: T,
+        self_offset: &Point<f64>,
+        other_offset: &Point<f64>,
+        height: f64,
     ) -> Self;
 
     /// Generates a duopyramid from two given polytopes with a given offset.
-    fn duotegum_with(p: &Self, q: &Self, p_offset: &Point<T>, q_offset: &Point<T>) -> Self;
+    fn duotegum_with(p: &Self, q: &Self, p_offset: &Point<f64>, q_offset: &Point<f64>) -> Self;
 
     /// Computes the volume of a polytope by adding up the contributions of all
     /// flags. Returns `None` if the volume is undefined.
     ///
     /// # Panics
     /// You must call [`Polytope::element_sort`] before calling this method.
-    fn volume(&self) -> Option<T> {
+    fn volume(&self) -> Option<f64> {
         let rank = self.rank();
 
         // We leave the nullitope's volume undefined.
@@ -768,7 +914,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
         match flat_vertices.get(0)?.len().cmp(&(rank - 1)) {
             // Degenerate polytopes have volume 0.
             std::cmp::Ordering::Less => {
-                return Some(T::ZERO);
+                return Some(0.0);
             }
             // Skew polytopes don't have a defined volume.
             std::cmp::Ordering::Greater => {
@@ -779,7 +925,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
 
         // Maps every element of the polytope to one of its vertices.
         let vertex_map = self.vertex_map();
-        let mut volume = T::ZERO;
+        let mut volume = 0.0;
 
         // All of the flags we've found so far.
         let mut all_flags = HashSet::new();
@@ -789,7 +935,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
             // If this flag forms a new component of the polytope, we iterate
             // over the oriented flags in this component.
             if !all_flags.contains(&flag) {
-                let mut component_volume = T::ZERO;
+                let mut component_volume = 0.0;
 
                 for flag_event in
                     OrientedFlagIter::with_flags(self.abs(), FlagChanges::all(rank), flag.into())
@@ -801,7 +947,7 @@ pub trait ConcretePolytope<T: Float>: Polytope {
                         // For each flag, there's a simplex defined by any vertices in its
                         // elements and the origin. We add up the volumes of all of these
                         // simplices times the sign of the flag that generated them.
-                        component_volume += oriented_flag.orientation.sign::<T>()
+                        component_volume += oriented_flag.orientation.sign()
                             * Matrix::from_iterator(
                                 rank - 1,
                                 rank - 1,
@@ -827,12 +973,12 @@ pub trait ConcretePolytope<T: Float>: Polytope {
             }
         }
 
-        Some(volume / T::u32(crate::factorial(rank - 1)))
+        Some(volume / f64::u32(crate::factorial(rank - 1)))
     }
 
     /// Computes the volume of a polytope by adding up the contributions of all
     /// flags. Returns `None` if the volume is undefined.
-    fn volume_mut(&mut self) -> Option<T> {
+    fn volume_mut(&mut self) -> Option<f64> {
         self.element_sort();
         self.volume()
     }
@@ -842,24 +988,31 @@ pub trait ConcretePolytope<T: Float>: Polytope {
     fn flatten(&mut self);
 
     /// Flattens the vertices of a polytope into a specified subspace.
-    fn flatten_into(&mut self, subspace: &Subspace<T>);
+    fn flatten_into(&mut self, subspace: &Subspace<f64>);
 
     /// Slices the polytope through a given plane.
-    fn cross_section(&self, slice: &Hyperplane<T>) -> Self;
+    fn cross_section(&self, slice: &Hyperplane<f64>) -> Self;
+	
+	/// Checks if is fissary.
+    fn is_fissary(&self) -> bool;
+	
+	/// Compounds coplanar facets
+    fn fuse_facets(&self) -> Self;
+	
 }
 
-impl<T: Float> ConcretePolytope<T> for Concrete<T> {
-    fn con(&self) -> &Concrete<T> {
+impl ConcretePolytope for Concrete {
+    fn con(&self) -> &Concrete {
         self
     }
 
-    fn con_mut(&mut self) -> &mut Concrete<T> {
+    fn con_mut(&mut self) -> &mut Concrete {
         self
     }
 
     /// Builds a dyad with a specified height.
-    fn dyad_with(height: T) -> Self {
-        let half_height = height / T::TWO;
+    fn dyad_with(height: f64) -> Self {
+        let half_height = height / 2.0;
 
         Self::new(
             vec![vec![-half_height].into(), vec![half_height].into()],
@@ -869,17 +1022,17 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
 
     /// Builds the Grünbaumian star polygon `{n / d}` with unit circumradius,
     /// rotated by an angle.
-    fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: T) -> Self {
+    fn grunbaum_star_polygon_with_rot(n: usize, d: usize, rot: f64) -> Self {
         assert!(n >= 2);
         assert!(d >= 1);
 
-        let angle = T::TAU * T::usize(d) / T::usize(n);
+        let angle = f64::TAU * f64::usize(d) / f64::usize(n);
 
         Self::new(
             (0..n)
                 .into_iter()
                 .map(|k| {
-                    let (sin, cos) = (T::usize(k) * angle + rot).fsin_cos();
+                    let (sin, cos) = (f64::usize(k) * angle + rot).fsin_cos();
                     vec![sin, cos].into()
                 })
                 .collect(),
@@ -894,7 +1047,7 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
     ///
     /// # Panics
     /// This method shouldn't panic. If it does, please file a bug.
-    fn try_dual_mut_with(&mut self, sphere: &Hypersphere<T>) -> Result<(), Self::DualError> {
+    fn try_dual_mut_with(&mut self, sphere: &Hypersphere<f64>) -> Result<(), Self::DualError> {
         // If we're dealing with a nullitope, the dual is itself.
         let rank = self.rank();
         if rank == 0 {
@@ -941,19 +1094,19 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
     }
 
     /// Builds a pyramid with a specified apex.
-    fn pyramid_with(&self, apex: Point<T>) -> Self {
+    fn pyramid_with(&self, apex: Point<f64>) -> Self {
         let mut poly = self.pyramid();
         *poly.vertices.last_mut().unwrap() = apex;
         poly
     }
 
     /// Builds a prism with a specified height.
-    fn prism_with(&self, height: T) -> Self {
+    fn prism_with(&self, height: f64) -> Self {
         self.duoprism(&Self::dyad_with(height))
     }
 
     /// Builds a tegum with two specified apices.
-    fn tegum_with(&self, apex1: Point<T>, apex2: Point<T>) -> Self {
+    fn tegum_with(&self, apex1: Point<f64>, apex2: Point<f64>) -> Self {
         let mut poly = self.tegum();
         let v = poly.vertices.len();
         poly.vertices[v - 1] = apex1;
@@ -967,7 +1120,7 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
     /// The vertices of the base should be specified in the same order as those
     /// of the original polytope. The vertices of the dual face should be
     /// specified in the same order as the facets of the original polytope.
-    fn antiprism_with_vertices<I: Iterator<Item = Point<T>>, J: Iterator<Item = Point<T>>>(
+    fn antiprism_with_vertices<I: Iterator<Item = Point<f64>>, J: Iterator<Item = Point<f64>>>(
         &self,
         vertices: I,
         dual_vertices: J,
@@ -994,9 +1147,9 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
     fn duopyramid_with(
         &self,
         other: &Self,
-        self_offset: &Point<T>,
-        other_offset: &Point<T>,
-        height: T,
+        self_offset: &Point<f64>,
+        other_offset: &Point<f64>,
+        height: f64,
     ) -> Self {
         Self::new(
             duopyramid_vertices(
@@ -1013,9 +1166,9 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
 
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
     /// from two polytopes.
-    fn duotegum_with(p: &Self, q: &Self, p_offset: &Point<T>, q_offset: &Point<T>) -> Self {
+    fn duotegum_with(p: &Self, q: &Self, p_offset: &Point<f64>, q_offset: &Point<f64>) -> Self {
         Self::new(
-            duopyramid_vertices(&p.vertices, &q.vertices, p_offset, q_offset, T::ZERO, true),
+            duopyramid_vertices(&p.vertices, &q.vertices, p_offset, q_offset, 0.0, true),
             p.abs.duotegum(&q.abs),
         )
     }
@@ -1029,7 +1182,7 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
     }
 
     /// Flattens the vertices of a polytope into a specified subspace.
-    fn flatten_into(&mut self, subspace: &Subspace<T>) {
+    fn flatten_into(&mut self, subspace: &Subspace<f64>) {
         if !subspace.is_full_rank() {
             for v in &mut self.vertices {
                 *v = subspace.flatten(v);
@@ -1041,7 +1194,11 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
     ///
     /// # Todo
     /// We should make this function take a general [`Subspace`] instead.
-    fn cross_section(&self, slice: &Hyperplane<T>) -> Self {
+    fn cross_section(&self, slice: &Hyperplane<f64>) -> Self {
+        if self.rank() < 4 {
+            unreachable!();
+        }
+
         let mut vertices = Vec::new();
         let mut ranks = Vec::with_capacity(self.rank());
 
@@ -1152,24 +1309,32 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
 
         // Builds the polytope.
         // TODO: no need for ranks, just use the builder directly.
-        let mut abs = AbstractBuilder::new();
+        let mut builder = AbstractBuilder::new();
         for subelements in ranks {
-            abs.push(subelements);
+            builder.push(subelements);
         }
 
         // Safety: TODO shit, this one's complicated... I'll come back to it.
-        Self::new(vertices, unsafe { abs.build() })
+        unsafe {
+            let mut abs = builder.build();
+            abs.untangle_faces();
+            Self::new(vertices, abs)
+        }
     }
 
-    fn truncate_with(&self, truncate_type: Vec<usize>, depth: Vec<T>) -> Self {
+    fn truncate_with(&self, truncate_type: Vec<usize>, depth: Vec<f64>) -> Self {
+        if truncate_type.is_empty() {
+            println!("Cannot truncate with no active nodes!");
+            return self.clone()
+        }
         let (abs, subflags) = self.abs().truncate_and_flags(truncate_type.clone());
         let element_vertices = self.avg_vertex_map();
 
-        let mut vertex_coords = Vec::<Point<T>>::new();
+        let mut vertex_coords = Vec::<Point<f64>>::new();
         for subflag in subflags {
-            let mut vector = Point::<T>::from_vec(vec![T::f64(0.0); self.rank() - 1]);
+            let mut vector = Point::<f64>::from_vec(vec![0.0; self.rank() - 1]);
             for (r, i) in subflag.iter().enumerate() {
-                vector += element_vertices[truncate_type[r] + 1][*i].clone() * depth[r];
+                vector += element_vertices[truncate_type[r] + 1][*i].clone() * depth[truncate_type[r]];
             }
             vertex_coords.push(vector);
         }
@@ -1177,6 +1342,81 @@ impl<T: Float> ConcretePolytope<T> for Concrete<T> {
 
         Self::new(vertex_coords, abs)
     }
+	
+	/// Checks if is fissary.
+    fn is_fissary(&self) -> bool {
+        let types = self.element_types();
+		
+        let mut i = 1;
+		while i < types.len() {
+			if i == self.rank() {
+				break;
+			}
+			let mut j = 0;
+			while j < types[i].len() {
+				let example = types[i][j].example;
+				
+				let mut element = self.abs.element(i, example).unwrap();
+				
+				element.element_sort();
+				if self.element(i, example).unwrap().is_fissary() && !element.is_compound() {
+					return true;
+				}
+				
+				let mut figure = self.abs.element_fig(i, example).unwrap().unwrap();
+				figure.element_sort();
+				if figure.is_compound() {
+					return true;
+				}
+				j = j+1;
+			}
+			i = i+1;
+		}
+		return false;
+    }
+	
+	/// Fuses coplanar facets
+	fn fuse_facets(&self) -> Self {
+		let mut i = 0 as usize;
+		
+		let mut builder = AbstractBuilder::new();
+		
+		while i < self.rank()-1 {
+			builder.push_empty();
+			for el in &self.abs.ranks()[i] {
+				builder.push_subs(el.subs.clone());
+			}
+			i+=1;
+		}
+
+		builder.push_empty();
+
+		i = 0 as usize;	
+		let mut compound = HashMap::<Vec<usize>,(usize,Subelements)>::new();
+		let mut current = 0 as usize;
+		while i < self.facet_count() {
+			let temp = self.element(self.rank() - 1, i).unwrap();
+			let facetvert = temp.vertices.iter();
+			let facet = self.abs.ranks()[self.rank() - 1][i].clone();
+			let subspace = Subspace::from_points(facetvert);
+			
+			let mut contained_vertices = self.vertices.clone().into_iter().enumerate().filter(|x| subspace.is_outer(&x.1)).map(|x| x.0).collect::<Vec<usize>>();
+			contained_vertices.sort();
+			if compound.contains_key(&contained_vertices) {
+				compound.get_mut(&contained_vertices).unwrap().1.extend(facet.subs.clone());
+			} else {
+				compound.insert(contained_vertices,(current,facet.subs.clone()));
+				current+=1;
+			}
+			i+=1;
+		}
+		let mut compound_ordered = compound.iter().map(|x| x.1).collect::<Vec<&(usize,Subelements)>>();
+		compound_ordered.sort_by(|a,b| a.0.cmp(&b.0));
+		compound_ordered.iter().for_each(|x| builder.push_subs(x.1.clone()));
+		
+		builder.push_max();
+		unsafe { Self::new(self.vertices.clone(),builder.build()) }
+	}
 }
 
 #[cfg(test)]
@@ -1187,7 +1427,7 @@ mod tests {
     use approx::abs_diff_eq;
 
     /// Tests that a polytope has an expected volume.
-    fn test_volume(mut poly: Concrete<f32>, volume: Option<f32>) {
+    fn test_volume(mut poly: Concrete, volume: Option<f64>) {
         poly.element_sort();
 
         if let Some(poly_volume) = poly.volume() {
@@ -1197,7 +1437,7 @@ mod tests {
             ));
 
             assert!(
-                abs_diff_eq!(poly_volume, volume, epsilon = f32::EPS),
+                abs_diff_eq!(poly_volume, volume, epsilon = f64::EPS),
                 "Expected volume {} for {}, found volume {}.",
                 volume,
                 "TBA: name",
@@ -1226,13 +1466,13 @@ mod tests {
         test_volume(Concrete::dyad(), Some(1.0));
     }
 
-    fn polygon_area(n: usize, d: usize) -> f32 {
-        let n = n as f32;
-        let d = d as f32;
-        n * (d * f32::TAU / n).sin() / 2.0
+    fn polygon_area(n: usize, d: usize) -> f64 {
+        let n = n as f64;
+        let d = d as f64;
+        n * (d * f64::TAU / n).sin() / 2.0
     }
 
-    fn test_compound(mut p: Concrete<f32>, volume: Option<f32>) {
+    fn test_compound(mut p: Concrete, volume: Option<f64>) {
         p.comp_append(p.clone());
         test_volume(p, volume)
     }
@@ -1254,7 +1494,7 @@ mod tests {
         }
     }
 
-    fn polygons_areas() -> (Vec<Concrete<f32>>, Vec<f32>) {
+    fn polygons_areas() -> (Vec<Concrete>, Vec<f64>) {
         let mut polygons = Vec::new();
         let mut areas = Vec::new();
         for n in 2..=5 {
@@ -1328,7 +1568,7 @@ mod tests {
         for n in 1..=6 {
             test_volume(
                 Concrete::simplex(n),
-                Some((n as f32 / (1 << (n - 1)) as f32).sqrt() / crate::factorial(n - 1) as f32),
+                Some((n as f64 / (1 << (n - 1)) as f64).sqrt() / crate::factorial(n - 1) as f64),
             );
         }
     }
@@ -1345,7 +1585,7 @@ mod tests {
         for n in 1..=6 {
             test_volume(
                 Concrete::orthoplex(n),
-                Some(1.0 / crate::factorial(n - 1) as f32),
+                Some(((1 << (n - 1)) as f64).sqrt() / crate::factorial(n - 1) as f64),
             );
         }
     }

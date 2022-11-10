@@ -1,0 +1,10 @@
+[
+Special(Prism(3,1)),
+Special(Antiprism(4,1)),
+UnloadedFolder(name:"Regular"),
+UnloadedFolder(name:"Quasiregular"),
+UnloadedFolder(name:"Truncate"),
+UnloadedFolder(name:"Trapezivert"),
+UnloadedFolder(name:"Omnitruncate"),
+UnloadedFolder(name:"Snub")
+]

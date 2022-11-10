@@ -106,7 +106,7 @@ impl Mul<CameraInputEvent> for f32 {
 
 impl CameraInputEvent {
     fn rotate(vec: Vec2, anchor_tf: &mut Transform) {
-        anchor_tf.rotate(Quat::from_euler(EulerRot::YXZ, vec.x, vec.y, 0.0));
+        anchor_tf.rotate(Quat::from_euler(EulerRot::YXZ, vec.x, vec.y, 0.));
     }
 
     fn translate(vec: Vec3, anchor_tf: &mut Transform, cam_gtf: &GlobalTransform) {
@@ -114,18 +114,18 @@ impl CameraInputEvent {
     }
 
     fn roll(roll: f32, anchor_tf: &mut Transform) {
-        anchor_tf.rotate(Quat::from_euler(EulerRot::YXZ, 0.0, 0.0, roll));
+        anchor_tf.rotate(Quat::from_euler(EulerRot::YXZ, 0., 0., roll));
     }
 
     /// Zooms into the camera.
     fn zoom(zoom: f32, cam_tf: &mut Transform) {
         cam_tf.translation.z += zoom * cam_tf.translation.length();
-        cam_tf.translation.z = cam_tf.translation.z.max(0.2);
+        cam_tf.translation.z = cam_tf.translation.z.max(0.05).min(400.);
     }
 
     /// Resets the camera to the default position.
     pub fn reset(anchor_tf: &mut Transform, cam_tf: &mut Transform) {
-        *cam_tf = Transform::from_translation(Vec3::new(0.0, 0.0, 5.0));
+        *cam_tf = Transform::from_translation(Vec3::new(0., 0., 5.));
         *anchor_tf = Transform::from_translation(Vec3::new(0.02, -0.025, -0.05))
             * Transform::from_translation(Vec3::new(-0.02, 0.025, 0.05))
                 .looking_at(Vec3::default(), Vec3::Y);
@@ -154,14 +154,16 @@ impl CameraInputEvent {
         ctx: &CtxRef,
     ) -> (f32, f32) {
         // TODO: make the spin rate modifiable in preferences.
-        const SPIN_RATE: f32 = std::f32::consts::TAU / 5.0;
+        const SPIN_RATE: f32 = std::f32::consts::TAU / 5.;
         const ROLL: CameraInputEvent = CameraInputEvent::Roll(SPIN_RATE);
 
         let real_scale = time.delta_seconds();
         let scale = if keyboard.pressed(KeyCode::LControl) | keyboard.pressed(KeyCode::RControl) {
-            real_scale * 3.0
+            real_scale * 1.5
+        } else if keyboard.pressed(KeyCode::LShift) | keyboard.pressed(KeyCode::RShift) {
+            real_scale / 4.
         } else {
-            real_scale
+            real_scale / 1.5
         };
 
         let fb = Self::Translate(Vec3::Z);
@@ -171,15 +173,15 @@ impl CameraInputEvent {
         if !ctx.wants_keyboard_input() {
             for keycode in keyboard.get_pressed() {
                 cam_inputs.send(match keycode {
-                    KeyCode::W | KeyCode::Up => -scale * fb,
-                    KeyCode::S | KeyCode::Down => scale * fb,
-                    KeyCode::D | KeyCode::Right => scale * lr,
-                    KeyCode::A | KeyCode::Left => -scale * lr,
-                    KeyCode::Space => scale * ud,
-                    KeyCode::LShift | KeyCode::RShift => -scale * ud,
-                    KeyCode::Q => real_scale * ROLL,
-                    KeyCode::E => -real_scale * ROLL,
-                    KeyCode::R => Self::Reset,
+                    KeyCode::S => -scale * ud,
+                    KeyCode::W => scale * ud,
+                    KeyCode::A => -scale * lr,
+                    KeyCode::D => scale * lr,
+                    KeyCode::R => -scale * fb,
+                    KeyCode::F => scale * fb,
+                    KeyCode::Q => scale * -1.2 * ROLL,
+                    KeyCode::E => scale * 1.2 * ROLL,
+                    KeyCode::X => Self::Reset,
                     _ => continue,
                 })
             }
@@ -192,16 +194,15 @@ impl CameraInputEvent {
     fn cam_events_from_mouse(
         mouse_button: &Input<MouseButton>,
         mut mouse_move: EventReader<'_, '_, MouseMotion>,
-        width: f32,
         height: f32,
         real_scale: f32,
         cam_inputs: &mut EventWriter<'_, '_, Self>,
     ) {
-        if mouse_button.pressed(MouseButton::Right) {
+        if mouse_button.pressed(MouseButton::Left) || mouse_button.pressed(MouseButton::Right) {
             for MouseMotion { mut delta } in mouse_move.iter() {
-                delta.x /= width;
+                delta.x /= height;
                 delta.y /= height;
-                cam_inputs.send(Self::RotateAnchor(-100.0 * real_scale * delta))
+                cam_inputs.send(Self::RotateAnchor(-800. * real_scale * delta))
             }
         }
     }
@@ -214,8 +215,8 @@ impl CameraInputEvent {
     ) {
         for MouseWheel { unit, y, .. } in mouse_wheel.iter() {
             let unit_scale = match unit {
-                MouseScrollUnit::Line => 12.0,
-                MouseScrollUnit::Pixel => 1.0,
+                MouseScrollUnit::Line => 12.,
+                MouseScrollUnit::Pixel => 1.,
             };
 
             cam_inputs.send(Self::Zoom(unit_scale * -scale * y))
@@ -235,12 +236,9 @@ fn add_cam_input_events(
     mut cam_inputs: EventWriter<'_, '_, CameraInputEvent>,
     egui_ctx: Res<'_, EguiContext>,
 ) {
-    let (width, height) = {
+    let height = {
         let primary_win = windows.get_primary().expect("There is no primary window");
-        (
-            primary_win.physical_width() as f32,
-            primary_win.physical_height() as f32,
-        )
+        primary_win.physical_height() as f32
     };
 
     let ctx = egui_ctx.ctx();
@@ -253,7 +251,6 @@ fn add_cam_input_events(
         CameraInputEvent::cam_events_from_mouse(
             &mouse_button,
             mouse_move,
-            width,
             height,
             real_scale,
             cam_inputs,

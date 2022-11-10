@@ -141,20 +141,24 @@ pub trait Polytope:
     fn polygon(n: usize) -> Self;
 
     /// Builds a [duopyramid](https://polytope.miraheze.org/wiki/Pyramid_product)
-    /// from two polytopes.
+    /// of two polytopes.
     fn duopyramid(&self, p: &Self) -> Self;
 
     /// Builds a [duoprism](https://polytope.miraheze.org/wiki/Prism_product)
-    /// from two polytopes.
+    /// of two polytopes.
     fn duoprism(&self, p: &Self) -> Self;
 
     /// Builds a [duotegum](https://polytope.miraheze.org/wiki/Tegum_product)
-    /// from two polytopes.
+    /// of two polytopes.
     fn duotegum(&self, p: &Self) -> Self;
 
     /// Builds a [duocomb](https://polytope.miraheze.org/wiki/Honeycomb_product)
-    /// from two polytopes.
+    /// of two polytopes.
     fn duocomb(&self, p: &Self) -> Self;
+
+    /// Builds a [star product](https://en.wikipedia.org/wiki/Star_product)
+    /// of two polytopes.
+    fn star_product(&self, p: &Self) -> Self;
 
     /// Builds a [pyramid](https://polytope.miraheze.org/wiki/Pyramid) from a
     /// given base.
@@ -238,13 +242,7 @@ pub trait Polytope:
 
     /// Builds an [orthoplex](https://polytope.miraheze.org/wiki/Orthoplex) with
     /// a given rank.
-    fn orthoplex(rank: usize) -> Self {
-        if rank == 0 {
-            Self::nullitope()
-        } else {
-            Self::multitegum(iter::repeat(&Self::dyad()).take(rank - 1))
-        }
-    }
+    fn orthoplex(rank: usize) -> Self;
 
     /// Builds a regular [octahedron](https://polytope.miraheze.org/wiki/Octahedron).
     fn octahedron() -> Self {
@@ -275,18 +273,7 @@ pub trait Polytope:
     fn element(&self, rank: usize, idx: usize) -> Option<Self>;
 
     /// Gets the element figure with a given rank and index as a polytope.
-    fn element_fig(&self, rank: usize, idx: usize) -> Result<Option<Self>, Self::DualError> {
-        if rank <= self.rank() {
-            // todo: this is quite inefficient for a small element figure since
-            // we take the dual of the entire thing.
-            if let Some(mut element_fig) = self.try_dual()?.element(self.rank() - rank, idx) {
-                element_fig.try_dual_mut()?;
-                return Ok(Some(element_fig));
-            }
-        }
-
-        Ok(None)
-    }
+    fn element_fig(&self, rank: usize, idx: usize) -> Result<Option<Self>, Self::DualError>;
 
     /// Gets the section defined by two elements with given ranks and indices as
     /// a polytope, or returns `None` in case no section is defined by these
@@ -328,6 +315,9 @@ pub trait Polytope:
         }
     }
 
+    /// Makes a polytope strongly connected. Splits compounds into their components.
+    fn defiss(&self) -> Vec<Self>;
+
     /// Builds a Petrial in place. Returns `true` if successful. Does not modify
     /// the original polytope otherwise.
     fn petrial_mut(&mut self) -> bool;
@@ -339,7 +329,7 @@ pub trait Polytope:
         clone.petrial_mut().then(|| clone)
     }
 
-    /// Returns the indices of the vertices of a Petrial polygon in cyclic
+    /// Returns the indices of the vertices of a Petrie polygon in cyclic
     /// order, or `None` if it self-intersects.
     ///
     /// # Panics
@@ -347,20 +337,20 @@ pub trait Polytope:
     fn petrie_polygon_vertices(&self, flag: Flag) -> Option<Vec<usize>> {
         let rank = self.rank();
         let mut new_flag = flag.clone();
-        let first_vertex = flag[0];
+        let first_vertex = flag[1];
         let mut vertices = Vec::new();
         let mut vertex_hash = HashSet::new();
 
         assert!(self.abs().sorted());
 
         loop {
-            // Applies 0-changes up to (rank-1)-changes in order.
-            for idx in 0..rank {
+            // Applies 1-changes up to (rank-1)-changes in order.
+            for idx in 1..rank {
                 new_flag.change_mut(self.abs(), idx);
             }
 
             // If we just hit a previous vertex, we return.
-            let new_vertex = new_flag[0];
+            let new_vertex = new_flag[1];
             if vertex_hash.contains(&new_vertex) {
                 return None;
             }
@@ -391,10 +381,12 @@ pub trait Polytope:
         let mut idx = 0;
         flag.push(0);
 
-        for r in 0..rank {
-            idx = self[(r, idx)].sups[0];
+        for r in (1..=rank).rev() {
+            idx = self[(r, idx)].subs[0];
             flag.push(idx);
         }
+
+        flag.reverse();
 
         flag
     }
@@ -450,6 +442,9 @@ pub trait Polytope:
     /// based on a given polytope. If it fails, it returns the index of a facet
     /// through the inversion center.
     fn try_antiprism(&self) -> Result<Self, Self::DualError>;
+
+    /// Splits compound faces into their components.
+    fn untangle_faces(&mut self);
 
     /// Determines whether a given polytope is
     /// [orientable](https://polytope.miraheze.org/wiki/Orientability).

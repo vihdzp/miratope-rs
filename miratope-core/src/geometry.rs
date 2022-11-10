@@ -17,10 +17,14 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use crate::float::Float;
+use crate::{
+    float::Float,
+    ElementMap, conc::Concrete, abs::Ranked, Polytope,
+};
 
 use approx::{abs_diff_eq, abs_diff_ne};
 use nalgebra::{allocator::Allocator, DefaultAllocator, Dim, Dynamic, OMatrix, U1};
+use vec_like::VecLike;
 
 /// A hypersphere with a certain center and radius.
 ///
@@ -41,7 +45,7 @@ impl<T: Float> Hypersphere<T> {
     /// Returns the radius of the hypersphere, or `NaN` if its squared radius is
     /// negative.
     pub fn radius(&self) -> T {
-        self.squared_radius.fsqrt()
+        ordered_float::Float::sqrt(self.squared_radius)
     }
 
     /// Constructs a hypersphere with a given dimension and radius,
@@ -94,6 +98,7 @@ impl<T: Float> Hypersphere<T> {
 ///
 /// TODO: Use asserts to guarantee that the basis is an orthogonal basis of unit
 /// vectors.
+#[derive(Clone,)]
 pub struct Subspace<T: Float> {
     /// An orthogonal basis for the subspace, defined by unit vectors.
     pub basis: Vec<Vector<T>>,
@@ -241,6 +246,11 @@ impl<T: Float> Subspace<T> {
     pub fn distance(&self, p: &Point<T>) -> T {
         (p - self.project(p)).norm()
     }
+	
+    /// Returns whether a point is contained on the subspace.
+    pub fn is_outer(&self, p: &Point<T>) -> bool {
+        abs_diff_eq!(self.distance(p), T::ZERO, epsilon = T::EPS)
+    }
 
     /// Computes a normal vector to the subspace, so that the specified point is
     /// left out of it. Returns `None` if the point given lies on the subspace.
@@ -254,6 +264,27 @@ impl<T: Float> Subspace<T> {
         todo!()
     } */
 }
+
+impl Concrete {
+    /// Computes the affine hull of an element.
+    pub fn affine_hull(&self, rank: usize, idx: usize) -> Subspace<f64> {
+        Subspace::from_points(
+            &mut self.element(rank, idx).unwrap().vertices.iter(),
+        )
+    }
+
+    /// Computes the affine hulls of all elements and puts them in an `ElementMap`.
+    pub fn element_map_affine_hulls(&self) -> ElementMap<Subspace<f64>> {
+        let mut element_map = ElementMap::new();
+        for r in 1..self.rank() {
+            element_map.push(Vec::new());
+            for (idx, _el) in self[r].iter().enumerate() {
+                element_map[r-1].push(self.affine_hull(r, idx));
+            }
+        }
+        element_map
+    }
+} 
 
 /// Represents an (oriented) hyperplane together with a normal vector.
 pub struct Hyperplane<T: Float> {

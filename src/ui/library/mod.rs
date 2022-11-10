@@ -6,7 +6,7 @@ use std::{
     path::PathBuf,
 };
 
-use super::config::LibPath;
+use super::{config::LibPath, main_window::PolyName};
 use crate::Concrete;
 use miratope_core::file::FromFile;
 use special::*;
@@ -23,8 +23,7 @@ pub struct LibraryPlugin;
 impl Plugin for LibraryPlugin {
     fn build(&self, app: &mut App) {
         // This must run after the Config resource has been added.
-        let lib_path = &app.world.get_resource::<LibPath>().unwrap();
-        let library = Library::new_folder(lib_path);
+        let library = Library::new_folder(&LibPath::default());
 
         // The library must be shown after the top panel, to avoid incorrect
         // positioning.
@@ -190,13 +189,6 @@ impl Library {
                 }
             }
 
-            // We cache these contents for future use.
-            if fs::write(path.join(".folder"), ron::to_string(&contents).unwrap()).is_ok() {
-                println!(".folder file overwritten!");
-            } else {
-                println!(".folder file could not be overwritten!");
-            }
-
             Ok(contents)
         }
     }
@@ -255,13 +247,14 @@ impl Library {
 fn show_library(
     egui_ctx: Res<'_, EguiContext>,
     mut query: Query<'_, '_, &mut Concrete>,
+    mut poly_name: ResMut<'_, PolyName>,
     mut library: ResMut<'_, Option<Library>>,
     lib_path: Res<'_, LibPath>,
 ) {
     // Shows the polytope library.
     if let Some(library) = library.as_mut() {
-        egui::SidePanel::left("side_panel")
-            .default_width(350.0)
+        egui::SidePanel::left("left_panel")
+            .default_width(300.0)
             .max_width(450.0)
             .show(egui_ctx.ctx(), |ui| {
                 egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
@@ -271,13 +264,20 @@ fn show_library(
 
                         // Loads a selected file.
                         ShowResult::Load(file) => match Concrete::from_path(&file) {
-                            Ok(q) => *query.iter_mut().next().unwrap() = q,
+                            Ok(q) => {
+                                *query.iter_mut().next().unwrap() = q;
+                                let path_buf = PathBuf::from(file);
+                                let file_name = path_buf.file_name().unwrap().to_str().unwrap();
+                                poly_name.0 = file_name[..file_name.len()-4].into();
+                            },
                             Err(err) => eprintln!("File open failed: {}", err),
                         },
 
                         // Loads a special polytope.
                         ShowResult::Special(special) => {
-                            *query.iter_mut().next().unwrap() = special.load()
+                            let (a, b) = special.load();
+                            *query.iter_mut().next().unwrap() = a;
+                            poly_name.0 = b;
                         }
                     }
                 })

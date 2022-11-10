@@ -1,6 +1,6 @@
 [package]
 name = "miratope-core"
-version = "0.1.0"
+version = "0.4.15"
 edition = "2018"
 
 [dependencies]
@@ -11,6 +11,7 @@ gcd = "2.0"
 itertools = "0.10"
 nalgebra = { version = "0.29", features = ["serde-serialize"] }
 ordered-float = "2.4"
+partitions = "0.2.4"
 petgraph = "0.6"
 rayon = "1.5"
 ron = "0.6"
@@ -20,4 +21,3 @@ strum_macros = "0.21"
 unchecked_unwrap = "3"
 xml-rs = "0.8"
 zip = "0.5"
-

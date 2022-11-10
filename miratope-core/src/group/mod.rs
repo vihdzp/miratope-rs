@@ -147,7 +147,7 @@ impl<T: Float> Group<Cyclic<Matrix<T>>> {
     }
 }
 
-impl<T: Float> Group<GenIter<Matrix<T>>> {
+impl Group<GenIter<Matrix<f64>>> {
     /// Parses a diagram and turns it into a Coxeter group.
     pub fn parse(input: &str) -> CdResult<Option<Self>> {
         GenIter::parse(input).map(|gens| gens.map(Into::into))
@@ -201,7 +201,7 @@ impl<T: GroupItem> Group<array::IntoIter<T, 2>> {
     /// # Safety
     /// The generator must be an involution.
     pub unsafe fn two(dim: T::Dim, gen: T) -> Self {
-        Self::new(dim, array::IntoIter::new([T::id(dim), gen]))
+        Self::new(dim, IntoIterator::into_iter([T::id(dim), gen]))
     }
 }
 
@@ -376,7 +376,7 @@ impl<T: Float, I: Iterator<Item = Matrix<T>>> Group<I> {
                 .filter_map(|(alpha, q), (beta, r)| {
                     (alpha.eq(beta)).then(|| {
                         let prod = mat_from_quats(q.quaternion(), r.quaternion());
-                        array::IntoIter::new([-&prod, prod])
+                        IntoIterator::into_iter([-&prod, prod])
                     })
                 })
                 .flatten(),
@@ -493,7 +493,7 @@ fn mat_from_quats<T: Float>(q: &Quaternion<T>, r: &Quaternion<T>) -> Matrix<T> {
         4,
         4,
         // q, q * i, q * j, q * k.
-        array::IntoIter::new([
+        IntoIterator::into_iter([
             *q,
             [q.w, q.k, -q.j, -q.i].into(),
             [-q.k, q.w, q.i, -q.j].into(),
@@ -501,7 +501,7 @@ fn mat_from_quats<T: Float>(q: &Quaternion<T>, r: &Quaternion<T>) -> Matrix<T> {
         ])
         .map(|q| {
             let arr = (q * r).coords.data.0[0];
-            array::IntoIter::new([arr[3], arr[0], arr[1], arr[2]])
+            IntoIterator::into_iter([arr[3], arr[0], arr[1], arr[2]])
         })
         .flatten(),
     )
@@ -534,7 +534,7 @@ mod tests {
     use gcd::Gcd;
 
     /// Tests a given symmetry group.
-    fn test<I: Iterator<Item = Matrix<f32>>>(
+    fn test<I: Iterator<Item = Matrix<f64>>>(
         group: Group<I>,
         order: usize,
         rot_order: usize,
@@ -561,7 +561,7 @@ mod tests {
     }
 
     /// Parses a CD and unwraps it.
-    fn parse_unwrap(input: &str) -> Group<GenIter<Matrix<f32>>> {
+    fn parse_unwrap(input: &str) -> Group<GenIter<Matrix<f64>>> {
         Group::parse(input).unwrap().unwrap()
     }
 
@@ -655,7 +655,7 @@ mod tests {
         }
     }
 
-    /// Tests the BC*n* symmetries, which correspond to the symmetries of the
+    /// Tests the B*n* symmetries, which correspond to the symmetries of the
     /// regular hypercube and orthoplex.
     #[test]
     fn hypercube() {

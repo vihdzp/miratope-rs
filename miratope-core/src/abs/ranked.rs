@@ -50,7 +50,7 @@ impl<T> IndexMut<(usize, usize)> for ElementMap<T> {
 /// refers to any element that's incident and of lesser rank than another. We
 /// instead use the term **recursive subelement** for the standard mathematical
 /// notion.
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct Subelements(Vec<usize>);
 impl_veclike!(Subelements, Item = usize);
@@ -101,7 +101,7 @@ impl From<Superelements> for Element {
 }
 
 impl Element {
-    /// Initializes a new element with no subelements and no superelements.
+    /// Initializes a new element.
     pub fn new(subs: Subelements, sups: Superelements) -> Self {
         Self { subs, sups }
     }
@@ -137,9 +137,9 @@ impl Element {
 /// A list of [`Elements`](Element) of the same rank.
 ///
 /// Internally, this is just a wrapper around a `Vec<Element>`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct ElementList(Vec<Element>);
+pub struct ElementList(pub Vec<Element>);
 impl_veclike!(ElementList, Item = Element);
 
 impl<'a> rayon::iter::IntoParallelIterator for &'a mut ElementList {
@@ -286,7 +286,7 @@ pub type ElementIntoIter = iter::Flatten<iter::Map<vec::IntoIter<ElementList>, I
 ///
 /// Contrary to [`Abstract`], there's no requirement that the elements in
 /// `Ranks` form a valid polytope.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct Ranks(Vec<ElementList>);
 impl_veclike!(Ranks, Item = ElementList);
 

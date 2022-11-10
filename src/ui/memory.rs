@@ -1,19 +1,18 @@
 //! Manages the memory tab.
 
-use bevy::prelude::Query;
-use bevy_egui::egui;
+use bevy::prelude::{Query, Res, ResMut};
+use bevy_egui::{egui, EguiContext};
 
 use crate::Concrete;
 
-/// The compile-time number of slots of memory.
-pub const MEMORY_SLOTS: usize = 8;
+use super::main_window::PolyName;
 
 /// Represents the memory slots to store polytopes.
 #[derive(Default)]
-pub struct Memory([Option<Concrete>; MEMORY_SLOTS]);
+pub struct Memory(pub Vec<Option<(Concrete, Option<String>)>>);
 
 impl std::ops::Index<usize> for Memory {
-    type Output = Option<Concrete>;
+    type Output = Option<(Concrete, Option<String>)>;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.0[index]
@@ -22,63 +21,112 @@ impl std::ops::Index<usize> for Memory {
 
 /// The label for the `n`-th memory slot.
 pub fn slot_label(n: usize) -> String {
-    format!("Slot {}", n + 1)
+    format!("polytope {}", n)
 }
 
 impl Memory {
+    /// Returns the length of the memory vector.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     /// Returns an iterator over the memory slots.
-    pub fn iter(&self) -> std::slice::Iter<'_, Option<Concrete>> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Option<(Concrete, Option<String>)>> {
         self.0.iter()
     }
 
+    /// Appends an element.
+    pub fn push(&mut self, a: (Concrete, Option<String>)) {
+        self.0.push(Some(a));
+    }
+
     /// Shows the memory menu in a specified Ui.
-    pub fn show(&mut self, ui: &mut egui::Ui, query: &mut Query<'_, '_, &mut Concrete>) {
-        egui::menu::menu(ui, "Memory", |ui| {
-            for (idx, slot) in self.0.iter_mut().enumerate() {
-                match slot {
-                    // Shows an empty slot.
-                    None => {
-                        egui::CollapsingHeader::new("Empty")
-                            .id_source(idx)
-                            .show(ui, |ui| {
+    pub fn show(&mut self, query: &mut Query<'_, '_, &mut Concrete>, poly_name: &mut ResMut<'_, PolyName>, egui_ctx: &Res<'_, EguiContext>, open: &mut bool) {
+        egui::Window::new("Memory")
+            .open(open)
+            .scroll(true)
+            .default_width(260.0)
+            .show(egui_ctx.ctx(), |ui| {
+            egui::containers::ScrollArea::auto_sized().show(ui, |ui| {
+                
+                ui.horizontal(|ui| {
+                    if ui.button("Clear memory").clicked() {
+                        self.0.clear();
+                    }
+        
+                    if ui.button("Add slot").clicked() {
+                        self.0.push(None);
+                    }
+                });
+    
+                ui.separator();
+    
+                for (idx, slot) in self.0.iter_mut().enumerate() {
+                    match slot {
+                        // Shows an empty slot.
+                        None => {
+                            ui.horizontal(|ui| {
+                                ui.label(format!("{}:", idx));
+                                ui.label("Empty");
+
                                 if ui.button("Save").clicked() {
                                     if let Some(p) = query.iter_mut().next() {
-                                        *slot = Some(p.clone());
+                                        *slot = Some((p.clone(), Some(poly_name.0.clone())));
                                     }
                                 }
-                            });
-                    }
+                             });
+                        }
 
-                    // Shows a slot with a polytope on it.
-                    Some(poly) => {
-                        let clear = egui::CollapsingHeader::new(slot_label(idx))
-                            .id_source(idx)
-                            .show(ui, |ui| {
+                        // Shows a slot with a polytope on it.
+                        Some((poly, label)) => {
+                            let mut clear = false;
+
+                            ui.horizontal(|ui| {
+                                ui.label(format!("{}:", idx));
+                                let name = match label {
+                                    None => {
+                                        slot_label(idx)
+                                    }
+                                    
+                                    Some(name) => {
+                                        name.to_string()
+                                    }
+                                };
+
+                                ui.label(&name);
+
                                 // Clones a polytope from memory.
                                 if ui.button("Load").clicked() {
                                     *query.iter_mut().next().unwrap() = poly.clone();
+                                    poly_name.0 = name.clone();
                                 }
 
                                 // Swaps the current polytope with the one on memory.
                                 if ui.button("Swap").clicked() {
                                     std::mem::swap(query.iter_mut().next().unwrap().as_mut(), poly);
+                                    *label = Some(poly_name.0.clone());
+                                    poly_name.0 = name;
                                 }
 
                                 // Clones a polytope into memory.
                                 if ui.button("Save").clicked() {
                                     *poly = query.iter_mut().next().unwrap().clone();
+                                    *label = Some(poly_name.0.clone());
                                 }
 
                                 // Clears a polytope from memory.
-                                ui.button("Clear").clicked()
+                                if ui.button("Clear").clicked() {
+                                    clear = true;
+                                }
                             });
 
-                        if clear.body_returned == Some(true) {
-                            *slot = None;
+                            if clear {
+                                *slot = None;
+                            }
                         }
                     }
                 }
-            }
+            });
         });
     }
 }

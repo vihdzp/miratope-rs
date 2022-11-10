@@ -5,8 +5,8 @@ members = ["miratope-core", "vec-like"]
 name = "miratope"
 description = "A polytope renderer and builder."
 license = "MIT"
-version = "0.1.0"
-repository = "https://github.com/vihdzp/miratope-rs"
+version = "0.4.15"
+repository = "https://github.com/galoomba1/miratope-rs"
 keywords = ["polytope", "dimension", "geometry"]
 authors = [
     "Violeta Hernández <vi.hdz.p@gmail.com>",
@@ -21,6 +21,7 @@ vec-like = { path = "vec-like" }
 approx = "0.5"
 directories = "4.0"
 lyon = "0.17"
+ordered-float = "2.4"
 rfd = "0.5"
 ron = "0.6"
 serde = { version = "1.0", features = ["derive"] }

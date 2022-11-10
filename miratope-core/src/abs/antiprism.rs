@@ -189,6 +189,12 @@ pub(super) fn antiprism_and_vertices(p: &Abstract) -> (Abstract, Vec<usize>, Vec
         section_map = new_section_map;
     }
 
+    // In the case of a point, the code to get vertex indices never gets run, so we do it manually.
+    if rank == 1 {
+        vertices.push(0);
+        dual_vertices.push(1);
+    }
+
     // We built this backwards, so let's fix it.
     let builder: AbstractBuilder = backwards_res.into_iter().rev().collect();
 

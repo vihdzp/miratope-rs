@@ -1,11 +1,13 @@
-//! Contains the code that opens an OFF file and parses it into a polytope.
+//! The code that opens an OFF file and parses it into a polytope.
+//! Also the code that writes an OFF file of a polytope.
 
-use std::{collections::HashMap, fmt::Display, io::Error as IoError, path::Path, str::FromStr};
+use std::{collections::{HashMap, HashSet}, fmt::Display, io::Error as IoError, path::Path, str::FromStr};
+
+use super::Position;
 
 use crate::{
     abs::{AbstractBuilder, Ranked, SubelementList, Subelements},
     conc::{cycle::CycleList, Concrete},
-    float::Float,
     geometry::Point,
     Polytope, COMPONENTS, ELEMENT_NAMES,
 };
@@ -16,37 +18,8 @@ use vec_like::VecLike;
 const HEADER: &str = concat!(
     "Generated using Miratope v",
     env!("CARGO_PKG_VERSION"),
-    " (https://github.com/vihdzp/miratope-rs)"
+    " (https://github.com/galoomba1/miratope-rs)"
 );
-
-/// A position in a file.
-#[derive(Clone, Copy, Default, Debug)]
-pub struct Position {
-    /// The row index.
-    row: u32,
-
-    /// The column index.
-    column: u32,
-}
-
-impl Position {
-    /// Increments the column number by 1.
-    pub fn next(&mut self) {
-        self.column += 1;
-    }
-
-    /// Increments the row number by 1, resets the column number.
-    pub fn next_line(&mut self) {
-        self.row += 1;
-        self.column = 0;
-    }
-}
-
-impl Display for Position {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "row {}, column {}", self.row + 1, self.column + 1)
-    }
-}
 
 /// Any error encountered while parsing an OFF file.
 #[derive(Clone, Copy, Debug)]
@@ -205,7 +178,7 @@ impl<'a> TokenIter<'a> {
                 idx = new_idx;
                 c = new_c;
             } else {
-                // We do this so that it seems ilke we read something at the end.
+                // We do this so that it seems like we read something at the end.
                 idx += 1;
                 break;
             }
@@ -301,11 +274,11 @@ impl<'a> OffReader<'a> {
     }
 
     /// Parses all vertex coordinates from the OFF file.
-    fn parse_vertices<T: Float>(
+    fn parse_vertices(
         &mut self,
         count: usize,
         dim: usize,
-    ) -> OffParseResult<Vec<Point<T>>> {
+    ) -> OffParseResult<Vec<Point<f64>>> {
         // Reads all vertices.
         let mut vertices = Vec::with_capacity(count);
 
@@ -375,6 +348,11 @@ impl<'a> OffReader<'a> {
             if rank != 3 {
                 faces.push(face);
             }
+
+            // Goes to the end of the line in order to ignore things like colour info.
+            if self.iter.position.column != 0 {
+                self.iter.comment = true;
+            }
         }
 
         // If this is a polygon, we add a single maximal element as a face.
@@ -406,6 +384,11 @@ impl<'a> OffReader<'a> {
             }
 
             els_subs.push(subs);
+
+            // Goes to the end of the line in order to ignore things like colour info.
+            if self.iter.position.column != 0 {
+                self.iter.comment = true;
+            }
         }
 
         Ok(els_subs)
@@ -422,7 +405,7 @@ impl<'a> OffReader<'a> {
     }*/
 
     /// Builds a concrete polytope from the OFF reader.
-    pub fn build<T: Float>(mut self) -> OffParseResult<Concrete<T>> {
+    pub fn build(mut self) -> OffParseResult<Concrete> {
         // Reads the rank of the polytope.
         let rank = self.rank()?;
 
@@ -530,18 +513,6 @@ pub enum OffWriteError {
     },
 }
 
-impl OffWriteError {
-    /// Returns the error in which two edges coincide. These must be ordered so
-    /// that we can run consistent tests on these.
-    fn coincident_edges(mut idx0: usize, mut idx1: usize) -> Self {
-        if idx0 > idx1 {
-            std::mem::swap(&mut idx0, &mut idx1);
-        }
-
-        Self::CoincidentEdges { idx0, idx1 }
-    }
-}
-
 impl Display for OffWriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
@@ -562,22 +533,22 @@ impl std::error::Error for OffWriteError {}
 type OffWriteResult<T> = Result<T, OffWriteError>;
 
 /// An auxiliary struct to write a polytope to an OFF file.
-pub struct OffWriter<'a, T: Float> {
+pub struct OffWriter<'a> {
     /// The output OFF file, as a string. (Maybe we should use a file writer
     /// or something similar instead?)
     off: String,
 
     /// The polytope that we're converting into an OFF file.
-    poly: &'a Concrete<T>,
+    poly: &'a Concrete,
 
     /// Options for the text output.
     options: OffOptions,
 }
 
-impl<'a, T: Float> OffWriter<'a, T> {
+impl<'a> OffWriter<'a> {
     /// Initializes a new OFF writer from a polytope, with a given set of
     /// options.
-    pub fn new(poly: &'a Concrete<T>, options: OffOptions) -> Self {
+    pub fn new(poly: &'a Concrete, options: OffOptions) -> Self {
         Self {
             off: String::new(),
             poly,
@@ -624,14 +595,15 @@ impl<'a, T: Float> OffWriter<'a, T> {
         self.push_str("OFF\n");
     }
 
-    /// Checks that no two edges coincide.
+    /// Counts coincident edges.
     ///
     /// This should only be called for polytopes with rank at least 3.
-    fn check_edges(&self) -> OffWriteResult<()> {
-        use std::collections::hash_map::Entry::*;
-        let mut hash_edges = HashMap::new();
+    fn check_edges(&self) -> usize {
+        let mut hash_edges = HashSet::new();
 
-        for (idx0, edge) in self.poly[2].iter().enumerate() {
+        let mut coincident_edges = 0;
+
+        for edge in &self.poly[2] {
             let subs = &edge.subs;
             let mut edge = (subs[0], subs[1]);
 
@@ -640,16 +612,14 @@ impl<'a, T: Float> OffWriter<'a, T> {
                 std::mem::swap(&mut edge.0, &mut edge.1);
             }
 
-            // We verify no other edge has the same vertices.
-            match hash_edges.entry(edge) {
-                Occupied(entry) => return Err(OffWriteError::coincident_edges(idx0, *entry.get())),
-                Vacant(entry) => {
-                    entry.insert(idx0);
-                }
+            // We check if another edge has the same vertices.
+            if hash_edges.contains(&edge) {
+                coincident_edges += 1;
+            } else {
+                hash_edges.insert(edge);
             }
         }
-
-        Ok(())
+        coincident_edges
     }
 
     /// Writes the polytope's element counts into an OFF file.
@@ -691,8 +661,13 @@ impl<'a, T: Float> OffWriter<'a, T> {
                 // Swaps edges and faces because OFF format bad.
                 self.push(' ');
                 self.push_to_str(self.el_count(3));
+
+                let coincident_edges = self.check_edges();
                 self.push(' ');
-                self.push_to_str(self.el_count(2));
+                self.push_to_str(self.el_count(2) - coincident_edges);
+                if coincident_edges > 0 {
+                    println!("Warning: Polytope contains coincident edges. They will be merged in the OFF file.");
+                }
 
                 for r in 4..rank {
                     self.push(' ');
@@ -817,9 +792,6 @@ impl<'a, T: Float> OffWriter<'a, T> {
             return Ok(self.off);
         }
 
-        // Checks that no two edges coincide.
-        self.check_edges()?;
-
         // Adds the element counts.
         self.write_el_counts();
 
@@ -877,10 +849,14 @@ impl std::error::Error for OffSaveError {}
 type OffSaveResult<T> = Result<T, OffSaveError>;
 
 //todo: put this in its own trait
-impl<T: Float> Concrete<T> {
+impl Concrete {
     /// Converts a polytope into an OFF file.
     pub fn to_off(&self, options: OffOptions) -> OffWriteResult<String> {
-        OffWriter::new(self, options).build()
+        let mut fixed = self.clone();
+        fixed.untangle_faces();
+        fixed.element_sort();
+
+        OffWriter::new(&fixed, options).build()
     }
 
     /// Writes a polytope's OFF file in a specified file path.
@@ -899,13 +875,13 @@ mod tests {
     /// Tests a particular OFF file.
     fn test_off_file<I: IntoIterator<Item = usize> + Clone>(src: &str, element_counts: I) {
         // Checks that element counts match up.
-        let poly = Concrete::<f32>::from_off(src).expect("OFF file could not be loaded.");
+        let poly = Concrete::from_off(src).expect("OFF file could not be loaded.");
         test(&poly, element_counts.clone());
 
         // Checks that the polytope can be reloaded correctly.
         const ERR: &str = "OFF file could not be reloaded.";
         test(
-            &Concrete::<f32>::from_off(&poly.to_off(Default::default()).expect(ERR)).expect(ERR),
+            &Concrete::from_off(&poly.to_off(Default::default()).expect(ERR)).expect(ERR),
             element_counts,
         );
     }
@@ -967,7 +943,7 @@ mod tests {
 
     /// Attempts to parse an OFF file, unwraps it.
     fn unwrap_off(src: &str) {
-        Concrete::<f32>::from_off(src).unwrap();
+        Concrete::from_off(src).unwrap();
     }
 
     /// An empty file should fail.
