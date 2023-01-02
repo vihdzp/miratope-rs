@@ -46,4 +46,6 @@ Miratope is written in Rust, so if you don't already have the latest version and
 
 Once you have completed all the steps you will only need to do step 4 to run Miratope from startup (but if the `[FILE PATH]` changes, you'll need to do step 3 again).
 
+There is currently an issue with the dependency `wgpu-core` not compiling on the latest version of Rust. The command `rustup default 1.59` to change to an older version should fix it. 
+
 If you have downloaded Miratope previously, updated to the most recent version, and are getting an error like "`error[E0710]: an unknown tool name found in scoped lint`" in the console, this means a crate that Miratope uses has gone out of date. Don't worry about what that means, just make sure your command line has the header pointed at Miratope (like in step 3), and type `rustup update` in the console. Cargo, Rust's built-in file handler, will automatically update all the crates Miratope uses which should fix the issue. If this still doesn't fix it, contact the devs in the `#miratope` channel on [Polytope Discord](https://discord.gg/zMRu7T4).
